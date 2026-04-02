@@ -1,0 +1,143 @@
+/* ── Overlay ──────────────────────────────────────────────────────────────────── */
+.hp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.hp-overlay--show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ── Modal card ───────────────────────────────────────────────────────────────── */
+.hp-modal {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  background: #1a1d23;
+  border-radius: 20px;
+  padding: 36px 32px 28px;
+  text-align: center;
+  overflow: hidden;
+  opacity: 0;
+  transform: scale(0.88) translateY(18px);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.28s ease;
+}
+.hp-overlay--show .hp-modal {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* ── Timer ring (top-right corner) ───────────────────────────────────────────── */
+.hp-timer {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+}
+.hp-timer svg { transform: rotate(-90deg); display: block; }
+.hp-timer__track { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 2.5; }
+.hp-timer__fill  { fill: none; stroke-width: 2.5; stroke-linecap: round; transition: stroke-dashoffset 0.1s linear; }
+.hp-timer__num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.65;
+  color: #fff;
+}
+
+/* ── Icon circle ──────────────────────────────────────────────────────────────── */
+.hp-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+/* ── Text ─────────────────────────────────────────────────────────────────────── */
+.hp-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
+}
+.hp-message {
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 26px;
+}
+
+/* ── OK button ────────────────────────────────────────────────────────────────── */
+.hp-ok-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 30px;
+  border: none;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s, transform 0.12s;
+}
+.hp-ok-btn:hover  { opacity: 0.85; transform: translateY(-1px); }
+.hp-ok-btn:active { transform: scale(0.97); }
+
+/* ── Progress bar (bottom) ────────────────────────────────────────────────────── */
+.hp-bar-track {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+}
+.hp-bar-fill {
+  height: 100%;
+  border-radius: 0 3px 3px 0;
+  transition: width 0.08s linear;
+}
+
+/* ── Variants ─────────────────────────────────────────────────────────────────── */
+.hp--success .hp-icon { background: rgba(15,110,86,0.25);  color: #5dcaa5; }
+.hp--success .hp-title { color: #5dcaa5; }
+.hp--success .hp-timer__fill { stroke: #5dcaa5; }
+.hp--success .hp-ok-btn  { background: #0f6e56; color: #9fe1cb; }
+.hp--success .hp-bar-fill { background: #5dcaa5; }
+
+.hp--error .hp-icon  { background: rgba(163,45,45,0.25);  color: #f09595; }
+.hp--error .hp-title { color: #f09595; }
+.hp--error .hp-timer__fill { stroke: #f09595; }
+.hp--error .hp-ok-btn  { background: #a32d2d; color: #f7c1c1; }
+.hp--error .hp-bar-fill { background: #f09595; }
+
+.hp--warning .hp-icon  { background: rgba(133,79,11,0.25);  color: #ef9f27; }
+.hp--warning .hp-title { color: #ef9f27; }
+.hp--warning .hp-timer__fill { stroke: #ef9f27; }
+.hp--warning .hp-ok-btn  { background: #854f0b; color: #fac775; }
+.hp--warning .hp-bar-fill { background: #ef9f27; }
+
+.hp--info .hp-icon  { background: rgba(24,95,165,0.25);  color: #85b7eb; }
+.hp--info .hp-title { color: #85b7eb; }
+.hp--info .hp-timer__fill { stroke: #85b7eb; }
+.hp--info .hp-ok-btn  { background: #185fa5; color: #b5d4f4; }
+.hp--info .hp-bar-fill { background: #85b7eb; }
