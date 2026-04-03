@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaStar, FaChartLine, FaUserCheck, FaTrophy, FaArrowUp, FaArrowDown } from 'react-icons/fa';
+import { FaStar, FaChartLine, FaUserCheck, FaTrophy, FaArrowUp, FaArrowDown,FaCheckCircle } from 'react-icons/fa';
 
 const Performance = ({ user }) => {
   const [performances] = useState([

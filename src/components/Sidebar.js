@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  FaTachometerAlt, FaUsers, FaCalendarCheck, FaMoneyBillWave, 
-  FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher, 
-  FaFileAlt, FaChartBar, FaCog, FaSignOutAlt, 
-  FaChevronLeft, FaChevronRight, FaBuilding, FaSitemap, 
+import {
+  FaTachometerAlt, FaUsers, FaCalendarCheck, FaMoneyBillWave,
+  FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
+  FaFileAlt, FaChartBar, FaCog, FaSignOutAlt,
+  FaChevronLeft, FaChevronRight, FaBuilding, FaSitemap,
   FaUserTag, FaDatabase, FaUserCircle, FaLeaf
 } from 'react-icons/fa';
 
@@ -37,9 +37,10 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
   ];
 
   const masterItems = [
-    { path: '/master/branches', icon: <FaBuilding />, label: 'Branches' },
-    { path: '/master/departments', icon: <FaSitemap />, label: 'Departments' },
-    { path: '/master/roles', icon: <FaUserTag />, label: 'Roles' },
+    { path: '/branch', icon: <FaBuilding />, label: 'Branches' },
+    { path: '/department', icon: <FaSitemap />, label: 'Departments' },
+    { path: '/role', icon: <FaUserTag />, label: 'Roles' },
+    { path: 'destination', icon: <FaUserTag />, label: 'Destination' },
   ];
 
   // Payroll section items

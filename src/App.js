@@ -16,17 +16,23 @@ import Documents from './pages/Documents';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Layout from './components/Layout';
-import { ToastContainer } from './components/Toast'; 
-import { STORAGE_KEYS } from './config/api.config'; 
+import Branch from './Masters/Branch';
+import Department from './Masters/Department';
+import Role from './Masters/Role';
+import Destination from './Masters/Destination';
+
+
+import { ToastContainer } from './components/Toast';
+import { STORAGE_KEYS } from './config/api.config';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser]         = useState(null);
-  const [loading, setLoading]                 = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // ✅ Use the same keys that Login.jsx saves
-    const token    = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);  // 'jwtToken'
+    const token = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);  // 'jwtToken'
     const userJson = localStorage.getItem(STORAGE_KEYS.USER_DATA);  // 'userData'
 
     if (token && userJson) {
@@ -85,17 +91,22 @@ function App() {
           element={isAuthenticated ? <Layout user={currentUser} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard"   element={<Dashboard    user={currentUser} />} />
-          <Route path="employees"   element={<Employees    user={currentUser} />} />
-          <Route path="attendance"  element={<Attendance   user={currentUser} />} />
-          <Route path="payroll"     element={<Payroll      user={currentUser} />} />
-          <Route path="leaves"      element={<LeaveManagement user={currentUser} />} />
-          <Route path="recruitment" element={<Recruitment  user={currentUser} />} />
-          <Route path="performance" element={<Performance  user={currentUser} />} />
-          <Route path="training"    element={<Training     user={currentUser} />} />
-          <Route path="documents"   element={<Documents    user={currentUser} />} />
-          <Route path="reports"     element={<Reports      user={currentUser} />} />
-          <Route path="settings"    element={<Settings     user={currentUser} />} />
+          <Route path="dashboard" element={<Dashboard user={currentUser} />} />
+          <Route path="employees" element={<Employees user={currentUser} />} />
+          <Route path="attendance" element={<Attendance user={currentUser} />} />
+          <Route path="payroll" element={<Payroll user={currentUser} />} />
+          <Route path="leaves" element={<LeaveManagement user={currentUser} />} />
+          <Route path="recruitment" element={<Recruitment user={currentUser} />} />
+          <Route path="performance" element={<Performance user={currentUser} />} />
+          <Route path="training" element={<Training user={currentUser} />} />
+          <Route path="documents" element={<Documents user={currentUser} />} />
+          <Route path="reports" element={<Reports user={currentUser} />} />
+          <Route path="settings" element={<Settings user={currentUser} />} />
+          <Route path="branch" element={<Branch user={currentUser} />} />
+          <Route path="department" element={<Department user={currentUser} />} />
+          <Route path="role" element={<Role user={currentUser} />} />
+          <Route path="destination" element={<Destination user={currentUser} />} />
+
         </Route>
       </Routes>
     </Router>
@@ -103,3 +114,5 @@ function App() {
 }
 
 export default App;
+
+
