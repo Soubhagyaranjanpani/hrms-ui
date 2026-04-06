@@ -6,14 +6,22 @@ const Role = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+
   const [formData, setFormData] = useState({
     roleName: "",
   });
 
   const [roleData, setRoleData] = useState([
-    { id: 1, roleName: "Admin", status: "y" },
-    { id: 2, roleName: "Doctor", status: "y" },
-    { id: 3, roleName: "Nurse", status: "y" },
+    { "id": 1, "roleName": "Admin", "status": "y" },
+    { "id": 2, "roleName": "Manager", "status": "y" },
+    { "id": 3, "roleName": "HR", "status": "y" },
+    { "id": 4, "roleName": "Developer", "status": "y" },
+    { "id": 5, "roleName": "Tester", "status": "y" },
+    { "id": 6, "roleName": "Accountant", "status": "y" },
+    { "id": 7, "roleName": "Support", "status": "y" }
   ]);
 
   // INPUT
@@ -43,6 +51,7 @@ const Role = () => {
 
     setFormData({ roleName: "" });
     setShowForm(false);
+    setCurrentPage(1); // reset to first page after add/edit
   };
 
   // EDIT
@@ -62,16 +71,43 @@ const Role = () => {
     setRoleData(updated);
   };
 
+  // Filtered data based on search
   const filteredRoles = roleData.filter((r) =>
     r.roleName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Pagination logic
+  const totalItems = filteredRoles.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
+  const currentRoles = filteredRoles.slice(startIndex, endIndex);
+
+  // Go to specific page
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  // Handle rows per page change
+  const handleRowsPerPageChange = (e) => {
+    setRowsPerPage(Number(e.target.value));
+    setCurrentPage(1);
+  };
+
+  // Reset to page 1 when search changes
+  const handleSearch = (e) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  };
+
   // ================= LIST =================
   if (!showForm) {
     return (
-      <div className="container mt-4">
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2 className="mb-0">Role Directory</h2>
+      <div className="container mt-1">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h2 className="mb-0" style={{ color: "#6366f1" }}>Role Directory</h2>
 
           <div className="d-flex gap-2">
             <input
@@ -79,7 +115,7 @@ const Role = () => {
               className="form-control"
               placeholder="Search by Role..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearch}
               style={{ width: "250px", borderRadius: "10px" }}
             />
 
@@ -88,7 +124,7 @@ const Role = () => {
               style={{
                 backgroundColor: "#6366f1",
                 color: "white",
-                borderRadius: "10px",
+                borderRadius: "20px",
                 padding: "8px 20px",
               }}
               onClick={() => setShowForm(true)}
@@ -116,82 +152,160 @@ const Role = () => {
                   <th>ACTION</th>
                 </tr>
               </thead>
-
               <tbody>
-                {filteredRoles.map((role, index) => (
-                  <tr key={role.id}>
-                    <td>{index + 1}</td>
-                    <td>{role.roleName}</td>
-
-                    {/* SAME TOGGLE */}
-                    <td>
-                      <div
-                        onClick={() => handleStatusToggle(role.id)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          cursor: "pointer",
-                        }}
-                      >
+                {currentRoles.length > 0 ? (
+                  currentRoles.map((role, index) => (
+                    <tr key={role.id}>
+                      <td>{startIndex + index + 1}</td>
+                      <td>{role.roleName}</td>
+                      <td>
                         <div
+                          onClick={() => handleStatusToggle(role.id)}
                           style={{
-                            width: "42px",
-                            height: "22px",
-                            borderRadius: "50px",
-                            backgroundColor:
-                              role.status === "y" ? "#2d6cdf" : "#ccc",
-                            position: "relative",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            cursor: "pointer",
                           }}
                         >
                           <div
                             style={{
-                              width: "18px",
-                              height: "18px",
-                              borderRadius: "50%",
-                              backgroundColor: "white",
-                              position: "absolute",
-                              top: "2px",
-                              left: role.status === "y" ? "22px" : "2px",
+                              width: "42px",
+                              height: "22px",
+                              borderRadius: "50px",
+                              backgroundColor:
+                                role.status === "y" ? "#2d6cdf" : "#ccc",
+                              position: "relative",
                             }}
-                          />
+                          >
+                            <div
+                              style={{
+                                width: "18px",
+                                height: "18px",
+                                borderRadius: "50%",
+                                backgroundColor: "white",
+                                position: "absolute",
+                                top: "2px",
+                                left: role.status === "y" ? "22px" : "2px",
+                              }}
+                            />
+                          </div>
+                          <span
+                            style={{
+                              color: role.status === "y" ? "#2d6cdf" : "#999",
+                              fontWeight: "600",
+                              fontSize: "13px",
+                            }}
+                          >
+                            {role.status === "y" ? "Active" : "Inactive"}
+                          </span>
                         </div>
-
-                        <span
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-sm"
                           style={{
-                            color:
-                              role.status === "y" ? "#2d6cdf" : "#999",
-                            fontWeight: "600",
-                            fontSize: "13px",
+                            backgroundColor:
+                              role.status === "y" ? "#6366f1" : "#ccc",
+                            color: "white",
+                            borderRadius: "10px",
+                            padding: "6px 10px",
+                            border: "none",
                           }}
+                          disabled={role.status !== "y"}
+                          onClick={() => handleEdit(role)}
                         >
-                          {role.status === "y" ? "Active" : "Inactive"}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td>
-                      <button
-                        className="btn btn-sm"
-                        style={{
-                          backgroundColor:
-                            role.status === "y" ? "#6366f1" : "#ccc",
-                          color: "white",
-                          borderRadius: "10px",
-                          padding: "6px 10px",
-                          border: "none",
-                        }}
-                        disabled={role.status !== "y"}
-                        onClick={() => handleEdit(role)}
-                      >
-                        <FaEdit />
-                      </button>
+                          <FaEdit />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="text-center py-4 text-muted">
+                      No roles found.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
+
+          {/* PAGINATION - exactly as shown in image */}
+          {totalItems > 0 && (
+            <div
+              style={{
+                borderTop: "1px solid #e5e7eb",
+                paddingTop: "15px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginTop: "1rem",
+                flexWrap: "wrap",
+                gap: "10px",
+              }}
+            >
+              <div style={{ fontSize: "14px", color: "#6c757d" }}>
+                Showing {startIndex + 1} to {endIndex} of {totalItems} entries
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                {/* Previous button */}
+                <button
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #dee2e6",
+                    backgroundColor: currentPage === 1 ? "#f8f9fa" : "#ffffff",
+                    color: currentPage === 1 ? "#adb5bd" : "#6366f1",
+                    cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  « Previous
+                </button>
+
+                {/* Page numbers */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => goToPage(page)}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid #dee2e6",
+                      backgroundColor: page === currentPage ? "#6366f1" : "#ffffff",
+                      color: page === currentPage ? "#ffffff" : "#495057",
+                      fontWeight: page === currentPage ? "bold" : "normal",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                    }}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                {/* Next button */}
+                <button
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #dee2e6",
+                    backgroundColor: currentPage === totalPages ? "#f8f9fa" : "#ffffff",
+                    color: currentPage === totalPages ? "#adb5bd" : "#6366f1",
+                    cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  Next »
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -199,14 +313,14 @@ const Role = () => {
 
   // ================= FORM =================
   return (
-    <div className="container mt-4">
-      <div className="d-flex align-items-center gap-3 mb-4">
+    <div className="container mt-1">
+      <div className="d-flex align-items-center gap-3 mb-3">
         <button
           className="btn"
           style={{
             backgroundColor: "#6366f1",
             color: "white",
-            borderRadius: "10px",
+            borderRadius: "20px",
             padding: "8px 20px",
           }}
           onClick={() => setShowForm(false)}
@@ -214,7 +328,9 @@ const Role = () => {
           <FaArrowLeft /> Back
         </button>
 
-        <h2>{editingRole ? "Edit Role" : "Add Role"}</h2>
+        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
+          {editingRole ? "Edit Role" : "Add Role"}
+        </h2>
       </div>
 
       <div
@@ -245,7 +361,7 @@ const Role = () => {
               style={{
                 backgroundColor: "#6366f1",
                 color: "white",
-                borderRadius: "10px",
+                borderRadius: "20px",
                 padding: "8px 25px",
               }}
             >
@@ -255,8 +371,9 @@ const Role = () => {
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ borderRadius: "10px", padding: "8px 25px" }}
+              style={{ borderRadius: "20px", padding: "8px 25px" }}
               onClick={() => setShowForm(false)}
+
             >
               Cancel
             </button>

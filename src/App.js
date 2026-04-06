@@ -8,7 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Attendance from './pages/Attendance';
 import Payroll from './pages/Payroll';
-import LeaveManagement from './pages/LeaveManagement';
+import LeaveManagement from './Leave/LeaveManagement';
 import Recruitment from './pages/Recruitment';
 import Performance from './pages/Performance';
 import Training from './pages/Training';
@@ -112,7 +112,7 @@ function App() {
           <Route path="attendance-policy" element={<AttendancePolicy user={currentUser} />} />
           <Route path="attendance-dashboard" element={<AttendanceDashboard user={currentUser} />} />
           <Route path="attendance-summary" element={<AttendanceSummary user={currentUser} />} />
-
+           
         </Route>
       </Routes>
     </Router>
