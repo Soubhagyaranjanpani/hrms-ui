@@ -1,170 +1,288 @@
-import React, { useState } from 'react';
-import { FaCheckCircle, FaClock, FaMapMarkerAlt, FaSearch } from 'react-icons/fa';
-import { toast } from 'react-toastify';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { FaSearch, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaClock, FaEye } from 'react-icons/fa';
+import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
+import { toast, ToastContainer } from '../components/Toast';
+import LoadingSpinner from '../components/LoadingSpinner';
 
-const Attendance = ({ user }) => {
-  const [attendance, setAttendance] = useState([
-    { id: 1, name: 'Emma Watson', date: '2024-04-01', checkIn: '09:00', checkOut: '17:30', status: 'Present', hours: 8.5, location: 'New York' },
-    { id: 2, name: 'Liam Brown', date: '2024-04-01', checkIn: '08:45', checkOut: '17:15', status: 'Present', hours: 8.5, location: 'London' },
-    { id: 3, name: 'Olivia Davis', date: '2024-04-01', checkIn: null, checkOut: null, status: 'Absent', hours: 0, location: '-' },
-    { id: 4, name: 'Noah Wilson', date: '2024-04-01', checkIn: '09:15', checkOut: '18:00', status: 'Present', hours: 8.75, location: 'Singapore' },
-    { id: 5, name: 'Ava Martinez', date: '2024-04-01', checkIn: '09:30', checkOut: '17:45', status: 'Late', hours: 8.25, location: 'Remote' },
-  ]);
+const MyAttendance = () => {
+  const [records, setRecords] = useState([]);
+  const [filteredRecords, setFilteredRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const getAuthConfig = () => ({
+    headers: { 
+      Authorization: `Bearer ${localStorage.getItem(STORAGE_KEYS.JWT_TOKEN)}`,
+      'Content-Type': 'application/json'
+    }
+  });
 
-  const getStatusBadge = (status) => {
-    const badges = {
-      Present: 'badge-success',
-      Absent: 'badge-danger',
-      Late: 'badge-warning'
-    };
-    return badges[status] || 'badge-secondary';
+  const formatTime = (timeString) => {
+    if (!timeString) return '--:--';
+    try {
+      const timePart = timeString.split('.')[0];
+      const [hours, minutes] = timePart.split(':');
+      const date = new Date();
+      date.setHours(parseInt(hours), parseInt(minutes));
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    } catch (error) {
+      return timeString;
+    }
   };
 
-  const handleCheckIn = () => {
-    toast.success('Checked in successfully!');
+  const fetchAttendance = async (showRefreshMessage = false) => {
+    if (showRefreshMessage) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    
+    try {
+      const response = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
+      const attendanceData = response.data?.response || response.data?.data || [];
+      
+      const transformedData = attendanceData.map(record => ({
+        id: record.id,
+        date: record.date,
+        checkIn: record.checkIn,
+        checkOut: record.checkOut,
+        hours: record.workingHours || 0,
+        status: record.status,
+        overtimeHours: record.overtimeHours || 0,
+        isLate: record.isLate || false,
+        isEarlyExit: record.isEarlyExit || false
+      }));
+      
+      setRecords(transformedData);
+      setFilteredRecords(transformedData);
+      
+      if (showRefreshMessage) {
+        toast.success('Success', 'Attendance records refreshed successfully');
+      }
+    } catch (error) {
+      console.error('Error fetching attendance:', error);
+      const message = error.response?.data?.message || 'Failed to fetch attendance records';
+      toast.error('Error', message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const handleCheckOut = () => {
-    toast.success('Checked out successfully!');
+  useEffect(() => {
+    fetchAttendance();
+  }, []);
+
+  useEffect(() => {
+    let filtered = [...records];
+    
+    filtered = filtered.filter(record => {
+      const recordDate = new Date(record.date);
+      return recordDate.getMonth() === selectedMonth && recordDate.getFullYear() === selectedYear;
+    });
+    
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(record => 
+        record.status?.toLowerCase() === statusFilter.toLowerCase()
+      );
+    }
+    
+    setFilteredRecords(filtered);
+  }, [selectedMonth, selectedYear, statusFilter, records]);
+
+  const getStatusClass = (status) => {
+    switch(status?.toUpperCase()) {
+      case 'PRESENT': return 'present';
+      case 'ABSENT': return 'absent';
+      case 'HALF_DAY': return 'late';
+      default: return 'pending';
+    }
   };
+
+  const summary = {
+    total: filteredRecords.length,
+    present: filteredRecords.filter(r => r.status === 'PRESENT').length,
+    absent: filteredRecords.filter(r => r.status === 'ABSENT').length,
+    halfDay: filteredRecords.filter(r => r.status === 'HALF_DAY').length,
+    totalHours: filteredRecords.reduce((sum, r) => sum + (r.hours || 0), 0).toFixed(1)
+  };
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
   return (
-    <div>
-      <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <h2 className="mb-0">Attendance Management</h2>
-        <div className="d-flex gap-2">
-          <button className="btn-gradient" onClick={handleCheckIn}>
-            <FaCheckCircle className="me-2" /> Check In
-          </button>
-          <button className="btn-outline-teal" onClick={handleCheckOut}>
-            <FaClock className="me-2" /> Check Out
-          </button>
-        </div>
-      </div>
+    <>
+      <ToastContainer />
+      <div className="attendance-root">
+        {refreshing && (
+          <div className="emp-modal-overlay">
+            <LoadingSpinner message="Refreshing records..." />
+          </div>
+        )}
 
-      {/* Stats Cards */}
-      <div className="row g-4 mb-4">
-        <div className="col-md-3">
-          <div className="stat-card">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <p className="text-gray mb-1">Present Today</p>
-                <h3 className="fw-bold mb-0">3</h3>
-                <small>60% of workforce</small>
-              </div>
-              <div className="stat-icon" style={{ background: 'rgba(46,204,113,0.2)' }}>
-                <FaCheckCircle color="#2ecc71" />
-              </div>
-            </div>
-          </div>
+        <div className="attendance-header">
+          <h1>My Attendance History</h1>
+          <p>View and track all your attendance records</p>
         </div>
-        <div className="col-md-3">
-          <div className="stat-card">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <p className="text-gray mb-1">Late Arrivals</p>
-                <h3 className="fw-bold mb-0">1</h3>
-                <small>20% late</small>
-              </div>
-              <div className="stat-icon" style={{ background: 'rgba(243,156,18,0.2)' }}>
-                <FaClock color="#f39c12" />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="stat-card">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <p className="text-gray mb-1">Avg. Hours</p>
-                <h3 className="fw-bold mb-0">8.4</h3>
-                <small>+0.3 vs last week</small>
-              </div>
-              <div className="stat-icon" style={{ background: 'rgba(52,152,219,0.2)' }}>
-                <FaClock color="#3498db" />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="stat-card">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <p className="text-gray mb-1">Monthly Rate</p>
-                <h3 className="fw-bold mb-0">94%</h3>
-                <small>Excellent</small>
-              </div>
-              <div className="stat-icon" style={{ background: 'rgba(45,156,124,0.2)' }}>
-                <FaCheckCircle color="#2d9c7c" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Date Selector */}
-      <div className="card-modern p-4 mb-4">
-        <div className="row">
-          <div className="col-md-6">
-            <label className="form-label">Select Date</label>
-            <input
-              type="date"
-              className="form-control"
-              style={{ background: 'rgba(10,25,31,0.8)', borderColor: 'rgba(45,156,124,0.3)', color: 'white' }}
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-            />
+        {/* Summary Cards */}
+        <div className="summary-grid">
+          <div className="stat-card attendance-stat">
+            <div className="stat-label">Total Days</div>
+            <div className="stat-value total">{summary.total}</div>
           </div>
-          <div className="col-md-6">
-            <label className="form-label">Quick Actions</label>
-            <div className="d-flex gap-2">
-              <button className="btn-outline-teal w-100">Export Report</button>
-              <button className="btn-outline-teal w-100">Bulk Update</button>
+          
+          <div className="stat-card attendance-stat">
+            <div className="stat-label"><FaCheckCircle size={12} /> Present</div>
+            <div className="stat-value present">{summary.present}</div>
+          </div>
+          
+          <div className="stat-card attendance-stat">
+            <div className="stat-label"><FaClock size={12} /> Half Day</div>
+            <div className="stat-value late">{summary.halfDay}</div>
+          </div>
+          
+          <div className="stat-card attendance-stat">
+            <div className="stat-label"><FaTimesCircle size={12} /> Absent</div>
+            <div className="stat-value absent">{summary.absent}</div>
+          </div>
+          
+          <div className="stat-card attendance-stat">
+            <div className="stat-label">Total Hours</div>
+            <div className="stat-value hours">{summary.totalHours}</div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="filter-card">
+          <div className="filter-group">
+            <div className="filter-item">
+              <label><FaCalendarAlt size={12} /> Month</label>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                className="filter-select"
+              >
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i} value={i}>
+                    {new Date(2000, i, 1).toLocaleString('default', { month: 'long' })}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="filter-item">
+              <label><FaCalendarAlt size={12} /> Year</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                className="filter-select"
+              >
+                {years.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="filter-item">
+              <label><FaEye size={12} /> Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="all">All</option>
+                <option value="present">Present</option>
+                <option value="half_day">Half Day</option>
+                <option value="absent">Absent</option>
+              </select>
+            </div>
+            
+            <div className="filter-item">
+              <button onClick={() => fetchAttendance(true)} className="refresh-btn" disabled={refreshing}>
+                <FaSearch size={14} />
+                {refreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Attendance Table */}
-      <div className="card-modern overflow-hidden">
-        <div className="table-responsive">
-          <table className="table table-custom">
-            <thead>
-              <tr>
-                <th>Employee</th>
-                <th>Date</th>
-                <th>Check In</th>
-                <th>Check Out</th>
-                <th>Hours</th>
-                <th>Status</th>
-                <th>Location</th>
-              </tr>
-            </thead>
-            <tbody>
-              {attendance.map(record => (
-                <tr key={record.id}>
-                  <td>
-                    <div className="fw-semibold">{record.name}</div>
-                  </td>
-                  <td>{record.date}</td>
-                  <td>{record.checkIn || '-'}</td>
-                  <td>{record.checkOut || '-'}</td>
-                  <td>{record.hours}</td>
-                  <td><span className={getStatusBadge(record.status)}>{record.status}</span></td>
-                  <td>
-                    {record.location !== '-' && <FaMapMarkerAlt className="me-1" />}
-                    {record.location}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Records Table */}
+        <div className="attendance-table-card">
+          {loading ? (
+            <div className="attendance-loading">
+              <div className="loading-spinner"></div>
+              <p>Loading attendance records...</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="attendance-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Day</th>
+                    <th>Check In</th>
+                    <th>Check Out</th>
+                    <th>Hours</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="attendance-empty">
+                        <div className="empty-icon">
+                          <FaCalendarAlt />
+                        </div>
+                        <p>No attendance records found</p>
+                        <small>Try selecting a different month or year</small>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRecords.map((record, idx) => (
+                      <tr key={record.id || idx}>
+                        <td className="date-cell">{record.date}</td>
+                        <td className="day-cell">
+                          {new Date(record.date).toLocaleDateString('en-US', { weekday: 'short' })}
+                        </td>
+                        <td className="time-cell">{formatTime(record.checkIn)}</td>
+                        <td className="time-cell">{formatTime(record.checkOut)}</td>
+                        <td className="hours-cell">{record.hours ? record.hours.toFixed(1) : 0}</td>
+                        <td>
+                          <span className={`status-badge ${getStatusClass(record.status)}`}>
+                            {record.status || 'PENDING'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
+
+        {/* Summary Footer */}
+        {filteredRecords.length > 0 && (
+          <div style={{
+            marginTop: '16px',
+            padding: '12px',
+            textAlign: 'center',
+            fontSize: '13px',
+            color: 'var(--text-muted)',
+            background: 'var(--bg-surface)',
+            borderRadius: '12px'
+          }}>
+            Showing {filteredRecords.length} of {records.length} total records
+          </div>
+        )}
       </div>
-    </div>
+    </>
   );
 };
 
-export default Attendance;
+export default MyAttendance;

@@ -13,6 +13,19 @@ export const API_ENDPOINTS = {
   RESET_PASSWORD:  `${BASE_URL}/api/employees/reset-password`,
   SEND_OTP:        (username) => `${BASE_URL}/api/employees/send-otp/${username}`,
   GET_CURRENT:     `${BASE_URL}/api/employees/current`,
+
+    CHECK_IN: `${BASE_URL}/api/attendance/check-in`,
+  CHECK_OUT: `${BASE_URL}/api/attendance/check-out`,
+  GET_MY_ATTENDANCE: `${BASE_URL}/api/attendance/my`,
+  GET_SUMMARY: `${BASE_URL}/api/attendance/summary`,
+  GET_DASHBOARD: `${BASE_URL}/api/attendance/dashboard`,
+  
+  // Policy
+   GET_ACTIVE_POLICY: `${BASE_URL}/api/policies/attendance/active`,
+  CREATE_POLICY: `${BASE_URL}/api/policies/attendance`,
+  ACTIVATE_POLICY: (id) => `${BASE_URL}/api/policies/attendance/activate/${id}`,
+
+
 };
 
 // ── LocalStorage Keys ────────────────────────

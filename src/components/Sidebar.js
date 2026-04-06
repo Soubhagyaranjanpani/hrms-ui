@@ -5,7 +5,7 @@ import {
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog, FaSignOutAlt,
   FaChevronLeft, FaChevronRight, FaBuilding, FaSitemap,
-  FaUserTag, FaDatabase, FaUserCircle, FaLeaf
+  FaUserTag, FaDatabase, FaUserCircle, FaLeaf,FaChartPie
 } from 'react-icons/fa';
 
 const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
@@ -22,7 +22,9 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
   // Employee section items
   const employeeItems = [
     { path: '/employees', icon: <FaUsers />, label: 'Employee ' },
-    // { path: '/add', icon: <FaUserPlus />, label: 'Add Employee' },
+    {path:'attendance-dashboard', icon:<FaChartLine />, label:'Attendance Dashboard'},
+    {path:'attendance-summary', icon:<FaChartPie />, label:'Attendance Summary'},
+    { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy' },
     { path: '/attendance', icon: <FaCalendarCheck />, label: 'Attendance' },
     { path: '/performance', icon: <FaChartLine />, label: 'Performance' },
     { path: '/training', icon: <FaChalkboardTeacher />, label: 'Training' },

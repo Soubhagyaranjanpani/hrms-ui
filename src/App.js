@@ -20,6 +20,9 @@ import Branch from './Masters/Branch';
 import Department from './Masters/Department';
 import Role from './Masters/Role';
 import Destination from './Masters/Destination';
+import AttendancePolicy from './pages/AttendancePolicy';
+import AttendanceDashboard from './pages/AttendanceDashboard';
+import AttendanceSummary from './pages/AttendanceSummary';
 
 
 import { ToastContainer } from './components/Toast';
@@ -106,6 +109,9 @@ function App() {
           <Route path="department" element={<Department user={currentUser} />} />
           <Route path="role" element={<Role user={currentUser} />} />
           <Route path="destination" element={<Destination user={currentUser} />} />
+          <Route path="attendance-policy" element={<AttendancePolicy user={currentUser} />} />
+          <Route path="attendance-dashboard" element={<AttendanceDashboard user={currentUser} />} />
+          <Route path="attendance-summary" element={<AttendanceSummary user={currentUser} />} />
 
         </Route>
       </Routes>
