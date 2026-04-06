@@ -5,7 +5,7 @@ import {
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog, FaSignOutAlt,
   FaChevronLeft, FaChevronRight, FaBuilding, FaSitemap,
-  FaUserTag, FaDatabase, FaUserCircle, FaLeaf,FaChartPie
+  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck
 } from 'react-icons/fa';
 
 const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
@@ -22,8 +22,8 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
   // Employee section items
   const employeeItems = [
     { path: '/employees', icon: <FaUsers />, label: 'Employee ' },
-    {path:'attendance-dashboard', icon:<FaChartLine />, label:'Attendance Dashboard'},
-    {path:'attendance-summary', icon:<FaChartPie />, label:'Attendance Summary'},
+    { path: 'attendance-dashboard', icon: <FaChartLine />, label: 'Attendance Dashboard' },
+    { path: 'attendance-summary', icon: <FaChartPie />, label: 'Attendance Summary' },
     { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy' },
     { path: '/attendance', icon: <FaCalendarCheck />, label: 'Attendance' },
     { path: '/performance', icon: <FaChartLine />, label: 'Performance' },
@@ -33,9 +33,11 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
   // Leave section items
   const leaveItems = [
     { path: '/leaves', icon: <FaPlane />, label: 'Apply Leave' },
-    { path: '/balance', icon: <FaLeaf />, label: 'Leave Balance' },
+    { path: '/approvedLeaves', icon: <FaLeaf />, label: 'Approve & Reject leave' },
     { path: '/history', icon: <FaCalendarCheck />, label: 'Leave History' },
     { path: '/calendar', icon: <FaChartBar />, label: 'Leave Calendar' },
+    // { path: '/', icon: <FaCheck />, label: 'Approved Leaves' },
+
   ];
 
   const masterItems = [
