@@ -1,301 +1,558 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FaSearch, FaTimes, FaPlus, FaCheck, FaClock, FaFilter } from 'react-icons/fa';
-import { toast } from 'react-toastify';
+import { FaSearch, FaTimes, FaPlus, FaClock, FaFilter, FaSpinner, FaSave, FaArrowLeft } from 'react-icons/fa';
+import { toast } from '../components/Toast';
+import axios from 'axios';
+import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const LeaveManagement = ({ user }) => {
-  // ---------- Mock leave data ----------
-  const [leaves, setLeaves] = useState([
-    { id: 1, employee: 'Emma Watson', type: 'Sick Leave', startDate: '2024-04-05', endDate: '2024-04-06', days: 2, status: 'Pending', reason: 'Flu', appliedDate: '2024-04-01' },
-    { id: 2, employee: 'Olivia Davis', type: 'Casual Leave', startDate: '2024-04-10', endDate: '2024-04-10', days: 1, status: 'Approved', reason: 'Personal', appliedDate: '2024-03-28' },
-    { id: 3, employee: 'Liam Brown', type: 'Paid Leave', startDate: '2024-04-15', endDate: '2024-04-18', days: 4, status: 'Pending', reason: 'Vacation', appliedDate: '2024-04-02' },
-    { id: 4, employee: 'Ava Martinez', type: 'Sick Leave', startDate: '2024-04-08', endDate: '2024-04-09', days: 2, status: 'Rejected', reason: 'Doctor appointment', appliedDate: '2024-04-01' },
-  ]);
-
-  // UI view: 'list' or 'form'
+  // ---------- State ----------
+  const [leaves, setLeaves] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState('list');
-
-  // List view state (search, pagination)
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(0);
   const [size] = useState(5);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+  const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
+  
+  // Current user state
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
-  // Form state (moved to top level to satisfy hooks rules)
+  // Form state
   const [formData, setFormData] = useState({
     employeeName: "",
-    leaveType: "CL",
-    fromDate: "",
-    toDate: "",
+    leaveTypeId: "",
+    startDate: "",
+    endDate: "",
     isHalfDay: false,
-    halfDaySession: "first",
+    halfDaySession: "MORNING",
     reason: "",
   });
-  const [message, setMessage] = useState("");
+  const [leaveTypes, setLeaveTypes] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
 
-  // Stats
-  const pendingCount = leaves.filter(l => l.status === 'Pending').length;
-  const approvedCount = leaves.filter(l => l.status === 'Approved').length;
+  // Helper: get auth headers
+  const getAuthHeaders = () => ({
+    Authorization: `Bearer ${localStorage.getItem(STORAGE_KEYS.JWT_TOKEN)}`,
+    'Content-Type': 'application/json',
+  });
 
-  // Filter leaves
-  const filterLeaves = useCallback(() => {
-    if (!debouncedSearch) return leaves;
-    const term = debouncedSearch.toLowerCase();
-    return leaves.filter(l =>
-      l.employee.toLowerCase().includes(term) ||
-      l.reason.toLowerCase().includes(term) ||
-      l.type.toLowerCase().includes(term)
-    );
+  // Fetch current user profile
+  const fetchCurrentUser = useCallback(async () => {
+    setLoadingUser(true);
+    try {
+      const response = await axios.get(API_ENDPOINTS.GET_CURRENT, {
+        headers: getAuthHeaders(),
+      });
+      const responseData = response.data;
+      if (responseData?.status === 200) {
+        const userString = responseData.response;
+        const nameMatch = userString.match(/\(([^)]+)\)/);
+        const emailMatch = userString.match(/^[^(]+/);
+        const userName = nameMatch ? nameMatch[1] : '';
+        const userEmail = emailMatch ? emailMatch[0].trim() : '';
+        
+        setCurrentUser({ name: userName, email: userEmail, fullName: userName });
+        setFormData(prev => ({ ...prev, employeeName: userName || userEmail }));
+      } else if (responseData?.response) {
+        const userString = responseData.response;
+        const nameMatch = userString.match(/\(([^)]+)\)/);
+        const userName = nameMatch ? nameMatch[1] : '';
+        setCurrentUser({ name: userName, email: userString, fullName: userName });
+        setFormData(prev => ({ ...prev, employeeName: userName || userString }));
+      } else {
+        setCurrentUser({ name: 'User', email: '' });
+        setFormData(prev => ({ ...prev, employeeName: 'User' }));
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+      const storedUser = localStorage.getItem(STORAGE_KEYS.USER_DATA);
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setCurrentUser(parsedUser);
+          setFormData(prev => ({ ...prev, employeeName: parsedUser?.name || parsedUser?.fullName || '' }));
+        } catch (e) {
+          console.error('Error parsing stored user:', e);
+        }
+      }
+    } finally {
+      setLoadingUser(false);
+    }
+  }, []);
+
+  // Fetch leave types
+  const fetchLeaveTypes = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_ENDPOINTS.BASE_URL || 'http://localhost:8080/hrms'}/api/leave-type`, {
+        headers: getAuthHeaders(),
+      });
+      
+      const types = Array.isArray(response.data) ? response.data : [];
+      setLeaveTypes(types);
+      
+      if (types.length === 0) {
+        toast.warning('No Leave Types', 'No leave types available for selection');
+      }
+    } catch (error) {
+      console.error('Error fetching leave types:', error);
+      toast.error('Error', 'Failed to load leave types');
+      setLeaveTypes([]);
+    }
+  }, []);
+
+  // Fetch my leaves
+  const fetchMyLeaves = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(API_ENDPOINTS.GET_MY_LEAVES, {
+        headers: getAuthHeaders(),
+      });
+      
+      const responseData = response.data;
+      let data = [];
+      
+      if (responseData?.status === 200 && Array.isArray(responseData.response)) {
+        data = responseData.response;
+      } else if (Array.isArray(responseData)) {
+        data = responseData;
+      } else if (responseData?.data && Array.isArray(responseData.data)) {
+        data = responseData.data;
+      } else {
+        data = [];
+      }
+      
+      const transformedData = data.map(leave => ({
+        id: leave.leaveId,
+        leaveType: { name: leave.leaveType },
+        leaveTypeName: leave.leaveType,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        totalDays: leave.totalDays,
+        days: leave.totalDays,
+        status: leave.status,
+        reason: leave.reason || '',
+        createdAt: leave.appliedDate || leave.startDate,
+        isHalfDay: leave.totalDays === 0.5,
+        halfDaySession: null
+      }));
+      
+      setLeaves(transformedData);
+      setTotalElements(transformedData.length);
+      setTotalPages(Math.ceil(transformedData.length / size));
+      
+      const total = transformedData.length;
+      const pending = transformedData.filter(l => l.status === 'PENDING').length;
+      const approved = transformedData.filter(l => l.status === 'APPROVED').length;
+      const rejected = transformedData.filter(l => l.status === 'REJECTED').length;
+      setStats({ total, pending, approved, rejected });
+      
+    } catch (error) {
+      console.error('Error fetching my leaves:', error);
+      toast.error('Error', 'Failed to load your leave requests');
+      setLeaves([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [size]);
+
+  // Initialize data
+  useEffect(() => {
+    const init = async () => {
+      await fetchCurrentUser();
+      await fetchLeaveTypes();
+      await fetchMyLeaves();
+    };
+    init();
+  }, [fetchCurrentUser, fetchLeaveTypes, fetchMyLeaves]);
+
+  // Get filtered leaves - ALWAYS returns array
+  const getFilteredLeaves = useCallback(() => {
+    const leavesArray = Array.isArray(leaves) ? leaves : [];
+    
+    if (!debouncedSearch || debouncedSearch.trim() === '') {
+      return leavesArray;
+    }
+    
+    const term = debouncedSearch.toLowerCase().trim();
+    return leavesArray.filter(leave => {
+      if (!leave) return false;
+      return (
+        (leave.leaveType?.name?.toLowerCase() || leave.leaveTypeName?.toLowerCase() || '').includes(term) ||
+        (leave.reason?.toLowerCase() || '').includes(term) ||
+        (leave.status?.toLowerCase() || '').includes(term)
+      );
+    });
   }, [leaves, debouncedSearch]);
 
-  const filteredLeaves = filterLeaves();
-  const paginatedLeaves = filteredLeaves.slice(page * size, (page + 1) * size);
+  const filteredLeaves = getFilteredLeaves();
+  
+  const getPaginatedLeaves = () => {
+    if (!Array.isArray(filteredLeaves)) {
+      return [];
+    }
+    const start = page * size;
+    const end = start + size;
+    return filteredLeaves.slice(start, end);
+  };
+  
+  const paginatedLeaves = getPaginatedLeaves();
 
   // Update pagination when filtered list changes
   useEffect(() => {
-    setTotalPages(Math.ceil(filteredLeaves.length / size));
-    setTotalElements(filteredLeaves.length);
-    setPage(0);
-  }, [filteredLeaves, size]);
+    const filtered = getFilteredLeaves();
+    const total = Array.isArray(filtered) ? filtered.length : 0;
+    setTotalPages(Math.ceil(total / size));
+    setTotalElements(total);
+    if (page !== 0 && total > 0) {
+      setPage(0);
+    }
+  }, [debouncedSearch, leaves]);
 
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
-      setPage(0);
     }, 500);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Approve / Reject handlers
-  const handleApprove = (id) => {
-    setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: 'Approved' } : l));
-    toast.success('Leave request approved');
+  // Validation functions
+  const validateField = (field, value) => {
+    switch(field) {
+      case 'leaveTypeId':
+        if (!value) return 'Leave type is required';
+        return '';
+      case 'startDate':
+        if (!value) return 'Start date is required';
+        if (formData.endDate && new Date(value) > new Date(formData.endDate)) {
+          return 'Start date cannot be after end date';
+        }
+        return '';
+      case 'endDate':
+        if (!formData.isHalfDay && !value) return 'End date is required';
+        if (value && formData.startDate && new Date(value) < new Date(formData.startDate)) {
+          return 'End date cannot be before start date';
+        }
+        return '';
+      case 'reason':
+        if (!value?.trim()) return 'Reason is required';
+        if (value?.length > 500) return 'Reason cannot exceed 500 characters';
+        return '';
+      default:
+        return '';
+    }
   };
 
-  const handleReject = (id) => {
-    setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: 'Rejected' } : l));
-    toast.error('Leave request rejected');
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    const error = validateField(field, formData[field]);
+    setErrors(prev => ({ ...prev, [field]: error }));
   };
 
   const getStatusBadge = (status) => {
     switch(status) {
-      case 'Approved': return 'badge-success';
-      case 'Pending':  return 'badge-warning';
-      case 'Rejected': return 'badge-danger';
+      case 'APPROVED': return 'badge-success';
+      case 'PENDING':  return 'badge-warning';
+      case 'REJECTED': return 'badge-danger';
       default:         return 'badge-info';
     }
   };
 
-  // Pagination range (same as Employees)
+  const getStatusText = (status) => {
+    switch(status) {
+      case 'APPROVED': return 'Approved';
+      case 'PENDING':  return 'Pending';
+      case 'REJECTED': return 'Rejected';
+      default:         return status || 'Unknown';
+    }
+  };
+
+  // Format leave type name
+  const formatLeaveTypeName = (name) => {
+    if (!name) return '-';
+    return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  };
+
+  // Pagination range
   const getPaginationRange = () => {
+    if (totalPages <= 1) return [];
     const delta = 2;
     const range = [];
-    const left  = Math.max(0, page - delta);
+    const left = Math.max(0, page - delta);
     const right = Math.min(totalPages - 1, page + delta);
-    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    if (left > 0) {
+      range.push(0);
+      if (left > 1) range.push('...');
+    }
     for (let i = left; i <= right; i++) range.push(i);
-    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    if (right < totalPages - 1) {
+      if (right < totalPages - 2) range.push('...');
+      range.push(totalPages - 1);
+    }
     return range;
   };
 
-  // Form handlers (defined at top level, but only used when view === 'form')
+  // Form handlers
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
+    const newValue = type === "checkbox" ? checked : value;
+    
     setFormData(prev => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: newValue,
     }));
-  };
-
-  const handleFormSubmit = (e) => {
-    e.preventDefault();
-    setMessage("Leave Applied Successfully!");
-
-    // Convert form data to leave record
-    let leaveTypeDisplay = '';
-    if (formData.leaveType === 'CL') leaveTypeDisplay = 'Casual Leave';
-    else if (formData.leaveType === 'SL') leaveTypeDisplay = 'Sick Leave';
-    else if (formData.leaveType === 'PL') leaveTypeDisplay = 'Paid Leave';
-
-    let days = 1;
-    if (!formData.isHalfDay && formData.fromDate && formData.toDate) {
-      const diffTime = new Date(formData.toDate) - new Date(formData.fromDate);
-      days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    } else if (formData.isHalfDay) {
-      days = 0.5;
+    
+    if (touched[name]) {
+      const error = validateField(name, newValue);
+      setErrors(prev => ({ ...prev, [name]: error }));
     }
+  };
 
-    const newLeave = {
-      id: leaves.length + 1,
-      employee: formData.employeeName || (user?.name || 'Unknown'),
-      type: leaveTypeDisplay,
-      startDate: formData.fromDate,
-      endDate: formData.isHalfDay ? formData.fromDate : formData.toDate,
-      days: days,
-      status: 'Pending',
-      reason: formData.reason,
-      appliedDate: new Date().toISOString().slice(0, 10),
-    };
-
-    setLeaves(prev => [newLeave, ...prev]);
-    toast.success('Leave request submitted successfully');
-
-    // Reset form and return to list after 1 second
-    setFormData({
-      employeeName: "",
-      leaveType: "CL",
-      fromDate: "",
-      toDate: "",
-      isHalfDay: false,
-      halfDaySession: "first",
-      reason: "",
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    
+    const fieldsToValidate = ['leaveTypeId', 'startDate', 'reason'];
+    if (!formData.isHalfDay) fieldsToValidate.push('endDate');
+    
+    const newErrors = {};
+    fieldsToValidate.forEach(field => {
+      const error = validateField(field, formData[field]);
+      if (error) newErrors[field] = error;
     });
-    setTimeout(() => setView('list'), 1000);
+    
+    setErrors(newErrors);
+    setTouched(fieldsToValidate.reduce((acc, f) => ({ ...acc, [f]: true }), {}));
+    
+    if (Object.keys(newErrors).length > 0) {
+      toast.warning('Validation Error', 'Please fix the highlighted fields');
+      return;
+    }
+    
+    setSubmitting(true);
+    
+    try {
+      const payload = {
+        leaveTypeId: parseInt(formData.leaveTypeId),
+        startDate: formData.startDate,
+        endDate: formData.isHalfDay ? formData.startDate : formData.endDate,
+        isHalfDay: formData.isHalfDay,
+        halfDaySession: formData.isHalfDay ? formData.halfDaySession : null,
+        reason: formData.reason.trim(),
+      };
+      
+      const response = await axios.post(API_ENDPOINTS.APPLY_LEAVE, payload, {
+        headers: getAuthHeaders(),
+      });
+      
+      if (response.data?.status === 200) {
+        toast.success('Success', response.data?.message || 'Leave request submitted successfully');
+      } else {
+        toast.success('Success', 'Leave request submitted successfully');
+      }
+      
+      setFormData({
+        employeeName: currentUser?.name || currentUser?.fullName || "",
+        leaveTypeId: "",
+        startDate: "",
+        endDate: "",
+        isHalfDay: false,
+        halfDaySession: "MORNING",
+        reason: "",
+      });
+      setErrors({});
+      setTouched({});
+      setView('list');
+      fetchMyLeaves();
+      
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || 'Failed to submit leave request';
+      toast.error('Error', errorMsg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const resetFormMessage = () => {
-    setMessage("");
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (e) {
+      return dateString;
+    }
   };
+
+  // Loading state
+  if (loading && view === 'list' && leaves.length === 0) {
+    return <LoadingSpinner message="Loading your leave requests..." />;
+  }
 
   // ---------- FORM VIEW ----------
   if (view === 'form') {
-    // Reset message when entering form (optional)
-    if (message) resetFormMessage();
+    if (loadingUser) {
+      return <LoadingSpinner message="Loading user profile..." />;
+    }
 
     return (
-      <div className="main-content">
-        <div className="page-header d-flex justify-content-between align-items-center">
-          <div>
-            <h1>Apply Leave</h1>
-            <p>Submit a new leave request</p>
+      <div className="emp-root">
+        <div className="emp-header">
+          <div className="emp-header-left">
+            <button className="emp-back-btn" onClick={() => { setView('list'); setErrors({}); setTouched({}); }}>
+              <FaArrowLeft size={12} /> Back
+            </button>
+            <div>
+              <h1 className="emp-title">Apply Leave</h1>
+              <p className="emp-subtitle">Submit a new leave request</p>
+            </div>
           </div>
-          <button className="btn-outline-indigo" onClick={() => setView('list')}>
-            Back
-          </button>
         </div>
 
-        <div className="card-modern p-4">
-          {message && (
-            <div className="badge-success mb-4" style={{ display: "inline-block" }}>
-              {message}
-            </div>
-          )}
-
-          <form onSubmit={handleFormSubmit}>
-            <div className="row g-4">
-              <div className="col-md-6">
-                <label className="form-label-modern">Employee Name *</label>
-                <input
-                  type="text"
-                  className="form-control-modern"
-                  name="employeeName"
-                  value={formData.employeeName}
-                  onChange={handleFormChange}
-                  required
-                />
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label-modern">Leave Type *</label>
-                <select
-                  className="form-control-modern"
-                  name="leaveType"
-                  value={formData.leaveType}
-                  onChange={handleFormChange}
-                  required
-                >
-                  <option value="CL">Casual Leave (CL)</option>
-                  <option value="SL">Sick Leave (SL)</option>
-                  <option value="PL">Paid Leave (PL)</option>
-                </select>
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label-modern">From Date *</label>
-                <input
-                  type="date"
-                  className="form-control-modern"
-                  name="fromDate"
-                  value={formData.fromDate}
-                  onChange={handleFormChange}
-                  required
-                />
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label-modern">To Date *</label>
-                <input
-                  type="date"
-                  className="form-control-modern"
-                  name="toDate"
-                  value={formData.toDate}
-                  onChange={handleFormChange}
-                  required
-                  disabled={formData.isHalfDay}
-                />
-                {formData.isHalfDay && (
-                  <small className="text-muted" style={{ fontSize: "11px" }}>
-                    To date disabled for half‑day requests
-                  </small>
-                )}
-              </div>
-
-              <div className="col-12">
-                <div className="form-check">
+        <div className="emp-form-wrap">
+          <form onSubmit={handleFormSubmit} noValidate>
+            <div className="emp-form-section">
+              <div className="emp-section-label">Leave Details</div>
+              <div className="emp-form-grid">
+                
+                <div className="emp-field">
+                  <label>Employee Name</label>
                   <input
-                    type="checkbox"
-                    className="form-check-input"
-                    id="isHalfDay"
-                    name="isHalfDay"
-                    checked={formData.isHalfDay}
-                    onChange={handleFormChange}
-                    style={{ borderColor: "#6366f1", cursor: "pointer" }}
+                    type="text"
+                    value={formData.employeeName || ''}
+                    disabled
+                    style={{ background: '#f0f2ff', cursor: 'not-allowed', fontWeight: 500 }}
                   />
-                  <label className="form-check-label" htmlFor="isHalfDay" style={{ fontWeight: "500" }}>
+                  <small className="emp-hint-text">Auto-filled from your profile</small>
+                </div>
+
+                <div className={`emp-field ${touched.leaveTypeId && errors.leaveTypeId ? 'has-error' : ''}`}>
+                  <label>Leave Type <span className="req">*</span></label>
+                  <select
+                    name="leaveTypeId"
+                    value={formData.leaveTypeId}
+                    onChange={handleFormChange}
+                    onBlur={() => handleBlur('leaveTypeId')}
+                    required
+                  >
+                    <option value="">Select leave type</option>
+                    {Array.isArray(leaveTypes) && leaveTypes.map(type => (
+                      <option key={type.id} value={type.id}>
+                        {formatLeaveTypeName(type.name)}
+                      </option>
+                    ))}
+                  </select>
+                  {touched.leaveTypeId && errors.leaveTypeId && (
+                    <span className="field-err">{errors.leaveTypeId}</span>
+                  )}
+                </div>
+
+                <div className={`emp-field ${touched.startDate && errors.startDate ? 'has-error' : ''}`}>
+                  <label>Start Date <span className="req">*</span></label>
+                  <input
+                    type="date"
+                    name="startDate"
+                    value={formData.startDate}
+                    onChange={handleFormChange}
+                    onBlur={() => handleBlur('startDate')}
+                    required
+                  />
+                  {touched.startDate && errors.startDate && (
+                    <span className="field-err">{errors.startDate}</span>
+                  )}
+                </div>
+
+                <div className={`emp-field ${!formData.isHalfDay && touched.endDate && errors.endDate ? 'has-error' : ''}`}>
+                  <label>End Date {!formData.isHalfDay && <span className="req">*</span>}</label>
+                  <input
+                    type="date"
+                    name="endDate"
+                    value={formData.endDate}
+                    onChange={handleFormChange}
+                    onBlur={() => handleBlur('endDate')}
+                    required={!formData.isHalfDay}
+                    disabled={formData.isHalfDay}
+                  />
+                  {formData.isHalfDay && (
+                    <span className="emp-hint-text">Disabled for half‑day requests</span>
+                  )}
+                  {!formData.isHalfDay && touched.endDate && errors.endDate && (
+                    <span className="field-err">{errors.endDate}</span>
+                  )}
+                </div>
+
+                <div className="emp-field">
+                  <label>&nbsp;</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      name="isHalfDay"
+                      checked={formData.isHalfDay}
+                      onChange={handleFormChange}
+                      style={{ width: '16px', height: '16px', margin: 0 }}
+                    />
                     Half Day Leave
                   </label>
                 </div>
-              </div>
 
-              {formData.isHalfDay && (
-                <div className="col-md-6">
-                  <label className="form-label-modern">Session *</label>
-                  <select
-                    className="form-control-modern"
-                    name="halfDaySession"
-                    value={formData.halfDaySession}
+                {formData.isHalfDay && (
+                  <div className="emp-field">
+                    <label>Session <span className="req">*</span></label>
+                    <select
+                      name="halfDaySession"
+                      value={formData.halfDaySession}
+                      onChange={handleFormChange}
+                      required
+                    >
+                      <option value="MORNING">Morning (First Half)</option>
+                      <option value="AFTERNOON">Afternoon (Second Half)</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className={`emp-field ${touched.reason && errors.reason ? 'has-error' : ''}`} style={{ gridColumn: '1 / -1' }}>
+                  <div className="emp-label-row">
+                    <label>Reason <span className="req">*</span></label>
+                    <span className="char-count" style={{ color: (formData.reason?.length || 0) > 400 ? '#f97316' : '#8b92b8' }}>
+                      {(formData.reason?.length || 0)}/500
+                    </span>
+                  </div>
+                  <textarea
+                    name="reason"
+                    rows="3"
+                    value={formData.reason}
                     onChange={handleFormChange}
+                    onBlur={() => handleBlur('reason')}
                     required
-                  >
-                    <option value="first">First Half (Morning)</option>
-                    <option value="second">Second Half (Afternoon)</option>
-                  </select>
+                    placeholder="Brief reason for leave..."
+                    maxLength={500}
+                  />
+                  {touched.reason && errors.reason && (
+                    <span className="field-err">{errors.reason}</span>
+                  )}
+                  <small className="emp-hint-text">Provide a clear reason for your leave request</small>
                 </div>
-              )}
-
-              <div className="col-12">
-                <label className="form-label-modern">Reason *</label>
-                <textarea
-                  className="form-control-modern"
-                  name="reason"
-                  rows="3"
-                  value={formData.reason}
-                  onChange={handleFormChange}
-                  required
-                  placeholder="Brief reason for leave..."
-                />
               </div>
+            </div>
 
-              <div className="col-12 mt-3">
-                <button type="submit" className="btn-gradient me-3">
-                  Apply Leave
-                </button>
-                <button type="button" className="btn-outline-indigo" onClick={() => setView('list')}>
-                  Cancel
-                </button>
-              </div>
+            <div className="emp-divider"></div>
+
+            <div className="emp-form-footer">
+              <button type="button" className="emp-cancel-btn" onClick={() => { setView('list'); setErrors({}); setTouched({}); }}>
+                Cancel
+              </button>
+              <button type="submit" className="emp-submit-btn" disabled={submitting}>
+                {submitting ? <><FaSpinner className="emp-spinner" /> Submitting...</> : <><FaSave size={12} /> Apply Leave</>}
+              </button>
             </div>
           </form>
         </div>
@@ -303,14 +560,14 @@ const LeaveManagement = ({ user }) => {
     );
   }
 
-  // ---------- LIST VIEW (same structure as Employees) ----------
+  // ---------- LIST VIEW ----------
   return (
     <div className="emp-root">
       <div className="emp-header">
         <div className="emp-header-left">
           <div>
-            <h1 className="emp-title">Leave Management</h1>
-            <p className="emp-subtitle">{totalElements} total requests</p>
+            <h1 className="emp-title">My Leaves</h1>
+            <p className="emp-subtitle">{totalElements} total leave requests</p>
           </div>
         </div>
         <button className="emp-add-btn" onClick={() => setView('form')}>
@@ -318,30 +575,16 @@ const LeaveManagement = ({ user }) => {
         </button>
       </div>
 
-      {/* Stats Cards */}
       <div className="row g-4 mb-4">
         <div className="col-md-3">
           <div className="stat-card">
             <div className="d-flex justify-content-between align-items-center">
               <div>
-                <p className="text-gray mb-1">Pending Requests</p>
-                <h3 className="fw-bold mb-0">{pendingCount}</h3>
+                <p className="text-gray mb-1">Total Requests</p>
+                <h3 className="fw-bold mb-0">{stats.total}</h3>
               </div>
-              <div className="stat-icon" style={{ background: 'rgba(243,156,18,0.2)' }}>
-                <FaClock color="#f39c12" />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-3">
-          <div className="stat-card">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <p className="text-gray mb-1">Approved This Month</p>
-                <h3 className="fw-bold mb-0">{approvedCount}</h3>
-              </div>
-              <div className="stat-icon" style={{ background: 'rgba(46,204,113,0.2)' }}>
-                <FaCheck color="#2ecc71" />
+              <div className="stat-icon icon-indigo">
+                <FaFilter color="#6366f1" />
               </div>
             </div>
           </div>
@@ -350,12 +593,11 @@ const LeaveManagement = ({ user }) => {
           <div className="stat-card">
             <div className="d-flex justify-content-between align-items-center">
               <div>
-                <p className="text-gray mb-1">Available Balance</p>
-                <h3 className="fw-bold mb-0">12</h3>
-                <small>Days remaining</small>
+                <p className="text-gray mb-1">Pending</p>
+                <h3 className="fw-bold mb-0">{stats.pending}</h3>
               </div>
-              <div className="stat-icon" style={{ background: 'rgba(52,152,219,0.2)' }}>
-                <FaClock color="#3498db" />
+              <div className="stat-icon icon-amber">
+                <FaClock color="#f59e0b" />
               </div>
             </div>
           </div>
@@ -364,26 +606,37 @@ const LeaveManagement = ({ user }) => {
           <div className="stat-card">
             <div className="d-flex justify-content-between align-items-center">
               <div>
-                <p className="text-gray mb-1">Leave Types</p>
-                <h3 className="fw-bold mb-0">4</h3>
-                <small>Sick, Casual, Paid, Unpaid</small>
+                <p className="text-gray mb-1">Approved</p>
+                <h3 className="fw-bold mb-0">{stats.approved}</h3>
               </div>
-              <div className="stat-icon" style={{ background: 'rgba(45,156,124,0.2)' }}>
-                <FaFilter color="#2d9c7c" />
+              <div className="stat-icon icon-teal">
+                <span style={{ fontSize: '20px' }}>✓</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="stat-card">
+            <div className="d-flex justify-content-between align-items-center">
+              <div>
+                <p className="text-gray mb-1">Rejected</p>
+                <h3 className="fw-bold mb-0">{stats.rejected}</h3>
+              </div>
+              <div className="stat-icon" style={{ background: '#fee2e2', color: '#ef4444' }}>
+                <span style={{ fontSize: '20px' }}>✗</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Search Bar */}
       <div className="emp-search-bar">
         <div className="emp-search-wrap">
           <FaSearch className="emp-search-icon" size={12} />
           <input
             className="emp-search-input"
             type="text"
-            placeholder="Search by employee, leave type or reason…"
+            placeholder="Search by leave type, reason or status…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -395,67 +648,73 @@ const LeaveManagement = ({ user }) => {
         </div>
       </div>
 
-      {/* Table */}
       <div className="emp-table-card">
         <div className="emp-table-wrap">
           <table className="emp-table">
             <thead>
               <tr>
                 <th>#</th>
-                <th>Employee</th>
                 <th>Leave Type</th>
                 <th>Duration</th>
                 <th>Days</th>
+                <th>Session</th>
                 <th>Reason</th>
                 <th>Applied Date</th>
                 <th>Status</th>
-                <th style={{ width: 80, textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {paginatedLeaves.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan="8" className="emp-empty">
+                    <div className="emp-empty-inner">
+                      <FaSpinner className="emp-spinner" style={{ width: '24px', height: '24px', marginBottom: '12px' }} />
+                      <p>Loading your leave requests...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedLeaves.length > 0 ? (
                 paginatedLeaves.map((leave, idx) => (
-                  <tr key={leave.id} className="emp-row">
+                  <tr key={leave?.id || idx} className="emp-row">
                     <td className="emp-sno">{page * size + idx + 1}</td>
-                    <td className="fw-semibold">{leave.employee}</td>
-                    <td>{leave.type}</td>
-                    <td>{leave.startDate} → {leave.endDate}</td>
-                    <td>{leave.days}</td>
-                    <td>{leave.reason}</td>
-                    <td className="emp-date">{leave.appliedDate}</td>
-                    <td><span className={getStatusBadge(leave.status)}>{leave.status}</span></td>
                     <td>
-                      <div className="emp-actions">
-                        {leave.status === 'Pending' && (
-                          <>
-                            <button
-                              className="emp-act emp-act--edit"
-                              onClick={() => handleApprove(leave.id)}
-                              title="Approve"
-                              style={{ background: '#d1fae5', color: '#065f46' }}
-                            >
-                              <FaCheck size={12} />
-                            </button>
-                            <button
-                              className="emp-act emp-act--del"
-                              onClick={() => handleReject(leave.id)}
-                              title="Reject"
-                            >
-                              <FaTimes size={12} />
-                            </button>
-                          </>
-                        )}
-                      </div>
+                      <span className="emp-pill emp-pill--indigo">
+                        {formatLeaveTypeName(leave?.leaveType?.name || leave?.leaveTypeName || '-')}
+                      </span>
+                    </td>
+                    <td className="emp-date">
+                      {formatDate(leave?.startDate)} → {formatDate(leave?.endDate)}
+                    </td>
+                    <td>{leave?.totalDays || leave?.days || 1}</td>
+                    <td>
+                      {leave?.isHalfDay ? (
+                        <span className="emp-pill" style={{ background: '#fef3c7', color: '#92400e' }}>
+                          {leave?.halfDaySession === 'MORNING' ? 'Morning' : 'Afternoon'}
+                        </span>
+                      ) : (
+                        <span className="emp-pill" style={{ background: '#e0e7ff', color: '#3730a3' }}>
+                          Full Day
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ maxWidth: '200px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                      {leave?.reason || '-'}
+                    </td>
+                    <td className="emp-date">{formatDate(leave?.createdAt || leave?.appliedDate)}</td>
+                    <td>
+                      <span className={getStatusBadge(leave?.status)}>
+                        {getStatusText(leave?.status)}
+                      </span>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="9" className="emp-empty">
+                  <td colSpan="8" className="emp-empty">
                     <div className="emp-empty-inner">
                       <span className="emp-empty-icon">📋</span>
                       <p>No leave requests found</p>
-                      <small>Try a different search or apply for a new leave</small>
+                      <small>Apply for a new leave using the button above</small>
                     </div>
                   </td>
                 </tr>
@@ -464,7 +723,6 @@ const LeaveManagement = ({ user }) => {
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="emp-pagination">
             <span className="emp-page-info">
@@ -489,539 +747,3 @@ const LeaveManagement = ({ user }) => {
 };
 
 export default LeaveManagement;
-
-
-
-
-// import { useState, useEffect, useCallback } from 'react';
-// import { FaSearch, FaTimes, FaPlus, FaCheck, FaClock, FaFilter } from 'react-icons/fa';
-// import { toast } from 'react-toastify';
-
-// const LeaveManagement = ({ user }) => {
-//   // ---------- Mock leave data ----------
-//   const [leaves, setLeaves] = useState([
-//     { id: 1, employee: 'Emma Watson', type: 'Sick Leave', startDate: '2024-04-05', endDate: '2024-04-06', days: 2, status: 'Pending', reason: 'Flu', appliedDate: '2024-04-01' },
-//     { id: 2, employee: 'Olivia Davis', type: 'Casual Leave', startDate: '2024-04-10', endDate: '2024-04-10', days: 1, status: 'Approved', reason: 'Personal', appliedDate: '2024-03-28' },
-//     { id: 3, employee: 'Liam Brown', type: 'Paid Leave', startDate: '2024-04-15', endDate: '2024-04-18', days: 4, status: 'Pending', reason: 'Vacation', appliedDate: '2024-04-02' },
-//     { id: 4, employee: 'Ava Martinez', type: 'Sick Leave', startDate: '2024-04-08', endDate: '2024-04-09', days: 2, status: 'Rejected', reason: 'Doctor appointment', appliedDate: '2024-04-01' },
-//   ]);
-
-//   // UI view: 'list' or 'form'
-//   const [view, setView] = useState('list');
-
-//   // Filter state
-//   const [statusFilter, setStatusFilter] = useState('All'); // 'All', 'Pending', 'Approved', 'Rejected'
-
-//   // List view state (search, pagination)
-//   const [searchTerm, setSearchTerm] = useState('');
-//   const [debouncedSearch, setDebouncedSearch] = useState('');
-//   const [page, setPage] = useState(0);
-//   const [size] = useState(5);
-//   const [totalPages, setTotalPages] = useState(0);
-//   const [totalElements, setTotalElements] = useState(0);
-
-//   // Form state (moved to top level to satisfy hooks rules)
-//   const [formData, setFormData] = useState({
-//     employeeName: "",
-//     leaveType: "CL",
-//     fromDate: "",
-//     toDate: "",
-//     isHalfDay: false,
-//     halfDaySession: "first",
-//     reason: "",
-//   });
-//   const [message, setMessage] = useState("");
-
-//   // Stats (based on all leaves)
-//   const pendingCount = leaves.filter(l => l.status === 'Pending').length;
-//   const approvedCount = leaves.filter(l => l.status === 'Approved').length;
-//   const rejectedCount = leaves.filter(l => l.status === 'Rejected').length;
-
-//   // Filter leaves based on status and search
-//   const filterLeaves = useCallback(() => {
-//     let filtered = leaves;
-    
-//     // Apply status filter
-//     if (statusFilter !== 'All') {
-//       filtered = filtered.filter(l => l.status === statusFilter);
-//     }
-    
-//     // Apply search filter
-//     if (debouncedSearch) {
-//       const term = debouncedSearch.toLowerCase();
-//       filtered = filtered.filter(l =>
-//         l.employee.toLowerCase().includes(term) ||
-//         l.reason.toLowerCase().includes(term) ||
-//         l.type.toLowerCase().includes(term)
-//       );
-//     }
-    
-//     return filtered;
-//   }, [leaves, statusFilter, debouncedSearch]);
-
-//   const filteredLeaves = filterLeaves();
-//   const paginatedLeaves = filteredLeaves.slice(page * size, (page + 1) * size);
-
-//   // Update pagination when filtered list changes
-//   useEffect(() => {
-//     setTotalPages(Math.ceil(filteredLeaves.length / size));
-//     setTotalElements(filteredLeaves.length);
-//     setPage(0);
-//   }, [filteredLeaves, size]);
-
-//   // Debounce search input
-//   useEffect(() => {
-//     const timer = setTimeout(() => {
-//       setDebouncedSearch(searchTerm);
-//       setPage(0);
-//     }, 500);
-//     return () => clearTimeout(timer);
-//   }, [searchTerm]);
-
-//   // Approve / Reject handlers
-//   const handleApprove = (id) => {
-//     setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: 'Approved' } : l));
-//     toast.success('Leave request approved');
-//   };
-
-//   const handleReject = (id) => {
-//     setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: 'Rejected' } : l));
-//     toast.error('Leave request rejected');
-//   };
-
-//   const getStatusBadge = (status) => {
-//     switch(status) {
-//       case 'Approved': return 'badge-success';
-//       case 'Pending':  return 'badge-warning';
-//       case 'Rejected': return 'badge-danger';
-//       default:         return 'badge-info';
-//     }
-//   };
-
-//   // Pagination range (same as Employees)
-//   const getPaginationRange = () => {
-//     const delta = 2;
-//     const range = [];
-//     const left  = Math.max(0, page - delta);
-//     const right = Math.min(totalPages - 1, page + delta);
-//     if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
-//     for (let i = left; i <= right; i++) range.push(i);
-//     if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
-//     return range;
-//   };
-
-//   // Form handlers (defined at top level, but only used when view === 'form')
-//   const handleFormChange = (e) => {
-//     const { name, value, type, checked } = e.target;
-//     setFormData(prev => ({
-//       ...prev,
-//       [name]: type === "checkbox" ? checked : value,
-//     }));
-//   };
-
-//   const handleFormSubmit = (e) => {
-//     e.preventDefault();
-//     setMessage("Leave Applied Successfully!");
-
-//     // Convert form data to leave record
-//     let leaveTypeDisplay = '';
-//     if (formData.leaveType === 'CL') leaveTypeDisplay = 'Casual Leave';
-//     else if (formData.leaveType === 'SL') leaveTypeDisplay = 'Sick Leave';
-//     else if (formData.leaveType === 'PL') leaveTypeDisplay = 'Paid Leave';
-
-//     let days = 1;
-//     if (!formData.isHalfDay && formData.fromDate && formData.toDate) {
-//       const diffTime = new Date(formData.toDate) - new Date(formData.fromDate);
-//       days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-//     } else if (formData.isHalfDay) {
-//       days = 0.5;
-//     }
-
-//     const newLeave = {
-//       id: leaves.length + 1,
-//       employee: formData.employeeName || (user?.name || 'Unknown'),
-//       type: leaveTypeDisplay,
-//       startDate: formData.fromDate,
-//       endDate: formData.isHalfDay ? formData.fromDate : formData.toDate,
-//       days: days,
-//       status: 'Pending',
-//       reason: formData.reason,
-//       appliedDate: new Date().toISOString().slice(0, 10),
-//     };
-
-//     setLeaves(prev => [newLeave, ...prev]);
-//     toast.success('Leave request submitted successfully');
-
-//     // Reset form and return to list after 1 second
-//     setFormData({
-//       employeeName: "",
-//       leaveType: "CL",
-//       fromDate: "",
-//       toDate: "",
-//       isHalfDay: false,
-//       halfDaySession: "first",
-//       reason: "",
-//     });
-//     setTimeout(() => setView('list'), 1000);
-//   };
-
-//   const resetFormMessage = () => {
-//     setMessage("");
-//   };
-
-//   // ---------- FORM VIEW ----------
-//   if (view === 'form') {
-//     if (message) resetFormMessage();
-
-//     return (
-//       <div className="main-content">
-//         <div className="page-header d-flex justify-content-between align-items-center">
-//           <div>
-//             <h1>Apply Leave</h1>
-//             <p>Submit a new leave request</p>
-//           </div>
-//           <button className="btn-outline-indigo" onClick={() => setView('list')}>
-//             Back
-//           </button>
-//         </div>
-
-//         <div className="card-modern p-4">
-//           {message && (
-//             <div className="badge-success mb-4" style={{ display: "inline-block" }}>
-//               {message}
-//             </div>
-//           )}
-
-//           <form onSubmit={handleFormSubmit}>
-//             <div className="row g-4">
-//               <div className="col-md-6">
-//                 <label className="form-label-modern">Employee Name *</label>
-//                 <input
-//                   type="text"
-//                   className="form-control-modern"
-//                   name="employeeName"
-//                   value={formData.employeeName}
-//                   onChange={handleFormChange}
-//                   required
-//                 />
-//               </div>
-
-//               <div className="col-md-6">
-//                 <label className="form-label-modern">Leave Type *</label>
-//                 <select
-//                   className="form-control-modern"
-//                   name="leaveType"
-//                   value={formData.leaveType}
-//                   onChange={handleFormChange}
-//                   required
-//                 >
-//                   <option value="CL">Casual Leave (CL)</option>
-//                   <option value="SL">Sick Leave (SL)</option>
-//                   <option value="PL">Paid Leave (PL)</option>
-//                 </select>
-//               </div>
-
-//               <div className="col-md-6">
-//                 <label className="form-label-modern">From Date *</label>
-//                 <input
-//                   type="date"
-//                   className="form-control-modern"
-//                   name="fromDate"
-//                   value={formData.fromDate}
-//                   onChange={handleFormChange}
-//                   required
-//                 />
-//               </div>
-
-//               <div className="col-md-6">
-//                 <label className="form-label-modern">To Date *</label>
-//                 <input
-//                   type="date"
-//                   className="form-control-modern"
-//                   name="toDate"
-//                   value={formData.toDate}
-//                   onChange={handleFormChange}
-//                   required
-//                   disabled={formData.isHalfDay}
-//                 />
-//                 {formData.isHalfDay && (
-//                   <small className="text-muted" style={{ fontSize: "11px" }}>
-//                     To date disabled for half‑day requests
-//                   </small>
-//                 )}
-//               </div>
-
-//               <div className="col-12">
-//                 <div className="form-check">
-//                   <input
-//                     type="checkbox"
-//                     className="form-check-input"
-//                     id="isHalfDay"
-//                     name="isHalfDay"
-//                     checked={formData.isHalfDay}
-//                     onChange={handleFormChange}
-//                     style={{ borderColor: "#6366f1", cursor: "pointer" }}
-//                   />
-//                   <label className="form-check-label" htmlFor="isHalfDay" style={{ fontWeight: "500" }}>
-//                     Half Day Leave
-//                   </label>
-//                 </div>
-//               </div>
-
-//               {formData.isHalfDay && (
-//                 <div className="col-md-6">
-//                   <label className="form-label-modern">Session *</label>
-//                   <select
-//                     className="form-control-modern"
-//                     name="halfDaySession"
-//                     value={formData.halfDaySession}
-//                     onChange={handleFormChange}
-//                     required
-//                   >
-//                     <option value="first">First Half (Morning)</option>
-//                     <option value="second">Second Half (Afternoon)</option>
-//                   </select>
-//                 </div>
-//               )}
-
-//               <div className="col-12">
-//                 <label className="form-label-modern">Reason *</label>
-//                 <textarea
-//                   className="form-control-modern"
-//                   name="reason"
-//                   rows="3"
-//                   value={formData.reason}
-//                   onChange={handleFormChange}
-//                   required
-//                   placeholder="Brief reason for leave..."
-//                 />
-//               </div>
-
-//               <div className="col-12 mt-3">
-//                 <button type="submit" className="btn-gradient me-3">
-//                   Apply Leave
-//                 </button>
-//                 <button type="button" className="btn-outline-indigo" onClick={() => setView('list')}>
-//                   Cancel
-//                 </button>
-//               </div>
-//             </div>
-//           </form>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   // ---------- LIST VIEW (with status filter and approve/reject) ----------
-//   return (
-//     <div className="emp-root">
-//       <div className="emp-header">
-//         <div className="emp-header-left">
-//           <div>
-//             <h1 className="emp-title">Leave Management</h1>
-//             <p className="emp-subtitle">{totalElements} total requests</p>
-//           </div>
-//         </div>
-//         <button className="emp-add-btn" onClick={() => setView('form')}>
-//           <FaPlus size={13} /> Apply for Leave
-//         </button>
-//       </div>
-
-//       {/* Stats Cards */}
-//       <div className="row g-4 mb-4">
-//         <div className="col-md-3">
-//           <div className="stat-card">
-//             <div className="d-flex justify-content-between align-items-center">
-//               <div>
-//                 <p className="text-gray mb-1">Pending Requests</p>
-//                 <h3 className="fw-bold mb-0">{pendingCount}</h3>
-//               </div>
-//               <div className="stat-icon" style={{ background: 'rgba(243,156,18,0.2)' }}>
-//                 <FaClock color="#f39c12" />
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-//         <div className="col-md-3">
-//           <div className="stat-card">
-//             <div className="d-flex justify-content-between align-items-center">
-//               <div>
-//                 <p className="text-gray mb-1">Approved</p>
-//                 <h3 className="fw-bold mb-0">{approvedCount}</h3>
-//               </div>
-//               <div className="stat-icon" style={{ background: 'rgba(46,204,113,0.2)' }}>
-//                 <FaCheck color="#2ecc71" />
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-//         <div className="col-md-3">
-//           <div className="stat-card">
-//             <div className="d-flex justify-content-between align-items-center">
-//               <div>
-//                 <p className="text-gray mb-1">Rejected</p>
-//                 <h3 className="fw-bold mb-0">{rejectedCount}</h3>
-//               </div>
-//               <div className="stat-icon" style={{ background: 'rgba(239,68,68,0.2)' }}>
-//                 <FaTimes color="#ef4444" />
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-//         <div className="col-md-3">
-//           <div className="stat-card">
-//             <div className="d-flex justify-content-between align-items-center">
-//               <div>
-//                 <p className="text-gray mb-1">Available Balance</p>
-//                 <h3 className="fw-bold mb-0">12</h3>
-//                 <small>Days remaining</small>
-//               </div>
-//               <div className="stat-icon" style={{ background: 'rgba(52,152,219,0.2)' }}>
-//                 <FaClock color="#3498db" />
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* Status Filter Tabs */}
-//       <div className="emp-search-bar" style={{ marginBottom: '16px', padding: '8px 16px' }}>
-//         <div className="d-flex gap-2 flex-wrap">
-//           {['All', 'Pending', 'Approved', 'Rejected'].map((filter) => (
-//             <button
-//               key={filter}
-//               className={`btn-filter ${statusFilter === filter ? 'active-filter' : ''}`}
-//               onClick={() => { setStatusFilter(filter); setPage(0); }}
-//               style={{
-//                 padding: '6px 16px',
-//                 borderRadius: '20px',
-//                 border: '1px solid #e0e2ff',
-//                 background: statusFilter === filter 
-//                   ? (filter === 'Pending' ? '#f59e0b' : filter === 'Approved' ? '#10b981' : filter === 'Rejected' ? '#ef4444' : '#6366f1')
-//                   : 'transparent',
-//                 color: statusFilter === filter ? '#fff' : '#4a5082',
-//                 cursor: 'pointer',
-//                 transition: 'all 0.2s',
-//                 fontSize: '13px',
-//                 fontWeight: '500'
-//               }}
-//             >
-//               {filter}
-//             </button>
-//           ))}
-//         </div>
-//       </div>
-
-//       {/* Search Bar */}
-//       <div className="emp-search-bar">
-//         <div className="emp-search-wrap">
-//           <FaSearch className="emp-search-icon" size={12} />
-//           <input
-//             className="emp-search-input"
-//             type="text"
-//             placeholder="Search by employee, leave type or reason…"
-//             value={searchTerm}
-//             onChange={(e) => setSearchTerm(e.target.value)}
-//           />
-//           {searchTerm && (
-//             <button className="emp-search-clear" onClick={() => setSearchTerm('')}>
-//               <FaTimes size={11} />
-//             </button>
-//           )}
-//         </div>
-//       </div>
-
-//       {/* Table */}
-//       <div className="emp-table-card">
-//         <div className="emp-table-wrap">
-//           <table className="emp-table">
-//             <thead>
-//               <tr>
-//                 <th>#</th>
-//                 <th>Employee</th>
-//                 <th>Leave Type</th>
-//                 <th>Duration</th>
-//                 <th>Days</th>
-//                 <th>Reason</th>
-//                 <th>Applied Date</th>
-//                 <th>Status</th>
-//                 <th style={{ width: 80, textAlign: 'center' }}>Actions</th>
-//               </tr>
-//             </thead>
-//             <tbody>
-//               {paginatedLeaves.length > 0 ? (
-//                 paginatedLeaves.map((leave, idx) => (
-//                   <tr key={leave.id} className="emp-row">
-//                     <td className="emp-sno">{page * size + idx + 1}</td>
-//                     <td className="fw-semibold">{leave.employee}</td>
-//                     <td>{leave.type}</td>
-//                     <td>{leave.startDate} → {leave.endDate}</td>
-//                     <td>{leave.days}</td>
-//                     <td>{leave.reason}</td>
-//                     <td className="emp-date">{leave.appliedDate}</td>
-//                     <td><span className={getStatusBadge(leave.status)}>{leave.status}</span></td>
-//                     <td>
-//                       <div className="emp-actions">
-//                         {leave.status === 'Pending' && (
-//                           <>
-//                             <button
-//                               className="emp-act emp-act--edit"
-//                               onClick={() => handleApprove(leave.id)}
-//                               title="Approve"
-//                               style={{ background: '#d1fae5', color: '#065f46' }}
-//                             >
-//                               <FaCheck size={12} />
-//                             </button>
-//                             <button
-//                               className="emp-act emp-act--del"
-//                               onClick={() => handleReject(leave.id)}
-//                               title="Reject"
-//                             >
-//                               <FaTimes size={12} />
-//                             </button>
-//                           </>
-//                         )}
-//                       </div>
-//                     </td>
-//                   </tr>
-//                 ))
-//               ) : (
-//                 <tr>
-//                   <td colSpan="9" className="emp-empty">
-//                     <div className="emp-empty-inner">
-//                       <span className="emp-empty-icon">📋</span>
-//                       <p>No leave requests found</p>
-//                       <small>Try a different search or apply for a new leave</small>
-//                     </div>
-//                   </td>
-//                 </tr>
-//               )}
-//             </tbody>
-//           </table>
-//         </div>
-
-//         {/* Pagination */}
-//         {totalPages > 1 && (
-//           <div className="emp-pagination">
-//             <span className="emp-page-info">
-//               Showing {page * size + 1}–{Math.min((page + 1) * size, totalElements)} of {totalElements} requests
-//             </span>
-//             <div className="emp-page-controls">
-//               <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
-//               {getPaginationRange().map((pg, i) =>
-//                 pg === '...' ? <span key={`dots-${i}`} className="emp-page-dots">…</span> : (
-//                   <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
-//                     {pg + 1}
-//                   </button>
-//                 )
-//               )}
-//               <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
-//             </div>
-//           </div>
-//         )}
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default LeaveManagement;

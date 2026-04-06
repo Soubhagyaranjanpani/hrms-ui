@@ -26,6 +26,15 @@ export const API_ENDPOINTS = {
   ACTIVATE_POLICY: (id) => `${BASE_URL}/api/policies/attendance/activate/${id}`,
 
 
+   APPLY_LEAVE:       `${BASE_URL}/api/leaves/apply`,
+  GET_MY_LEAVES:     `${BASE_URL}/api/leaves/my`,
+  GET_TEAM_LEAVES:   `${BASE_URL}/api/leaves/team`,
+  APPROVE_LEAVE:     `${BASE_URL}/api/leaves/approve`,
+  REJECT_LEAVE:      `${BASE_URL}/api/leaves/reject`,
+  DELETE_LEAVE:      (id) => `${BASE_URL}/api/leaves/${id}`,
+   LEAVE_TYPES:   `${BASE_URL}/api/leave-type`,
+  GET_LEAVE_BALANCE: (empId) => `${BASE_URL}/api/leaves/balance/${empId}`,
+
 };
 
 // ── LocalStorage Keys ────────────────────────
