@@ -100,7 +100,7 @@ const Department = () => {
     });
 
     setShowForm(false);
-    setCurrentPage(1); // reset to first page after add/edit
+    setCurrentPage(1);
   };
 
   // EDIT
@@ -135,20 +135,18 @@ const Department = () => {
   const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
   const currentDepts = filteredDepts.slice(startIndex, endIndex);
 
-  // Go to specific page
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
   };
 
-  // Reset to page 1 when search changes
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
     setCurrentPage(1);
   };
 
-  // ================= LIST =================
+  // ================= LIST VIEW =================
   if (!showForm) {
     return (
       <div className="container mt-1">
@@ -360,10 +358,15 @@ const Department = () => {
     );
   }
 
-  // ================= FORM =================
+  // ================= FORM VIEW =================
   return (
     <div className="container mt-1">
-      <div className="d-flex align-items-center gap-3 mb-3">
+      {/* Header with Back button on the right side */}
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
+          {editingDept ? "Edit Department" : "Add Department"}
+        </h2>
+
         <button
           className="btn"
           style={{
@@ -371,15 +374,14 @@ const Department = () => {
             color: "white",
             borderRadius: "20px",
             padding: "8px 20px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
           onClick={() => setShowForm(false)}
         >
           <FaArrowLeft /> Back
         </button>
-
-        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
-          {editingDept ? "Edit Department" : "Add Department"}
-        </h2>
       </div>
 
       <div

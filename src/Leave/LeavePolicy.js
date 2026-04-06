@@ -397,7 +397,12 @@ const LeavePolicy = () => {
   // ================= FORM VIEW (SECOND PAGE) =================
   return (
     <div className="container mt-1">
-      <div className="d-flex align-items-center gap-3 mb-3">
+      {/* Header with Back button on the right side */}
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
+          {editingPolicy ? "Edit Leave Policy" : "Add Leave Policy"}
+        </h2>
+
         <button
           className="btn"
           style={{
@@ -413,10 +418,6 @@ const LeavePolicy = () => {
         >
           <FaArrowLeft /> Back
         </button>
-
-        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
-          {editingPolicy ? "Edit Leave Policy" : "Add Leave Policy"}
-        </h2>
       </div>
 
       <div

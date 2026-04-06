@@ -51,7 +51,7 @@ const Destination = () => {
 
     setFormData({ destinationName: "" });
     setShowForm(false);
-    setCurrentPage(1); // reset to first page after add/edit
+    setCurrentPage(1);
   };
 
   // EDIT
@@ -83,20 +83,18 @@ const Destination = () => {
   const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
   const currentDestinations = filteredDestinations.slice(startIndex, endIndex);
 
-  // Go to specific page
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
   };
 
-  // Reset to page 1 when search changes
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
     setCurrentPage(1);
   };
 
-  // ================= LIST =================
+  // ================= LIST VIEW =================
   if (!showForm) {
     return (
       <div className="container mt-1">
@@ -246,7 +244,6 @@ const Destination = () => {
               </div>
 
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                {/* Previous button */}
                 <button
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
@@ -263,7 +260,6 @@ const Destination = () => {
                   « Previous
                 </button>
 
-                {/* Page numbers */}
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                   <button
                     key={page}
@@ -283,7 +279,6 @@ const Destination = () => {
                   </button>
                 ))}
 
-                {/* Next button */}
                 <button
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
@@ -307,10 +302,15 @@ const Destination = () => {
     );
   }
 
-  // ================= FORM =================
+  // ================= FORM VIEW =================
   return (
     <div className="container mt-1">
-      <div className="d-flex align-items-center gap-3 mb-3">
+      {/* Header with Back button on the right side */}
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
+          {editingDestination ? "Edit Destination" : "Add Destination"}
+        </h2>
+
         <button
           className="btn"
           style={{
@@ -318,15 +318,14 @@ const Destination = () => {
             color: "white",
             borderRadius: "20px",
             padding: "8px 20px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
           onClick={() => setShowForm(false)}
         >
           <FaArrowLeft /> Back
         </button>
-
-        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
-          {editingDestination ? "Edit Destination" : "Add Destination"}
-        </h2>
       </div>
 
       <div

@@ -136,7 +136,7 @@ const Branch = () => {
     });
 
     setShowForm(false);
-    setCurrentPage(1); // ✅ Reset to first page after add/edit
+    setCurrentPage(1);
   };
 
   // EDIT - Only if branch is active
@@ -169,19 +169,17 @@ const Branch = () => {
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
-  const currentBranches = filteredBranches.slice(startIndex, endIndex); // ✅ Use this for rendering
+  const currentBranches = filteredBranches.slice(startIndex, endIndex);
 
-  // Go to specific page
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
   };
 
-  // Handle search with page reset
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
-    setCurrentPage(1); // ✅ Reset to first page when searching
+    setCurrentPage(1);
   };
 
   // ================= LIST VIEW =================
@@ -199,7 +197,7 @@ const Branch = () => {
               className="form-control"
               placeholder="Search by Name..."
               value={searchQuery}
-              onChange={handleSearch} // ✅ Using handleSearch that resets page
+              onChange={handleSearch}
               style={{ width: "250px", borderRadius: "10px" }}
             />
 
@@ -255,10 +253,10 @@ const Branch = () => {
                 </tr>
               </thead>
               <tbody>
-                {currentBranches.length > 0 ? ( // ✅ Use currentBranches
+                {currentBranches.length > 0 ? (
                   currentBranches.map((branch, index) => (
                     <tr key={branch.id}>
-                      <td>{startIndex + index + 1}</td> {/* ✅ Correct row number */}
+                      <td>{startIndex + index + 1}</td>
                       <td>{branch.branchCode}</td>
                       <td>{branch.branchName}</td>
                       <td>{branch.address}</td>
@@ -353,7 +351,7 @@ const Branch = () => {
             </table>
           </div>
 
-          {/* ✅ PAGINATION - exactly like Role component */}
+          {/* PAGINATION */}
           {totalItems > 0 && (
             <div
               style={{
@@ -372,7 +370,6 @@ const Branch = () => {
               </div>
 
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                {/* Previous button */}
                 <button
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
@@ -389,7 +386,6 @@ const Branch = () => {
                   « Previous
                 </button>
 
-                {/* Page numbers */}
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                   <button
                     key={page}
@@ -409,7 +405,6 @@ const Branch = () => {
                   </button>
                 ))}
 
-                {/* Next button */}
                 <button
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
@@ -437,7 +432,12 @@ const Branch = () => {
   // ================= FORM VIEW =================
   return (
     <div className="container mt-1">
-      <div className="d-flex align-items-center gap-3 mb-3">
+      {/* Header with Back button on the right side */}
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
+          {editingBranch ? "Edit Branch" : "Add Branch"}
+        </h2>
+
         <button
           className="btn"
           style={{
@@ -453,10 +453,6 @@ const Branch = () => {
         >
           <FaArrowLeft /> Back
         </button>
-
-        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
-          {editingBranch ? "Edit Branch" : "Add Branch"}
-        </h2>
       </div>
 
       <div
