@@ -34,9 +34,8 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
   const leaveItems = [
     { path: '/leaves', icon: <FaPlane />, label: 'Apply Leave' },
     { path: '/approvedLeaves', icon: <FaLeaf />, label: 'Approve & Reject leave' },
-    { path: '/history', icon: <FaCalendarCheck />, label: 'Leave History' },
+    { path: '/leavePolicy', icon: <FaCalendarCheck />, label: 'Leave Policy' },
     { path: '/calendar', icon: <FaChartBar />, label: 'Leave Calendar' },
-    // { path: '/', icon: <FaCheck />, label: 'Approved Leaves' },
 
   ];
 

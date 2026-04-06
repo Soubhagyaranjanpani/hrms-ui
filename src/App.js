@@ -28,6 +28,7 @@ import AttendanceSummary from './pages/AttendanceSummary';
 import { ToastContainer } from './components/Toast';
 import { STORAGE_KEYS } from './config/api.config';
 import ApprovedLeaves from './Leave/ApproveRejectLeave';
+import LeavePolicy from './Leave/LeavePolicy';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -114,6 +115,7 @@ function App() {
           <Route path="attendance-dashboard" element={<AttendanceDashboard user={currentUser} />} />
           <Route path="attendance-summary" element={<AttendanceSummary user={currentUser} />} />
           <Route path="approvedLeaves" element={<ApprovedLeaves user={currentUser}/>}/>
+          <Route path="leavePolicy" element={<LeavePolicy user={currentUser}/>}/>
         </Route>
       </Routes>
     </Router>
