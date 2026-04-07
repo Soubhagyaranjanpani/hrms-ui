@@ -493,13 +493,6 @@ const LeavePolicy = () => {
       <div className="emp-root">
         <div className="emp-header">
           <div className="emp-header-left">
-            <button className="emp-back-btn" onClick={() => {
-              setShowForm(false);
-              setEditingPolicy(null);
-              resetForm();
-            }} disabled={loading}>
-              <FaArrowLeft size={12} /> Back
-            </button>
             <div>
               <h1 className="emp-title" style={{ fontSize: "24px" }}>
                 {editingPolicy ? "Edit Leave Policy" : "Create Leave Policy"}
@@ -508,6 +501,15 @@ const LeavePolicy = () => {
                 {editingPolicy ? "Modify policy rules and settings" : "Define new leave policy rules"}
               </p>
             </div>
+          </div>
+          <div className="d-flex gap-2">
+            <button className="emp-back-btn" onClick={() => {
+              setShowForm(false);
+              setEditingPolicy(null);
+              resetForm();
+            }} disabled={loading}>
+              <FaArrowLeft size={12} /> Back
+            </button>
           </div>
         </div>
 
