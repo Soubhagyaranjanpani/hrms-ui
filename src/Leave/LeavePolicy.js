@@ -1,172 +1,245 @@
-import { useState } from "react";
-import { FaEdit, FaArrowLeft } from "react-icons/fa";
+import React, { useState, useEffect } from "react";
+import { FaEdit, FaArrowLeft, FaCheckCircle } from "react-icons/fa";
+import axios from "axios";
+import { API_ENDPOINTS, STORAGE_KEYS } from "../config/api.config";
+import { toast } from "../components/Toast"; 
+import LoadingSpinner from "../components/LoadingSpinner"; 
 
 const LeavePolicy = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [leaveTypes, setLeaveTypes] = useState([]);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
+  // Form data matching backend DTO
   const [formData, setFormData] = useState({
-    leaveType: "",
-    carryForwardAllowed: "No",
-    leaveExpireDate: "",
+    leaveTypeId: "",
+    carryForwardAllowed: false,
+    maxCarryForwardDays: "",
+    expiryType: "YEAR_END",
+    accrualEnabled: false,
     accrualPerMonth: "",
-    policyDescription: "",
-    policyPrice: "",
-    policyDuration: "",
-    policyApprover: "",
+    requiresApproval: true,
+    maxApprovalLevels: "1",
+    sandwichPolicyEnabled: false,
+    holidayIncludedInLeave: false,
+    weekendIncludedInLeave: false,
+    allowHalfDay: false,
+    allowBackdatedLeave: false,
+    maxLeaveDaysPerRequest: "",
+    documentRequired: false,
+    isActive: true,
   });
 
-  const [policyData, setPolicyData] = useState([
-    {
-      id: 1,
-      leaveType: "Annual",
-      carryForwardAllowed: "Yes",
-      leaveExpireDate: "2025-12-31",
-      accrualPerMonth: "2.5",
-      policyDescription: "Standard annual",
-      policyPrice: "0",
-      policyDuration: "12 months",
-      policyApprover: "HR Manager",
-      status: "y",
-    },
-    {
-      id: 2,
-      leaveType: "Sick ",
-      carryForwardAllowed: "No",
-      leaveExpireDate: "2024-12-31",
-      accrualPerMonth: "1",
-      policyDescription: "Medical leave",
-      policyPrice: "0",
-      policyDuration: "12 months",
-      policyApprover: "Team Lead",
-      status: "y",
-    },
-    {
-      id: 3,
-      leaveType: "Casual ",
-      carryForwardAllowed: "Yes",
-      leaveExpireDate: "2025-06-30",
-      accrualPerMonth: "1.5",
-      policyDescription: "Short duration",
-      policyPrice: "0",
-      policyDuration: "6 months",
-      policyApprover: "HR Manager",
-      status: "y",
-    },
-    {
-      id: 4,
-      leaveType: "Maternity ",
-      carryForwardAllowed: "No",
-      leaveExpireDate: "2024-12-31",
-      accrualPerMonth: "0",
-      policyDescription: "26 weeks fully",
-      policyPrice: "100",
-      policyDuration: "6 months",
-      policyApprover: "HR Director",
-      status: "y",
-    },
-    {
-      id: 5,
-      leaveType: "Paternity ",
-      carryForwardAllowed: "No",
-      leaveExpireDate: "2024-12-31",
-      accrualPerMonth: "0",
-      policyDescription: "2 weeks paternity leave",
-      policyPrice: "100",
-      policyDuration: "2 weeks",
-      policyApprover: "HR Manager",
-      status: "y",
-    },
-    {
-      id: 6,
-      leaveType: "Bereavement ",
-      carryForwardAllowed: "No",
-      leaveExpireDate: "2024-12-31",
-      accrualPerMonth: "0",
-      policyDescription: "3 days paid leave",
-      policyPrice: "0",
-      policyDuration: "3 days",
-      policyApprover: "Team Lead",
-      status: "y",
-    },
-    {
-      id: 7,
-      leaveType: "Study ",
-      carryForwardAllowed: "Yes",
-      leaveExpireDate: "2025-03-31",
-      accrualPerMonth: "1",
-      policyDescription: "Educational",
-      policyPrice: "0",
-      policyDuration: "10 days",
-      policyApprover: "Department Head",
-      status: "y",
-    },
-  ]);
+  const [policyData, setPolicyData] = useState([]);
+
+  // Expiry type options (matching backend enum)
+  const expiryTypeOptions = [
+    { value: "NEVER", label: "Never Expires" },
+    { value: "YEAR_END", label: "End of Year" },
+    { value: "FINANCIAL_YEAR_END", label: "End of Financial Year" },
+    { value: "AFTER_DAYS", label: "After Specific Days" },
+  ];
+
+  // Fetch leave types on component mount
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+    return {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    };
+  };
+
+  const fetchInitialData = async () => {
+    setInitialLoading(true);
+    try {
+      await Promise.all([fetchLeaveTypes(), fetchPolicies()]);
+    } catch (error) {
+      console.error("Error fetching initial data:", error);
+      toast.error("Error", "Failed to load leave policies data");
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  const fetchLeaveTypes = async () => {
+    try {
+      const response = await axios.get(API_ENDPOINTS.LEAVE_TYPES, getAuthHeaders());
+      if (Array.isArray(response.data)) {
+        setLeaveTypes(response.data);
+      } else if (response.data?.response && Array.isArray(response.data.response)) {
+        setLeaveTypes(response.data.response);
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        setLeaveTypes(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching leave types:", error);
+      toast.error("Error", "Failed to fetch leave types");
+      throw error;
+    }
+  };
+
+  const fetchPolicies = async () => {
+    try {
+      const response = await axios.get(API_ENDPOINTS.GET_ALL_LEAVE_POLICIES, getAuthHeaders());
+      if (response.data?.response && Array.isArray(response.data.response)) {
+        setPolicyData(response.data.response);
+      } else if (Array.isArray(response.data)) {
+        setPolicyData(response.data);
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        setPolicyData(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching policies:", error);
+      toast.error("Error", "Failed to fetch leave policies");
+      throw error;
+    }
+  };
 
   // INPUT CHANGE
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    const { name, value, type, checked } = e.target;
+    setFormData({
+      ...formData,
+      [name]: type === "checkbox" ? checked : value,
+    });
   };
 
   // ADD + UPDATE
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    if (editingPolicy) {
-      const updated = policyData.map((p) =>
-        p.id === editingPolicy.id ? { ...p, ...formData } : p
-      );
-      setPolicyData(updated);
-      setEditingPolicy(null);
-    } else {
-      const newPolicy = {
-        id: policyData.length + 1,
+    try {
+      if (!formData.leaveTypeId) {
+        toast.warning("Validation Error", "Please select a leave type");
+        setLoading(false);
+        return;
+      }
+
+      const payload = {
         ...formData,
-        status: "y",
+        maxCarryForwardDays: formData.maxCarryForwardDays ? parseInt(formData.maxCarryForwardDays) : null,
+        accrualPerMonth: formData.accrualPerMonth ? parseFloat(formData.accrualPerMonth) : null,
+        maxApprovalLevels: formData.maxApprovalLevels ? parseInt(formData.maxApprovalLevels) : null,
+        maxLeaveDaysPerRequest: formData.maxLeaveDaysPerRequest ? parseInt(formData.maxLeaveDaysPerRequest) : null,
+        leaveTypeId: parseInt(formData.leaveTypeId),
       };
-      setPolicyData([...policyData, newPolicy]);
-    }
 
+      if (editingPolicy) {
+        await axios.put(
+          API_ENDPOINTS.UPDATE_LEAVE_POLICY(editingPolicy.id),
+          payload,
+          getAuthHeaders()
+        );
+        toast.success("Success", "Leave policy updated successfully");
+      } else {
+        await axios.post(API_ENDPOINTS.CREATE_LEAVE_POLICY, payload, getAuthHeaders());
+        toast.success("Success", "Leave policy created successfully");
+      }
+
+      await fetchPolicies();
+      resetForm();
+      setShowForm(false);
+      setEditingPolicy(null);
+      setCurrentPage(1);
+    } catch (error) {
+      console.error("Error saving policy:", error);
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || "Error saving policy";
+      toast.error("Error", errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
     setFormData({
-      leaveType: "",
-      carryForwardAllowed: "No",
-      leaveExpireDate: "",
+      leaveTypeId: "",
+      carryForwardAllowed: false,
+      maxCarryForwardDays: "",
+      expiryType: "YEAR_END",
+      accrualEnabled: false,
       accrualPerMonth: "",
-      policyDescription: "",
-      policyPrice: "",
-      policyDuration: "",
-      policyApprover: "",
+      requiresApproval: true,
+      maxApprovalLevels: "1",
+      sandwichPolicyEnabled: false,
+      holidayIncludedInLeave: false,
+      weekendIncludedInLeave: false,
+      allowHalfDay: false,
+      allowBackdatedLeave: false,
+      maxLeaveDaysPerRequest: "",
+      documentRequired: false,
+      isActive: true,
     });
-
-    setShowForm(false);
-    setCurrentPage(1);
   };
 
-  // EDIT - Only if active
-  const handleEdit = (policy) => {
-    if (policy.status === "y") {
-      setEditingPolicy(policy);
-      setFormData(policy);
-      setShowForm(true);
+  const handleActivate = async (policy) => {
+    if (!window.confirm(`Activate this policy for ${getLeaveTypeName(policy.leaveType?.id || policy.leaveType)}? This will deactivate other policies for this leave type.`)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await axios.put(API_ENDPOINTS.ACTIVATE_LEAVE_POLICY(policy.id), {}, getAuthHeaders());
+      await fetchPolicies();
+      toast.success("Success", "Policy activated successfully");
+    } catch (error) {
+      console.error("Error activating policy:", error);
+      toast.error("Error", error.response?.data?.message || "Error activating policy");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Filtered data based on search
+  const handleEdit = (policy) => {
+    setEditingPolicy(policy);
+    setFormData({
+      leaveTypeId: policy.leaveType?.id || "",
+      carryForwardAllowed: policy.carryForwardAllowed || false,
+      maxCarryForwardDays: policy.maxCarryForwardDays || "",
+      expiryType: policy.expiryType || "YEAR_END",
+      accrualEnabled: policy.accrualEnabled || false,
+      accrualPerMonth: policy.accrualPerMonth || "",
+      requiresApproval: policy.requiresApproval ?? true,
+      maxApprovalLevels: policy.maxApprovalLevels || "1",
+      sandwichPolicyEnabled: policy.sandwichPolicyEnabled || false,
+      holidayIncludedInLeave: policy.holidayIncludedInLeave || false,
+      weekendIncludedInLeave: policy.weekendIncludedInLeave || false,
+      allowHalfDay: policy.allowHalfDay || false,
+      allowBackdatedLeave: policy.allowBackdatedLeave || false,
+      maxLeaveDaysPerRequest: policy.maxLeaveDaysPerRequest || "",
+      documentRequired: policy.documentRequired || false,
+      isActive: policy.isActive ?? true,
+    });
+    setShowForm(true);
+  };
+
+  const getLeaveTypeName = (leaveTypeId) => {
+    const leaveType = leaveTypes.find(lt => lt.id === leaveTypeId);
+    return leaveType ? leaveType.name : "Unknown";
+  };
+
+  const formatBoolean = (value) => {
+    return value ? "Yes" : "No";
+  };
+
   const filteredPolicies = policyData.filter(
     (p) =>
-      p.leaveType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.carryForwardAllowed.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.policyDescription &&
-        p.policyDescription.toLowerCase().includes(searchQuery.toLowerCase()))
+      (p.leaveType?.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      formatBoolean(p.carryForwardAllowed).toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Pagination logic
   const totalItems = filteredPolicies.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
@@ -184,408 +257,498 @@ const LeavePolicy = () => {
     setCurrentPage(1);
   };
 
-  // Predefined options for Leave Type dropdown
-  const leaveTypeOptions = [
-    "Annual Leave",
-    "Sick Leave",
-    "Casual Leave",
-    "Maternity Leave",
-    "Paternity Leave",
-  ];
+  // Toggle Switch Component
+  const ToggleSwitch = ({ name, checked, onChange, disabled, label }) => (
+    <label className="toggle-switch" style={{ display: "flex", alignItems: "center", gap: "12px", cursor: disabled ? "not-allowed" : "pointer" }}>
+      <div className="toggle-container">
+        <input
+          type="checkbox"
+          name={name}
+          checked={checked}
+          onChange={onChange}
+          disabled={disabled}
+          style={{ display: "none" }}
+        />
+        <div 
+          className={`toggle-slider ${checked ? "active" : ""}`}
+          onClick={() => !disabled && onChange({ target: { name, type: "checkbox", checked: !checked } })}
+          style={{
+            width: "44px",
+            height: "24px",
+            backgroundColor: checked ? "#6366f1" : "#c7d2fe",
+            borderRadius: "34px",
+            position: "relative",
+            transition: "all 0.3s ease",
+            cursor: disabled ? "not-allowed" : "pointer",
+            opacity: disabled ? 0.6 : 1,
+          }}
+        >
+          <div 
+            className="toggle-knob"
+            style={{
+              width: "18px",
+              height: "18px",
+              backgroundColor: "white",
+              borderRadius: "50%",
+              position: "absolute",
+              top: "3px",
+              left: checked ? "22px" : "3px",
+              transition: "left 0.3s ease",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+            }}
+          />
+        </div>
+      </div>
+      <span style={{ fontSize: "13px", fontWeight: "500", color: "#4a5082" }}>{label}</span>
+    </label>
+  );
+
+  if (initialLoading) {
+    return <LoadingSpinner message="Loading leave policies..." />;
+  }
 
   // ================= LIST VIEW =================
   if (!showForm) {
     return (
-      <div className="container mt-1">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h2 className="mb-0" style={{ color: "#6366f1" }}>
-            Leave Policy
-          </h2>
-
-          <div className="d-flex gap-2">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Search by Leave..."
-              value={searchQuery}
-              onChange={handleSearch}
-              style={{ width: "250px", borderRadius: "10px" }}
-            />
-
-            <button
-              className="btn"
-              style={{
-                backgroundColor: "#6366f1",
-                color: "white",
-                borderRadius: "20px",
-                padding: "8px 20px",
-              }}
-              onClick={() => {
-                setShowForm(true);
-                setEditingPolicy(null);
-                setFormData({
-                  leaveType: "",
-                  carryForwardAllowed: "No",
-                  leaveExpireDate: "",
-                  accrualPerMonth: "",
-                  policyDescription: "",
-                  policyPrice: "",
-                  policyDuration: "",
-                  policyApprover: "",
-                });
-              }}
-            >
-              Add
-            </button>
-          </div>
-        </div>
-
-        <div
-          className="card-modern p-3"
-          style={{
-            borderRadius: "15px",
-            backgroundColor: "white",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-          }}
-        >
-          <div className="table-responsive">
-            <table className="table table-custom">
-              <thead>
-                <tr>
-                  <th>No</th>
-                  <th>LeaveType</th>
-                  <th>CarryForward</th>
-                  <th>ExpireDate</th>
-                  <th>Accrual/Month</th>
-                  <th>Description</th>
-                  <th>Price($)</th>
-                  <th>Duration</th>
-                  <th>Approver</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentPolicies.length > 0 ? (
-                  currentPolicies.map((policy, index) => (
-                    <tr key={policy.id}>
-                      <td>{startIndex + index + 1}</td>
-                      <td>{policy.leaveType}</td>
-                      <td>{policy.carryForwardAllowed}</td>
-                      <td>{policy.leaveExpireDate}</td>
-                      <td>{policy.accrualPerMonth}</td>
-                      <td>{policy.policyDescription}</td>
-                      <td>{policy.policyPrice}</td>
-                      <td>{policy.policyDuration}</td>
-                      <td>{policy.policyApprover}</td>
-
-                      {/* ACTION BUTTON */}
-                      <td>
-                        <button
-                          className="btn btn-sm"
-                          style={{
-                            backgroundColor:
-                              policy.status === "y" ? "#6366f1" : "#ccc",
-                            color: "white",
-                            borderRadius: "10px",
-                            padding: "6px 10px",
-                            cursor: policy.status === "y" ? "pointer" : "not-allowed",
-                            opacity: policy.status === "y" ? 1 : 0.6,
-                            border: "none",
-                          }}
-                          onClick={() => handleEdit(policy)}
-                          disabled={policy.status !== "y"}
-                          title={
-                            policy.status !== "y"
-                              ? "Cannot edit inactive policy"
-                              : "Edit policy"
-                          }
-                        >
-                          <FaEdit />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="10" className="text-center py-4 text-muted">
-                      No leave policies found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* PAGINATION */}
-          {totalItems > 0 && (
-            <div
-              style={{
-                borderTop: "1px solid #e5e7eb",
-                paddingTop: "15px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginTop: "1rem",
-                flexWrap: "wrap",
-                gap: "10px",
-              }}
-            >
-              <div style={{ fontSize: "14px", color: "#6c757d" }}>
-                Showing {startIndex + 1} to {endIndex} of {totalItems} entries
-              </div>
-
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <button
-                  onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid #dee2e6",
-                    backgroundColor: currentPage === 1 ? "#f8f9fa" : "#ffffff",
-                    color: currentPage === 1 ? "#adb5bd" : "#6366f1",
-                    cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                    fontSize: "14px",
-                  }}
-                >
-                  « Previous
-                </button>
-
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => goToPage(page)}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: "6px",
-                      border: "1px solid #dee2e6",
-                      backgroundColor: page === currentPage ? "#6366f1" : "#ffffff",
-                      color: page === currentPage ? "#ffffff" : "#495057",
-                      fontWeight: page === currentPage ? "bold" : "normal",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                    }}
-                  >
-                    {page}
-                  </button>
-                ))}
-
-                <button
-                  onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid #dee2e6",
-                    backgroundColor:
-                      currentPage === totalPages ? "#f8f9fa" : "#ffffff",
-                    color: currentPage === totalPages ? "#adb5bd" : "#6366f1",
-                    cursor: currentPage === totalPages ? "not-allowed" : "pointer",
-                    fontSize: "14px",
-                  }}
-                >
-                  Next »
-                </button>
+      <div className="container mt-3">
+        <div className="emp-root">
+          <div className="emp-header">
+            <div className="emp-header-left">
+              <div>
+                <h1 className="emp-title" style={{ fontSize: "24px" }}>Leave Policies</h1>
+                <p className="emp-subtitle">Manage leave rules and configurations</p>
               </div>
             </div>
-          )}
+            <div className="d-flex gap-2">
+              <div className="emp-search-wrap" style={{ width: "250px" }}>
+                <span className="emp-search-icon">🔍</span>
+                <input
+                  type="text"
+                  className="emp-search-input"
+                  placeholder="Search by leave type..."
+                  value={searchQuery}
+                  onChange={handleSearch}
+                  style={{ paddingLeft: "30px" }}
+                />
+                {searchQuery && (
+                  <button className="emp-search-clear" onClick={() => setSearchQuery("")}>
+                    ✕
+                  </button>
+                )}
+              </div>
+              <button className="emp-add-btn" onClick={() => {
+                setShowForm(true);
+                setEditingPolicy(null);
+                resetForm();
+              }}>
+                + Add Policy
+              </button>
+            </div>
+          </div>
+
+          <div className="emp-table-card">
+            <div className="emp-table-wrap">
+              <table className="emp-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Leave Type</th>
+                    <th>Carry Forward</th>
+                    <th>Max Carry Days</th>
+                    <th>Accrual/Month</th>
+                    <th>Approval</th>
+                    <th>Half Day</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: "center" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading && currentPolicies.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" className="emp-empty">
+                        <div className="emp-empty-inner">
+                          <div className="emp-spinner" style={{ width: "30px", height: "30px", borderWidth: "3px" }}></div>
+                          <p>Loading policies...</p>
+                        </div>
+                       </td>
+                    </tr>
+                  ) : currentPolicies.length > 0 ? (
+                    currentPolicies.map((policy, index) => (
+                      <tr className="emp-row" key={policy.id}>
+                        <td className="emp-sno">{startIndex + index + 1}</td>
+                        <td>
+                          <div className="emp-info-cell">
+                            <div className="emp-avatar" style={{ background: "#e0e7ff", color: "#6366f1" }}>
+                              {policy.leaveType?.name?.charAt(0) || "L"}
+                            </div>
+                            <div>
+                              <div className="emp-name">{policy.leaveType?.name || "Unknown"}</div>
+                              {policy.isActive && (
+                                <span className="emp-pill emp-pill--indigo" style={{ fontSize: "10px", padding: "2px 8px" }}>
+                                  Active
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td>{formatBoolean(policy.carryForwardAllowed)}</td>
+                        <td>{policy.maxCarryForwardDays || "-"}</td>
+                        <td>{policy.accrualPerMonth || "-"}</td>
+                        <td>{formatBoolean(policy.requiresApproval)}</td>
+                        <td>{formatBoolean(policy.allowHalfDay)}</td>
+                        <td>
+                          <span className={`emp-pill ${policy.isActive ? "emp-pill--indigo" : ""}`} style={{
+                            background: policy.isActive ? "#d1fae5" : "#f3f4f6",
+                            color: policy.isActive ? "#065f46" : "#6b7280"
+                          }}>
+                            {policy.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="emp-actions">
+                            <button
+                              className="emp-act emp-act--edit"
+                              onClick={() => handleEdit(policy)}
+                              title="Edit policy"
+                              disabled={loading}
+                            >
+                              <FaEdit size={12} />
+                            </button>
+                            {!policy.isActive && (
+                              <button
+                                className="emp-act"
+                                style={{ background: "#d1fae5", color: "#065f46" }}
+                                onClick={() => handleActivate(policy)}
+                                title="Activate policy"
+                                disabled={loading}
+                              >
+                                <FaCheckCircle size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="9" className="emp-empty">
+                        <div className="emp-empty-inner">
+                          <div className="emp-empty-icon">📋</div>
+                          <p>No leave policies found</p>
+                          <small>Click "Add Policy" to create one</small>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {totalItems > 0 && (
+              <div className="emp-pagination">
+                <div className="emp-page-info">
+                  Showing {startIndex + 1} to {endIndex} of {totalItems} entries
+                </div>
+                <div className="emp-page-controls">
+                  <button className="emp-page-btn" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1 || loading}>
+                    « Prev
+                  </button>
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        className={`emp-page-num ${pageNum === currentPage ? "active" : ""}`}
+                        onClick={() => goToPage(pageNum)}
+                        disabled={loading}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  <button className="emp-page-btn" onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages || loading}>
+                    Next »
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
-  // ================= FORM VIEW (SECOND PAGE) =================
+  // ================= FORM VIEW WITH TOGGLE SWITCHES =================
   return (
-    <div className="container mt-1">
-      {/* Header with Back button on the right side */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
-          {editingPolicy ? "Edit Leave Policy" : "Add Leave Policy"}
-        </h2>
-
-        <button
-          className="btn"
-          style={{
-            backgroundColor: "#6366f1",
-            color: "white",
-            borderRadius: "20px",
-            padding: "8px 20px",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-          onClick={() => setShowForm(false)}
-        >
-          <FaArrowLeft /> Back
-        </button>
-      </div>
-
-      <div
-        className="card p-4 shadow-sm"
-        style={{
-          borderRadius: "15px",
-          border: "none",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-        }}
-      >
-        <form onSubmit={handleSubmit}>
-          <div className="row g-3">
-            <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
-                Leave Type
-              </label>
-              <select
-                className="form-select"
-                name="leaveType"
-                value={formData.leaveType}
-                onChange={handleInputChange}
-                required
-                style={{ borderRadius: "8px" }}
-              >
-                <option value="" disabled>Select leave type</option>
-                {leaveTypeOptions.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
-                Carry Forward Allowed
-              </label>
-              <select
-                className="form-select"
-                name="carryForwardAllowed"
-                value={formData.carryForwardAllowed}
-                onChange={handleInputChange}
-                style={{ borderRadius: "8px" }}
-              >
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-              </select>
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
-                Leave Expire Date
-              </label>
-              <input
-                type="date"
-                className="form-control"
-                name="leaveExpireDate"
-                value={formData.leaveExpireDate}
-                onChange={handleInputChange}
-                style={{ borderRadius: "8px" }}
-              />
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
-                Accrual Per Month (days)
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                className="form-control"
-                name="accrualPerMonth"
-                value={formData.accrualPerMonth}
-                onChange={handleInputChange}
-                placeholder="e.g., 2.5"
-                style={{ borderRadius: "8px" }}
-              />
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
-                Policy Description
-              </label>
-              <textarea
-                className="form-control"
-                name="policyDescription"
-                value={formData.policyDescription}
-                onChange={handleInputChange}
-                rows="2"
-                placeholder="Describe the policy"
-                style={{ borderRadius: "8px" }}
-              />
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
-                Policy Price ($)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                className="form-control"
-                name="policyPrice"
-                value={formData.policyPrice}
-                onChange={handleInputChange}
-                placeholder="e.g., 100.00"
-                style={{ borderRadius: "8px" }}
-              />
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
-                Policy Duration
-              </label>
-              <input
-                type="text"
-                className="form-control"
-                name="policyDuration"
-                value={formData.policyDuration}
-                onChange={handleInputChange}
-                placeholder="e.g., 12 months"
-                style={{ borderRadius: "8px" }}
-              />
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
-                Approver
-              </label>
-              <input
-                type="text"
-                className="form-control"
-                name="policyApprover"
-                value={formData.policyApprover}
-                onChange={handleInputChange}
-                placeholder="e.g., HR Manager"
-                style={{ borderRadius: "8px" }}
-              />
+    <div className="container mt-3">
+      <div className="emp-root">
+        <div className="emp-header">
+          <div className="emp-header-left">
+            <button className="emp-back-btn" onClick={() => {
+              setShowForm(false);
+              setEditingPolicy(null);
+              resetForm();
+            }} disabled={loading}>
+              <FaArrowLeft size={12} /> Back
+            </button>
+            <div>
+              <h1 className="emp-title" style={{ fontSize: "24px" }}>
+                {editingPolicy ? "Edit Leave Policy" : "Create Leave Policy"}
+              </h1>
+              <p className="emp-subtitle">
+                {editingPolicy ? "Modify policy rules and settings" : "Define new leave policy rules"}
+              </p>
             </div>
           </div>
+        </div>
 
-          <div className="mt-4">
-            <button
-              className="btn me-2"
-              style={{
-                backgroundColor: "#6366f1",
-                color: "white",
-                borderRadius: "20px",
-                padding: "8px 25px",
-                border: "none",
-              }}
-            >
-              {editingPolicy ? "Update Policy" : "Save Policy"}
-            </button>
+        <div className="emp-form-wrap">
+          <form onSubmit={handleSubmit}>
+            {/* Basic Information */}
+            <div className="emp-form-section">
+              <div className="emp-section-label">Basic Information</div>
+              <div className="emp-form-grid">
+                <div className="emp-field">
+                  <div className="emp-label-row">
+                    <label>Leave Type <span className="req">*</span></label>
+                  </div>
+                  <select
+                    name="leaveTypeId"
+                    value={formData.leaveTypeId}
+                    onChange={handleInputChange}
+                    required
+                    disabled={loading}
+                  >
+                    <option value="">Select leave type</option>
+                    {leaveTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name} (Max: {type.maxDaysPerYear} days/year)
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{
-                borderRadius: "20px",
-                padding: "8px 25px",
-              }}
-              onClick={() => setShowForm(false)}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+                <div className="emp-field">
+                  <div className="emp-label-row">
+                    <label>Status</label>
+                  </div>
+                  <ToggleSwitch
+                    name="isActive"
+                    checked={formData.isActive}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                    label={formData.isActive ? "Active" : "Inactive"}
+                  />
+                  <div className="emp-hint-text">Note: Only one policy per leave type can be active</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="emp-divider"></div>
+
+            {/* Carry Forward & Expiry */}
+            <div className="emp-form-section">
+              <div className="emp-section-label">Carry Forward & Expiry</div>
+              <div className="emp-form-grid">
+                <div className="emp-field">
+                  <ToggleSwitch
+                    name="carryForwardAllowed"
+                    checked={formData.carryForwardAllowed}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                    label="Carry Forward Allowed"
+                  />
+                </div>
+
+                <div className="emp-field">
+                  <label>Max Carry Forward Days</label>
+                  <input
+                    type="number"
+                    name="maxCarryForwardDays"
+                    value={formData.maxCarryForwardDays}
+                    onChange={handleInputChange}
+                    disabled={!formData.carryForwardAllowed || loading}
+                    placeholder="e.g., 30"
+                  />
+                </div>
+
+                <div className="emp-field">
+                  <label>Expiry Type</label>
+                  <select
+                    name="expiryType"
+                    value={formData.expiryType}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                  >
+                    {expiryTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="emp-divider"></div>
+
+            {/* Accrual Settings */}
+            <div className="emp-form-section">
+              <div className="emp-section-label">Accrual Settings</div>
+              <div className="emp-form-grid">
+                <div className="emp-field">
+                  <ToggleSwitch
+                    name="accrualEnabled"
+                    checked={formData.accrualEnabled}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                    label="Accrual Enabled"
+                  />
+                </div>
+
+                <div className="emp-field">
+                  <label>Accrual Per Month (days)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    name="accrualPerMonth"
+                    value={formData.accrualPerMonth}
+                    onChange={handleInputChange}
+                    disabled={!formData.accrualEnabled || loading}
+                    placeholder="e.g., 2.5"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="emp-divider"></div>
+
+            {/* Approval Rules */}
+            <div className="emp-form-section">
+              <div className="emp-section-label">Approval Rules</div>
+              <div className="emp-form-grid">
+                <div className="emp-field">
+                  <ToggleSwitch
+                    name="requiresApproval"
+                    checked={formData.requiresApproval}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                    label="Requires Approval"
+                  />
+                </div>
+
+                <div className="emp-field">
+                  <label>Max Approval Levels</label>
+                  <input
+                    type="number"
+                    name="maxApprovalLevels"
+                    value={formData.maxApprovalLevels}
+                    onChange={handleInputChange}
+                    disabled={!formData.requiresApproval || loading}
+                    placeholder="e.g., 2"
+                  />
+                </div>
+
+                <div className="emp-field">
+                  <label>Max Days Per Request</label>
+                  <input
+                    type="number"
+                    name="maxLeaveDaysPerRequest"
+                    value={formData.maxLeaveDaysPerRequest}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                    placeholder="e.g., 10"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="emp-divider"></div>
+
+            {/* Advanced Settings - All Toggles */}
+            <div className="emp-form-section">
+              <div className="emp-section-label">Advanced Settings</div>
+              <div className="emp-form-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
+                <ToggleSwitch
+                  name="sandwichPolicyEnabled"
+                  checked={formData.sandwichPolicyEnabled}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  label="Sandwich Policy Enabled"
+                />
+
+                <ToggleSwitch
+                  name="holidayIncludedInLeave"
+                  checked={formData.holidayIncludedInLeave}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  label="Holiday Included in Leave"
+                />
+
+                <ToggleSwitch
+                  name="weekendIncludedInLeave"
+                  checked={formData.weekendIncludedInLeave}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  label="Weekend Included in Leave"
+                />
+
+                <ToggleSwitch
+                  name="allowHalfDay"
+                  checked={formData.allowHalfDay}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  label="Allow Half Day Leave"
+                />
+
+                <ToggleSwitch
+                  name="allowBackdatedLeave"
+                  checked={formData.allowBackdatedLeave}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  label="Allow Backdated Leave"
+                />
+
+                <ToggleSwitch
+                  name="documentRequired"
+                  checked={formData.documentRequired}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  label="Document Required"
+                />
+              </div>
+            </div>
+
+            <div className="emp-form-footer">
+              <button type="button" className="emp-cancel-btn" onClick={() => {
+                setShowForm(false);
+                setEditingPolicy(null);
+                resetForm();
+              }} disabled={loading}>
+                Close
+              </button>
+              <button type="submit" className="emp-submit-btn" disabled={loading}>
+                {loading ? (
+                  <>
+                    <span className="emp-spinner"></span>
+                    {editingPolicy ? "Updating..." : "Saving..."}
+                  </>
+                ) : (
+                  editingPolicy ? "Update Policy" : "Save Policy"
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

@@ -12,10 +12,12 @@ const AttendanceDashboard = () => {
     totalPresent: 0,
     totalAbsent: 0,
     totalHalfDay: 0,
+    totalLeave: 0,
     attendanceRate: 0
   });
   const [currentTime, setCurrentTime] = useState(new Date());
   const [monthlyRecords, setMonthlyRecords] = useState([]);
+  const [historicalRecords, setHistoricalRecords] = useState([]);
 
   const getAuthConfig = () => ({
     headers: { 
@@ -37,10 +39,22 @@ const AttendanceDashboard = () => {
     }
   };
 
+  // Filter out future dates
+  const filterHistoricalRecords = (records) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return records.filter(record => {
+      const recordDate = new Date(record.date);
+      recordDate.setHours(0, 0, 0, 0);
+      return recordDate <= today;
+    });
+  };
+
   const fetchTodayStatus = async () => {
     try {
       const response = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
-      const records = response.data?.response || response.data?.data || [];
+      const records = response.data?.response || [];
       const today = new Date().toISOString().split('T')[0];
       const todayData = records.find(record => record.date === today);
       
@@ -52,14 +66,19 @@ const AttendanceDashboard = () => {
           hours: todayData.workingHours || 0,
           status: todayData.status,
           overtimeHours: todayData.overtimeHours || 0,
-          date: todayData.date
+          date: todayData.date,
+          leaveType: todayData.leaveType
         });
       } else {
         setTodayRecord(null);
       }
       
       setMonthlyRecords(records);
-      calculateStats(records);
+      
+      // Filter for historical records only (past dates)
+      const historical = filterHistoricalRecords(records);
+      setHistoricalRecords(historical);
+      calculateStats(historical);
     } catch (error) {
       console.error('Error fetching today status:', error);
       toast.error('Error', 'Failed to fetch attendance status');
@@ -67,15 +86,20 @@ const AttendanceDashboard = () => {
   };
 
   const calculateStats = (records) => {
-    const present = records.filter(r => r.status === 'PRESENT').length;
-    const absent = records.filter(r => r.status === 'ABSENT').length;
-    const halfDay = records.filter(r => r.status === 'HALF_DAY').length;
-    const total = records.length;
+    // Filter out WEEKEND records from statistics
+    const workingDays = records.filter(r => r.status !== 'WEEKEND');
+    
+    const present = workingDays.filter(r => r.status === 'PRESENT').length;
+    const absent = workingDays.filter(r => r.status === 'ABSENT').length;
+    const halfDay = workingDays.filter(r => r.status === 'HALF_DAY').length;
+    const leave = workingDays.filter(r => r.status === 'LEAVE').length;
+    const total = workingDays.length;
     
     setStats({
       totalPresent: present,
       totalAbsent: absent,
       totalHalfDay: halfDay,
+      totalLeave: leave,
       attendanceRate: total > 0 ? (((present + halfDay * 0.5) / total) * 100).toFixed(1) : 0
     });
   };
@@ -87,10 +111,12 @@ const AttendanceDashboard = () => {
         params: { month: now.getMonth() + 1, year: now.getFullYear() },
         ...getAuthConfig()
       });
-      const records = response.data?.response || response.data?.data || [];
+      const records = response.data?.response || [];
       if (records.length > 0) {
         setMonthlyRecords(records);
-        calculateStats(records);
+        const historical = filterHistoricalRecords(records);
+        setHistoricalRecords(historical);
+        calculateStats(historical);
       }
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -101,7 +127,7 @@ const AttendanceDashboard = () => {
     setLoading(true);
     try {
       const response = await axios.post(API_ENDPOINTS.CHECK_IN, {}, getAuthConfig());
-      if (response.data?.status === 'SUCCESS' || response.data?.message?.includes('success')) {
+      if (response.data?.status === 200 || response.data?.message?.includes('success')) {
         toast.success('Success!', 'Checked in successfully!');
         await Promise.all([fetchTodayStatus(), fetchMonthlyStats()]);
       } else {
@@ -119,7 +145,7 @@ const AttendanceDashboard = () => {
     setLoading(true);
     try {
       const response = await axios.post(API_ENDPOINTS.CHECK_OUT, {}, getAuthConfig());
-      if (response.data?.status === 'SUCCESS' || response.data?.message?.includes('success')) {
+      if (response.data?.status === 200 || response.data?.message?.includes('success')) {
         toast.success('Success!', 'Checked out successfully!');
         await Promise.all([fetchTodayStatus(), fetchMonthlyStats()]);
       } else {
@@ -146,19 +172,36 @@ const AttendanceDashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Check if user can check in (not checked in today and not weekend)
   const isCheckedIn = todayRecord?.checkIn && !todayRecord?.checkOut;
   const isCheckedOut = todayRecord?.checkOut !== null && todayRecord?.checkOut !== undefined;
-  const canCheckIn = !isCheckedIn && !isCheckedOut;
-  const canCheckOut = isCheckedIn && !isCheckedOut;
+  const isWeekend = todayRecord?.status === 'WEEKEND';
+  const isOnLeave = todayRecord?.status === 'LEAVE';
+  const canCheckIn = !isCheckedIn && !isCheckedOut && !isWeekend && !isOnLeave;
+  const canCheckOut = isCheckedIn && !isCheckedOut && !isWeekend;
 
   const getStatusColor = (status) => {
     switch(status) {
       case 'PRESENT': return 'success';
       case 'HALF_DAY': return 'warning';
       case 'ABSENT': return 'danger';
+      case 'LEAVE': return 'info';
+      case 'WEEKEND': return 'secondary';
       default: return 'info';
     }
   };
+
+  const getStatusText = (record) => {
+    if (record.status === 'LEAVE' && record.leaveType) {
+      return `${record.status} (${record.leaveType})`;
+    }
+    return record.status || 'PENDING';
+  };
+
+  // Sort records by date (most recent first)
+  const sortedHistoricalRecords = [...historicalRecords].sort((a, b) => 
+    new Date(b.date) - new Date(a.date)
+  );
 
   return (
     <>
@@ -214,7 +257,7 @@ const AttendanceDashboard = () => {
             </div>
 
             {/* Today's Status */}
-            {todayRecord && (
+            {todayRecord && todayRecord.status !== 'WEEKEND' && (
               <div style={{
                 marginTop: '24px',
                 paddingTop: '24px',
@@ -244,7 +287,7 @@ const AttendanceDashboard = () => {
                 <div>
                   <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '4px' }}>Status</p>
                   <span className={`badge-${getStatusColor(todayRecord.status)}`}>
-                    {todayRecord.status || 'PENDING'}
+                    {getStatusText(todayRecord)}
                   </span>
                 </div>
                 {todayRecord.overtimeHours > 0 && (
@@ -255,6 +298,30 @@ const AttendanceDashboard = () => {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {todayRecord?.status === 'WEEKEND' && (
+              <div style={{
+                marginTop: '24px',
+                paddingTop: '24px',
+                borderTop: '1px solid var(--border-light)',
+                textAlign: 'center',
+                color: 'var(--text-muted)'
+              }}>
+                <p>🏖️ Today is a weekend! Enjoy your day off.</p>
+              </div>
+            )}
+
+            {todayRecord?.status === 'LEAVE' && (
+              <div style={{
+                marginTop: '24px',
+                paddingTop: '24px',
+                borderTop: '1px solid var(--border-light)',
+                textAlign: 'center',
+                color: 'var(--text-muted)'
+              }}>
+                <p>📅 You are on {todayRecord.leaveType || ''} leave today.</p>
               </div>
             )}
 
@@ -295,6 +362,15 @@ const AttendanceDashboard = () => {
           <div className="stat-card attendance-stat">
             <div className="stat-label">
               <FaCalendarAlt size={14} />
+              Leave Days
+            </div>
+            <div className="stat-value" style={{ color: '#8b5cf6' }}>{stats.totalLeave}</div>
+            <div className="stat-trend">This month</div>
+          </div>
+
+          <div className="stat-card attendance-stat">
+            <div className="stat-label">
+              <FaCalendarAlt size={14} />
               Absent Days
             </div>
             <div className="stat-value absent">{stats.totalAbsent}</div>
@@ -311,13 +387,16 @@ const AttendanceDashboard = () => {
           </div>
         </div>
 
-        {/* Recent Records Table */}
-        {monthlyRecords.length > 0 && (
+        {/* Historical Records Table - Only Past Dates */}
+        {sortedHistoricalRecords.length > 0 && (
           <div className="attendance-table-card">
             <div style={{ padding: '20px', borderBottom: '1px solid var(--border-light)' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)' }}>
-                Recent Attendance Records
+                Attendance History {historicalRecords.length > 0 && `(${historicalRecords.length} records)`}
               </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Showing past attendance records only
+              </p>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table className="attendance-table">
@@ -332,8 +411,8 @@ const AttendanceDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {monthlyRecords.slice(0, 5).map((record) => (
-                    <tr key={record.id}>
+                  {sortedHistoricalRecords.map((record, index) => (
+                    <tr key={record.id || index}>
                       <td className="date-cell">{record.date}</td>
                       <td className="day-cell">
                         {new Date(record.date).toLocaleDateString('en-US', { weekday: 'short' })}
@@ -343,13 +422,25 @@ const AttendanceDashboard = () => {
                       <td className="hours-cell">{record.workingHours?.toFixed(1) || '0.0'}</td>
                       <td>
                         <span className={`status-badge ${getStatusColor(record.status)}`}>
-                          {record.status || 'PENDING'}
+                          {getStatusText(record)}
                         </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* No History Message */}
+        {sortedHistoricalRecords.length === 0 && monthlyRecords.length > 0 && (
+          <div className="attendance-table-card">
+            <div style={{ padding: '40px', textAlign: 'center' }}>
+              <p style={{ color: 'var(--text-muted)' }}>No past attendance records found</p>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                Future dates are not displayed in the history
+              </p>
             </div>
           </div>
         )}

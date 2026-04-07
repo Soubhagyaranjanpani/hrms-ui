@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaSearch, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaClock, FaEye } from 'react-icons/fa';
+import { FaSearch, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaClock, FaEye, FaUmbrellaBeach, FaRegCalendarAlt } from 'react-icons/fa';
 import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
 import { toast, ToastContainer } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -43,7 +43,8 @@ const MyAttendance = () => {
     
     try {
       const response = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
-      const attendanceData = response.data?.response || response.data?.data || [];
+      // Updated to match actual response structure: response.data?.response
+      const attendanceData = response.data?.response || [];
       
       const transformedData = attendanceData.map(record => ({
         id: record.id,
@@ -53,8 +54,8 @@ const MyAttendance = () => {
         hours: record.workingHours || 0,
         status: record.status,
         overtimeHours: record.overtimeHours || 0,
-        isLate: record.isLate || false,
-        isEarlyExit: record.isEarlyExit || false
+        leaveType: record.leaveType || null,
+        employeeName: record.employeeName
       }));
       
       setRecords(transformedData);
@@ -91,6 +92,9 @@ const MyAttendance = () => {
       );
     }
     
+    // Sort by date (most recent first)
+    filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
     setFilteredRecords(filtered);
   }, [selectedMonth, selectedYear, statusFilter, records]);
 
@@ -99,20 +103,45 @@ const MyAttendance = () => {
       case 'PRESENT': return 'present';
       case 'ABSENT': return 'absent';
       case 'HALF_DAY': return 'late';
+      case 'LEAVE': return 'leave';
+      case 'WEEKEND': return 'weekend';
       default: return 'pending';
     }
   };
 
+  const getStatusIcon = (status) => {
+    switch(status?.toUpperCase()) {
+      case 'PRESENT': return <FaCheckCircle size={12} />;
+      case 'ABSENT': return <FaTimesCircle size={12} />;
+      case 'HALF_DAY': return <FaClock size={12} />;
+      case 'LEAVE': return <FaUmbrellaBeach size={12} />;
+      case 'WEEKEND': return <FaRegCalendarAlt size={12} />;
+      default: return null;
+    }
+  };
+
+  const getStatusText = (record) => {
+    if (record.status === 'LEAVE' && record.leaveType) {
+      return `${record.status} (${record.leaveType})`;
+    }
+    return record.status || 'PENDING';
+  };
+
+  // Filter out WEEKEND from statistics (only count working days)
+  const workingDaysRecords = filteredRecords.filter(r => r.status !== 'WEEKEND');
+  
   const summary = {
-    total: filteredRecords.length,
-    present: filteredRecords.filter(r => r.status === 'PRESENT').length,
-    absent: filteredRecords.filter(r => r.status === 'ABSENT').length,
-    halfDay: filteredRecords.filter(r => r.status === 'HALF_DAY').length,
-    totalHours: filteredRecords.reduce((sum, r) => sum + (r.hours || 0), 0).toFixed(1)
+    total: workingDaysRecords.length,
+    present: workingDaysRecords.filter(r => r.status === 'PRESENT').length,
+    absent: workingDaysRecords.filter(r => r.status === 'ABSENT').length,
+    halfDay: workingDaysRecords.filter(r => r.status === 'HALF_DAY').length,
+    leave: workingDaysRecords.filter(r => r.status === 'LEAVE').length,
+    totalHours: workingDaysRecords.reduce((sum, r) => sum + (r.hours || 0), 0).toFixed(1)
   };
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+  const months = Array.from({ length: 12 }, (_, i) => i);
 
   return (
     <>
@@ -132,28 +161,59 @@ const MyAttendance = () => {
         {/* Summary Cards */}
         <div className="summary-grid">
           <div className="stat-card attendance-stat">
-            <div className="stat-label">Total Days</div>
+            <div className="stat-label">
+              <FaCalendarAlt size={12} style={{ marginRight: '4px' }} />
+              Working Days
+            </div>
             <div className="stat-value total">{summary.total}</div>
+            <div className="stat-trend">Excluding weekends</div>
           </div>
           
           <div className="stat-card attendance-stat">
-            <div className="stat-label"><FaCheckCircle size={12} /> Present</div>
+            <div className="stat-label">
+              <FaCheckCircle size={12} style={{ marginRight: '4px' }} />
+              Present
+            </div>
             <div className="stat-value present">{summary.present}</div>
+            <div className="stat-trend">
+              {summary.total > 0 ? ((summary.present / summary.total) * 100).toFixed(1) : 0}% rate
+            </div>
           </div>
           
           <div className="stat-card attendance-stat">
-            <div className="stat-label"><FaClock size={12} /> Half Day</div>
+            <div className="stat-label">
+              <FaClock size={12} style={{ marginRight: '4px' }} />
+              Half Day
+            </div>
             <div className="stat-value late">{summary.halfDay}</div>
+            <div className="stat-trend">Partial attendance</div>
+          </div>
+
+          <div className="stat-card attendance-stat">
+            <div className="stat-label">
+              <FaUmbrellaBeach size={12} style={{ marginRight: '4px' }} />
+              Leave
+            </div>
+            <div className="stat-value" style={{ color: '#8b5cf6' }}>{summary.leave}</div>
+            <div className="stat-trend">Approved leaves</div>
           </div>
           
           <div className="stat-card attendance-stat">
-            <div className="stat-label"><FaTimesCircle size={12} /> Absent</div>
+            <div className="stat-label">
+              <FaTimesCircle size={12} style={{ marginRight: '4px' }} />
+              Absent
+            </div>
             <div className="stat-value absent">{summary.absent}</div>
+            <div className="stat-trend">No attendance</div>
           </div>
           
           <div className="stat-card attendance-stat">
-            <div className="stat-label">Total Hours</div>
+            <div className="stat-label">
+              <FaClock size={12} style={{ marginRight: '4px' }} />
+              Total Hours
+            </div>
             <div className="stat-value hours">{summary.totalHours}</div>
+            <div className="stat-trend">Hours worked</div>
           </div>
         </div>
 
@@ -167,9 +227,9 @@ const MyAttendance = () => {
                 onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
                 className="filter-select"
               >
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i} value={i}>
-                    {new Date(2000, i, 1).toLocaleString('default', { month: 'long' })}
+                {months.map(month => (
+                  <option key={month} value={month}>
+                    {new Date(2000, month, 1).toLocaleString('default', { month: 'long' })}
                   </option>
                 ))}
               </select>
@@ -195,10 +255,12 @@ const MyAttendance = () => {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="filter-select"
               >
-                <option value="all">All</option>
+                <option value="all">All Status</option>
                 <option value="present">Present</option>
                 <option value="half_day">Half Day</option>
+                <option value="leave">Leave</option>
                 <option value="absent">Absent</option>
+                <option value="weekend">Weekend</option>
               </select>
             </div>
             
@@ -249,12 +311,19 @@ const MyAttendance = () => {
                         <td className="day-cell">
                           {new Date(record.date).toLocaleDateString('en-US', { weekday: 'short' })}
                         </td>
-                        <td className="time-cell">{formatTime(record.checkIn)}</td>
-                        <td className="time-cell">{formatTime(record.checkOut)}</td>
-                        <td className="hours-cell">{record.hours ? record.hours.toFixed(1) : 0}</td>
+                        <td className="time-cell">
+                          {record.status === 'LEAVE' ? '—' : formatTime(record.checkIn)}
+                        </td>
+                        <td className="time-cell">
+                          {record.status === 'LEAVE' ? '—' : formatTime(record.checkOut)}
+                        </td>
+                        <td className="hours-cell">
+                          {record.status === 'LEAVE' ? '—' : (record.hours ? record.hours.toFixed(1) : '0.0')}
+                        </td>
                         <td>
                           <span className={`status-badge ${getStatusClass(record.status)}`}>
-                            {record.status || 'PENDING'}
+                            {getStatusIcon(record.status)}
+                            <span style={{ marginLeft: '4px' }}>{getStatusText(record)}</span>
                           </span>
                         </td>
                       </tr>
@@ -270,14 +339,41 @@ const MyAttendance = () => {
         {filteredRecords.length > 0 && (
           <div style={{
             marginTop: '16px',
-            padding: '12px',
-            textAlign: 'center',
-            fontSize: '13px',
-            color: 'var(--text-muted)',
+            padding: '16px',
             background: 'var(--bg-surface)',
-            borderRadius: '12px'
+            borderRadius: '12px',
+            border: '1px solid var(--border-light)'
           }}>
-            Showing {filteredRecords.length} of {records.length} total records
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                  Showing {filteredRecords.length} of {records.length} total records
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '16px', fontSize: '12px' }}>
+                {summary.present > 0 && (
+                  <span style={{ color: '#10b981' }}>
+                    ✅ Present: {summary.present}
+                  </span>
+                )}
+                {summary.leave > 0 && (
+                  <span style={{ color: '#8b5cf6' }}>
+                    📅 Leave: {summary.leave}
+                  </span>
+                )}
+                {summary.absent > 0 && (
+                  <span style={{ color: '#ef4444' }}>
+                    ❌ Absent: {summary.absent}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
