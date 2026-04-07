@@ -398,7 +398,7 @@ const LeaveManagement = ({ user }) => {
     return <LoadingSpinner message="Loading your leave requests..." />;
   }
 
-  // ---------- FORM VIEW ----------
+  // ---------- FORM VIEW (Back button moved to right side) ----------
   if (view === 'form') {
     if (loadingUser) {
       return <LoadingSpinner message="Loading user profile..." />;
@@ -406,16 +406,14 @@ const LeaveManagement = ({ user }) => {
 
     return (
       <div className="emp-root">
-        <div className="emp-header">
-          <div className="emp-header-left">
-            <button className="emp-back-btn" onClick={() => { setView('list'); setErrors({}); setTouched({}); }}>
-              <FaArrowLeft size={12} /> Back
-            </button>
-            <div>
-              <h1 className="emp-title">Apply Leave</h1>
-              <p className="emp-subtitle">Submit a new leave request</p>
-            </div>
+        <div className="emp-header" style={{ justifyContent: 'space-between' }}>
+          <div>
+            <h1 className="emp-title">Apply Leave</h1>
+            <p className="emp-subtitle">Submit a new leave request</p>
           </div>
+          <button className="emp-back-btn" onClick={() => { setView('list'); setErrors({}); setTouched({}); }}>
+            <FaArrowLeft size={12} /> Back
+          </button>
         </div>
 
         <div className="emp-form-wrap">
@@ -429,7 +427,6 @@ const LeaveManagement = ({ user }) => {
                   <input
                     type="text"
                     value={formData.employeeName || ''}
-                    disabled
                     style={{ background: '#f0f2ff', cursor: 'not-allowed', fontWeight: 500 }}
                   />
                   <small className="emp-hint-text">Auto-filled from your profile</small>
@@ -671,8 +668,8 @@ const LeaveManagement = ({ user }) => {
                       <FaSpinner className="emp-spinner" style={{ width: '24px', height: '24px', marginBottom: '12px' }} />
                       <p>Loading your leave requests...</p>
                     </div>
-                  </td>
-                </tr>
+                   </td>
+                 </tr>
               ) : paginatedLeaves.length > 0 ? (
                 paginatedLeaves.map((leave, idx) => (
                   <tr key={leave?.id || idx} className="emp-row">

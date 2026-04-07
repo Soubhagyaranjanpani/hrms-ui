@@ -15,13 +15,13 @@ const Role = () => {
   });
 
   const [roleData, setRoleData] = useState([
-    { "id": 1, "roleName": "Admin", "status": "y" },
-    { "id": 2, "roleName": "Manager", "status": "y" },
-    { "id": 3, "roleName": "HR", "status": "y" },
-    { "id": 4, "roleName": "Developer", "status": "y" },
-    { "id": 5, "roleName": "Tester", "status": "y" },
-    { "id": 6, "roleName": "Accountant", "status": "y" },
-    { "id": 7, "roleName": "Support", "status": "y" }
+    { id: 1, roleName: "Admin", status: "y" },
+    { id: 2, roleName: "Manager", status: "y" },
+    { id: 3, roleName: "HR", status: "y" },
+    { id: 4, roleName: "Developer", status: "y" },
+    { id: 5, roleName: "Tester", status: "y" },
+    { id: 6, roleName: "Accountant", status: "y" },
+    { id: 7, roleName: "Support", status: "y" },
   ]);
 
   // INPUT
@@ -89,11 +89,6 @@ const Role = () => {
     }
   };
 
-  const handleRowsPerPageChange = (e) => {
-    setRowsPerPage(Number(e.target.value));
-    setCurrentPage(1);
-  };
-
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
     setCurrentPage(1);
@@ -103,8 +98,21 @@ const Role = () => {
   if (!showForm) {
     return (
       <div className="container mt-1">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h2 className="mb-0" style={{ color: "#6366f1" }}>Role Directory</h2>
+        <div
+          className="d-flex justify-content-between align-items-center mb-3"
+          style={{ flexWrap: "wrap", gap: "12px" }}
+        >
+          <h2
+            style={{
+              fontFamily: "Sora, sans-serif",
+              fontSize: "22px",
+              fontWeight: "700",
+              color: "var(--text-primary)",
+              margin: 0,
+            }}
+          >
+            Role Directory
+          </h2>
 
           <div className="d-flex gap-2">
             <input
@@ -113,18 +121,43 @@ const Role = () => {
               placeholder="Search by Role..."
               value={searchQuery}
               onChange={handleSearch}
-              style={{ width: "250px", borderRadius: "10px" }}
+              style={{
+                width: "250px",
+                borderRadius: "12px",
+                border: "1px solid var(--border-medium)",
+                fontSize: "13px",
+                padding: "8px 14px",
+                fontFamily: "DM Sans, sans-serif",
+              }}
             />
 
             <button
               className="btn"
               style={{
-                backgroundColor: "#6366f1",
+                background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
                 color: "white",
-                borderRadius: "20px",
+                borderRadius: "12px",
                 padding: "8px 20px",
+                fontSize: "13px",
+                fontWeight: "600",
+                border: "none",
+                boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
+                transition: "all 0.25s",
+                cursor: "pointer",
               }}
-              onClick={() => setShowForm(true)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 8px 20px rgba(99,102,241,0.42)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 14px rgba(99,102,241,0.3)";
+              }}
+              onClick={() => {
+                setShowForm(true);
+                setEditingRole(null);
+                setFormData({ roleName: "" });
+              }}
             >
               Add
             </button>
@@ -134,27 +167,28 @@ const Role = () => {
         <div
           className="card-modern p-3"
           style={{
-            borderRadius: "15px",
-            backgroundColor: "white",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+            borderRadius: "20px",
+            backgroundColor: "var(--card-bg)",
+            boxShadow: "0 2px 12px rgba(99,102,241,0.06)",
+            border: "1px solid var(--border-light)",
           }}
         >
           <div className="table-responsive">
-            <table className="table table-custom">
+            <table className="table table-custom" style={{ marginBottom: 0 }}>
               <thead>
                 <tr>
-                  <th>No</th>
-                  <th>NAME</th>
-                  <th>STATUS</th>
-                  <th>ACTION</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>NO</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>NAME</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>STATUS</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>ACTION</th>
                 </tr>
               </thead>
               <tbody>
                 {currentRoles.length > 0 ? (
                   currentRoles.map((role, index) => (
                     <tr key={role.id}>
-                      <td>{startIndex + index + 1}</td>
-                      <td>{role.roleName}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{startIndex + index + 1}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{role.roleName}</td>
                       <td>
                         <div
                           onClick={() => handleStatusToggle(role.id)}
@@ -170,9 +204,9 @@ const Role = () => {
                               width: "42px",
                               height: "22px",
                               borderRadius: "50px",
-                              backgroundColor:
-                                role.status === "y" ? "#2d6cdf" : "#ccc",
+                              backgroundColor: role.status === "y" ? "var(--accent-indigo)" : "#ccc",
                               position: "relative",
+                              transition: "0.3s",
                             }}
                           >
                             <div
@@ -184,14 +218,16 @@ const Role = () => {
                                 position: "absolute",
                                 top: "2px",
                                 left: role.status === "y" ? "22px" : "2px",
+                                transition: "0.3s",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
                               }}
                             />
                           </div>
                           <span
                             style={{
-                              color: role.status === "y" ? "#2d6cdf" : "#999",
+                              color: role.status === "y" ? "var(--accent-indigo)" : "#999",
                               fontWeight: "600",
-                              fontSize: "13px",
+                              fontSize: "12px",
                             }}
                           >
                             {role.status === "y" ? "Active" : "Inactive"}
@@ -202,15 +238,19 @@ const Role = () => {
                         <button
                           className="btn btn-sm"
                           style={{
-                            backgroundColor:
-                              role.status === "y" ? "#6366f1" : "#ccc",
+                            backgroundColor: role.status === "y" ? "var(--accent-indigo)" : "#ccc",
                             color: "white",
                             borderRadius: "10px",
                             padding: "6px 10px",
+                            cursor: role.status === "y" ? "pointer" : "not-allowed",
+                            opacity: role.status === "y" ? 1 : 0.6,
                             border: "none",
+                            fontSize: "12px",
+                            transition: "all 0.2s",
                           }}
                           disabled={role.status !== "y"}
                           onClick={() => handleEdit(role)}
+                          title={role.status !== "y" ? "Cannot edit inactive role" : "Edit role"}
                         >
                           <FaEdit />
                         </button>
@@ -219,7 +259,7 @@ const Role = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="4" className="text-center py-4 text-muted">
+                    <td colSpan="4" className="text-center py-4 text-muted" style={{ fontSize: "13px", color: "var(--text-muted)" }}>
                       No roles found.
                     </td>
                   </tr>
@@ -232,7 +272,7 @@ const Role = () => {
           {totalItems > 0 && (
             <div
               style={{
-                borderTop: "1px solid #e5e7eb",
+                borderTop: "1px solid var(--border-light)",
                 paddingTop: "15px",
                 display: "flex",
                 justifyContent: "space-between",
@@ -242,7 +282,7 @@ const Role = () => {
                 gap: "10px",
               }}
             >
-              <div style={{ fontSize: "14px", color: "#6c757d" }}>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                 Showing {startIndex + 1} to {endIndex} of {totalItems} entries
               </div>
 
@@ -252,12 +292,14 @@ const Role = () => {
                   disabled={currentPage === 1}
                   style={{
                     padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid #dee2e6",
-                    backgroundColor: currentPage === 1 ? "#f8f9fa" : "#ffffff",
-                    color: currentPage === 1 ? "#adb5bd" : "#6366f1",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border-medium)",
+                    backgroundColor: currentPage === 1 ? "#f8f9fa" : "var(--bg-white)",
+                    color: currentPage === 1 ? "#adb5bd" : "var(--accent-indigo)",
                     cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                    fontSize: "14px",
+                    fontSize: "12px",
+                    fontFamily: "DM Sans, sans-serif",
+                    transition: "all 0.2s",
                   }}
                 >
                   « Previous
@@ -269,13 +311,14 @@ const Role = () => {
                     onClick={() => goToPage(page)}
                     style={{
                       padding: "6px 12px",
-                      borderRadius: "6px",
-                      border: "1px solid #dee2e6",
-                      backgroundColor: page === currentPage ? "#6366f1" : "#ffffff",
-                      color: page === currentPage ? "#ffffff" : "#495057",
+                      borderRadius: "8px",
+                      border: "1px solid var(--border-medium)",
+                      backgroundColor: page === currentPage ? "var(--accent-indigo)" : "var(--bg-white)",
+                      color: page === currentPage ? "#ffffff" : "var(--text-secondary)",
                       fontWeight: page === currentPage ? "bold" : "normal",
                       cursor: "pointer",
-                      fontSize: "14px",
+                      fontSize: "12px",
+                      fontFamily: "DM Sans, sans-serif",
                     }}
                   >
                     {page}
@@ -287,12 +330,12 @@ const Role = () => {
                   disabled={currentPage === totalPages}
                   style={{
                     padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid #dee2e6",
-                    backgroundColor: currentPage === totalPages ? "#f8f9fa" : "#ffffff",
-                    color: currentPage === totalPages ? "#adb5bd" : "#6366f1",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border-medium)",
+                    backgroundColor: currentPage === totalPages ? "#f8f9fa" : "var(--bg-white)",
+                    color: currentPage === totalPages ? "#adb5bd" : "var(--accent-indigo)",
                     cursor: currentPage === totalPages ? "not-allowed" : "pointer",
-                    fontSize: "14px",
+                    fontSize: "12px",
                   }}
                 >
                   Next »
@@ -308,22 +351,33 @@ const Role = () => {
   // ================= FORM VIEW =================
   return (
     <div className="container mt-1">
-      {/* Header with Back button on the right side */}
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
+        <h2
+          style={{
+            fontFamily: "Sora, sans-serif",
+            fontSize: "22px",
+            fontWeight: "700",
+            color: "var(--text-primary)",
+            margin: 0,
+          }}
+        >
           {editingRole ? "Edit Role" : "Add Role"}
         </h2>
 
         <button
           className="btn"
           style={{
-            backgroundColor: "#6366f1",
+            background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
             color: "white",
-            borderRadius: "20px",
+            borderRadius: "12px",
             padding: "8px 20px",
             display: "flex",
             alignItems: "center",
             gap: "8px",
+            fontSize: "13px",
+            fontWeight: "600",
+            border: "none",
+            cursor: "pointer",
           }}
           onClick={() => setShowForm(false)}
         >
@@ -334,21 +388,39 @@ const Role = () => {
       <div
         className="card p-4 shadow-sm"
         style={{
-          borderRadius: "15px",
-          border: "none",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+          borderRadius: "20px",
+          border: "1px solid var(--border-light)",
+          boxShadow: "0 2px 12px rgba(99,102,241,0.06)",
+          backgroundColor: "var(--card-bg)",
         }}
       >
         <form onSubmit={handleSubmit}>
           <div className="row g-3">
-            <div className="col-md-12">
-              <label style={{ color: "#6366f1" }}>Role Name</label>
+            <div className="col-md-6">
+              <label
+                style={{
+                  color: "var(--accent-indigo)",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  marginBottom: "6px",
+                }}
+              >
+                Role Name
+              </label>
               <input
                 className="form-control"
                 name="roleName"
                 value={formData.roleName}
                 onChange={handleInputChange}
-                style={{ borderRadius: "8px" }}
+                required
+                style={{
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-medium)",
+                  fontSize: "13px",
+                  fontFamily: "DM Sans, sans-serif",
+                  padding: "9px 12px",
+                  backgroundColor: "var(--bg-surface)",
+                }}
               />
             </div>
           </div>
@@ -357,10 +429,24 @@ const Role = () => {
             <button
               className="btn me-2"
               style={{
-                backgroundColor: "#6366f1",
+                background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
                 color: "white",
-                borderRadius: "20px",
-                padding: "8px 25px",
+                borderRadius: "12px",
+                padding: "9px 25px",
+                border: "none",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+                boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
+                transition: "all 0.25s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 8px 20px rgba(99,102,241,0.42)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 14px rgba(99,102,241,0.3)";
               }}
             >
               {editingRole ? "Update" : "Save"}
@@ -369,7 +455,16 @@ const Role = () => {
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ borderRadius: "20px", padding: "8px 25px" }}
+              style={{
+                borderRadius: "12px",
+                padding: "9px 25px",
+                fontSize: "13px",
+                fontWeight: "500",
+                border: "1.5px solid var(--border-medium)",
+                backgroundColor: "var(--bg-white)",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+              }}
               onClick={() => setShowForm(false)}
             >
               Cancel

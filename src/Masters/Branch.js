@@ -156,7 +156,7 @@ const Branch = () => {
     setBranchData(updated);
   };
 
-  // Filtered data based on search (search on multiple fields)
+  // Filtered data based on search
   const filteredBranches = branchData.filter(
     (b) =>
       b.branchName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -186,8 +186,19 @@ const Branch = () => {
   if (!showForm) {
     return (
       <div className="container mt-1">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h2 className="mb-0" style={{ color: "#6366f1" }}>
+        <div
+          className="d-flex justify-content-between align-items-center mb-3"
+          style={{ flexWrap: "wrap", gap: "12px" }}
+        >
+          <h2
+            style={{
+              fontFamily: "Sora, sans-serif",
+              fontSize: "22px",
+              fontWeight: "700",
+              color: "var(--text-primary)",
+              margin: 0,
+            }}
+          >
             Branch Directory
           </h2>
 
@@ -198,16 +209,37 @@ const Branch = () => {
               placeholder="Search by Name..."
               value={searchQuery}
               onChange={handleSearch}
-              style={{ width: "250px", borderRadius: "10px" }}
+              style={{
+                width: "250px",
+                borderRadius: "12px",
+                border: "1px solid var(--border-medium)",
+                fontSize: "13px",
+                padding: "8px 14px",
+                fontFamily: "DM Sans, sans-serif",
+              }}
             />
 
             <button
               className="btn"
               style={{
-                backgroundColor: "#6366f1",
+                background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
                 color: "white",
-                borderRadius: "20px",
+                borderRadius: "12px",
                 padding: "8px 20px",
+                fontSize: "13px",
+                fontWeight: "600",
+                border: "none",
+                boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
+                transition: "all 0.25s",
+                cursor: "pointer",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 8px 20px rgba(99,102,241,0.42)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 14px rgba(99,102,241,0.3)";
               }}
               onClick={() => {
                 setShowForm(true);
@@ -231,39 +263,40 @@ const Branch = () => {
         <div
           className="card-modern p-3"
           style={{
-            borderRadius: "15px",
-            backgroundColor: "white",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+            borderRadius: "20px",
+            backgroundColor: "var(--card-bg)",
+            boxShadow: "0 2px 12px rgba(99,102,241,0.06)",
+            border: "1px solid var(--border-light)",
           }}
         >
           <div className="table-responsive">
-            <table className="table table-custom">
+            <table className="table table-custom" style={{ marginBottom: 0 }}>
               <thead>
                 <tr>
-                  <th>No</th>
-                  <th>CODE</th>
-                  <th>BRANCH NAME</th>
-                  <th>ADDRESS</th>
-                  <th>CITY</th>
-                  <th>STATE</th>
-                  <th>COUNTRY</th>
-                  <th>PINCODE</th>
-                  <th>STATUS</th>
-                  <th>ACTION</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>No</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>CODE</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>BRANCH NAME</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>ADDRESS</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>CITY</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>STATE</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>COUNTRY</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>PINCODE</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>STATUS</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>ACTION</th>
                 </tr>
               </thead>
               <tbody>
                 {currentBranches.length > 0 ? (
                   currentBranches.map((branch, index) => (
                     <tr key={branch.id}>
-                      <td>{startIndex + index + 1}</td>
-                      <td>{branch.branchCode}</td>
-                      <td>{branch.branchName}</td>
-                      <td>{branch.address}</td>
-                      <td>{branch.city}</td>
-                      <td>{branch.state}</td>
-                      <td>{branch.country}</td>
-                      <td>{branch.pincode}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{startIndex + index + 1}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{branch.branchCode}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{branch.branchName}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{branch.address}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{branch.city}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{branch.state}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{branch.country}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{branch.pincode}</td>
 
                       {/* STATUS TOGGLE */}
                       <td>
@@ -281,8 +314,7 @@ const Branch = () => {
                               width: "42px",
                               height: "22px",
                               borderRadius: "50px",
-                              backgroundColor:
-                                branch.status === "y" ? "#2d6cdf" : "#ccc",
+                              backgroundColor: branch.status === "y" ? "var(--accent-indigo)" : "#ccc",
                               position: "relative",
                               transition: "0.3s",
                             }}
@@ -303,9 +335,9 @@ const Branch = () => {
                           </div>
                           <span
                             style={{
-                              color: branch.status === "y" ? "#2d6cdf" : "#999",
+                              color: branch.status === "y" ? "var(--accent-indigo)" : "#999",
                               fontWeight: "600",
-                              fontSize: "13px",
+                              fontSize: "12px",
                             }}
                           >
                             {branch.status === "y" ? "Active" : "Inactive"}
@@ -318,22 +350,19 @@ const Branch = () => {
                         <button
                           className="btn btn-sm"
                           style={{
-                            backgroundColor:
-                              branch.status === "y" ? "#6366f1" : "#ccc",
+                            backgroundColor: branch.status === "y" ? "var(--accent-indigo)" : "#ccc",
                             color: "white",
                             borderRadius: "10px",
                             padding: "6px 10px",
                             cursor: branch.status === "y" ? "pointer" : "not-allowed",
                             opacity: branch.status === "y" ? 1 : 0.6,
                             border: "none",
+                            fontSize: "12px",
+                            transition: "all 0.2s",
                           }}
                           onClick={() => handleEdit(branch)}
                           disabled={branch.status !== "y"}
-                          title={
-                            branch.status !== "y"
-                              ? "Cannot edit inactive branch"
-                              : "Edit branch"
-                          }
+                          title={branch.status !== "y" ? "Cannot edit inactive branch" : "Edit branch"}
                         >
                           <FaEdit />
                         </button>
@@ -342,7 +371,7 @@ const Branch = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="10" className="text-center py-4 text-muted">
+                    <td colSpan="10" className="text-center py-4 text-muted" style={{ fontSize: "13px", color: "var(--text-muted)" }}>
                       No branches found.
                     </td>
                   </tr>
@@ -355,7 +384,7 @@ const Branch = () => {
           {totalItems > 0 && (
             <div
               style={{
-                borderTop: "1px solid #e5e7eb",
+                borderTop: "1px solid var(--border-light)",
                 paddingTop: "15px",
                 display: "flex",
                 justifyContent: "space-between",
@@ -365,7 +394,7 @@ const Branch = () => {
                 gap: "10px",
               }}
             >
-              <div style={{ fontSize: "14px", color: "#6c757d" }}>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                 Showing {startIndex + 1} to {endIndex} of {totalItems} entries
               </div>
 
@@ -375,12 +404,14 @@ const Branch = () => {
                   disabled={currentPage === 1}
                   style={{
                     padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid #dee2e6",
-                    backgroundColor: currentPage === 1 ? "#f8f9fa" : "#ffffff",
-                    color: currentPage === 1 ? "#adb5bd" : "#6366f1",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border-medium)",
+                    backgroundColor: currentPage === 1 ? "#f8f9fa" : "var(--bg-white)",
+                    color: currentPage === 1 ? "#adb5bd" : "var(--accent-indigo)",
                     cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                    fontSize: "14px",
+                    fontSize: "12px",
+                    fontFamily: "DM Sans, sans-serif",
+                    transition: "all 0.2s",
                   }}
                 >
                   « Previous
@@ -392,13 +423,14 @@ const Branch = () => {
                     onClick={() => goToPage(page)}
                     style={{
                       padding: "6px 12px",
-                      borderRadius: "6px",
-                      border: "1px solid #dee2e6",
-                      backgroundColor: page === currentPage ? "#6366f1" : "#ffffff",
-                      color: page === currentPage ? "#ffffff" : "#495057",
+                      borderRadius: "8px",
+                      border: "1px solid var(--border-medium)",
+                      backgroundColor: page === currentPage ? "var(--accent-indigo)" : "var(--bg-white)",
+                      color: page === currentPage ? "#ffffff" : "var(--text-secondary)",
                       fontWeight: page === currentPage ? "bold" : "normal",
                       cursor: "pointer",
-                      fontSize: "14px",
+                      fontSize: "12px",
+                      fontFamily: "DM Sans, sans-serif",
                     }}
                   >
                     {page}
@@ -410,13 +442,12 @@ const Branch = () => {
                   disabled={currentPage === totalPages}
                   style={{
                     padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid #dee2e6",
-                    backgroundColor:
-                      currentPage === totalPages ? "#f8f9fa" : "#ffffff",
-                    color: currentPage === totalPages ? "#adb5bd" : "#6366f1",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border-medium)",
+                    backgroundColor: currentPage === totalPages ? "#f8f9fa" : "var(--bg-white)",
+                    color: currentPage === totalPages ? "#adb5bd" : "var(--accent-indigo)",
                     cursor: currentPage === totalPages ? "not-allowed" : "pointer",
-                    fontSize: "14px",
+                    fontSize: "12px",
                   }}
                 >
                   Next »
@@ -432,22 +463,33 @@ const Branch = () => {
   // ================= FORM VIEW =================
   return (
     <div className="container mt-1">
-      {/* Header with Back button on the right side */}
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
+        <h2
+          style={{
+            fontFamily: "Sora, sans-serif",
+            fontSize: "22px",
+            fontWeight: "700",
+            color: "var(--text-primary)",
+            margin: 0,
+          }}
+        >
           {editingBranch ? "Edit Branch" : "Add Branch"}
         </h2>
 
         <button
           className="btn"
           style={{
-            backgroundColor: "#6366f1",
+            background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
             color: "white",
-            borderRadius: "20px",
+            borderRadius: "12px",
             padding: "8px 20px",
             display: "flex",
             alignItems: "center",
             gap: "8px",
+            fontSize: "13px",
+            fontWeight: "600",
+            border: "none",
+            cursor: "pointer",
           }}
           onClick={() => setShowForm(false)}
         >
@@ -458,15 +500,16 @@ const Branch = () => {
       <div
         className="card p-4 shadow-sm"
         style={{
-          borderRadius: "15px",
-          border: "none",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+          borderRadius: "20px",
+          border: "1px solid var(--border-light)",
+          boxShadow: "0 2px 12px rgba(99,102,241,0.06)",
+          backgroundColor: "var(--card-bg)",
         }}
       >
         <form onSubmit={handleSubmit}>
           <div className="row g-3">
             <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
+              <label className="form-label fw-semibold" style={{ color: "var(--accent-indigo)", fontSize: "12px", fontWeight: "600", marginBottom: "6px" }}>
                 Branch Code
               </label>
               <input
@@ -475,12 +518,19 @@ const Branch = () => {
                 value={formData.branchCode}
                 onChange={handleInputChange}
                 required
-                style={{ borderRadius: "8px" }}
+                style={{
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-medium)",
+                  fontSize: "13px",
+                  fontFamily: "DM Sans, sans-serif",
+                  padding: "9px 12px",
+                  backgroundColor: "var(--bg-surface)",
+                }}
               />
             </div>
 
             <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
+              <label className="form-label fw-semibold" style={{ color: "var(--accent-indigo)", fontSize: "12px", fontWeight: "600", marginBottom: "6px" }}>
                 Branch Name
               </label>
               <input
@@ -489,12 +539,19 @@ const Branch = () => {
                 value={formData.branchName}
                 onChange={handleInputChange}
                 required
-                style={{ borderRadius: "8px" }}
+                style={{
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-medium)",
+                  fontSize: "13px",
+                  fontFamily: "DM Sans, sans-serif",
+                  padding: "9px 12px",
+                  backgroundColor: "var(--bg-surface)",
+                }}
               />
             </div>
 
             <div className="col-md-12">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
+              <label className="form-label fw-semibold" style={{ color: "var(--accent-indigo)", fontSize: "12px", fontWeight: "600", marginBottom: "6px" }}>
                 Address
               </label>
               <input
@@ -502,12 +559,19 @@ const Branch = () => {
                 name="address"
                 value={formData.address}
                 onChange={handleInputChange}
-                style={{ borderRadius: "8px" }}
+                style={{
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-medium)",
+                  fontSize: "13px",
+                  fontFamily: "DM Sans, sans-serif",
+                  padding: "9px 12px",
+                  backgroundColor: "var(--bg-surface)",
+                }}
               />
             </div>
 
             <div className="col-md-4">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
+              <label className="form-label fw-semibold" style={{ color: "var(--accent-indigo)", fontSize: "12px", fontWeight: "600", marginBottom: "6px" }}>
                 City
               </label>
               <input
@@ -515,12 +579,19 @@ const Branch = () => {
                 name="city"
                 value={formData.city}
                 onChange={handleInputChange}
-                style={{ borderRadius: "8px" }}
+                style={{
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-medium)",
+                  fontSize: "13px",
+                  fontFamily: "DM Sans, sans-serif",
+                  padding: "9px 12px",
+                  backgroundColor: "var(--bg-surface)",
+                }}
               />
             </div>
 
             <div className="col-md-4">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
+              <label className="form-label fw-semibold" style={{ color: "var(--accent-indigo)", fontSize: "12px", fontWeight: "600", marginBottom: "6px" }}>
                 State
               </label>
               <input
@@ -528,12 +599,19 @@ const Branch = () => {
                 name="state"
                 value={formData.state}
                 onChange={handleInputChange}
-                style={{ borderRadius: "8px" }}
+                style={{
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-medium)",
+                  fontSize: "13px",
+                  fontFamily: "DM Sans, sans-serif",
+                  padding: "9px 12px",
+                  backgroundColor: "var(--bg-surface)",
+                }}
               />
             </div>
 
             <div className="col-md-4">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
+              <label className="form-label fw-semibold" style={{ color: "var(--accent-indigo)", fontSize: "12px", fontWeight: "600", marginBottom: "6px" }}>
                 Country
               </label>
               <input
@@ -541,12 +619,19 @@ const Branch = () => {
                 name="country"
                 value={formData.country}
                 onChange={handleInputChange}
-                style={{ borderRadius: "8px" }}
+                style={{
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-medium)",
+                  fontSize: "13px",
+                  fontFamily: "DM Sans, sans-serif",
+                  padding: "9px 12px",
+                  backgroundColor: "var(--bg-surface)",
+                }}
               />
             </div>
 
             <div className="col-md-4">
-              <label className="form-label fw-semibold" style={{ color: "#6366f1" }}>
+              <label className="form-label fw-semibold" style={{ color: "var(--accent-indigo)", fontSize: "12px", fontWeight: "600", marginBottom: "6px" }}>
                 Pincode
               </label>
               <input
@@ -554,7 +639,14 @@ const Branch = () => {
                 name="pincode"
                 value={formData.pincode}
                 onChange={handleInputChange}
-                style={{ borderRadius: "8px" }}
+                style={{
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-medium)",
+                  fontSize: "13px",
+                  fontFamily: "DM Sans, sans-serif",
+                  padding: "9px 12px",
+                  backgroundColor: "var(--bg-surface)",
+                }}
               />
             </div>
           </div>
@@ -563,11 +655,24 @@ const Branch = () => {
             <button
               className="btn me-2"
               style={{
-                backgroundColor: "#6366f1",
+                background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
                 color: "white",
-                borderRadius: "20px",
-                padding: "8px 25px",
+                borderRadius: "12px",
+                padding: "9px 25px",
                 border: "none",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+                boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
+                transition: "all 0.25s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 8px 20px rgba(99,102,241,0.42)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 14px rgba(99,102,241,0.3)";
               }}
             >
               {editingBranch ? "Update Branch" : "Save Branch"}
@@ -577,8 +682,14 @@ const Branch = () => {
               type="button"
               className="btn btn-secondary"
               style={{
-                borderRadius: "20px",
-                padding: "8px 25px",
+                borderRadius: "12px",
+                padding: "9px 25px",
+                fontSize: "13px",
+                fontWeight: "500",
+                border: "1.5px solid var(--border-medium)",
+                backgroundColor: "var(--bg-white)",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
               }}
               onClick={() => setShowForm(false)}
             >

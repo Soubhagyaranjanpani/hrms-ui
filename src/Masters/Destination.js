@@ -98,8 +98,19 @@ const Destination = () => {
   if (!showForm) {
     return (
       <div className="container mt-1">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h2 className="mb-0" style={{ color: "#6366f1" }}>
+        <div
+          className="d-flex justify-content-between align-items-center mb-3"
+          style={{ flexWrap: "wrap", gap: "12px" }}
+        >
+          <h2
+            style={{
+              fontFamily: "Sora, sans-serif",
+              fontSize: "22px",
+              fontWeight: "700",
+              color: "var(--text-primary)",
+              margin: 0,
+            }}
+          >
             Destination Directory
           </h2>
 
@@ -110,18 +121,43 @@ const Destination = () => {
               placeholder="Search by Destination..."
               value={searchQuery}
               onChange={handleSearch}
-              style={{ width: "250px", borderRadius: "10px" }}
+              style={{
+                width: "250px",
+                borderRadius: "12px",
+                border: "1px solid var(--border-medium)",
+                fontSize: "13px",
+                padding: "8px 14px",
+                fontFamily: "DM Sans, sans-serif",
+              }}
             />
 
             <button
               className="btn"
               style={{
-                backgroundColor: "#6366f1",
+                background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
                 color: "white",
-                borderRadius: "20px",
+                borderRadius: "12px",
                 padding: "8px 20px",
+                fontSize: "13px",
+                fontWeight: "600",
+                border: "none",
+                boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
+                transition: "all 0.25s",
+                cursor: "pointer",
               }}
-              onClick={() => setShowForm(true)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 8px 20px rgba(99,102,241,0.42)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 14px rgba(99,102,241,0.3)";
+              }}
+              onClick={() => {
+                setShowForm(true);
+                setEditingDestination(null);
+                setFormData({ destinationName: "" });
+              }}
             >
               Add
             </button>
@@ -131,27 +167,28 @@ const Destination = () => {
         <div
           className="card-modern p-3"
           style={{
-            borderRadius: "15px",
-            backgroundColor: "white",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+            borderRadius: "20px",
+            backgroundColor: "var(--card-bg)",
+            boxShadow: "0 2px 12px rgba(99,102,241,0.06)",
+            border: "1px solid var(--border-light)",
           }}
         >
           <div className="table-responsive">
-            <table className="table table-custom">
+            <table className="table table-custom" style={{ marginBottom: 0 }}>
               <thead>
                 <tr>
-                  <th>No</th>
-                  <th>NAME</th>
-                  <th>STATUS</th>
-                  <th>ACTION</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>NO</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>NAME</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>STATUS</th>
+                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>ACTION</th>
                 </tr>
               </thead>
               <tbody>
                 {currentDestinations.length > 0 ? (
                   currentDestinations.map((destination, index) => (
                     <tr key={destination.id}>
-                      <td>{startIndex + index + 1}</td>
-                      <td>{destination.destinationName}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{startIndex + index + 1}</td>
+                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{destination.destinationName}</td>
                       <td>
                         <div
                           onClick={() => handleStatusToggle(destination.id)}
@@ -167,9 +204,9 @@ const Destination = () => {
                               width: "42px",
                               height: "22px",
                               borderRadius: "50px",
-                              backgroundColor:
-                                destination.status === "y" ? "#2d6cdf" : "#ccc",
+                              backgroundColor: destination.status === "y" ? "var(--accent-indigo)" : "#ccc",
                               position: "relative",
+                              transition: "0.3s",
                             }}
                           >
                             <div
@@ -181,14 +218,16 @@ const Destination = () => {
                                 position: "absolute",
                                 top: "2px",
                                 left: destination.status === "y" ? "22px" : "2px",
+                                transition: "0.3s",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
                               }}
                             />
                           </div>
                           <span
                             style={{
-                              color: destination.status === "y" ? "#2d6cdf" : "#999",
+                              color: destination.status === "y" ? "var(--accent-indigo)" : "#999",
                               fontWeight: "600",
-                              fontSize: "13px",
+                              fontSize: "12px",
                             }}
                           >
                             {destination.status === "y" ? "Active" : "Inactive"}
@@ -199,15 +238,19 @@ const Destination = () => {
                         <button
                           className="btn btn-sm"
                           style={{
-                            backgroundColor:
-                              destination.status === "y" ? "#6366f1" : "#ccc",
+                            backgroundColor: destination.status === "y" ? "var(--accent-indigo)" : "#ccc",
                             color: "white",
                             borderRadius: "10px",
                             padding: "6px 10px",
+                            cursor: destination.status === "y" ? "pointer" : "not-allowed",
+                            opacity: destination.status === "y" ? 1 : 0.6,
                             border: "none",
+                            fontSize: "12px",
+                            transition: "all 0.2s",
                           }}
                           disabled={destination.status !== "y"}
                           onClick={() => handleEdit(destination)}
+                          title={destination.status !== "y" ? "Cannot edit inactive destination" : "Edit destination"}
                         >
                           <FaEdit />
                         </button>
@@ -216,7 +259,7 @@ const Destination = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="4" className="text-center py-4 text-muted">
+                    <td colSpan="4" className="text-center py-4 text-muted" style={{ fontSize: "13px", color: "var(--text-muted)" }}>
                       No destinations found.
                     </td>
                   </tr>
@@ -225,11 +268,11 @@ const Destination = () => {
             </table>
           </div>
 
-          {/* Pagination */}
+          {/* PAGINATION */}
           {totalItems > 0 && (
             <div
               style={{
-                borderTop: "1px solid #e5e7eb",
+                borderTop: "1px solid var(--border-light)",
                 paddingTop: "15px",
                 display: "flex",
                 justifyContent: "space-between",
@@ -239,7 +282,7 @@ const Destination = () => {
                 gap: "10px",
               }}
             >
-              <div style={{ fontSize: "14px", color: "#6c757d" }}>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                 Showing {startIndex + 1} to {endIndex} of {totalItems} entries
               </div>
 
@@ -249,12 +292,14 @@ const Destination = () => {
                   disabled={currentPage === 1}
                   style={{
                     padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid #dee2e6",
-                    backgroundColor: currentPage === 1 ? "#f8f9fa" : "#ffffff",
-                    color: currentPage === 1 ? "#adb5bd" : "#6366f1",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border-medium)",
+                    backgroundColor: currentPage === 1 ? "#f8f9fa" : "var(--bg-white)",
+                    color: currentPage === 1 ? "#adb5bd" : "var(--accent-indigo)",
                     cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                    fontSize: "14px",
+                    fontSize: "12px",
+                    fontFamily: "DM Sans, sans-serif",
+                    transition: "all 0.2s",
                   }}
                 >
                   « Previous
@@ -266,13 +311,14 @@ const Destination = () => {
                     onClick={() => goToPage(page)}
                     style={{
                       padding: "6px 12px",
-                      borderRadius: "6px",
-                      border: "1px solid #dee2e6",
-                      backgroundColor: page === currentPage ? "#6366f1" : "#ffffff",
-                      color: page === currentPage ? "#ffffff" : "#495057",
+                      borderRadius: "8px",
+                      border: "1px solid var(--border-medium)",
+                      backgroundColor: page === currentPage ? "var(--accent-indigo)" : "var(--bg-white)",
+                      color: page === currentPage ? "#ffffff" : "var(--text-secondary)",
                       fontWeight: page === currentPage ? "bold" : "normal",
                       cursor: "pointer",
-                      fontSize: "14px",
+                      fontSize: "12px",
+                      fontFamily: "DM Sans, sans-serif",
                     }}
                   >
                     {page}
@@ -284,12 +330,12 @@ const Destination = () => {
                   disabled={currentPage === totalPages}
                   style={{
                     padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid #dee2e6",
-                    backgroundColor: currentPage === totalPages ? "#f8f9fa" : "#ffffff",
-                    color: currentPage === totalPages ? "#adb5bd" : "#6366f1",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border-medium)",
+                    backgroundColor: currentPage === totalPages ? "#f8f9fa" : "var(--bg-white)",
+                    color: currentPage === totalPages ? "#adb5bd" : "var(--accent-indigo)",
                     cursor: currentPage === totalPages ? "not-allowed" : "pointer",
-                    fontSize: "14px",
+                    fontSize: "12px",
                   }}
                 >
                   Next »
@@ -305,22 +351,33 @@ const Destination = () => {
   // ================= FORM VIEW =================
   return (
     <div className="container mt-1">
-      {/* Header with Back button on the right side */}
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2 style={{ color: "#6366f1", fontWeight: "700" }}>
+        <h2
+          style={{
+            fontFamily: "Sora, sans-serif",
+            fontSize: "22px",
+            fontWeight: "700",
+            color: "var(--text-primary)",
+            margin: 0,
+          }}
+        >
           {editingDestination ? "Edit Destination" : "Add Destination"}
         </h2>
 
         <button
           className="btn"
           style={{
-            backgroundColor: "#6366f1",
+            background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
             color: "white",
-            borderRadius: "20px",
+            borderRadius: "12px",
             padding: "8px 20px",
             display: "flex",
             alignItems: "center",
             gap: "8px",
+            fontSize: "13px",
+            fontWeight: "600",
+            border: "none",
+            cursor: "pointer",
           }}
           onClick={() => setShowForm(false)}
         >
@@ -331,21 +388,39 @@ const Destination = () => {
       <div
         className="card p-4 shadow-sm"
         style={{
-          borderRadius: "15px",
-          border: "none",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+          borderRadius: "20px",
+          border: "1px solid var(--border-light)",
+          boxShadow: "0 2px 12px rgba(99,102,241,0.06)",
+          backgroundColor: "var(--card-bg)",
         }}
       >
         <form onSubmit={handleSubmit}>
           <div className="row g-3">
-            <div className="col-md-12">
-              <label style={{ color: "#6366f1" }}>Destination Name</label>
+            <div className="col-md-6">
+              <label
+                style={{
+                  color: "var(--accent-indigo)",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  marginBottom: "6px",
+                }}
+              >
+                Destination Name
+              </label>
               <input
                 className="form-control"
                 name="destinationName"
                 value={formData.destinationName}
                 onChange={handleInputChange}
-                style={{ borderRadius: "8px" }}
+                required
+                style={{
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-medium)",
+                  fontSize: "13px",
+                  fontFamily: "DM Sans, sans-serif",
+                  padding: "9px 12px",
+                  backgroundColor: "var(--bg-surface)",
+                }}
               />
             </div>
           </div>
@@ -354,10 +429,24 @@ const Destination = () => {
             <button
               className="btn me-2"
               style={{
-                backgroundColor: "#6366f1",
+                background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
                 color: "white",
-                borderRadius: "20px",
-                padding: "8px 25px",
+                borderRadius: "12px",
+                padding: "9px 25px",
+                border: "none",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+                boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
+                transition: "all 0.25s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 8px 20px rgba(99,102,241,0.42)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 14px rgba(99,102,241,0.3)";
               }}
             >
               {editingDestination ? "Update" : "Save"}
@@ -366,7 +455,16 @@ const Destination = () => {
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ borderRadius: "20px", padding: "8px 25px" }}
+              style={{
+                borderRadius: "12px",
+                padding: "9px 25px",
+                fontSize: "13px",
+                fontWeight: "500",
+                border: "1.5px solid var(--border-medium)",
+                backgroundColor: "var(--bg-white)",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+              }}
               onClick={() => setShowForm(false)}
             >
               Cancel

@@ -356,24 +356,31 @@ const Employees = ({ user }) => {
     <div className="emp-root">
 
       {/* ── Header ── */}
-      <div className="emp-header">
-        <div className="emp-header-left">
-          {view === 'form' && (
+      <div className="emp-header" style={view === 'form' ? { justifyContent: 'space-between' } : {}}>
+        {view === 'form' ? (
+          // Form view: title on left, back button on right
+          <>
+            <div>
+              <h1 className="emp-title">{editMode ? 'Edit Employee' : 'Add Employee'}</h1>
+              <p className="emp-subtitle">{editMode ? 'Update employee information' : 'Enter new employee details'}</p>
+            </div>
             <button className="emp-back-btn" onClick={() => { setView('list'); resetForm(); }}>
               <FaArrowLeft size={12} /> Back
             </button>
-          )}
-          <div>
-            <h1 className="emp-title">
-              {view === 'list' ? 'Employee Directory' : (editMode ? 'Edit Employee' : 'Add Employee')}
-            </h1>
-            {view === 'list' && <p className="emp-subtitle">{totalElements} total employees</p>}
-          </div>
-        </div>
-        {view === 'list' && (
-          <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
-            <FaUserPlus size={13} /> Add Employee
-          </button>
+          </>
+        ) : (
+          // List view: original layout
+          <>
+            <div className="emp-header-left">
+              <div>
+                <h1 className="emp-title">Employee Directory</h1>
+                <p className="emp-subtitle">{totalElements} total employees</p>
+              </div>
+            </div>
+            <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
+              <FaUserPlus size={13} /> Add Employee
+            </button>
+          </>
         )}
       </div>
 
@@ -515,7 +522,7 @@ const Employees = ({ user }) => {
         </>
       ) : (
 
-        /* ════════════ FORM VIEW ════════════ */
+        /* ════════════ FORM VIEW (unchanged except header) ════════════ */
         <div className="emp-form-wrap">
           <form onSubmit={handleSubmit} noValidate>
 

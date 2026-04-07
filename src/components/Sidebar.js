@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   FaTachometerAlt, FaUsers, FaCalendarCheck, FaMoneyBillWave,
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
-  FaFileAlt, FaChartBar, FaCog, FaSignOutAlt,
+  FaFileAlt, FaChartBar, FaCog,
   FaChevronLeft, FaChevronRight, FaBuilding, FaSitemap,
   FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck
 } from 'react-icons/fa';
@@ -571,19 +571,17 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
               fontWeight: 500,
               whiteSpace: 'nowrap',
               cursor: 'pointer',
-              borderLeft: '3px solid transparent',
+              borderLeft: 'none',
             }}
             onMouseEnter={e => {
               e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
-              e.currentTarget.style.borderLeft = '3px solid #ef4444';
+              e.currentTarget.style.borderLeft ='none';
             }}
             onMouseLeave={e => {
               e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.borderLeft = '3px solid transparent';
+              e.currentTarget.style.borderLeft = 'none';
             }}
           >
-            <FaSignOutAlt style={{ flexShrink: 0 }} />
-            {!sidebarCollapsed && <span>Logout</span>}
           </div>
         </li>
       </ul>
