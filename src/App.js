@@ -23,6 +23,7 @@ import Destination from './Masters/Destination';
 import AttendancePolicy from './pages/AttendancePolicy';
 import AttendanceDashboard from './pages/AttendanceDashboard';
 import AttendanceSummary from './pages/AttendanceSummary';
+import Profile from './pages/Profile';
 
 
 import { ToastContainer } from './components/Toast';
@@ -117,6 +118,7 @@ function App() {
           <Route path="attendance-policy" element={<AttendancePolicy user={currentUser} />} />
           <Route path="attendance-dashboard" element={<AttendanceDashboard user={currentUser} />} />
           <Route path="attendance-summary" element={<AttendanceSummary user={currentUser} />} />
+          <Route path="profile" element={<Profile user={currentUser} />} />
           <Route path="approvedLeaves" element={<ApprovedLeaves user={currentUser}/>}/>
           <Route path="leavePolicy" element={<LeavePolicy user={currentUser}/>}/>
           <Route path="leaveCalendar" element={<LeaveCalendar user={currentUser}/>}/>

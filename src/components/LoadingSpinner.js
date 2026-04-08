@@ -18,7 +18,7 @@ const LoadingSpinner = ({ message = 'Loading...' }) => {
           align-items: center;
           justify-content: center;
           min-height: 400px;
-          background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+          background: transparent;
           border-radius: 20px;
         }
         
@@ -76,7 +76,7 @@ const LoadingSpinner = ({ message = 'Loading...' }) => {
         }
         
         .loading-message {
-          color: #b0b0b0;
+          color: var(--text-muted);
           font-size: 16px;
           margin: 0;
           animation: fadeInOut 1.5s ease-in-out infinite;

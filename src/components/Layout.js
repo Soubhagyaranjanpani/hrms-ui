@@ -1,12 +1,28 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 
 const Layout = ({ user, onLogout }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      setSidebarOpen(!mobile);
+      if (mobile) {
+        setSidebarCollapsed(false);
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleLogout = () => {
     onLogout();
@@ -14,6 +30,10 @@ const Layout = ({ user, onLogout }) => {
   };
 
   const toggleSidebar = () => {
+    if (isMobile) {
+      setSidebarOpen(!sidebarOpen);
+      return;
+    }
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
@@ -21,19 +41,22 @@ const Layout = ({ user, onLogout }) => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const mainMarginLeft = sidebarCollapsed ? '72px' : '260px';
+  const mainMarginLeft = isMobile ? '0px' : sidebarCollapsed ? '72px' : '260px';
 
   return (
     <div className="d-flex">
       {/* Sidebar Component */}
       <Sidebar 
         sidebarCollapsed={sidebarCollapsed}
+        sidebarOpen={sidebarOpen}
+        isMobile={isMobile}
+        onItemClick={() => isMobile && setSidebarOpen(false)}
         toggleSidebar={toggleSidebar}
         onLogout={handleLogout}
       />
 
       {/* Mobile overlay */}
-      {sidebarOpen && (
+      {isMobile && sidebarOpen && (
         <div
           className="d-md-none"
           style={{
@@ -57,8 +80,8 @@ const Layout = ({ user, onLogout }) => {
           flex: 1,
           minHeight: '100vh',
           transition: 'margin-left 0.3s ease',
-          width: `calc(100% - ${mainMarginLeft})`,
-          background: '#f0f2ff',
+          width: isMobile ? '100%' : `calc(100% - ${mainMarginLeft})`,
+          background: 'var(--bg-page)',
         }}
       >
         {/* Header Component */}
@@ -70,7 +93,7 @@ const Layout = ({ user, onLogout }) => {
         />
 
         {/* Page Content */}
-        <div style={{ padding: '24px' }}>
+        <div style={{ padding: isMobile ? '12px' : '18px' }}>
           <Outlet />
         </div>
       </div>

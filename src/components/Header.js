@@ -1,93 +1,59 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FaBars, FaBell, FaBuilding } from 'react-icons/fa';
 import { FiLogOut } from 'react-icons/fi'; // ✅ NEW ICON
 
 const Header = ({ user, onLogout, onMenuClick }) => {
-  const [notificationCount] = useState(3);
+  const notificationCount = 3;
+  const navigate = useNavigate();
+  const PLACEHOLDER_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%234f46e5'/%3E%3Cstop offset='1' stop-color='%230f766e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='80' height='80' fill='url(%23g)'/%3E%3Ctext x='40' y='50' font-family='Arial, sans-serif' font-size='30' font-weight='700' text-anchor='middle' fill='white'%3EU%3C/text%3E%3C/svg%3E";
 
-  const getRoleColor = (role) => {
-    if (!role) return '#8b92b8';
+  const avatarSrc = user?.avatar && typeof user.avatar === 'string'
+    ? user.avatar
+    : PLACEHOLDER_AVATAR;
+
+  const getRoleClass = (role) => {
+    if (!role) return 'app-header-role-default';
     const lowerRole = role.toLowerCase();
-    if (lowerRole === 'admin') return '#f97316';
-    if (lowerRole === 'employee') return '#818cf8';
-    if (lowerRole === 'manager') return '#10b981';
-    return '#8b92b8';
+    if (lowerRole === 'admin') return 'app-header-role-admin';
+    if (lowerRole === 'employee') return 'app-header-role-employee';
+    if (lowerRole === 'manager') return 'app-header-role-manager';
+    return 'app-header-role-default';
+  };
+
+  const handleProfileClick = () => {
+    navigate('/profile');
   };
 
   return (
-    <nav style={{
-      background: '#1e2340',
-      borderBottom: '1px solid #e0e2ff',
-      padding: '12px 24px',
-      position: 'sticky',
-      top: 0,
-      zIndex: 999,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      boxShadow: '0 1px 12px rgba(99,102,241,0.07)',
-    }}>
+    <nav className="app-header">
 
       {/* LEFT */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="app-header-left">
         <button
-          className="d-md-none"
+          className="app-header-menu-btn d-md-none"
           onClick={onMenuClick}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#6366f1',
-            cursor: 'pointer',
-            padding: '8px',
-            borderRadius: '8px'
-          }}
         >
           <FaBars size={22} />
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <FaBuilding size={20} style={{ color: '#818cf8', opacity: 0.8 }} />
-          <h1 style={{
-            margin: 0,
-            fontSize: 'clamp(1rem, 4vw, 1.35rem)',
-            fontWeight: 700,
-            background: 'linear-gradient(120deg, #6366f1 0%, #f97316 45%, #10b981 80%)',
-            WebkitBackgroundClip: 'text',
-            color: 'transparent',
-          }}>
+        <div className="app-header-title-wrap">
+          <FaBuilding size={18} className="app-header-title-icon" />
+          <h1 className="app-header-title">
             Human Resource Management System
           </h1>
         </div>
       </div>
 
       {/* RIGHT */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+      <div className="app-header-right">
 
         {/* Bell */}
-        <div style={{ position: 'relative' }}>
-          <button style={{
-            background: 'transparent',
-            border: 'none',
-            padding: '8px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-          }}>
-            <FaBell size={19} style={{ color: '#8b92b8' }} />
+        <div className="app-header-bell-wrap">
+          <button className="app-header-bell-btn">
+            <FaBell size={18} />
             {notificationCount > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: '2px',
-                right: '2px',
-                background: '#ef4444',
-                color: '#fff',
-                fontSize: '10px',
-                width: '16px',
-                height: '16px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
+              <span className="app-header-bell-badge">
                 {notificationCount}
               </span>
             )}
@@ -97,76 +63,51 @@ const Header = ({ user, onLogout, onMenuClick }) => {
         {/* USER */}
         <div className="dropdown">
           <div
-            className="d-flex align-items-center gap-2"
+            className="d-flex align-items-center gap-2 app-header-user-trigger"
             data-bs-toggle="dropdown"
-            style={{
-              cursor: 'pointer',
-              padding: '4px 8px',
-              borderRadius: '8px',
-              background: 'transparent'
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'transparent'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
-            <div style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #6366f1, #f97316)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontWeight: 700,
-            }}>
-              {user?.avatar || user?.name?.charAt(0) || 'A'}
+            <div className="app-header-user-avatar">
+              <img
+                src={avatarSrc}
+                alt="User profile"
+                className="app-header-user-avatar-img"
+                onError={(e) => {
+                  e.currentTarget.src = PLACEHOLDER_AVATAR;
+                }}
+              />
             </div>
 
-            <div>
-              <div style={{ fontWeight: 600, color: '#f5f6ff' }}>
+            <div className="app-header-user-meta">
+              <div className="app-header-user-name">
                 {user?.name || 'User'}
               </div>
-              <div style={{
-                fontSize: '12px',
-                color: getRoleColor(user?.role)
-              }}>
+              <div className={`app-header-user-role ${getRoleClass(user?.role)}`}>
                 {user?.role || 'Employee'}
               </div>
             </div>
           </div>
 
           {/* DROPDOWN */}
-          <ul className="dropdown-menu dropdown-menu-end" style={{
-            background: '#ffffff',
-            borderRadius: '12px',
-            padding: '8px',
-            marginTop: '8px'
-          }}>
+          <ul className="dropdown-menu dropdown-menu-end app-header-dropdown-menu">
             <li>
-              <a className="dropdown-item" href="#">👤 Profile</a>
+              <button type="button" className="dropdown-item app-header-dropdown-btn" onClick={handleProfileClick}>
+                👤 Profile
+              </button>
             </li>
 
             <li><hr className="dropdown-divider" /></li>
 
             {/* ✅ ONLY CHANGE → Logout Icon */}
             <li>
-              <a className="dropdown-item d-flex align-items-center gap-2" onClick={onLogout}>
+              <button type="button" className="dropdown-item d-flex align-items-center gap-2 app-header-dropdown-btn" onClick={onLogout}>
                 <FiLogOut size={16} />
                 Logout
-              </a>
+              </button>
             </li>
           </ul>
         </div>
 
       </div>
-
-      <style>{`
-        .dropdown-item:hover {
-          background: #f5f6ff !important;
-          color: #6366f1 !important;
-        }
-      `}</style>
-
     </nav>
   );
 };

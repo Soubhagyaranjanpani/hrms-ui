@@ -8,7 +8,7 @@ import {
   FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck
 } from 'react-icons/fa';
 
-const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
+const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleSidebar, onLogout }) => {
   const [masterOpen, setMasterOpen] = useState(true);
   const [employeeOpen, setEmployeeOpen] = useState(true);
   const [leaveOpen, setLeaveOpen] = useState(true);
@@ -83,7 +83,7 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
     setDocumentsOpen(!documentsOpen);
   };
 
-  const sidebarWidth = sidebarCollapsed ? '72px' : '260px';
+  const sidebarWidth = isMobile ? '260px' : (sidebarCollapsed ? '72px' : '260px');
 
   return (
     <div
@@ -91,12 +91,15 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
       style={{
         width: sidebarWidth,
         position: 'fixed',
+        top: 0,
+        left: 0,
+        transform: isMobile ? (sidebarOpen ? 'translateX(0)' : 'translateX(-100%)') : 'translateX(0)',
         height: '100vh',
-        transition: 'width 0.3s ease',
+        transition: 'transform 0.3s ease, width 0.3s ease',
         overflowY: 'auto',
         overflowX: 'hidden',
         zIndex: 1000,
-        background: 'linear-gradient(180deg, #1e2340 0%, #252b50 100%)',
+        background: 'linear-gradient(180deg, var(--sidebar-bg-top) 0%, var(--sidebar-bg-bottom) 100%)',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -117,14 +120,14 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
             <h3 style={{
               fontSize: '20px',
               margin: 0,
-              background: 'linear-gradient(135deg, #818cf8, #fb923c)',
+              background: 'linear-gradient(135deg, var(--accent-indigo-light), var(--accent-teal-light))',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
               fontFamily: "'Sora', sans-serif",
               fontWeight: 700,
             }}>HRNexus</h3>
-            <p style={{ fontSize: '11px', color: '#8b92b8', margin: 0 }}>Enterprise HRMS</p>
+            <p style={{ fontSize: '11px', color: 'var(--sidebar-text)', margin: 0 }}>Enterprise HRMS</p>
           </div>
         )}
 
@@ -140,7 +143,7 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
             background: 'rgba(99,102,241,0.18)',
             border: '1.5px solid rgba(129,140,248,0.4)',
             borderRadius: '10px',
-            color: '#a5b4fc',
+            color: 'var(--sidebar-text-active)',
             cursor: 'pointer',
             fontSize: '13px',
             fontWeight: 600,
@@ -151,7 +154,7 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
           }}
           onMouseEnter={e => {
             e.currentTarget.style.background = 'rgba(99,102,241,0.32)';
-            e.currentTarget.style.borderColor = '#818cf8';
+            e.currentTarget.style.borderColor = 'var(--accent-indigo-light)';
           }}
           onMouseLeave={e => {
             e.currentTarget.style.background = 'rgba(99,102,241,0.18)';
@@ -166,7 +169,14 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
       </div>
 
       {/* Nav Items */}
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, flex: 1 }}>
+      <ul
+        style={{ listStyle: 'none', padding: 0, margin: 0, flex: 1 }}
+        onClickCapture={(e) => {
+          if (isMobile && e.target.closest('a')) {
+            onItemClick?.();
+          }
+        }}
+      >
         {/* Dashboard Menu Item */}
         {menuItems.map((item, index) => (
           <li key={index} style={{ margin: '3px 10px' }}>
@@ -179,12 +189,12 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                 gap: sidebarCollapsed ? '0' : '12px',
                 justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                 padding: sidebarCollapsed ? '11px' : '11px 14px',
-                color: isActive ? '#a5b4fc' : '#8b92b8',
+                color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
                 textDecoration: 'none',
                 borderRadius: '10px',
                 transition: 'all 0.2s ease',
-                background: isActive ? 'rgba(99,102,241,0.18)' : 'transparent',
-                borderLeft: isActive ? '3px solid #6366f1' : '3px solid transparent',
+                background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
                 fontSize: '14px',
                 fontWeight: isActive ? 600 : 400,
                 whiteSpace: 'nowrap',
@@ -207,7 +217,7 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '8px 10px',
-                color: '#6b7298',
+                color: 'var(--sidebar-heading)',
                 fontSize: '11px',
                 fontWeight: 600,
                 textTransform: 'uppercase',
@@ -217,11 +227,11 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                 transition: 'all 0.2s ease',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.color = '#a5b4fc';
-                e.currentTarget.style.background = 'rgba(99,102,241,0.08)';
+                e.currentTarget.style.color = 'var(--sidebar-text-active)';
+                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.color = '#6b7298';
+                e.currentTarget.style.color = 'var(--sidebar-heading)';
                 e.currentTarget.style.background = 'transparent';
               }}
             >
@@ -249,12 +259,12 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                     justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                     padding: sidebarCollapsed ? '11px' : '11px 14px',
                     paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                    color: isActive ? '#a5b4fc' : '#8b92b8',
+                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
                     textDecoration: 'none',
                     borderRadius: '10px',
                     transition: 'all 0.2s ease',
-                    background: isActive ? 'rgba(99,102,241,0.18)' : 'transparent',
-                    borderLeft: isActive ? '3px solid #6366f1' : '3px solid transparent',
+                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
                     fontSize: '14px',
                     fontWeight: isActive ? 600 : 400,
                     whiteSpace: 'nowrap',
@@ -279,7 +289,7 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '8px 10px',
-                color: '#6b7298',
+                color: 'var(--sidebar-heading)',
                 fontSize: '11px',
                 fontWeight: 600,
                 textTransform: 'uppercase',
@@ -289,11 +299,11 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                 transition: 'all 0.2s ease',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.color = '#a5b4fc';
-                e.currentTarget.style.background = 'rgba(99,102,241,0.08)';
+                e.currentTarget.style.color = 'var(--sidebar-text-active)';
+                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.color = '#6b7298';
+                e.currentTarget.style.color = 'var(--sidebar-heading)';
                 e.currentTarget.style.background = 'transparent';
               }}
             >
@@ -321,12 +331,12 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                     justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                     padding: sidebarCollapsed ? '11px' : '11px 14px',
                     paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                    color: isActive ? '#a5b4fc' : '#8b92b8',
+                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
                     textDecoration: 'none',
                     borderRadius: '10px',
                     transition: 'all 0.2s ease',
-                    background: isActive ? 'rgba(99,102,241,0.18)' : 'transparent',
-                    borderLeft: isActive ? '3px solid #6366f1' : '3px solid transparent',
+                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
                     fontSize: '14px',
                     fontWeight: isActive ? 600 : 400,
                     whiteSpace: 'nowrap',
@@ -351,7 +361,7 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '8px 10px',
-                color: '#6b7298',
+                color: 'var(--sidebar-heading)',
                 fontSize: '11px',
                 fontWeight: 600,
                 textTransform: 'uppercase',
@@ -361,11 +371,11 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                 transition: 'all 0.2s ease',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.color = '#a5b4fc';
-                e.currentTarget.style.background = 'rgba(99,102,241,0.08)';
+                e.currentTarget.style.color = 'var(--sidebar-text-active)';
+                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.color = '#6b7298';
+                e.currentTarget.style.color = 'var(--sidebar-heading)';
                 e.currentTarget.style.background = 'transparent';
               }}
             >
@@ -393,12 +403,12 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                     justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                     padding: sidebarCollapsed ? '11px' : '11px 14px',
                     paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                    color: isActive ? '#a5b4fc' : '#8b92b8',
+                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
                     textDecoration: 'none',
                     borderRadius: '10px',
                     transition: 'all 0.2s ease',
-                    background: isActive ? 'rgba(99,102,241,0.18)' : 'transparent',
-                    borderLeft: isActive ? '3px solid #6366f1' : '3px solid transparent',
+                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
                     fontSize: '14px',
                     fontWeight: isActive ? 600 : 400,
                     whiteSpace: 'nowrap',
@@ -423,7 +433,7 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '8px 10px',
-                color: '#6b7298',
+                color: 'var(--sidebar-heading)',
                 fontSize: '11px',
                 fontWeight: 600,
                 textTransform: 'uppercase',
@@ -433,11 +443,11 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                 transition: 'all 0.2s ease',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.color = '#a5b4fc';
-                e.currentTarget.style.background = 'rgba(99,102,241,0.08)';
+                e.currentTarget.style.color = 'var(--sidebar-text-active)';
+                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.color = '#6b7298';
+                e.currentTarget.style.color = 'var(--sidebar-heading)';
                 e.currentTarget.style.background = 'transparent';
               }}
             >
@@ -465,12 +475,12 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                     justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                     padding: sidebarCollapsed ? '11px' : '11px 14px',
                     paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                    color: isActive ? '#a5b4fc' : '#8b92b8',
+                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
                     textDecoration: 'none',
                     borderRadius: '10px',
                     transition: 'all 0.2s ease',
-                    background: isActive ? 'rgba(99,102,241,0.18)' : 'transparent',
-                    borderLeft: isActive ? '3px solid #6366f1' : '3px solid transparent',
+                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
                     fontSize: '14px',
                     fontWeight: isActive ? 600 : 400,
                     whiteSpace: 'nowrap',
@@ -495,7 +505,7 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '8px 10px',
-                color: '#6b7298',
+                color: 'var(--sidebar-heading)',
                 fontSize: '11px',
                 fontWeight: 600,
                 textTransform: 'uppercase',
@@ -505,11 +515,11 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                 transition: 'all 0.2s ease',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.color = '#a5b4fc';
-                e.currentTarget.style.background = 'rgba(99,102,241,0.08)';
+                e.currentTarget.style.color = 'var(--sidebar-text-active)';
+                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.color = '#6b7298';
+                e.currentTarget.style.color = 'var(--sidebar-heading)';
                 e.currentTarget.style.background = 'transparent';
               }}
             >
@@ -537,12 +547,12 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
                     justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                     padding: sidebarCollapsed ? '11px' : '11px 14px',
                     paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                    color: isActive ? '#a5b4fc' : '#8b92b8',
+                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
                     textDecoration: 'none',
                     borderRadius: '10px',
                     transition: 'all 0.2s ease',
-                    background: isActive ? 'rgba(99,102,241,0.18)' : 'transparent',
-                    borderLeft: isActive ? '3px solid #6366f1' : '3px solid transparent',
+                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
                     fontSize: '14px',
                     fontWeight: isActive ? 600 : 400,
                     whiteSpace: 'nowrap',
@@ -560,14 +570,17 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
         {/* Logout */}
         <li style={{ margin: '3px 10px', marginTop: '12px' }}>
           <div
-            onClick={onLogout}
+            onClick={() => {
+              if (isMobile) onItemClick?.();
+              onLogout();
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: sidebarCollapsed ? '0' : '12px',
               justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
               padding: sidebarCollapsed ? '11px' : '11px 14px',
-              color: '#f87171',
+              color: 'var(--danger)',
               borderRadius: '10px',
               transition: 'all 0.2s ease',
               fontSize: '14px',
@@ -592,8 +605,8 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
       <style>{`
         .sidebar::-webkit-scrollbar { width: 4px; }
         .sidebar::-webkit-scrollbar-track { background: rgba(99,102,241,0.08); border-radius: 10px; }
-        .sidebar::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
-        .sidebar::-webkit-scrollbar-thumb:hover { background: #818cf8; }
+        .sidebar::-webkit-scrollbar-thumb { background: var(--accent-indigo); border-radius: 10px; }
+        .sidebar::-webkit-scrollbar-thumb:hover { background: var(--accent-indigo-light); }
       `}</style>
     </div>
   );
