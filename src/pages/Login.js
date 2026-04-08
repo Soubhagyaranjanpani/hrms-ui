@@ -192,8 +192,13 @@ const Login = ({ onLogin }) => {
                 <div className="d-flex flex-column h-100">
                   <div className="mb-4">
                     <div className="d-flex align-items-center gap-2 mb-3">
-                      <div className="bg-white bg-opacity-20 rounded-3 p-2">
-                        <FaBuilding size={28} className="text-white" />
+                      <div className="rounded-3 p-2 d-inline-flex align-items-center justify-content-center" style={{
+                        width: '44px',
+                        height: '44px',
+                        background: '#ffffff',
+                        boxShadow: '0 6px 16px rgba(15, 23, 42, 0.18)'
+                      }}>
+                        <FaBuilding size={24} style={{ color: '#4f46e5' }} />
                       </div>
                       <h2 className="fw-bold mb-0 text-white" style={{ letterSpacing: '-0.5px' }}>HRNexus</h2>
                     </div>
