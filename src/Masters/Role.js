@@ -24,6 +24,12 @@ const Role = () => {
     { id: 7, roleName: "Support", status: "y" },
   ]);
 
+  // Helper to reset form state
+  const resetForm = () => {
+    setFormData({ roleName: "" });
+    setEditingRole(null);
+  };
+
   // INPUT
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -49,7 +55,7 @@ const Role = () => {
       setRoleData([...roleData, newRole]);
     }
 
-    setFormData({ roleName: "" });
+    resetForm();
     setShowForm(false);
     setCurrentPage(1);
   };
@@ -154,9 +160,8 @@ const Role = () => {
                 e.currentTarget.style.boxShadow = "0 4px 14px rgba(99,102,241,0.3)";
               }}
               onClick={() => {
+                resetForm();
                 setShowForm(true);
-                setEditingRole(null);
-                setFormData({ roleName: "" });
               }}
             >
               Add
@@ -364,24 +369,15 @@ const Role = () => {
           {editingRole ? "Edit Role" : "Add Role"}
         </h2>
 
+        {/* REPLACED BACK BUTTON - exactly as requested */}
         <button
-          className="btn"
-          style={{
-            background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
-            color: "white",
-            borderRadius: "12px",
-            padding: "8px 20px",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            fontSize: "13px",
-            fontWeight: "600",
-            border: "none",
-            cursor: "pointer",
+          className="emp-back-btn"
+          onClick={() => {
+            resetForm();
+            setShowForm(false);
           }}
-          onClick={() => setShowForm(false)}
         >
-          <FaArrowLeft /> Back
+          <FaArrowLeft size={12} /> Back
         </button>
       </div>
 
@@ -465,7 +461,10 @@ const Role = () => {
                 color: "var(--text-secondary)",
                 cursor: "pointer",
               }}
-              onClick={() => setShowForm(false)}
+              onClick={() => {
+                resetForm();
+                setShowForm(false);
+              }}
             >
               Cancel
             </button>
