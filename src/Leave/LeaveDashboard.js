@@ -299,7 +299,7 @@ const LeaveDashboard = () => {
                       </div>
                       <div>
                         <div style={{ fontWeight: '600', fontSize: '14px' }}>{leave.employeeName}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>ID: {leave.leaveId}</div>
+                       
                       </div>
                     </div>
                   </td>

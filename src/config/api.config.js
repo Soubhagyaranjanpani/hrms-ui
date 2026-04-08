@@ -41,6 +41,10 @@ export const API_ENDPOINTS = {
   CREATE_LEAVE_POLICY: `${BASE_URL}/api/leave-policy`,
   UPDATE_LEAVE_POLICY: (id) => `${BASE_URL}/api/leave-policy/${id}`,
   GET_ALL_LEAVE_POLICIES: `${BASE_URL}/api/leave-policy/policies`,
+   CREATE_HOLIDAY: `${BASE_URL}/api/holidays`,
+  GET_ALL_HOLIDAYS: `${BASE_URL}/api/holidays`,
+  DELETE_HOLIDAY: (id) => `${BASE_URL}/api/holidays/${id}`,
+  UPLOAD_HOLIDAYS: `${BASE_URL}/api/holidays/upload`,
 
 };
 
@@ -51,4 +55,11 @@ export const STORAGE_KEYS = {
   USERNAME: "username",
   ROLE: "roleName",
   USER_DATA: "userData",
+};
+export const getAuthHeaders = () => {
+  const token = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
 };
