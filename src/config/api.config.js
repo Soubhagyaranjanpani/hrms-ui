@@ -34,6 +34,9 @@ export const API_ENDPOINTS = {
   DELETE_LEAVE: (id) => `${BASE_URL}/api/leaves/${id}`,
   LEAVE_TYPES: `${BASE_URL}/api/leave-type`,
   GET_LEAVE_BALANCE: (empId) => `${BASE_URL}/api/leaves/balance/${empId}`,
+  GET_ALL_LEAVES: `${BASE_URL}/api/leaves/all`,
+
+  LEAVE_DASHBOARD: `${BASE_URL}/api/leaves/dashboard`,
 
   CREATE_LEAVE_POLICY: `${BASE_URL}/api/leave-policy`,
   UPDATE_LEAVE_POLICY: (id) => `${BASE_URL}/api/leave-policy/${id}`,

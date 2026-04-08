@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaSearch, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaClock, FaEye, FaUmbrellaBeach, FaRegCalendarAlt } from 'react-icons/fa';
+import { FaSearch, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaClock, FaEye, FaUmbrellaBeach, FaRegCalendarAlt, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
 import { toast, ToastContainer } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const MyAttendance = () => {
   const [records, setRecords] = useState([]);
-  const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const getAuthConfig = () => ({
     headers: { 
@@ -43,7 +43,6 @@ const MyAttendance = () => {
     
     try {
       const response = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
-      // Updated to match actual response structure: response.data?.response
       const attendanceData = response.data?.response || [];
       
       const transformedData = attendanceData.map(record => ({
@@ -59,7 +58,6 @@ const MyAttendance = () => {
       }));
       
       setRecords(transformedData);
-      setFilteredRecords(transformedData);
       
       if (showRefreshMessage) {
         toast.success('Success', 'Attendance records refreshed successfully');
@@ -78,47 +76,10 @@ const MyAttendance = () => {
     fetchAttendance();
   }, []);
 
+  // Sync current month with selected month/year
   useEffect(() => {
-    let filtered = [...records];
-    
-    filtered = filtered.filter(record => {
-      const recordDate = new Date(record.date);
-      return recordDate.getMonth() === selectedMonth && recordDate.getFullYear() === selectedYear;
-    });
-    
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(record => 
-        record.status?.toLowerCase() === statusFilter.toLowerCase()
-      );
-    }
-    
-    // Sort by date (most recent first)
-    filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-    
-    setFilteredRecords(filtered);
-  }, [selectedMonth, selectedYear, statusFilter, records]);
-
-  const getStatusClass = (status) => {
-    switch(status?.toUpperCase()) {
-      case 'PRESENT': return 'present';
-      case 'ABSENT': return 'absent';
-      case 'HALF_DAY': return 'late';
-      case 'LEAVE': return 'leave';
-      case 'WEEKEND': return 'weekend';
-      default: return 'pending';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch(status?.toUpperCase()) {
-      case 'PRESENT': return <FaCheckCircle size={12} />;
-      case 'ABSENT': return <FaTimesCircle size={12} />;
-      case 'HALF_DAY': return <FaClock size={12} />;
-      case 'LEAVE': return <FaUmbrellaBeach size={12} />;
-      case 'WEEKEND': return <FaRegCalendarAlt size={12} />;
-      default: return null;
-    }
-  };
+    setCurrentMonth(new Date(selectedYear, selectedMonth, 1));
+  }, [selectedMonth, selectedYear]);
 
   const getStatusText = (record) => {
     if (record.status === 'LEAVE' && record.leaveType) {
@@ -127,8 +88,116 @@ const MyAttendance = () => {
     return record.status || 'PENDING';
   };
 
-  // Filter out WEEKEND from statistics (only count working days)
-  const workingDaysRecords = filteredRecords.filter(r => r.status !== 'WEEKEND');
+  // Calendar generation logic
+  const getDaysInMonth = (year, month) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (year, month) => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  const getAttendanceForDate = (dateStr) => {
+    return records.find(record => record.date === dateStr);
+  };
+
+  const isFutureDate = (dateStr) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkDate = new Date(dateStr);
+    checkDate.setHours(0, 0, 0, 0);
+    return checkDate > today;
+  };
+
+  const getDateStatusClass = (dateStr) => {
+    if (isFutureDate(dateStr)) return '';
+    
+    const record = getAttendanceForDate(dateStr);
+    if (!record) return '';
+    
+    // Apply status filter to calendar view
+    if (statusFilter !== 'all') {
+      if (record.status?.toLowerCase() !== statusFilter.toLowerCase()) {
+        return '';
+      }
+    }
+    
+    switch(record.status) {
+      case 'PRESENT': return 'calendar-day-present';
+      case 'ABSENT': return 'calendar-day-absent';
+      case 'LEAVE': return 'calendar-day-leave';
+      case 'WEEKEND': return 'calendar-day-weekend';
+      case 'HALF_DAY': return 'calendar-day-halfday';
+      default: return '';
+    }
+  };
+
+  const getStatusTooltip = (dateStr) => {
+    if (isFutureDate(dateStr)) return 'Future date - No data yet';
+    const record = getAttendanceForDate(dateStr);
+    if (!record) return 'No record';
+    if (record.status === 'LEAVE' && record.leaveType) {
+      return `${record.status} (${record.leaveType})`;
+    }
+    if (record.workingHours) {
+      return `${record.status} - ${record.workingHours.toFixed(1)} hrs`;
+    }
+    return record.status;
+  };
+
+  const renderCalendar = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const daysInMonth = getDaysInMonth(year, month);
+    const firstDay = getFirstDayOfMonth(year, month);
+    const today = new Date().toISOString().split('T')[0];
+    
+    const days = [];
+    // Add empty cells for days before month starts
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
+    }
+    
+    // Add cells for each day of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const isToday = dateStr === today;
+      const statusClass = getDateStatusClass(dateStr);
+      const tooltip = getStatusTooltip(dateStr);
+      const isFuture = isFutureDate(dateStr);
+      
+      days.push(
+        <div 
+          key={day} 
+          className={`calendar-day ${statusClass} ${isToday ? 'calendar-day-today' : ''} ${isFuture ? 'calendar-day-future' : ''}`}
+          title={tooltip}
+        >
+          <span className="calendar-day-number">{day}</span>
+          {statusClass && !isFuture && <span className="calendar-day-indicator"></span>}
+        </div>
+      );
+    }
+    
+    return days;
+  };
+
+  const changeMonth = (increment) => {
+    const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + increment, 1);
+    setCurrentMonth(newDate);
+    setSelectedMonth(newDate.getMonth());
+    setSelectedYear(newDate.getFullYear());
+  };
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  // Calculate summary stats for the selected month/year
+  const monthRecords = records.filter(record => {
+    const recordDate = new Date(record.date);
+    return recordDate.getMonth() === selectedMonth && recordDate.getFullYear() === selectedYear;
+  });
+  
+  const workingDaysRecords = monthRecords.filter(r => r.status !== 'WEEKEND');
   
   const summary = {
     total: workingDaysRecords.length,
@@ -158,67 +227,72 @@ const MyAttendance = () => {
           <p>View and track all your attendance records</p>
         </div>
 
-        {/* Summary Cards */}
-        <div className="summary-grid">
-          <div className="stat-card attendance-stat">
-            <div className="stat-label">
-              <FaCalendarAlt size={12} style={{ marginRight: '4px' }} />
+        {/* Summary Cards - Compact */}
+        <div className="summary-grid" style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
+          gap: '16px',
+          marginBottom: '24px'
+        }}>
+          <div className="stat-card attendance-stat" style={{ padding: '14px' }}>
+            <div className="stat-label" style={{ fontSize: '11px' }}>
+              <FaCalendarAlt size={11} style={{ marginRight: '4px' }} />
               Working Days
             </div>
-            <div className="stat-value total">{summary.total}</div>
-            <div className="stat-trend">Excluding weekends</div>
+            <div className="stat-value total" style={{ fontSize: '28px' }}>{summary.total}</div>
+            <div className="stat-trend" style={{ fontSize: '10px' }}>Excluding weekends</div>
           </div>
           
-          <div className="stat-card attendance-stat">
-            <div className="stat-label">
-              <FaCheckCircle size={12} style={{ marginRight: '4px' }} />
+          <div className="stat-card attendance-stat" style={{ padding: '14px' }}>
+            <div className="stat-label" style={{ fontSize: '11px' }}>
+              <FaCheckCircle size={11} style={{ marginRight: '4px' }} />
               Present
             </div>
-            <div className="stat-value present">{summary.present}</div>
-            <div className="stat-trend">
+            <div className="stat-value present" style={{ fontSize: '28px' }}>{summary.present}</div>
+            <div className="stat-trend" style={{ fontSize: '10px' }}>
               {summary.total > 0 ? ((summary.present / summary.total) * 100).toFixed(1) : 0}% rate
             </div>
           </div>
           
-          <div className="stat-card attendance-stat">
-            <div className="stat-label">
-              <FaClock size={12} style={{ marginRight: '4px' }} />
+          <div className="stat-card attendance-stat" style={{ padding: '14px' }}>
+            <div className="stat-label" style={{ fontSize: '11px' }}>
+              <FaClock size={11} style={{ marginRight: '4px' }} />
               Half Day
             </div>
-            <div className="stat-value late">{summary.halfDay}</div>
-            <div className="stat-trend">Partial attendance</div>
+            <div className="stat-value late" style={{ fontSize: '28px' }}>{summary.halfDay}</div>
+            <div className="stat-trend" style={{ fontSize: '10px' }}>Partial attendance</div>
           </div>
 
-          <div className="stat-card attendance-stat">
-            <div className="stat-label">
-              <FaUmbrellaBeach size={12} style={{ marginRight: '4px' }} />
+          <div className="stat-card attendance-stat" style={{ padding: '14px' }}>
+            <div className="stat-label" style={{ fontSize: '11px' }}>
+              <FaUmbrellaBeach size={11} style={{ marginRight: '4px' }} />
               Leave
             </div>
-            <div className="stat-value" style={{ color: '#8b5cf6' }}>{summary.leave}</div>
-            <div className="stat-trend">Approved leaves</div>
+            <div className="stat-value" style={{ fontSize: '28px', color: '#8b5cf6' }}>{summary.leave}</div>
+            <div className="stat-trend" style={{ fontSize: '10px' }}>Approved leaves</div>
           </div>
           
-          <div className="stat-card attendance-stat">
-            <div className="stat-label">
-              <FaTimesCircle size={12} style={{ marginRight: '4px' }} />
+          <div className="stat-card attendance-stat" style={{ padding: '14px' }}>
+            <div className="stat-label" style={{ fontSize: '11px' }}>
+              <FaTimesCircle size={11} style={{ marginRight: '4px' }} />
               Absent
             </div>
-            <div className="stat-value absent">{summary.absent}</div>
-            <div className="stat-trend">No attendance</div>
+            <div className="stat-value absent" style={{ fontSize: '28px' }}>{summary.absent}</div>
+            <div className="stat-trend" style={{ fontSize: '10px' }}>No attendance</div>
           </div>
           
-          <div className="stat-card attendance-stat">
-            <div className="stat-label">
-              <FaClock size={12} style={{ marginRight: '4px' }} />
+          <div className="stat-card attendance-stat" style={{ padding: '14px' }}>
+            <div className="stat-label" style={{ fontSize: '11px' }}>
+              <FaClock size={11} style={{ marginRight: '4px' }} />
               Total Hours
             </div>
-            <div className="stat-value hours">{summary.totalHours}</div>
-            <div className="stat-trend">Hours worked</div>
+            <div className="stat-value hours" style={{ fontSize: '28px' }}>{summary.totalHours}</div>
+            <div className="stat-trend" style={{ fontSize: '10px' }}>Hours worked</div>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="filter-card">
+        {/* Filters - Above Calendar */}
+        <div className="filter-card" style={{ marginBottom: '24px' }}>
           <div className="filter-group">
             <div className="filter-item">
               <label><FaCalendarAlt size={12} /> Month</label>
@@ -249,7 +323,7 @@ const MyAttendance = () => {
             </div>
             
             <div className="filter-item">
-              <label><FaEye size={12} /> Status</label>
+              <label><FaEye size={12} /> Status Filter</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -273,72 +347,109 @@ const MyAttendance = () => {
           </div>
         </div>
 
-        {/* Records Table */}
-        <div className="attendance-table-card">
-          {loading ? (
-            <div className="attendance-loading">
-              <div className="loading-spinner"></div>
-              <p>Loading attendance records...</p>
+        {/* Modern Calendar Component */}
+        <div className="attendance-table-card" style={{ overflow: 'visible', marginBottom: '24px' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                Attendance Calendar
+                {statusFilter !== 'all' && (
+                  <span style={{ 
+                    fontSize: '12px', 
+                    fontWeight: '500', 
+                    marginLeft: '10px',
+                    padding: '2px 8px',
+                    background: 'var(--accent-indigo-pale)',
+                    borderRadius: '20px',
+                    color: 'var(--accent-indigo)'
+                  }}>
+                    Filtered: {statusFilter}
+                  </span>
+                )}
+              </h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+              </p>
             </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="attendance-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Day</th>
-                    <th>Check In</th>
-                    <th>Check Out</th>
-                    <th>Hours</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRecords.length === 0 ? (
-                    <tr>
-                      <td colSpan="6" className="attendance-empty">
-                        <div className="empty-icon">
-                          <FaCalendarAlt />
-                        </div>
-                        <p>No attendance records found</p>
-                        <small>Try selecting a different month or year</small>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredRecords.map((record, idx) => (
-                      <tr key={record.id || idx}>
-                        <td className="date-cell">{record.date}</td>
-                        <td className="day-cell">
-                          {new Date(record.date).toLocaleDateString('en-US', { weekday: 'short' })}
-                        </td>
-                        <td className="time-cell">
-                          {record.status === 'LEAVE' ? '—' : formatTime(record.checkIn)}
-                        </td>
-                        <td className="time-cell">
-                          {record.status === 'LEAVE' ? '—' : formatTime(record.checkOut)}
-                        </td>
-                        <td className="hours-cell">
-                          {record.status === 'LEAVE' ? '—' : (record.hours ? record.hours.toFixed(1) : '0.0')}
-                        </td>
-                        <td>
-                          <span className={`status-badge ${getStatusClass(record.status)}`}>
-                            {getStatusIcon(record.status)}
-                            <span style={{ marginLeft: '4px' }}>{getStatusText(record)}</span>
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => changeMonth(-1)} className="calendar-nav-btn" style={{ padding: '6px 10px' }}>
+                <FaChevronLeft size={12} />
+              </button>
+              <button onClick={() => changeMonth(1)} className="calendar-nav-btn" style={{ padding: '6px 10px' }}>
+                <FaChevronRight size={12} />
+              </button>
             </div>
-          )}
+          </div>
+          
+          <div style={{ padding: '20px' }}>
+            {loading ? (
+              <div className="attendance-loading" style={{ padding: '40px' }}>
+                <div className="loading-spinner"></div>
+                <p>Loading attendance data...</p>
+              </div>
+            ) : (
+              <>
+                <div className="calendar-grid">
+                  {weekDays.map(day => (
+                    <div key={day} className="calendar-weekday" style={{ fontSize: '13px', padding: '8px' }}>{day}</div>
+                  ))}
+                  {renderCalendar()}
+                </div>
+                
+                {/* Legend */}
+                <div className="calendar-legend" style={{ gap: '12px', paddingTop: '16px' }}>
+                  <div className="legend-item" style={{ fontSize: '12px' }}>
+                    <span className="legend-color present-color"></span>
+                    <span>Present</span>
+                  </div>
+                  <div className="legend-item" style={{ fontSize: '12px' }}>
+                    <span className="legend-color absent-color"></span>
+                    <span>Absent</span>
+                  </div>
+                  <div className="legend-item" style={{ fontSize: '12px' }}>
+                    <span className="legend-color leave-color"></span>
+                    <span>Leave</span>
+                  </div>
+                  <div className="legend-item" style={{ fontSize: '12px' }}>
+                    <span className="legend-color weekend-color"></span>
+                    <span>Weekend</span>
+                  </div>
+                  <div className="legend-item" style={{ fontSize: '12px' }}>
+                    <span className="legend-color halfday-color"></span>
+                    <span>Half Day</span>
+                  </div>
+                  <div className="legend-item" style={{ fontSize: '12px' }}>
+                    <span className="legend-color today-color"></span>
+                    <span>Today</span>
+                  </div>
+                  <div className="legend-item" style={{ fontSize: '12px' }}>
+                    <span className="legend-color future-color"></span>
+                    <span>Future Date</span>
+                  </div>
+                </div>
+
+                {/* Filter info message */}
+                {statusFilter !== 'all' && (
+                  <div style={{
+                    marginTop: '20px',
+                    padding: '10px 16px',
+                    background: 'var(--accent-indigo-pale)',
+                    borderRadius: '10px',
+                    textAlign: 'center'
+                  }}>
+                    <p style={{ fontSize: '12px', color: 'var(--accent-indigo)', margin: 0 }}>
+                      🔍 Showing only <strong>{statusFilter}</strong> days in the calendar
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Summary Footer */}
-        {filteredRecords.length > 0 && (
+        {!loading && monthRecords.length > 0 && (
           <div style={{
-            marginTop: '16px',
             padding: '16px',
             background: 'var(--bg-surface)',
             borderRadius: '12px',
@@ -353,13 +464,18 @@ const MyAttendance = () => {
             }}>
               <div>
                 <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-                  Showing {filteredRecords.length} of {records.length} total records
+                  Total records for {monthNames[selectedMonth]} {selectedYear}: {monthRecords.length}
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: '16px', fontSize: '12px' }}>
+              <div style={{ display: 'flex', gap: '16px', fontSize: '12px', flexWrap: 'wrap' }}>
                 {summary.present > 0 && (
                   <span style={{ color: '#10b981' }}>
                     ✅ Present: {summary.present}
+                  </span>
+                )}
+                {summary.halfDay > 0 && (
+                  <span style={{ color: '#f59e0b' }}>
+                    ⏰ Half Day: {summary.halfDay}
                   </span>
                 )}
                 {summary.leave > 0 && (

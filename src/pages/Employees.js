@@ -153,7 +153,12 @@ const Employees = ({ user }) => {
       if (filterActive !== null) url += `&isActive=${filterActive}`;
       const res = await axios.get(url, axiosConfig);
       if (res.data?.status === 200 && res.data?.response) {
-        setEmployees(res.data.response.content || []);
+        // Clean the employee names to remove "null" string
+        const cleanedEmployees = (res.data.response.content || []).map(emp => ({
+          ...emp,
+          name: cleanName(emp.name)
+        }));
+        setEmployees(cleanedEmployees);
         setTotalPages(res.data.response.totalPages || 0);
         setTotalElements(res.data.response.totalElements || 0);
       } else { setEmployees([]); }
@@ -162,6 +167,17 @@ const Employees = ({ user }) => {
       setEmployees([]);
     } finally { setLoading(false); }
   }, [page, size, debouncedSearch, filterActive]);
+
+  // Function to clean name by removing "null" string
+  const cleanName = (name) => {
+    if (!name) return '';
+    // Remove "null" string (case insensitive) from the name
+    let cleaned = name.replace(/\s+null\s*/gi, ' ').replace(/\s+null$/i, '');
+    cleaned = cleaned.replace(/^null\s+/i, '');
+    // Trim extra spaces
+    cleaned = cleaned.trim();
+    return cleaned || name; // Return cleaned name or original if cleaning removed everything
+  };
 
   const fetchBranches = async () => {
     setLoadingBranches(true);
@@ -290,7 +306,7 @@ const Employees = ({ user }) => {
   const handleEdit = (emp) => {
     setSelectedEmployee(emp);
     const fd = {
-      name: emp.name || '', email: emp.email || '', password: '',
+      name: cleanName(emp.name || ''), email: emp.email || '', password: '',
       phone: emp.phone || '', joiningDate: emp.joiningDate || '',
       roleId: '', departmentId: '', branchId: '',
       address: emp.address || '', profilePicture: emp.profilePicture || ''
@@ -321,6 +337,21 @@ const Employees = ({ user }) => {
   const formatDate = (d) => {
     if (!d) return '—';
     return new Date(d).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+  };
+
+  // Helper function to get initials from full name (cleaned)
+  const getInitials = (fullName) => {
+    if (!fullName) return '?';
+    const cleanedName = cleanName(fullName);
+    const nameParts = cleanedName.trim().split(/\s+/);
+    if (nameParts.length === 1) {
+      // Only first name, take first character
+      return nameParts[0].charAt(0).toUpperCase();
+    }
+    // First name + last name initials
+    const firstInitial = nameParts[0].charAt(0);
+    const lastInitial = nameParts[nameParts.length - 1].charAt(0);
+    return (firstInitial + lastInitial).toUpperCase();
   };
 
   const avatarColors = [
@@ -423,8 +454,10 @@ const Employees = ({ user }) => {
                 </thead>
                 <tbody>
                   {employees.length > 0 ? employees.map((emp, idx) => {
-                    const ac = getAvatarColor(emp.name);
-                    const initials = `${emp.name?.charAt(0)||''}${emp.name?.split(' ')[1]?.charAt(0)||''}`.toUpperCase();
+                    const cleanedName = cleanName(emp.name);
+                    const ac = getAvatarColor(cleanedName);
+                    // Get initials properly from cleaned name
+                    const initials = getInitials(cleanedName);
                     return (
                       <tr key={emp.id} className="emp-row">
                         <td className="emp-sno">{page * size + idx + 1}</td>
@@ -434,9 +467,9 @@ const Employees = ({ user }) => {
                               {initials}
                             </div>
                             <div>
-                              <div className="emp-name">{emp.name}</div>
+                              <div className="emp-name">{cleanedName || '—'}</div>
                               <div className="emp-email">{emp.email}</div>
-                              {emp.phone && <div className="emp-phone">{emp.phone}</div>}
+                              {/* {emp.phone && <div className="emp-phone">{emp.phone}</div>} */}
                             </div>
                           </div>
                         </td>
@@ -522,7 +555,7 @@ const Employees = ({ user }) => {
         </>
       ) : (
 
-        /* ════════════ FORM VIEW (unchanged except header) ════════════ */
+        /* ════════════ FORM VIEW ════════════ */
         <div className="emp-form-wrap">
           <form onSubmit={handleSubmit} noValidate>
 
@@ -724,7 +757,7 @@ const Employees = ({ user }) => {
             <div className="emp-modal-icon"><FaTrash size={18} /></div>
             <h3 className="emp-modal-title">Delete Employee</h3>
             <p className="emp-modal-body">
-              You're about to permanently delete <strong>{employeeToDelete.name}</strong>.
+              You're about to permanently delete <strong>{cleanName(employeeToDelete.name)}</strong>.
             </p>
             <p className="emp-modal-warn">This action cannot be undone.</p>
             <div className="emp-modal-actions">

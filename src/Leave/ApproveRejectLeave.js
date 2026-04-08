@@ -16,10 +16,11 @@ const LeaveApproval = ({ user }) => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
+  const [userRole, setUserRole] = useState(null);
   
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState(null); // 'approve' or 'reject'
+  const [modalType, setModalType] = useState(null);
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [remarks, setRemarks] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -30,17 +31,50 @@ const LeaveApproval = ({ user }) => {
     'Content-Type': 'application/json',
   });
 
-  // Fetch team leaves
-  const fetchTeamLeaves = useCallback(async () => {
+  // Check user role on component mount
+  useEffect(() => {
+    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    setUserRole(role);
+    
+    if (role !== 'HR' && role !== 'ROLE_HR' && role !== 'MANAGER' && role !== 'ROLE_MANAGER') {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch leaves based on role
+  const fetchLeaves = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.get(API_ENDPOINTS.GET_TEAM_LEAVES, {
-        headers: getAuthHeaders(),
-      });
-      
-      const responseData = response.data;
+      const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+      let response;
       let data = [];
       
+      if (role === 'HR' || role === 'ROLE_HR') {
+        // HR: Use GET_ALL_LEAVES API to get all leaves
+        console.log('HR fetching all leaves from:', API_ENDPOINTS.GET_ALL_LEAVES);
+        response = await axios.get(API_ENDPOINTS.GET_ALL_LEAVES, {
+          headers: getAuthHeaders(),
+          params: {
+            status: 'PENDING_L2'  // Filter for PENDING_L2 status
+          }
+        });
+      } else if (role === 'MANAGER' || role === 'ROLE_MANAGER') {
+        // Manager: Use GET_TEAM_LEAVES API to get team leaves
+        console.log('Manager fetching team leaves from:', API_ENDPOINTS.GET_TEAM_LEAVES);
+        response = await axios.get(API_ENDPOINTS.GET_TEAM_LEAVES, {
+          headers: getAuthHeaders(),
+          params: {
+            status: 'PENDING'  // Filter for PENDING status
+          }
+        });
+      } else {
+        setLoading(false);
+        return;
+      }
+      
+      const responseData = response.data;
+      
+      // Handle response structure
       if (responseData?.status === 200 && Array.isArray(responseData.response)) {
         data = responseData.response;
       } else if (Array.isArray(responseData)) {
@@ -51,8 +85,9 @@ const LeaveApproval = ({ user }) => {
         data = [];
       }
       
+      // Transform data
       const transformedData = data.map(leave => ({
-        id: leave.leaveId,
+        id: leave.leaveId || leave.id,
         employeeName: leave.employeeName || leave.employee?.name || 'Unknown',
         leaveType: leave.leaveType,
         startDate: leave.startDate,
@@ -68,24 +103,35 @@ const LeaveApproval = ({ user }) => {
       setTotalPages(Math.ceil(transformedData.length / size));
       
       const total = transformedData.length;
-      const pending = transformedData.filter(l => l.status === 'PENDING' || l.status === 'PENDING_L2').length;
+      const pending = transformedData.filter(l => 
+        l.status === 'PENDING' || l.status === 'PENDING_L2'
+      ).length;
       const approved = transformedData.filter(l => l.status === 'APPROVED').length;
       const rejected = transformedData.filter(l => l.status === 'REJECTED').length;
       setStats({ total, pending, approved, rejected });
       
     } catch (error) {
-      console.error('Error fetching team leaves:', error);
-      toast.error('Error', 'Failed to load team leave requests');
+      console.error('Error fetching leaves:', error);
+      if (error.response?.status === 401) {
+        toast.error('Authentication Error', 'Please login again');
+      } else if (error.response?.status === 403) {
+        toast.error('Access Denied', 'You don\'t have permission to view these requests');
+      } else {
+        toast.error('Error', error.response?.data?.message || 'Failed to load leave requests');
+      }
       setLeaves([]);
     } finally {
       setLoading(false);
     }
   }, [size]);
 
-  // Initialize data
+  // Initialize data based on role
   useEffect(() => {
-    fetchTeamLeaves();
-  }, [fetchTeamLeaves]);
+    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    if (role === 'HR' || role === 'ROLE_HR' || role === 'MANAGER' || role === 'ROLE_MANAGER') {
+      fetchLeaves();
+    }
+  }, [fetchLeaves, userRole]);
 
   // Get filtered leaves
   const getFilteredLeaves = useCallback(() => {
@@ -127,7 +173,7 @@ const LeaveApproval = ({ user }) => {
     if (page !== 0 && total > 0) {
       setPage(0);
     }
-  }, [debouncedSearch, leaves]);
+  }, [debouncedSearch, leaves, getFilteredLeaves, size, page]);
 
   // Debounce search input
   useEffect(() => {
@@ -161,7 +207,7 @@ const LeaveApproval = ({ user }) => {
     try {
       const payload = {
         leaveId: selectedLeave.id,
-        remarks: remarks.trim() || `Approved by ${localStorage.getItem(STORAGE_KEYS.USERNAME) || 'Manager'}`,
+        remarks: remarks.trim() || `Approved by ${localStorage.getItem(STORAGE_KEYS.USERNAME) || 'User'}`,
       };
       
       const response = await axios.post(API_ENDPOINTS.APPROVE_LEAVE, payload, {
@@ -170,12 +216,13 @@ const LeaveApproval = ({ user }) => {
       
       if (response.data?.status === 200) {
         toast.success('Success', response.data?.message || 'Leave request approved successfully');
+        closeModal();
+        fetchLeaves();
       } else {
         toast.success('Success', 'Leave request approved successfully');
+        closeModal();
+        fetchLeaves();
       }
-      
-      closeModal();
-      fetchTeamLeaves();
       
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Failed to approve leave request';
@@ -207,12 +254,13 @@ const LeaveApproval = ({ user }) => {
       
       if (response.data?.status === 200) {
         toast.success('Success', response.data?.message || 'Leave request rejected successfully');
+        closeModal();
+        fetchLeaves();
       } else {
         toast.success('Success', 'Leave request rejected successfully');
+        closeModal();
+        fetchLeaves();
       }
-      
-      closeModal();
-      fetchTeamLeaves();
       
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Failed to reject leave request';
@@ -233,26 +281,29 @@ const LeaveApproval = ({ user }) => {
   };
 
   const getStatusText = (status) => {
+    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
     switch(status) {
       case 'APPROVED': return 'Approved';
-      case 'PENDING': return 'Pending';
-      case 'PENDING_L2': return 'Level 2 Pending';
+      case 'PENDING': return role === 'HR' ? 'Pending (Level 1)' : 'Pending';
+      case 'PENDING_L2': return 'Pending (Level 2 - HR)';
       case 'REJECTED': return 'Rejected';
       default: return status || 'Unknown';
     }
   };
 
   const isPending = (status) => {
-    return status === 'PENDING' || status === 'PENDING_L2';
+    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    if (role === 'HR' || role === 'ROLE_HR') {
+      return status === 'PENDING_L2';
+    }
+    return status === 'PENDING';
   };
 
-  // Format leave type name
   const formatLeaveTypeName = (name) => {
     if (!name) return '-';
     return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
   };
 
-  // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     try {
@@ -266,7 +317,6 @@ const LeaveApproval = ({ user }) => {
     }
   };
 
-  // Pagination range
   const getPaginationRange = () => {
     if (totalPages <= 1) return [];
     const delta = 2;
@@ -285,10 +335,43 @@ const LeaveApproval = ({ user }) => {
     return range;
   };
 
+  // Show access denied message if user is not HR or Manager
+  const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+  if (role !== 'HR' && role !== 'ROLE_HR' && role !== 'MANAGER' && role !== 'ROLE_MANAGER' && role !== null) {
+    return (
+      <div className="emp-root" style={{ maxWidth: '100%', overflowX: 'auto', padding: '40px' }}>
+        <div style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: '20px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+          <h2 style={{ color: '#1e2340', marginBottom: '8px' }}>Access Denied</h2>
+          <p style={{ color: '#8b92b8' }}>This page is only accessible to HR and Manager personnel.</p>
+        </div>
+      </div>
+    );
+  }
+
   // Loading state
   if (loading && leaves.length === 0) {
-    return <LoadingSpinner message="Loading team leave requests..." />;
+    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    const message = role === 'HR' ? 'Loading Level 2 pending requests...' : 'Loading team leave requests...';
+    return <LoadingSpinner message={message} />;
   }
+
+  // Get title based on role
+  const getPageTitle = () => {
+    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    if (role === 'HR' || role === 'ROLE_HR') {
+      return 'Leave Approval - HR Level 2';
+    }
+    return 'Leave Approval - Team Requests';
+  };
+
+  const getSubtitle = () => {
+    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    if (role === 'HR' || role === 'ROLE_HR') {
+      return `${totalElements} pending Level 2 requests`;
+    }
+    return `${totalElements} pending team requests`;
+  };
 
   return (
     <div className="emp-root" style={{ maxWidth: '100%', overflowX: 'auto' }}>
@@ -296,13 +379,13 @@ const LeaveApproval = ({ user }) => {
       <div className="emp-header">
         <div className="emp-header-left">
           <div>
-            <h1 className="emp-title">Leave Approval</h1>
-            <p className="emp-subtitle">{totalElements} total requests</p>
+            <h1 className="emp-title">{getPageTitle()}</h1>
+            <p className="emp-subtitle">{getSubtitle()}</p>
           </div>
         </div>
       </div>
 
-      {/* Stats Cards - Equal height using flexbox */}
+      {/* Stats Cards */}
       <div className="row g-4 mb-4" style={{ display: 'flex', flexWrap: 'wrap', margin: '0 -8px' }}>
         <div className="col-md-3" style={{ padding: '0 8px', flex: '1 1 200px', minWidth: '180px' }}>
           <div className="stat-card" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -321,7 +404,7 @@ const LeaveApproval = ({ user }) => {
           <div className="stat-card" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div className="d-flex justify-content-between align-items-center">
               <div>
-                <p className="text-gray mb-1" style={{ fontSize: '12px', color: '#8b92b8' }}>Pending for Approval</p>
+                <p className="text-gray mb-1" style={{ fontSize: '12px', color: '#8b92b8' }}>Pending</p>
                 <h3 className="fw-bold mb-0" style={{ fontSize: '32px', fontWeight: 700, color: '#f59e0b' }}>{stats.pending}</h3>
               </div>
               <div className="stat-icon icon-amber" style={{ width: '44px', height: '44px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fef3c7' }}>
@@ -358,6 +441,36 @@ const LeaveApproval = ({ user }) => {
         </div>
       </div>
 
+      {/* Info Banner for HR */}
+      {/* {(localStorage.getItem(STORAGE_KEYS.ROLE) === 'HR' || localStorage.getItem(STORAGE_KEYS.ROLE) === 'ROLE_HR') && (
+        <div style={{ 
+          background: '#fef3c7', 
+          borderLeft: '4px solid #f59e0b', 
+          padding: '12px 16px', 
+          marginBottom: '20px',
+          borderRadius: '8px',
+          fontSize: '13px',
+          color: '#92400e'
+        }}>
+          <strong>📋 Level 2 Approval Required:</strong> Showing only leave requests that have been approved by Level 1 (Manager) and are pending HR approval.
+        </div>
+      )} */}
+
+      {/* Info Banner for Manager */}
+      {(localStorage.getItem(STORAGE_KEYS.ROLE) === 'MANAGER' || localStorage.getItem(STORAGE_KEYS.ROLE) === 'ROLE_MANAGER') && (
+        <div style={{ 
+          background: '#dbeafe', 
+          borderLeft: '4px solid #3b82f6', 
+          padding: '12px 16px', 
+          marginBottom: '20px',
+          borderRadius: '8px',
+          fontSize: '13px',
+          color: '#1e40af'
+        }}>
+          <strong>📋 Level 1 Approval Required:</strong> Showing leave requests from your team members pending your approval.
+        </div>
+      )}
+
       {/* Search Bar */}
       <div className="emp-search-bar">
         <div className="emp-search-wrap">
@@ -377,7 +490,7 @@ const LeaveApproval = ({ user }) => {
         </div>
       </div>
 
-      {/* Table - Increased width */}
+      {/* Table */}
       <div className="emp-table-card" style={{ overflowX: 'auto' }}>
         <div className="emp-table-wrap" style={{ minWidth: '1000px', overflowX: 'auto' }}>
           <table className="emp-table" style={{ width: '100%', minWidth: '1000px' }}>
@@ -400,7 +513,7 @@ const LeaveApproval = ({ user }) => {
                   <td colSpan="9" className="emp-empty">
                     <div className="emp-empty-inner">
                       <FaSpinner className="emp-spinner" style={{ width: '24px', height: '24px', marginBottom: '12px' }} />
-                      <p>Loading team leave requests...</p>
+                      <p>Loading leave requests...</p>
                     </div>
                   </td>
                 </tr>
@@ -473,7 +586,11 @@ const LeaveApproval = ({ user }) => {
                     <div className="emp-empty-inner">
                       <span className="emp-empty-icon" style={{ fontSize: '32px', opacity: 0.4 }}>📋</span>
                       <p style={{ fontWeight: 600, color: '#4a5082', marginTop: '8px' }}>No leave requests found</p>
-                      <small style={{ fontSize: '12px', color: '#8b92b8' }}>No pending requests to approve at this time</small>
+                      <small style={{ fontSize: '12px', color: '#8b92b8' }}>
+                        {(localStorage.getItem(STORAGE_KEYS.ROLE) === 'HR' || localStorage.getItem(STORAGE_KEYS.ROLE) === 'ROLE_HR') 
+                          ? 'No Level 2 pending requests at this time'
+                          : 'No pending requests from your team members'}
+                      </small>
                     </div>
                   </td>
                 </tr>

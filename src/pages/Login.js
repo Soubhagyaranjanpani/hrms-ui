@@ -50,10 +50,15 @@ const Login = ({ onLogin }) => {
 
       const { jwtToken, username, employeeId, roleName } = data.response;
 
+      // Save to localStorage
       localStorage.setItem(STORAGE_KEYS.JWT_TOKEN, jwtToken);
       localStorage.setItem(STORAGE_KEYS.EMPLOYEE_ID, employeeId);
       localStorage.setItem(STORAGE_KEYS.USERNAME, username);
-      localStorage.setItem(STORAGE_KEYS.ROLE, roleName ?? '');
+      
+      // Save role directly from API response (no fallback)
+      if (roleName) {
+        localStorage.setItem(STORAGE_KEYS.ROLE, roleName.toUpperCase());
+      }
 
       if (rememberMe) {
         localStorage.setItem(STORAGE_KEYS.REMEMBER_EMAIL, email);
@@ -61,19 +66,24 @@ const Login = ({ onLogin }) => {
         localStorage.removeItem(STORAGE_KEYS.REMEMBER_EMAIL);
       }
 
+      // Create user data object
       const userData = {
         id: employeeId,
         email: username,
         name: username.split('@')[0],
-        role: roleName ?? 'Employee',
+        role: roleName ? roleName.toUpperCase() : null,
         avatar: username[0].toUpperCase(),
         jwtToken,
       };
+      
       localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
+
+      console.log('Role saved from API:', localStorage.getItem(STORAGE_KEYS.ROLE));
 
       onLogin(userData);
       navigate('/dashboard');
-      setTimeout(() => toast.success('Welcome back!', `Logged in as ${userData.name}.`), 100);
+      setTimeout(() => toast.success('Welcome back!', `Logged in as ${userData.name}`), 100);
+      
     } catch (err) {
       console.error('Login error:', err);
       toast.error('Network error', 'Unable to reach the server. Check your connection.');

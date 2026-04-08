@@ -32,9 +32,10 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
 
   // Leave section items
   const leaveItems = [
+    { path: '/LeaveDashboard', icon: <FaChartLine />, label: 'Leave Dashboard' },
     { path: '/leaves', icon: <FaPlane />, label: 'Apply Leave' },
-    {path:'/approvedLeaves', icon:<FaCheck />, label:'Approve & Reject leave'},
-    {path:'/leavePolicy', icon:<FaCog />, label:'Leave Policy'},
+    { path: '/approvedLeaves', icon: <FaCheck />, label: 'Approve & Reject leave' },
+    { path: '/leavePolicy', icon: <FaCog />, label: 'Leave Policy' },
     { path: '/leaveCalendar', icon: <FaChartBar />, label: 'Leave Calendar' },
 
   ];
@@ -575,7 +576,7 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, onLogout }) => {
             }}
             onMouseEnter={e => {
               e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
-              e.currentTarget.style.borderLeft ='none';
+              e.currentTarget.style.borderLeft = 'none';
             }}
             onMouseLeave={e => {
               e.currentTarget.style.background = 'transparent';
