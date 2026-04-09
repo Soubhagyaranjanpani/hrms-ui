@@ -4,8 +4,8 @@ import { toast } from 'react-toastify';
 
 const Settings = ({ user }) => {
   const [company, setCompany] = useState({
-    name: 'HRNexus Inc.',
-    email: 'contact@hrnexus.com',
+    name: 'ARI-HRMS',
+    email: 'contact@ari-hrms.com',
     phone: '+1 234 567 8900',
     address: '123 Business Ave, New York, NY 10001',
     timezone: 'EST',

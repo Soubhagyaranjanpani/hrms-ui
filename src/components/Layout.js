@@ -37,10 +37,6 @@ const Layout = ({ user, onLogout }) => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  const toggleMobileSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
   const mainMarginLeft = isMobile ? '0px' : sidebarCollapsed ? '72px' : '260px';
 
   return (
@@ -51,7 +47,6 @@ const Layout = ({ user, onLogout }) => {
         sidebarOpen={sidebarOpen}
         isMobile={isMobile}
         onItemClick={() => isMobile && setSidebarOpen(false)}
-        toggleSidebar={toggleSidebar}
         onLogout={handleLogout}
       />
 
@@ -88,8 +83,7 @@ const Layout = ({ user, onLogout }) => {
         <Header 
           user={user}
           onLogout={handleLogout}
-          onMenuClick={toggleMobileSidebar}
-          sidebarCollapsed={sidebarCollapsed}
+          onMenuClick={toggleSidebar}
         />
 
         {/* Page Content */}

@@ -22,10 +22,10 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
 
 const Dashboard = ({ user }) => {
   const chartPalette = {
-    primary: '#4f46e5',
-    success: '#0f766e',
+    primary: '#9d174d',
+    success: '#15803d',
     warning: '#d97706',
-    info: '#0369a1',
+    info: '#b45309',
     danger: '#dc2626',
     text: '#475569',
     grid: 'rgba(148, 163, 184, 0.25)',
@@ -51,8 +51,8 @@ const Dashboard = ({ user }) => {
           const { ctx, chartArea } = chart;
           if (!chartArea) return chartPalette.success;
           const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          gradient.addColorStop(0, '#14b8a6');
-          gradient.addColorStop(1, '#0f766e');
+          gradient.addColorStop(0, '#22c55e');
+          gradient.addColorStop(1, '#15803d');
           return gradient;
         },
         borderRadius: 12,
@@ -118,7 +118,7 @@ const Dashboard = ({ user }) => {
       },
       tooltip: {
         backgroundColor: 'rgba(15, 23, 42, 0.94)',
-        borderColor: 'rgba(99, 102, 241, 0.45)',
+        borderColor: 'rgba(190, 24, 93, 0.45)',
         borderWidth: 1,
         titleColor: '#e2e8f0',
         bodyColor: '#cbd5e1',
@@ -167,7 +167,7 @@ const Dashboard = ({ user }) => {
       legend: { display: false },
       tooltip: {
         backgroundColor: 'rgba(15, 23, 42, 0.94)',
-        borderColor: 'rgba(99, 102, 241, 0.45)',
+        borderColor: 'rgba(190, 24, 93, 0.45)',
         borderWidth: 1,
         titleColor: '#e2e8f0',
         bodyColor: '#cbd5e1',

@@ -4,11 +4,13 @@ import {
   FaTachometerAlt, FaUsers, FaCalendarCheck, FaMoneyBillWave,
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog,
-  FaChevronLeft, FaChevronRight, FaBuilding, FaSitemap,
+  FaBuilding, FaSitemap,
   FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks
 } from 'react-icons/fa';
+import { BsChevronDown, BsChevronRight } from 'react-icons/bs';
+import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
 
-const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleSidebar, onLogout }) => {
+const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogout }) => {
   const [masterOpen, setMasterOpen] = useState(true);
   const [employeeOpen, setEmployeeOpen] = useState(true);
   const [leaveOpen, setLeaveOpen] = useState(true);
@@ -113,7 +115,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
         overflowY: 'auto',
         overflowX: 'hidden',
         zIndex: 1000,
-        background: 'linear-gradient(180deg, var(--sidebar-bg-top) 0%, var(--sidebar-bg-bottom) 100%)',
+        background: 'linear-gradient(135deg, var(--sidebar-bg-top), var(--sidebar-bg-bottom))',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -122,7 +124,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+        justifyContent: 'center',
         padding: sidebarCollapsed ? '20px 0' : '20px 20px',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
         marginBottom: '16px',
@@ -130,56 +132,16 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
         flexShrink: 0,
       }}>
         {!sidebarCollapsed && (
-          <div>
-            <h3 style={{
-              fontSize: '20px',
-              margin: 0,
-              background: 'linear-gradient(135deg, var(--accent-indigo-light), var(--accent-teal-light))',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              fontFamily: "'Sora', sans-serif",
-              fontWeight: 700,
-            }}>HRNexus</h3>
-            <p style={{ fontSize: '11px', color: 'var(--sidebar-text)', margin: 0 }}>Enterprise HRMS</p>
+          <div style={{
+            background: 'rgba(255,255,255,0.98)',
+            borderRadius: '12px',
+            padding: 0,
+            maxWidth: '220px',
+            width: '100%'
+          }}>
+            <img src={ariHrmsLogo} alt="ARI-HRMS" style={{ width: '100%', height: 'auto', display: 'block', filter: 'contrast(1.12) saturate(1.08)', borderRadius: '8px' }} />
           </div>
         )}
-
-        <button
-          onClick={toggleSidebar}
-          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            padding: sidebarCollapsed ? '8px' : '8px 12px',
-            background: 'rgba(99,102,241,0.18)',
-            border: '1.5px solid rgba(129,140,248,0.4)',
-            borderRadius: '10px',
-            color: 'var(--sidebar-text-active)',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: 600,
-            fontFamily: "'DM Sans', sans-serif",
-            transition: 'all 0.2s ease',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'rgba(99,102,241,0.32)';
-            e.currentTarget.style.borderColor = 'var(--accent-indigo-light)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'rgba(99,102,241,0.18)';
-            e.currentTarget.style.borderColor = 'rgba(129,140,248,0.4)';
-          }}
-        >
-          {sidebarCollapsed
-            ? <FaChevronRight size={13} />
-            : <><FaChevronLeft size={13} /><span>Collapse</span></>
-          }
-        </button>
       </div>
 
       {/* Nav Items */}
@@ -253,7 +215,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
                 <FaUserCircle size={12} />
                 <span>EMPLOYEE</span>
               </span>
-              {employeeOpen ? <FaChevronLeft size={10} /> : <FaChevronRight size={10} />}
+              {employeeOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
           </li>
         )}
@@ -325,7 +287,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
                 <FaTasks size={12} />
                 <span>TASK MANAGEMENT</span>
               </span>
-              {tasksOpen ? <FaChevronLeft size={10} /> : <FaChevronRight size={10} />}
+              {tasksOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
           </li>
         )}
@@ -397,7 +359,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
                 <FaPlane size={12} />
                 <span>LEAVE</span>
               </span>
-              {leaveOpen ? <FaChevronLeft size={10} /> : <FaChevronRight size={10} />}
+              {leaveOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
           </li>
         )}
@@ -469,7 +431,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
                 <FaDatabase size={12} />
                 <span>MASTER</span>
               </span>
-              {masterOpen ? <FaChevronLeft size={10} /> : <FaChevronRight size={10} />}
+              {masterOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
           </li>
         )}
@@ -541,7 +503,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
                 <FaMoneyBillWave size={12} />
                 <span>PAYROLL</span>
               </span>
-              {payrollOpen ? <FaChevronLeft size={10} /> : <FaChevronRight size={10} />}
+              {payrollOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
           </li>
         )}
@@ -613,7 +575,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
                 <FaFileAlt size={12} />
                 <span>DOCUMENTS</span>
               </span>
-              {documentsOpen ? <FaChevronLeft size={10} /> : <FaChevronRight size={10} />}
+              {documentsOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
           </li>
         )}
@@ -690,7 +652,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
 
       <style>{`
         .sidebar::-webkit-scrollbar { width: 4px; }
-        .sidebar::-webkit-scrollbar-track { background: rgba(99,102,241,0.08); border-radius: 10px; }
+        .sidebar::-webkit-scrollbar-track { background: rgba(190,24,93,0.08); border-radius: 10px; }
         .sidebar::-webkit-scrollbar-thumb { background: var(--accent-indigo); border-radius: 10px; }
         .sidebar::-webkit-scrollbar-thumb:hover { background: var(--accent-indigo-light); }
       `}</style>

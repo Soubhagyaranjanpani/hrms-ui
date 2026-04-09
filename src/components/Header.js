@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaBars, FaBell, FaBuilding } from 'react-icons/fa';
-import { FiLogOut } from 'react-icons/fi'; // ✅ NEW ICON
+import { FaBell, FaBuilding } from 'react-icons/fa';
+import { FiLogOut, FiMenu } from 'react-icons/fi';
 
 const Header = ({ user, onLogout, onMenuClick }) => {
   const notificationCount = 3;
@@ -31,16 +31,19 @@ const Header = ({ user, onLogout, onMenuClick }) => {
       {/* LEFT */}
       <div className="app-header-left">
         <button
-          className="app-header-menu-btn d-md-none"
+          className="app-header-menu-btn"
           onClick={onMenuClick}
+          type="button"
+          aria-label="Toggle sidebar"
+          title="Toggle sidebar"
         >
-          <FaBars size={22} />
+          <FiMenu size={20} />
         </button>
 
         <div className="app-header-title-wrap">
           <FaBuilding size={18} className="app-header-title-icon" />
           <h1 className="app-header-title">
-            Human Resource Management System
+            ARI-HRMS • Human Resource Management System
           </h1>
         </div>
       </div>
