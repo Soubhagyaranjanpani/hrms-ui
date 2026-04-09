@@ -1,8 +1,8 @@
 
 
-// export const BASE_URL = "http://localhost:8080/hrms";
+export const BASE_URL = "http://localhost:8080/hrms";
 
-export const BASE_URL = "http://103.133.215.182:8081/hrms";
+// export const BASE_URL = "http://103.133.215.182:8081/hrms";
 export const API_ENDPOINTS = {
   // ── Auth / Employee ──────────────────────────
   LOGIN: `${BASE_URL}/api/employees/login`,

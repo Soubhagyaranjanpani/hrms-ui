@@ -10,7 +10,7 @@ import Attendance from './pages/Attendance';
 import Payroll from './pages/Payroll';
 import LeaveManagement from './Leave/LeaveManagement';
 import Recruitment from './pages/Recruitment';
-import Performance from './pages/Performance';
+import Performance from './Task/Performance';
 import Training from './pages/Training';
 import Documents from './pages/Documents';
 import Reports from './pages/Reports';
@@ -24,6 +24,13 @@ import AttendancePolicy from './pages/AttendancePolicy';
 import AttendanceDashboard from './pages/AttendanceDashboard';
 import AttendanceSummary from './pages/AttendanceSummary';
 import Profile from './pages/Profile';
+import TaskDashboard from './Task/TaskDashboard';
+import CreateTask from './Task/CreateTask';
+import TaskList from './Task/TaskList';
+import TaskDetail from './Task/TaskDetail';
+
+
+
 
 
 import { ToastContainer } from './components/Toast';
@@ -119,11 +126,17 @@ function App() {
           <Route path="attendance-dashboard" element={<AttendanceDashboard user={currentUser} />} />
           <Route path="attendance-summary" element={<AttendanceSummary user={currentUser} />} />
           <Route path="profile" element={<Profile user={currentUser} />} />
-          <Route path="approvedLeaves" element={<ApprovedLeaves user={currentUser}/>}/>
-          <Route path="leavePolicy" element={<LeavePolicy user={currentUser}/>}/>
-          <Route path="leaveCalendar" element={<LeaveCalendar user={currentUser}/>}/>
-                    <Route path="LeaveDashboard" element={<LeaveDashboard user={currentUser}/>}/>
-                    <Route path="holidays" element={<HolidayManagement user={currentUser} />} />
+          <Route path="approvedLeaves" element={<ApprovedLeaves user={currentUser} />} />
+          <Route path="leavePolicy" element={<LeavePolicy user={currentUser} />} />
+          <Route path="leaveCalendar" element={<LeaveCalendar user={currentUser} />} />
+          <Route path="LeaveDashboard" element={<LeaveDashboard user={currentUser} />} />
+          <Route path="holidays" element={<HolidayManagement user={currentUser} />} />
+          <Route path="TaskDashboard" element={<TaskDashboard user={currentUser} />} />
+          <Route path="CreateTask" element={<CreateTask user={currentUser} />} />
+          <Route path="TaskList" element={<TaskList user={currentUser} />} />
+          <Route path="TaskDetail" element={<TaskDetail user={currentUser} />} />
+
+
 
         </Route>
       </Routes>

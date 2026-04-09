@@ -5,7 +5,7 @@ import {
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog,
   FaChevronLeft, FaChevronRight, FaBuilding, FaSitemap,
-  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck
+  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks
 } from 'react-icons/fa';
 
 const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleSidebar, onLogout }) => {
@@ -14,6 +14,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
   const [leaveOpen, setLeaveOpen] = useState(true);
   const [payrollOpen, setPayrollOpen] = useState(true);
   const [documentsOpen, setDocumentsOpen] = useState(true);
+  const [tasksOpen, setTasksOpen] = useState(true);
 
   const menuItems = [
     { path: '/dashboard', icon: <FaTachometerAlt />, label: 'Dashboard' },
@@ -26,7 +27,6 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
     { path: 'attendance-summary', icon: <FaChartPie />, label: 'Attendance Summary' },
     { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy' },
     { path: '/attendance', icon: <FaCalendarCheck />, label: 'Attendance' },
-    { path: '/performance', icon: <FaChartLine />, label: 'Performance' },
     { path: '/training', icon: <FaChalkboardTeacher />, label: 'Training' },
   ];
 
@@ -37,8 +37,8 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
     { path: '/approvedLeaves', icon: <FaCheck />, label: 'Approve & Reject leave' },
     { path: '/leavePolicy', icon: <FaCog />, label: 'Leave Policy' },
     // { path: '/leaveCalendar', icon: <FaChartBar />, label: 'Leave Calendar' },
-    {path: '/holidays', icon: <FaLeaf />, label: 'Holiday Management' },
- 
+    { path: '/holidays', icon: <FaLeaf />, label: 'Holiday Management' },
+
 
   ];
 
@@ -54,6 +54,16 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
     { path: '/payroll', icon: <FaMoneyBillWave />, label: 'Payroll Management' },
     { path: '/payroll/salary', icon: <FaMoneyBillWave />, label: 'Salary Processing' },
     { path: '/reports', icon: <FaChartBar />, label: 'Payroll Reports' },
+  ];
+
+  // Task Management section items
+  const tasksItems = [
+    { path: '/TaskDashboard', icon: <FaTachometerAlt />, label: 'Task Dashboard' },
+    { path: '/CreateTask', icon: <FaTasks />, label: 'Create Task' },
+    { path: '/TaskList', icon: <FaTasks />, label: 'My Tasks' },
+    // { path: '/TaskDetail', icon: <FaTasks />, label: 'Task Detail' },
+    { path: '/performance', icon: <FaChartLine />, label: 'Performance' },
+
   ];
 
   // Documents section items
@@ -81,6 +91,10 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
 
   const toggleDocuments = () => {
     setDocumentsOpen(!documentsOpen);
+  };
+
+  const toggleTasks = () => {
+    setTasksOpen(!tasksOpen);
   };
 
   const sidebarWidth = isMobile ? '260px' : (sidebarCollapsed ? '72px' : '260px');
@@ -249,6 +263,78 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, toggleS
           <>
             {employeeItems.map((item, index) => (
               <li key={`employee-${index}`} style={{ margin: '3px 10px' }}>
+                <NavLink
+                  to={item.path}
+                  title={sidebarCollapsed ? item.label : ''}
+                  style={({ isActive }) => ({
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: sidebarCollapsed ? '0' : '12px',
+                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                    padding: sidebarCollapsed ? '11px' : '11px 14px',
+                    paddingLeft: sidebarCollapsed ? '11px' : '38px',
+                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                    textDecoration: 'none',
+                    borderRadius: '10px',
+                    transition: 'all 0.2s ease',
+                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                    fontSize: '14px',
+                    fontWeight: isActive ? 600 : 400,
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                  })}
+                >
+                  <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+                  {!sidebarCollapsed && <span>{item.label}</span>}
+                </NavLink>
+              </li>
+            ))}
+          </>
+        )}
+
+        {/* Task Management Section Header */}
+        {!sidebarCollapsed && (
+          <li style={{ margin: '16px 10px 8px 10px' }}>
+            <div
+              onClick={toggleTasks}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 10px',
+                color: 'var(--sidebar-heading)',
+                fontSize: '11px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                cursor: 'pointer',
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = 'var(--sidebar-text-active)';
+                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = 'var(--sidebar-heading)';
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FaTasks size={12} />
+                <span>TASK MANAGEMENT</span>
+              </span>
+              {tasksOpen ? <FaChevronLeft size={10} /> : <FaChevronRight size={10} />}
+            </div>
+          </li>
+        )}
+
+        {/* Task Management Items */}
+        {(tasksOpen || sidebarCollapsed) && (
+          <>
+            {tasksItems.map((item, index) => (
+              <li key={`tasks-${index}`} style={{ margin: '3px 10px' }}>
                 <NavLink
                   to={item.path}
                   title={sidebarCollapsed ? item.label : ''}
