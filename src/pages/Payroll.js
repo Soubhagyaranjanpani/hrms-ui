@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import {
-  FaDownload, FaEye, FaCheckCircle, FaClock, FaFileInvoiceDollar,
+  FaDownload, FaEye, FaCheckCircle, FaClock, FaRupeeSign,
   FaUserFriends, FaChartLine, FaCalendarAlt, FaArrowRight,
-  FaRegClock, FaRegCheckCircle, FaUser, FaMoneyBillWave,
-  FaPercent, FaRupeeSign
+  FaRegClock, FaRegCheckCircle, FaUser, FaPercent
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
@@ -77,7 +76,7 @@ const Payroll = ({ user }) => {
             background: 'linear-gradient(145deg, var(--accent-indigo), var(--accent-indigo-light))',
             boxShadow: '0 10px 20px -5px rgba(157, 23, 77, 0.3)'
           }}>
-            <FaFileInvoiceDollar />
+            <FaRupeeSign />
           </div>
           <div className="page-header-text">
             <h1 style={{ background: 'linear-gradient(135deg, var(--primary-navy), var(--accent-indigo))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
@@ -105,7 +104,7 @@ const Payroll = ({ user }) => {
                 <small>For {selectedMonth}</small>
               </div>
               <div className="stat-icon" style={{ background: 'rgba(45,156,124,0.2)' }}>
-                <FaMoneyBillWave color="#2d9c7c" />
+                <FaRupeeSign color="#2d9c7c" />
               </div>
             </div>
           </div>
@@ -265,7 +264,7 @@ const Payroll = ({ user }) => {
                 <tr>
                   <td colSpan="8" className="text-center py-5">
                     <div style={{ opacity: 0.6 }}>
-                      <FaFileInvoiceDollar size={40} style={{ marginBottom: '12px', color: 'var(--text-muted)' }} />
+                      <FaRupeeSign size={40} style={{ marginBottom: '12px', color: 'var(--text-muted)' }} />
                       <p className="text-muted mb-0">No payroll records found for {selectedMonth}</p>
                     </div>
                   </td>
@@ -348,7 +347,7 @@ const Payroll = ({ user }) => {
               </div>
             ) : (
               <div className="text-center py-4 text-muted">
-                <FaMoneyBillWave size={36} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                <FaRupeeSign size={36} style={{ opacity: 0.3, marginBottom: '12px' }} />
                 <p>No processed transactions for {selectedMonth}</p>
               </div>
             )}
@@ -367,6 +366,3 @@ const Payroll = ({ user }) => {
 };
 
 export default Payroll;
-
-
-
