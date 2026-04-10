@@ -28,6 +28,7 @@ import TaskDashboard from './Task/TaskDashboard';
 import CreateTask from './Task/CreateTask';
 import TaskList from './Task/TaskList';
 import TaskDetail from './Task/TaskDetail';
+import ChatBot from './components/ChatBot';
 
 
 
@@ -98,6 +99,7 @@ function App() {
   return (
     <Router>
       <ToastContainer />
+      <ChatBot user={currentUser} />
       <Routes>
         <Route
           path="/login"

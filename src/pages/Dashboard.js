@@ -37,7 +37,7 @@ const Dashboard = ({ user }) => {
     pendingLeaves: 8,
     averageAttendance: 94,
     totalDepartments: 8,
-    monthlyPayroll: '245K'
+    monthlyPayroll: '1.85Cr' // Changed to Indian format
   });
 
   const barChartData = {
@@ -226,7 +226,7 @@ const Dashboard = ({ user }) => {
     },
     {
       title: 'Monthly Payroll',
-      value: `$${stats.monthlyPayroll}`,
+      value: `₹${stats.monthlyPayroll}`, // Changed from $ to ₹
       note: 'Processed on 28th',
       noteColor: chartPalette.info,
       icon: <FaMoneyBillWave />,
