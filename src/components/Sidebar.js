@@ -48,13 +48,13 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/branch', icon: <FaBuilding />, label: 'Branches' },
     { path: '/department', icon: <FaSitemap />, label: 'Departments' },
     { path: '/role', icon: <FaUserTag />, label: 'Roles' },
-    { path: 'destination', icon: <FaUserTag />, label: 'Destination' },
+    { path: '/designation', icon: <FaUserTag />, label: 'Designation' },
   ];
 
   // Payroll section items
   const payrollItems = [
     { path: '/payroll', icon: <FaMoneyBillWave />, label: 'Payroll Management' },
-    { path: '/payroll/salary', icon: <FaMoneyBillWave />, label: 'Salary Processing' },
+    // { path: '/payrollProcessing', icon: <FaMoneyBillWave />, label: 'Salary Processing' },
     { path: '/reports', icon: <FaChartBar />, label: 'Payroll Reports' },
   ];
 

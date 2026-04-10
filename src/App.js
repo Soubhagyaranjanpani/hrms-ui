@@ -19,7 +19,7 @@ import Layout from './components/Layout';
 import Branch from './Masters/Branch';
 import Department from './Masters/Department';
 import Role from './Masters/Role';
-import Destination from './Masters/Destination';
+import Designation from './Masters/Designation';
 import AttendancePolicy from './pages/AttendancePolicy';
 import AttendanceDashboard from './pages/AttendanceDashboard';
 import AttendanceSummary from './pages/AttendanceSummary';
@@ -40,6 +40,7 @@ import LeavePolicy from './Leave/LeavePolicy';
 import LeaveCalendar from './Leave/LeaveCalendar';
 import LeaveDashboard from './Leave/LeaveDashboard';
 import HolidayManagement from './Leave/HolidayManagement';
+
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -121,7 +122,7 @@ function App() {
           <Route path="branch" element={<Branch user={currentUser} />} />
           <Route path="department" element={<Department user={currentUser} />} />
           <Route path="role" element={<Role user={currentUser} />} />
-          <Route path="destination" element={<Destination user={currentUser} />} />
+          <Route path="designation" element={<Designation user={currentUser} />} />
           <Route path="attendance-policy" element={<AttendancePolicy user={currentUser} />} />
           <Route path="attendance-dashboard" element={<AttendanceDashboard user={currentUser} />} />
           <Route path="attendance-summary" element={<AttendanceSummary user={currentUser} />} />
