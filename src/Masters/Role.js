@@ -1,476 +1,559 @@
-import { useState } from "react";
-import { FaEdit, FaArrowLeft } from "react-icons/fa";
+
+import { useState, useEffect, useCallback } from "react";
+import {
+  FaSearch, FaEdit, FaArrowLeft, FaSave, FaExclamationCircle, FaUserPlus, FaTimes
+} from "react-icons/fa";
+import axios from "axios";
+import { toast } from "../components/Toast";
+import LoadingSpinner from "../components/LoadingSpinner";
+import { BASE_URL, STORAGE_KEYS } from "../config/api.config";
+
+/* ─── Validation Rules ─── */
+const RULES = {
+  roleName: {
+    required: true,
+    minLen: 2,
+    maxLen: 50,
+    pattern: /^[a-zA-Z\s]+$/,
+    patternMsg: "Only letters and spaces allowed",
+  },
+};
+
+const validate = (field, value) => {
+  const r = RULES[field];
+  if (!r) return "";
+  const v = typeof value === "string" ? value.trim() : String(value ?? "").trim();
+  if (r.required && !v) return "This field is required";
+  if (!v && !r.required) return "";
+  if (r.minLen && v.length < r.minLen) return `Minimum ${r.minLen} characters`;
+  if (r.maxLen && v.length > r.maxLen) return `Maximum ${r.maxLen} characters`;
+  if (r.pattern && !r.pattern.test(v)) return r.patternMsg;
+  return "";
+};
+
+const FieldError = ({ msg }) =>
+  msg ? (
+    <span className="field-err">
+      <FaExclamationCircle size={10} /> {msg}
+    </span>
+  ) : null;
+
+const CharCount = ({ value, max }) => {
+  const len = (value || "").length;
+  const warn = len > max * 0.85;
+  return (
+    <span className="char-count" style={{ color: warn ? "#f97316" : "#8b92b8" }}>
+      {len}/{max}
+    </span>
+  );
+};
 
 const Role = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [editingRole, setEditingRole] = useState(null);
+  const [view, setView] = useState("list");
+  const [editMode, setEditMode] = useState(false);
+  const [selectedRole, setSelectedRole] = useState(null);
 
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
+  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Pagination (frontend)
+  const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [searchName, setSearchName] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const [formData, setFormData] = useState({
-    roleName: "",
-  });
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusAction, setStatusAction] = useState({ id: null, newStatus: null, name: "" });
 
-  const [roleData, setRoleData] = useState([
-    { id: 1, roleName: "Admin", status: "y" },
-    { id: 2, roleName: "Manager", status: "y" },
-    { id: 3, roleName: "HR", status: "y" },
-    { id: 4, roleName: "Developer", status: "y" },
-    { id: 5, roleName: "Tester", status: "y" },
-    { id: 6, roleName: "Accountant", status: "y" },
-    { id: 7, roleName: "Support", status: "y" },
-  ]);
+  const [formData, setFormData] = useState({ roleName: "" });
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
 
-  // Helper to reset form state
-  const resetForm = () => {
-    setFormData({ roleName: "" });
-    setEditingRole(null);
+  const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  const axiosConfig = {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      "Content-Type": "application/json",
+    },
   };
 
-  // INPUT
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchName);
+      setPage(0);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [searchName]);
 
-  // SAVE
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    if (editingRole) {
-      const updated = roleData.map((r) =>
-        r.id === editingRole.id ? { ...r, ...formData } : r
-      );
-      setRoleData(updated);
-      setEditingRole(null);
-    } else {
-      const newRole = {
-        id: roleData.length + 1,
-        ...formData,
-        status: "y",
-      };
-      setRoleData([...roleData, newRole]);
+  // Fetch roles from API
+  const fetchRoles = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/roles/list?flag=0`, axiosConfig);
+      if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+        // Map API fields { id, name, status } to component fields
+        const mapped = res.data.response.map((r) => ({
+          id: r.id,
+          roleName: r.name,
+          status: r.status || "y",
+        }));
+        setRoles(mapped);
+      } else {
+        setRoles([]);
+      }
+    } catch (err) {
+      console.error("Fetch error:", err);
+      toast.error("Error", err.response?.data?.message || "Failed to fetch roles");
+      setRoles([]);
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    resetForm();
-    setShowForm(false);
-    setCurrentPage(1);
-  };
+  useEffect(() => {
+    fetchRoles();
+  }, [fetchRoles]);
 
-  // EDIT
-  const handleEdit = (role) => {
-    if (role.status === "y") {
-      setEditingRole(role);
-      setFormData(role);
-      setShowForm(true);
-    }
-  };
-
-  // STATUS TOGGLE
-  const handleStatusToggle = (id) => {
-    const updated = roleData.map((r) =>
-      r.id === id ? { ...r, status: r.status === "y" ? "n" : "y" } : r
-    );
-    setRoleData(updated);
-  };
-
-  // Filtered data based on search
-  const filteredRoles = roleData.filter((r) =>
-    r.roleName.toLowerCase().includes(searchQuery.toLowerCase())
+  // Filter roles based on search
+  const filteredRoles = roles.filter((r) =>
+    r.roleName?.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
 
-  // Pagination logic
   const totalItems = filteredRoles.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
-  const currentRoles = filteredRoles.slice(startIndex, endIndex);
+  const startIndex = page * rowsPerPage;
+  const currentRoles = filteredRoles.slice(startIndex, startIndex + rowsPerPage);
 
-  const goToPage = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
+  // Form handlers
+  const handleChange = (field, value) => {
+    const updated = { ...formData, [field]: value };
+    setFormData(updated);
+    if (touched[field]) {
+      setErrors((prev) => ({ ...prev, [field]: validate(field, value) }));
     }
   };
 
-  const handleSearch = (e) => {
-    setSearchQuery(e.target.value);
-    setCurrentPage(1);
+  const handleBlur = (field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    setErrors((prev) => ({ ...prev, [field]: validate(field, formData[field]) }));
   };
 
-  // ================= LIST VIEW =================
-  if (!showForm) {
-    return (
-      <div className="container mt-1">
-        <div
-          className="d-flex justify-content-between align-items-center mb-3"
-          style={{ flexWrap: "wrap", gap: "12px" }}
-        >
-          <h2
-            style={{
-              fontFamily: "Sora, sans-serif",
-              fontSize: "22px",
-              fontWeight: "700",
-              color: "var(--text-primary)",
-              margin: 0,
-            }}
-          >
-            Role Directory
-          </h2>
+  const resetForm = () => {
+    setFormData({ roleName: "" });
+    setErrors({});
+    setTouched({});
+    setEditMode(false);
+    setSelectedRole(null);
+  };
 
-          <div className="d-flex gap-2">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Search by Role..."
-              value={searchQuery}
-              onChange={handleSearch}
-              style={{
-                width: "250px",
-                borderRadius: "12px",
-                border: "1px solid var(--border-medium)",
-                fontSize: "13px",
-                padding: "8px 14px",
-                fontFamily: "DM Sans, sans-serif",
-              }}
-            />
+  // Create or Update role
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
+    // Validate
+    const err = validate("roleName", formData.roleName);
+    setTouched({ roleName: true });
+    setErrors({ roleName: err });
+    if (err) {
+      toast.warning("Validation Error", "Please fix the highlighted fields");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        name: formData.roleName.trim(),
+        status: "y",
+      };
+
+      let url, method;
+      if (editMode) {
+        url = `${BASE_URL}/roles/update/${selectedRole.id}`;
+        method = axios.put;
+      } else {
+        url = `${BASE_URL}/roles/add`;
+        method = axios.post;
+      }
+
+      const res = await method(url, payload, axiosConfig);
+      if (res.data?.status === 200) {
+        toast.success("Success", editMode ? "Role updated" : "Role created");
+        resetForm();
+        setView("list");
+        fetchRoles();
+      } else {
+        throw new Error(res.data?.message || "Operation failed");
+      }
+    } catch (err) {
+      console.error("Submit error:", err);
+      toast.error("Error", err.response?.data?.message || err.message || "Something went wrong");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Edit role
+  const handleEdit = (role) => {
+    if (role.status !== "y") {
+      toast.warning("Inactive", "Cannot edit an inactive role");
+      return;
+    }
+    setFormData({ roleName: role.roleName });
+    setSelectedRole(role);
+    setEditMode(true);
+    setView("form");
+  };
+
+  // Status toggle
+  const handleStatusToggle = (id, currentStatus, name) => {
+    const newStatus = currentStatus === "y" ? "n" : "y";
+    setStatusAction({ id, newStatus, name });
+    setShowStatusModal(true);
+  };
+
+  const confirmStatusChange = async () => {
+    const { id, newStatus } = statusAction;
+    setLoading(true);
+    try {
+      const res = await axios.put(
+        `${BASE_URL}/roles/update/${id}`,
+        { status: newStatus },
+        axiosConfig
+      );
+      if (res.data?.status === 200) {
+        toast.success(
+          "Status Updated",
+          `Role ${newStatus === "y" ? "activated" : "deactivated"}`
+        );
+        fetchRoles();
+      } else {
+        throw new Error(res.data?.message || "Status change failed");
+      }
+    } catch (err) {
+      toast.error("Error", err.response?.data?.message || "Failed to change status");
+    } finally {
+      setLoading(false);
+      setShowStatusModal(false);
+      setStatusAction({ id: null, newStatus: null, name: "" });
+    }
+  };
+
+  // Pagination range with ellipsis
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) {
+      range.push(0);
+      if (left > 1) range.push("...");
+    }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) {
+      if (right < totalPages - 2) range.push("...");
+      range.push(totalPages - 1);
+    }
+    return range;
+  };
+
+  const isFieldOk = (f) => touched[f] && !errors[f] && formData[f]?.trim();
+  const isFieldErr = (f) => touched[f] && !!errors[f];
+
+  const handleRowsPerPageChange = (e) => {
+    setRowsPerPage(Number(e.target.value));
+    setPage(0);
+  };
+
+  if (loading && view === "list" && roles.length === 0) {
+    return <LoadingSpinner message="Loading roles..." />;
+  }
+
+  return (
+    <div className="emp-root">
+      {/* Header */}
+      <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
+        {view === "form" ? (
+          <>
+            <div>
+              <h1 className="emp-title">{editMode ? "Edit Role" : "Add Role"}</h1>
+              <p className="emp-subtitle">
+                {editMode ? "Update role information" : "Enter new role details"}
+              </p>
+            </div>
             <button
-              className="btn"
-              style={{
-                background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
-                color: "white",
-                borderRadius: "12px",
-                padding: "8px 20px",
-                fontSize: "13px",
-                fontWeight: "600",
-                border: "none",
-                boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
-                transition: "all 0.25s",
-                cursor: "pointer",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 8px 20px rgba(99,102,241,0.42)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 4px 14px rgba(99,102,241,0.3)";
-              }}
+              className="emp-back-btn"
               onClick={() => {
                 resetForm();
-                setShowForm(true);
+                setView("list");
               }}
             >
-              Add
+              <FaArrowLeft size={12} /> Back
             </button>
-          </div>
-        </div>
+          </>
+        ) : (
+          <>
+            <div className="emp-header-left">
+              <div>
+                <h1 className="emp-title">Role Directory</h1>
+                <p className="emp-subtitle">{totalItems} total roles</p>
+              </div>
+            </div>
+            <button
+              className="emp-add-btn"
+              onClick={() => {
+                resetForm();
+                setView("form");
+              }}
+            >
+              <FaUserPlus size={13} /> Add Role
+            </button>
+          </>
+        )}
+      </div>
 
-        <div
-          className="card-modern p-3"
-          style={{
-            borderRadius: "20px",
-            backgroundColor: "var(--card-bg)",
-            boxShadow: "0 2px 12px rgba(99,102,241,0.06)",
-            border: "1px solid var(--border-light)",
-          }}
-        >
-          <div className="table-responsive">
-            <table className="table table-custom" style={{ marginBottom: 0 }}>
-              <thead>
-                <tr>
-                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>NO</th>
-                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>NAME</th>
-                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>STATUS</th>
-                  <th style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase" }}>ACTION</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentRoles.length > 0 ? (
-                  currentRoles.map((role, index) => (
-                    <tr key={role.id}>
-                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{startIndex + index + 1}</td>
-                      <td style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{role.roleName}</td>
-                      <td>
-                        <div
-                          onClick={() => handleStatusToggle(role.id)}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            cursor: "pointer",
-                          }}
-                        >
+      {/* LIST VIEW */}
+      {view === "list" ? (
+        <>
+          <div className="emp-search-bar">
+            <div className="emp-search-wrap">
+              <FaSearch className="emp-search-icon" size={12} />
+              <input
+                className="emp-search-input"
+                type="text"
+                placeholder="Search by role name…"
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+              />
+              {searchName && (
+                <button className="emp-search-clear" onClick={() => setSearchName("")}>
+                  <FaTimes size={11} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="emp-table-card">
+            <div className="emp-table-wrap">
+              <table className="emp-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 44 }}>#</th>
+                    <th>Role Name</th>
+                    <th style={{ width: 100 }}>Status</th>
+                    <th style={{ width: 70, textAlign: "center" }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentRoles.length > 0 ? (
+                    currentRoles.map((role, idx) => (
+                      <tr key={role.id} className="emp-row">
+                        <td className="emp-sno">{startIndex + idx + 1}</td>
+                        <td>
+                          <div className="emp-name">{role.roleName || "—"}</div>
+                        </td>
+                        <td>
                           <div
+                            onClick={() => handleStatusToggle(role.id, role.status, role.roleName)}
                             style={{
-                              width: "42px",
-                              height: "22px",
-                              borderRadius: "50px",
-                              backgroundColor: role.status === "y" ? "var(--accent-indigo)" : "#ccc",
-                              position: "relative",
-                              transition: "0.3s",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              cursor: "pointer",
                             }}
                           >
                             <div
                               style={{
-                                width: "18px",
-                                height: "18px",
-                                borderRadius: "50%",
-                                backgroundColor: "white",
-                                position: "absolute",
-                                top: "2px",
-                                left: role.status === "y" ? "22px" : "2px",
-                                transition: "0.3s",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                                width: "42px",
+                                height: "22px",
+                                borderRadius: "50px",
+                                backgroundColor: role.status === "y" ? "#6366f1" : "#cbd5e1",
+                                position: "relative",
+                                transition: "0.2s",
                               }}
-                            />
+                            >
+                              <div
+                                style={{
+                                  width: "18px",
+                                  height: "18px",
+                                  borderRadius: "50%",
+                                  backgroundColor: "white",
+                                  position: "absolute",
+                                  top: "2px",
+                                  left: role.status === "y" ? "22px" : "2px",
+                                  transition: "0.2s",
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                                }}
+                              />
+                            </div>
+                            <span
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: "500",
+                                color: role.status === "y" ? "#6366f1" : "#94a3b8",
+                              }}
+                            >
+                              {role.status === "y" ? "Active" : "Inactive"}
+                            </span>
                           </div>
-                          <span
-                            style={{
-                              color: role.status === "y" ? "var(--accent-indigo)" : "#999",
-                              fontWeight: "600",
-                              fontSize: "12px",
-                            }}
-                          >
-                            {role.status === "y" ? "Active" : "Inactive"}
-                          </span>
+                        </td>
+                        <td>
+                          <div className="emp-actions">
+                            <button
+                              className="emp-act emp-act--edit"
+                              onClick={() => handleEdit(role)}
+                              title={role.status !== "y" ? "Cannot edit inactive role" : "Edit"}
+                              style={{ opacity: role.status !== "y" ? 0.5 : 1 }}
+                              disabled={role.status !== "y"}
+                            >
+                              <FaEdit size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4" className="emp-empty">
+                        <div className="emp-empty-inner">
+                          <span className="emp-empty-icon">🔑</span>
+                          <p>No roles found</p>
+                          <small>Try a different search or add a new role</small>
                         </div>
                       </td>
-                      <td>
-                        <button
-                          className="btn btn-sm"
-                          style={{
-                            backgroundColor: role.status === "y" ? "var(--accent-indigo)" : "#ccc",
-                            color: "white",
-                            borderRadius: "10px",
-                            padding: "6px 10px",
-                            cursor: role.status === "y" ? "pointer" : "not-allowed",
-                            opacity: role.status === "y" ? 1 : 0.6,
-                            border: "none",
-                            fontSize: "12px",
-                            transition: "all 0.2s",
-                          }}
-                          disabled={role.status !== "y"}
-                          onClick={() => handleEdit(role)}
-                          title={role.status !== "y" ? "Cannot edit inactive role" : "Edit role"}
-                        >
-                          <FaEdit />
-                        </button>
-                      </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4" className="text-center py-4 text-muted" style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-                      No roles found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-          {/* PAGINATION */}
-          {totalItems > 0 && (
-            <div
-              style={{
-                borderTop: "1px solid var(--border-light)",
-                paddingTop: "15px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginTop: "1rem",
-                flexWrap: "wrap",
-                gap: "10px",
-              }}
-            >
-              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                Showing {startIndex + 1} to {endIndex} of {totalItems} entries
-              </div>
+            {/* Pagination */}
+            {totalItems > 0 && (
+              <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <span className="emp-page-info">
+                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} roles
+                  </span>
+                </div>
 
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <button
-                  onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--border-medium)",
-                    backgroundColor: currentPage === 1 ? "#f8f9fa" : "var(--bg-white)",
-                    color: currentPage === 1 ? "#adb5bd" : "var(--accent-indigo)",
-                    cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                    fontSize: "12px",
-                    fontFamily: "DM Sans, sans-serif",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  « Previous
-                </button>
-
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <div className="emp-page-controls">
                   <button
-                    key={page}
-                    onClick={() => goToPage(page)}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--border-medium)",
-                      backgroundColor: page === currentPage ? "var(--accent-indigo)" : "var(--bg-white)",
-                      color: page === currentPage ? "#ffffff" : "var(--text-secondary)",
-                      fontWeight: page === currentPage ? "bold" : "normal",
-                      cursor: "pointer",
-                      fontSize: "12px",
-                      fontFamily: "DM Sans, sans-serif",
-                    }}
+                    className="emp-page-btn"
+                    disabled={page === 0}
+                    onClick={() => setPage(page - 1)}
                   >
-                    {page}
+                    ← Prev
                   </button>
-                ))}
-
-                <button
-                  onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--border-medium)",
-                    backgroundColor: currentPage === totalPages ? "#f8f9fa" : "var(--bg-white)",
-                    color: currentPage === totalPages ? "#adb5bd" : "var(--accent-indigo)",
-                    cursor: currentPage === totalPages ? "not-allowed" : "pointer",
-                    fontSize: "12px",
-                  }}
+                  {getPaginationRange().map((pg, i) =>
+                    pg === "..." ? (
+                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                    ) : (
+                      <button
+                        key={pg}
+                        className={`emp-page-num ${pg === page ? "active" : ""}`}
+                        onClick={() => setPage(pg)}
+                      >
+                        {pg + 1}
+                      </button>
+                    )
+                  )}
+                  <button
+                    className="emp-page-btn"
+                    disabled={page + 1 >= totalPages}
+                    onClick={() => setPage(page + 1)}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        /* FORM VIEW */
+        <div className="emp-form-wrap">
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="emp-form-section">
+              <div className="emp-section-label">Role Information</div>
+              <div className="emp-form-grid" style={{ maxWidth: "500px" }}>
+                <div
+                  className={`emp-field ${isFieldErr("roleName") ? "has-error" : ""} ${
+                    isFieldOk("roleName") ? "has-ok" : ""
+                  }`}
                 >
-                  Next »
-                </button>
+                  <div className="emp-label-row">
+                    <label>
+                      Role Name <span className="req">*</span>
+                    </label>
+                    <CharCount value={formData.roleName} max={50} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="e.g., Admin, Manager, Developer"
+                    value={formData.roleName}
+                    maxLength={50}
+                    onChange={(e) => handleChange("roleName", e.target.value)}
+                    onBlur={() => handleBlur("roleName")}
+                  />
+                  <FieldError msg={errors.roleName} />
+                  <small className="emp-hint-text">2–50 characters, letters only</small>
+                </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>
-    );
-  }
 
-  // ================= FORM VIEW =================
-  return (
-    <div className="container mt-1">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2
-          style={{
-            fontFamily: "Sora, sans-serif",
-            fontSize: "22px",
-            fontWeight: "700",
-            color: "var(--text-primary)",
-            margin: 0,
-          }}
-        >
-          {editingRole ? "Edit Role" : "Add Role"}
-        </h2>
-
-        {/* REPLACED BACK BUTTON - exactly as requested */}
-        <button
-          className="emp-back-btn"
-          onClick={() => {
-            resetForm();
-            setShowForm(false);
-          }}
-        >
-          <FaArrowLeft size={12} /> Back
-        </button>
-      </div>
-
-      <div
-        className="card p-4 shadow-sm"
-        style={{
-          borderRadius: "20px",
-          border: "1px solid var(--border-light)",
-          boxShadow: "0 2px 12px rgba(99,102,241,0.06)",
-          backgroundColor: "var(--card-bg)",
-        }}
-      >
-        <form onSubmit={handleSubmit}>
-          <div className="row g-3">
-            <div className="col-md-6">
-              <label
-                style={{
-                  color: "var(--accent-indigo)",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  marginBottom: "6px",
+            <div className="emp-form-footer">
+              <button
+                type="button"
+                className="emp-cancel-btn"
+                onClick={() => {
+                  resetForm();
+                  setView("list");
                 }}
               >
-                Role Name
-              </label>
-              <input
-                className="form-control"
-                name="roleName"
-                value={formData.roleName}
-                onChange={handleInputChange}
-                required
-                style={{
-                  borderRadius: "10px",
-                  border: "1px solid var(--border-medium)",
-                  fontSize: "13px",
-                  fontFamily: "DM Sans, sans-serif",
-                  padding: "9px 12px",
-                  backgroundColor: "var(--bg-surface)",
-                }}
-              />
+                Cancel
+              </button>
+              <button type="submit" className="emp-submit-btn" disabled={submitting}>
+                {submitting ? (
+                  <><span className="emp-spinner" /> {editMode ? "Updating…" : "Creating…"}</>
+                ) : (
+                  <><FaSave size={12} /> {editMode ? "Update Role" : "Create Role"}</>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Status Confirmation Modal */}
+      {showStatusModal && (
+        <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
+          <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="emp-modal-icon">
+              {statusAction.newStatus === "y" ? "✅" : "⛔"}
+            </div>
+            <h3 className="emp-modal-title">Confirm Status Change</h3>
+            <p className="emp-modal-body">
+              Are you sure you want to{" "}
+              <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
+              <strong>{statusAction.name}</strong>?
+            </p>
+            <p className="emp-modal-warn">
+              {statusAction.newStatus === "n"
+                ? "Inactive roles cannot be edited until reactivated."
+                : "Active roles will be available for selection."}
+            </p>
+            <div className="emp-modal-actions">
+              <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>
+                Cancel
+              </button>
+              <button className="emp-modal-confirm" onClick={confirmStatusChange}>
+                Confirm
+              </button>
             </div>
           </div>
-
-          <div className="mt-4">
-            <button
-              className="btn me-2"
-              style={{
-                background: "linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-light))",
-                color: "white",
-                borderRadius: "12px",
-                padding: "9px 25px",
-                border: "none",
-                fontSize: "13px",
-                fontWeight: "600",
-                cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
-                transition: "all 0.25s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 8px 20px rgba(99,102,241,0.42)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 4px 14px rgba(99,102,241,0.3)";
-              }}
-            >
-              {editingRole ? "Update" : "Save"}
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{
-                borderRadius: "12px",
-                padding: "9px 25px",
-                fontSize: "13px",
-                fontWeight: "500",
-                border: "1.5px solid var(--border-medium)",
-                backgroundColor: "var(--bg-white)",
-                color: "var(--text-secondary)",
-                cursor: "pointer",
-              }}
-              onClick={() => {
-                resetForm();
-                setShowForm(false);
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
+        </div>
+      )}
     </div>
   );
 };
