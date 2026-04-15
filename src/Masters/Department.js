@@ -1,7 +1,7 @@
-
 import { useState, useEffect, useCallback } from "react";
 import {
-  FaSearch, FaEdit, FaArrowLeft, FaSave, FaExclamationCircle, FaUserPlus, FaTimes
+  FaSearch, FaEdit, FaArrowLeft, FaSave, FaExclamationCircle,
+  FaUserPlus, FaTimes
 } from "react-icons/fa";
 import axios from "axios";
 import { toast } from "../components/Toast";
@@ -10,19 +10,19 @@ import { BASE_URL, STORAGE_KEYS } from "../config/api.config";
 
 /* ─── Validation Rules ─── */
 const RULES = {
-  deptName: {
-    required: true,
-    minLen: 2,
-    maxLen: 100,
-    pattern: /^[a-zA-Z0-9\s&-]+$/,
-    patternMsg: "Only letters, numbers, spaces, & and -",
-  },
   deptCode: {
     required: true,
     minLen: 2,
     maxLen: 20,
     pattern: /^[A-Z0-9-]+$/,
     patternMsg: "Only uppercase letters, numbers, and hyphens",
+  },
+  name: {
+    required: true,
+    minLen: 2,
+    maxLen: 50,
+    pattern: /^[a-zA-Z\s]+$/,
+    patternMsg: "Only letters and spaces allowed",
   },
   branchId: {
     required: true,
@@ -61,14 +61,13 @@ const CharCount = ({ value, max }) => {
 const Department = () => {
   const [view, setView] = useState("list");
   const [editMode, setEditMode] = useState(false);
-  const [selectedDept, setSelectedDept] = useState(null);
+  const [selectedDepartment, setSelectedDepartment] = useState(null);
 
   const [departments, setDepartments] = useState([]);
-  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Pagination (frontend)
+  // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchName, setSearchName] = useState("");
@@ -77,20 +76,46 @@ const Department = () => {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusAction, setStatusAction] = useState({ id: null, newStatus: null, name: "" });
 
-  const [formData, setFormData] = useState({
-    deptName: "",
-    deptCode: "",
-    branchId: "",
-  });
+  const [formData, setFormData] = useState({ deptCode: "", name: "", branchId: "" });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
+  // For branch dropdown
+  const [branches, setBranches] = useState([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+
+  // Auth
   const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
   const axiosConfig = {
     headers: {
       Authorization: `Bearer ${getAuthToken()}`,
       "Content-Type": "application/json",
     },
+  };
+
+  const ensureToken = () => {
+    const token = getAuthToken();
+    if (!token) {
+      toast.error("Authentication Required", "Please login to continue");
+      return false;
+    }
+    return true;
+  };
+
+  // Fetch branches for dropdown
+  const fetchBranches = async () => {
+    setLoadingBranches(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/branches/list?flag=0`, axiosConfig);
+      if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+        setBranches(res.data.response);
+      }
+    } catch (err) {
+      console.error("Fetch branches error:", err);
+      toast.error("Error", "Failed to fetch branches");
+    } finally {
+      setLoadingBranches(false);
+    }
   };
 
   // Debounce search
@@ -102,20 +127,23 @@ const Department = () => {
     return () => clearTimeout(t);
   }, [searchName]);
 
-  // Fetch departments from API
+  // Fetch departments
   const fetchDepartments = useCallback(async () => {
+    if (!ensureToken()) return;
     setLoading(true);
     try {
       const res = await axios.get(`${BASE_URL}/departments/list?flag=0`, axiosConfig);
-      if (res.data?.status === 200 && Array.isArray(res.data.response)) {
-        // Map API fields { id, name, code, branchId, status } to component fields
+      // if (res.data?.status === 200 && Array.isArray(res.data.response)) 
+if (res.data?.response && Array.isArray(res.data.response)) 
+
+        {
         const mapped = res.data.response.map((d) => ({
           id: d.id,
-          deptName: d.name,
           deptCode: d.code,
+          name: d.name,
           branchId: d.branchId,
-          branchName: d.branchName || "",
-          status: d.status || "y",
+          branchName: d.branchName,
+          status: d.isActive ? "y" : "n",
         }));
         setDepartments(mapped);
       } else {
@@ -130,33 +158,16 @@ const Department = () => {
     }
   }, []);
 
-  // Fetch branches for dropdown
-  const fetchBranches = useCallback(async () => {
-    try {
-      const res = await axios.get(`${BASE_URL}/branches/list?flag=0`, axiosConfig);
-      if (res.data?.status === 200 && Array.isArray(res.data.response)) {
-        setBranches(res.data.response);
-      }
-    } catch (err) {
-      console.error("Fetch branches error:", err);
-    }
-  }, []);
-
   useEffect(() => {
     fetchDepartments();
     fetchBranches();
-  }, [fetchDepartments, fetchBranches]);
+  }, [fetchDepartments]);
 
-  // Filter departments based on search (name, code, branch name)
-  const filteredDepartments = departments.filter((d) => {
-    const query = debouncedSearch.toLowerCase();
-    return (
-      d.deptName?.toLowerCase().includes(query) ||
-      d.deptCode?.toLowerCase().includes(query) ||
-      d.branchName?.toLowerCase().includes(query)
-    );
-  });
-
+  // Filter & pagination
+  const filteredDepartments = departments.filter((d) =>
+    d.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    d.deptCode?.toLowerCase().includes(debouncedSearch.toLowerCase())
+  );
   const totalItems = filteredDepartments.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
@@ -178,49 +189,55 @@ const Department = () => {
   };
 
   const resetForm = () => {
-    setFormData({ deptName: "", deptCode: "", branchId: "" });
+    setFormData({ deptCode: "", name: "", branchId: "" });
     setErrors({});
     setTouched({});
     setEditMode(false);
-    setSelectedDept(null);
+    setSelectedDepartment(null);
   };
 
-  // Create or Update department
+  // Create / Update
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!ensureToken()) return;
 
     // Validate all fields
-    const fields = ["deptName", "deptCode", "branchId"];
-    const newTouched = {};
-    const newErrors = {};
-    fields.forEach((f) => {
-      newTouched[f] = true;
-      const err = validate(f, formData[f]);
-      if (err) newErrors[f] = err;
-    });
-    setTouched(newTouched);
-    setErrors(newErrors);
-    if (Object.keys(newErrors).length > 0) {
+    const errCode = validate("deptCode", formData.deptCode);
+    const errName = validate("name", formData.name);
+    const errBranch = validate("branchId", formData.branchId);
+    setTouched({ deptCode: true, name: true, branchId: true });
+    setErrors({ deptCode: errCode, name: errName, branchId: errBranch });
+
+    if (errCode || errName || errBranch) {
       toast.warning("Validation Error", "Please fix the highlighted fields");
       return;
     }
 
     setSubmitting(true);
     try {
-      const payload = {
-        name: formData.deptName.trim(),
-        code: formData.deptCode.trim(),
-        branchId: parseInt(formData.branchId),
-        status: "y",
-      };
+      const codeTrimmed = formData.deptCode.trim();
+      const nameTrimmed = formData.name.trim();
+      const branchIdInt = parseInt(formData.branchId);
+      let url, method, payload;
 
-      let url, method;
       if (editMode) {
-        url = `${BASE_URL}/departments/update/${selectedDept.id}`;
+        url = `${BASE_URL}/departments/update`;
         method = axios.put;
+        payload = {
+          id: selectedDepartment.id,
+          code: codeTrimmed,
+          name: nameTrimmed,
+          branchId: branchIdInt,
+        };
       } else {
-        url = `${BASE_URL}/departments/add`;
+        url = `${BASE_URL}/departments/create`;
         method = axios.post;
+        payload = {
+          code: codeTrimmed,
+          name: nameTrimmed,
+          branchId: branchIdInt,
+          isActive: true,
+        };
       }
 
       const res = await method(url, payload, axiosConfig);
@@ -247,11 +264,11 @@ const Department = () => {
       return;
     }
     setFormData({
-      deptName: dept.deptName,
       deptCode: dept.deptCode,
-      branchId: dept.branchId,
+      name: dept.name,
+      branchId: dept.branchId ? dept.branchId.toString() : "",
     });
-    setSelectedDept(dept);
+    setSelectedDepartment(dept);
     setEditMode(true);
     setView("form");
   };
@@ -264,19 +281,17 @@ const Department = () => {
   };
 
   const confirmStatusChange = async () => {
-    const { id, newStatus } = statusAction;
+    if (!ensureToken()) return;
+    const { id } = statusAction;
     setLoading(true);
     try {
       const res = await axios.put(
-        `${BASE_URL}/departments/update/${id}`,
-        { status: newStatus },
+        `${BASE_URL}/departments/status/${id}`,
+        null,
         axiosConfig
       );
       if (res.data?.status === 200) {
-        toast.success(
-          "Status Updated",
-          `Department ${newStatus === "y" ? "activated" : "deactivated"}`
-        );
+        toast.success("Status Updated", "Department status changed");
         fetchDepartments();
       } else {
         throw new Error(res.data?.message || "Status change failed");
@@ -290,7 +305,7 @@ const Department = () => {
     }
   };
 
-  // Pagination range with ellipsis
+  // Pagination helpers
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
@@ -372,7 +387,7 @@ const Department = () => {
               <input
                 className="emp-search-input"
                 type="text"
-                placeholder="Search by name, code, or branch…"
+                placeholder="Search by name or code…"
                 value={searchName}
                 onChange={(e) => setSearchName(e.target.value)}
               />
@@ -390,8 +405,8 @@ const Department = () => {
                 <thead>
                   <tr>
                     <th style={{ width: 44 }}>#</th>
-                    <th>Name</th>
                     <th>Code</th>
+                    <th>Department Name</th>
                     <th>Branch</th>
                     <th style={{ width: 100 }}>Status</th>
                     <th style={{ width: 70, textAlign: "center" }}>Action</th>
@@ -402,16 +417,14 @@ const Department = () => {
                     currentDepartments.map((dept, idx) => (
                       <tr key={dept.id} className="emp-row">
                         <td className="emp-sno">{startIndex + idx + 1}</td>
-                        <td>
-                          <div className="emp-name">{dept.deptName || "—"}</div>
-                        </td>
                         <td>{dept.deptCode || "—"}</td>
+                        <td>
+                          <div className="emp-name">{dept.name || "—"}</div>
+                        </td>
                         <td>{dept.branchName || "—"}</td>
                         <td>
                           <div
-                            onClick={() =>
-                              handleStatusToggle(dept.id, dept.status, dept.deptName)
-                            }
+                            onClick={() => handleStatusToggle(dept.id, dept.status, dept.name)}
                             style={{
                               display: "flex",
                               alignItems: "center",
@@ -424,7 +437,7 @@ const Department = () => {
                                 width: "42px",
                                 height: "22px",
                                 borderRadius: "50px",
-                                backgroundColor: dept.status === "y" ? "#6366f1" : "#cbd5e1",
+                                backgroundColor: dept.status === "y" ? "var(--accent-indigo)" : "var(--border-medium)",
                                 position: "relative",
                                 transition: "0.2s",
                               }}
@@ -447,7 +460,7 @@ const Department = () => {
                               style={{
                                 fontSize: "12px",
                                 fontWeight: "500",
-                                color: dept.status === "y" ? "#6366f1" : "#94a3b8",
+                                color: dept.status === "y" ? "var(--accent-indigo)" : "var(--text-muted)",
                               }}
                             >
                               {dept.status === "y" ? "Active" : "Inactive"}
@@ -473,7 +486,7 @@ const Department = () => {
                     <tr>
                       <td colSpan="6" className="emp-empty">
                         <div className="emp-empty-inner">
-                          <span className="emp-empty-icon">🏛️</span>
+                          <span className="emp-empty-icon">🏢</span>
                           <p>No departments found</p>
                           <small>Try a different search or add a new department</small>
                         </div>
@@ -532,36 +545,11 @@ const Department = () => {
           <form onSubmit={handleSubmit} noValidate>
             <div className="emp-form-section">
               <div className="emp-section-label">Department Information</div>
-              <div className="emp-form-grid">
-                {/* Department Name */}
-                <div
-                  className={`emp-field ${isFieldErr("deptName") ? "has-error" : ""} ${
-                    isFieldOk("deptName") ? "has-ok" : ""
-                  }`}
-                >
-                  <div className="emp-label-row">
-                    <label>
-                      Department Name <span className="req">*</span>
-                    </label>
-                    <CharCount value={formData.deptName} max={100} />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="e.g., Cardiology, Human Resources"
-                    value={formData.deptName}
-                    maxLength={100}
-                    onChange={(e) => handleChange("deptName", e.target.value)}
-                    onBlur={() => handleBlur("deptName")}
-                  />
-                  <FieldError msg={errors.deptName} />
-                  <small className="emp-hint-text">2–100 characters, letters, numbers, spaces, &, -</small>
-                </div>
-
+              <div className="emp-form-grid" style={{ maxWidth: "500px" }}>
                 {/* Department Code */}
                 <div
-                  className={`emp-field ${isFieldErr("deptCode") ? "has-error" : ""} ${
-                    isFieldOk("deptCode") ? "has-ok" : ""
-                  }`}
+                  className={`emp-field ${isFieldErr("deptCode") ? "has-error" : ""} ${isFieldOk("deptCode") ? "has-ok" : ""
+                    }`}
                 >
                   <div className="emp-label-row">
                     <label>
@@ -571,7 +559,7 @@ const Department = () => {
                   </div>
                   <input
                     type="text"
-                    placeholder="e.g., CAR001"
+                    placeholder="e.g., DEPT001"
                     value={formData.deptCode}
                     maxLength={20}
                     onChange={(e) => handleChange("deptCode", e.target.value)}
@@ -581,11 +569,33 @@ const Department = () => {
                   <small className="emp-hint-text">Uppercase letters, numbers, hyphens</small>
                 </div>
 
-                {/* Branch */}
+                {/* Department Name */}
                 <div
-                  className={`emp-field ${isFieldErr("branchId") ? "has-error" : ""} ${
-                    isFieldOk("branchId") ? "has-ok" : ""
-                  }`}
+                  className={`emp-field ${isFieldErr("name") ? "has-error" : ""} ${isFieldOk("name") ? "has-ok" : ""
+                    }`}
+                >
+                  <div className="emp-label-row">
+                    <label>
+                      Department Name <span className="req">*</span>
+                    </label>
+                    <CharCount value={formData.name} max={50} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="e.g., IT, HR, Finance"
+                    value={formData.name}
+                    maxLength={50}
+                    onChange={(e) => handleChange("name", e.target.value)}
+                    onBlur={() => handleBlur("name")}
+                  />
+                  <FieldError msg={errors.name} />
+                  <small className="emp-hint-text">2–50 characters, letters only</small>
+                </div>
+
+                {/* Branch Dropdown */}
+                <div
+                  className={`emp-field ${isFieldErr("branchId") ? "has-error" : ""} ${isFieldOk("branchId") ? "has-ok" : ""
+                    }`}
                 >
                   <label>
                     Branch <span className="req">*</span>
@@ -594,6 +604,7 @@ const Department = () => {
                     value={formData.branchId}
                     onChange={(e) => handleChange("branchId", e.target.value)}
                     onBlur={() => handleBlur("branchId")}
+                    disabled={loadingBranches}
                   >
                     <option value="">Select branch</option>
                     {branches.map((b) => (

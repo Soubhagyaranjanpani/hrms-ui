@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import {
   FaSearch, FaEdit, FaArrowLeft, FaSave, FaExclamationCircle, FaUserPlus, FaTimes
@@ -74,9 +75,8 @@ const Branch = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Pagination (frontend)
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);  // <-- added dropdown support
+  const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchName, setSearchName] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -103,7 +103,15 @@ const Branch = () => {
     },
   };
 
-  // Debounce search
+  const ensureToken = () => {
+    const token = getAuthToken();
+    if (!token) {
+      toast.error("Authentication Required", "Please login to continue");
+      return false;
+    }
+    return true;
+  };
+
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(searchName);
@@ -112,8 +120,8 @@ const Branch = () => {
     return () => clearTimeout(t);
   }, [searchName]);
 
-  // Fetch branches from API
   const fetchBranches = useCallback(async () => {
+    if (!ensureToken()) return;
     setLoading(true);
     try {
       const res = await axios.get(`${BASE_URL}/branches/list?flag=0`, axiosConfig);
@@ -127,7 +135,7 @@ const Branch = () => {
           state: b.state || "",
           country: b.country || "",
           pincode: b.pincode || "",
-          status: b.status || "y",
+          status: b.isActive ? "y" : "n",
         }));
         setBranches(mapped);
       } else {
@@ -146,7 +154,6 @@ const Branch = () => {
     fetchBranches();
   }, [fetchBranches]);
 
-  // Filter branches based on search
   const filteredBranches = branches.filter((b) => {
     const query = debouncedSearch.toLowerCase();
     return (
@@ -155,13 +162,11 @@ const Branch = () => {
       b.city?.toLowerCase().includes(query)
     );
   });
-
   const totalItems = filteredBranches.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
   const currentBranches = filteredBranches.slice(startIndex, startIndex + rowsPerPage);
 
-  // Form handlers (unchanged)
   const handleChange = (field, value) => {
     if (field === "branchCode") value = value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
     const updated = { ...formData, [field]: value };
@@ -192,9 +197,9 @@ const Branch = () => {
     setSelectedBranch(null);
   };
 
-  // Create or Update branch
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!ensureToken()) return;
 
     const fields = ["branchCode", "branchName", "address", "city", "state", "country", "pincode"];
     const newTouched = {};
@@ -213,24 +218,34 @@ const Branch = () => {
 
     setSubmitting(true);
     try {
-      const payload = {
-        code: formData.branchCode,
-        name: formData.branchName,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        country: formData.country,
-        pincode: formData.pincode,
-        status: "y",
-      };
+      let url, method, payload;
 
-      let url, method;
       if (editMode) {
-        url = `${BASE_URL}/branches/update/${selectedBranch.id}`;
+        url = `${BASE_URL}/branches/update`;
         method = axios.put;
+        payload = {
+          id: selectedBranch.id,
+          code: formData.branchCode.trim(),
+          name: formData.branchName.trim(),
+          address: formData.address.trim(),
+          city: formData.city.trim(),
+          state: formData.state.trim(),
+          country: formData.country.trim(),
+          pincode: formData.pincode.trim(),
+        };
       } else {
-        url = `${BASE_URL}/branches/add`;
+        url = `${BASE_URL}/branches/create`;
         method = axios.post;
+        payload = {
+          code: formData.branchCode.trim(),
+          name: formData.branchName.trim(),
+          address: formData.address.trim(),
+          city: formData.city.trim(),
+          state: formData.state.trim(),
+          country: formData.country.trim(),
+          pincode: formData.pincode.trim(),
+          isActive: true,
+        };
       }
 
       const res = await method(url, payload, axiosConfig);
@@ -250,43 +265,25 @@ const Branch = () => {
     }
   };
 
-  // Edit branch
-  const handleEdit = async (branch) => {
+  const handleEdit = (branch) => {
     if (branch.status !== "y") {
       toast.warning("Inactive", "Cannot edit an inactive branch");
       return;
     }
-    setLoading(true);
-    try {
-      let full = branch;
-      try {
-        const res = await axios.get(`${BASE_URL}/branches/${branch.id}`, axiosConfig);
-        if (res.data?.status === 200 && res.data.response) {
-          full = res.data.response;
-        }
-      } catch (err) {
-        console.warn("Could not fetch full details, using list data", err);
-      }
-      setFormData({
-        branchCode: full.code || branch.branchCode,
-        branchName: full.name || branch.branchName,
-        address: full.address || "",
-        city: full.city || "",
-        state: full.state || "",
-        country: full.country || "",
-        pincode: full.pincode || "",
-      });
-      setSelectedBranch(branch);
-      setEditMode(true);
-      setView("form");
-    } catch (err) {
-      toast.error("Error", "Could not load branch details");
-    } finally {
-      setLoading(false);
-    }
+    setFormData({
+      branchCode: branch.branchCode,
+      branchName: branch.branchName,
+      address: branch.address || "",
+      city: branch.city || "",
+      state: branch.state || "",
+      country: branch.country || "",
+      pincode: branch.pincode || "",
+    });
+    setSelectedBranch(branch);
+    setEditMode(true);
+    setView("form");
   };
 
-  // Status toggle
   const handleStatusToggle = (id, currentStatus, name) => {
     const newStatus = currentStatus === "y" ? "n" : "y";
     setStatusAction({ id, newStatus, name });
@@ -294,19 +291,13 @@ const Branch = () => {
   };
 
   const confirmStatusChange = async () => {
-    const { id, newStatus } = statusAction;
+    if (!ensureToken()) return;
+    const { id } = statusAction;
     setLoading(true);
     try {
-      const res = await axios.put(
-        `${BASE_URL}/branches/update/${id}`,
-        { status: newStatus },
-        axiosConfig
-      );
+      const res = await axios.put(`${BASE_URL}/branches/status/${id}`, null, axiosConfig);
       if (res.data?.status === 200) {
-        toast.success(
-          "Status Updated",
-          `Branch ${newStatus === "y" ? "activated" : "deactivated"}`
-        );
+        toast.success("Status Updated", "Branch status changed");
         fetchBranches();
       } else {
         throw new Error(res.data?.message || "Status change failed");
@@ -320,7 +311,6 @@ const Branch = () => {
     }
   };
 
-  // Pagination range with ellipsis
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
@@ -341,10 +331,9 @@ const Branch = () => {
   const isFieldOk = (f) => touched[f] && !errors[f] && formData[f]?.trim();
   const isFieldErr = (f) => touched[f] && !!errors[f];
 
-  // Handle rows per page change
   const handleRowsPerPageChange = (e) => {
     setRowsPerPage(Number(e.target.value));
-    setPage(0); // reset to first page
+    setPage(0);
   };
 
   if (loading && view === "list" && branches.length === 0) {
@@ -397,7 +386,6 @@ const Branch = () => {
       {/* LIST VIEW */}
       {view === "list" ? (
         <>
-          {/* Search Bar */}
           <div className="emp-search-bar">
             <div className="emp-search-wrap">
               <FaSearch className="emp-search-icon" size={12} />
@@ -416,7 +404,6 @@ const Branch = () => {
             </div>
           </div>
 
-          {/* Table Card */}
           <div className="emp-table-card">
             <div className="emp-table-wrap">
               <table className="emp-table">
@@ -440,9 +427,7 @@ const Branch = () => {
                       <tr key={branch.id} className="emp-row">
                         <td className="emp-sno">{startIndex + idx + 1}</td>
                         <td>{branch.branchCode || "—"}</td>
-                        <td>
-                          <div className="emp-name">{branch.branchName || "—"}</div>
-                        </td>
+                        <td><div className="emp-name">{branch.branchName || "—"}</div></td>
                         <td>{branch.address || "—"}</td>
                         <td>{branch.city || "—"}</td>
                         <td>{branch.state || "—"}</td>
@@ -450,9 +435,7 @@ const Branch = () => {
                         <td>{branch.pincode || "—"}</td>
                         <td>
                           <div
-                            onClick={() =>
-                              handleStatusToggle(branch.id, branch.status, branch.branchName)
-                            }
+                            onClick={() => handleStatusToggle(branch.id, branch.status, branch.branchName)}
                             style={{
                               display: "flex",
                               alignItems: "center",
@@ -465,7 +448,8 @@ const Branch = () => {
                                 width: "42px",
                                 height: "22px",
                                 borderRadius: "50px",
-                                backgroundColor: branch.status === "y" ? "#6366f1" : "#cbd5e1",
+                                // ✅ FIX: use theme variable for active color
+                                backgroundColor: branch.status === "y" ? "var(--accent-indigo)" : "var(--border-medium)",
                                 position: "relative",
                                 transition: "0.2s",
                               }}
@@ -488,7 +472,7 @@ const Branch = () => {
                               style={{
                                 fontSize: "12px",
                                 fontWeight: "500",
-                                color: branch.status === "y" ? "#6366f1" : "#94a3b8",
+                                color: branch.status === "y" ? "var(--accent-indigo)" : "var(--text-muted)",
                               }}
                             >
                               {branch.status === "y" ? "Active" : "Inactive"}
@@ -525,51 +509,33 @@ const Branch = () => {
               </table>
             </div>
 
-            {/* Pagination Controls with Rows Per Page Dropdown */}
             {totalItems > 0 && (
               <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   <span className="emp-page-info">
                     Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} branches
                   </span>
-
                 </div>
 
                 <div className="emp-page-controls">
-                  <button
-                    className="emp-page-btn"
-                    disabled={page === 0}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    ← Prev
-                  </button>
+                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
                   {getPaginationRange().map((pg, i) =>
                     pg === "..." ? (
                       <span key={`dots-${i}`} className="emp-page-dots">…</span>
                     ) : (
-                      <button
-                        key={pg}
-                        className={`emp-page-num ${pg === page ? "active" : ""}`}
-                        onClick={() => setPage(pg)}
-                      >
+                      <button key={pg} className={`emp-page-num ${pg === page ? "active" : ""}`} onClick={() => setPage(pg)}>
                         {pg + 1}
                       </button>
                     )
                   )}
-                  <button
-                    className="emp-page-btn"
-                    disabled={page + 1 >= totalPages}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    Next →
-                  </button>
+                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
                 </div>
               </div>
             )}
           </div>
         </>
       ) : (
-        /* FORM VIEW (unchanged, same as Employees page style) */
+        /* FORM VIEW (unchanged, same as before) */
         <div className="emp-form-wrap">
           <form onSubmit={handleSubmit} noValidate>
             <div className="emp-form-section">
@@ -688,15 +654,9 @@ const Branch = () => {
             </div>
 
             <div className="emp-form-footer">
-              <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView("list"); }}>
-                Cancel
-              </button>
+              <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView("list"); }}>Cancel</button>
               <button type="submit" className="emp-submit-btn" disabled={submitting}>
-                {submitting ? (
-                  <><span className="emp-spinner" /> {editMode ? "Updating…" : "Creating…"}</>
-                ) : (
-                  <><FaSave size={12} /> {editMode ? "Update Branch" : "Create Branch"}</>
-                )}
+                {submitting ? <><span className="emp-spinner" /> {editMode ? "Updating…" : "Creating…"}</> : <><FaSave size={12} /> {editMode ? "Update Branch" : "Create Branch"}</>}
               </button>
             </div>
           </form>
@@ -707,13 +667,10 @@ const Branch = () => {
       {showStatusModal && (
         <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
           <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="emp-modal-icon">
-              {statusAction.newStatus === "y" ? "✅" : "⛔"}
-            </div>
+            <div className="emp-modal-icon">{statusAction.newStatus === "y" ? "✅" : "⛔"}</div>
             <h3 className="emp-modal-title">Confirm Status Change</h3>
             <p className="emp-modal-body">
-              Are you sure you want to{" "}
-              <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
+              Are you sure you want to <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
               <strong>{statusAction.name}</strong>?
             </p>
             <p className="emp-modal-warn">

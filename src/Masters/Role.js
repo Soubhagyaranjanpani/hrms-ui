@@ -1,7 +1,7 @@
-
 import { useState, useEffect, useCallback } from "react";
 import {
-  FaSearch, FaEdit, FaArrowLeft, FaSave, FaExclamationCircle, FaUserPlus, FaTimes
+  FaSearch, FaEdit, FaArrowLeft, FaSave, FaExclamationCircle,
+  FaUserPlus, FaTimes
 } from "react-icons/fa";
 import axios from "axios";
 import { toast } from "../components/Toast";
@@ -57,7 +57,7 @@ const Role = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Pagination (frontend)
+  // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchName, setSearchName] = useState("");
@@ -70,12 +70,22 @@ const Role = () => {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
+  // Auth
   const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
   const axiosConfig = {
     headers: {
       Authorization: `Bearer ${getAuthToken()}`,
       "Content-Type": "application/json",
     },
+  };
+
+  const ensureToken = () => {
+    const token = getAuthToken();
+    if (!token) {
+      toast.error("Authentication Required", "Please login to continue");
+      return false;
+    }
+    return true;
   };
 
   // Debounce search
@@ -87,17 +97,17 @@ const Role = () => {
     return () => clearTimeout(t);
   }, [searchName]);
 
-  // Fetch roles from API
+  // Fetch roles
   const fetchRoles = useCallback(async () => {
+    if (!ensureToken()) return;
     setLoading(true);
     try {
       const res = await axios.get(`${BASE_URL}/roles/list?flag=0`, axiosConfig);
       if (res.data?.status === 200 && Array.isArray(res.data.response)) {
-        // Map API fields { id, name, status } to component fields
         const mapped = res.data.response.map((r) => ({
           id: r.id,
           roleName: r.name,
-          status: r.status || "y",
+          status: r.isActive ? "y" : "n",
         }));
         setRoles(mapped);
       } else {
@@ -116,11 +126,10 @@ const Role = () => {
     fetchRoles();
   }, [fetchRoles]);
 
-  // Filter roles based on search
+  // Filter & pagination
   const filteredRoles = roles.filter((r) =>
     r.roleName?.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
-
   const totalItems = filteredRoles.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
@@ -148,11 +157,11 @@ const Role = () => {
     setSelectedRole(null);
   };
 
-  // Create or Update role
+  // Create / Update
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!ensureToken()) return;
 
-    // Validate
     const err = validate("roleName", formData.roleName);
     setTouched({ roleName: true });
     setErrors({ roleName: err });
@@ -163,18 +172,20 @@ const Role = () => {
 
     setSubmitting(true);
     try {
-      const payload = {
-        name: formData.roleName.trim(),
-        status: "y",
-      };
+      const roleNameTrimmed = formData.roleName.trim();
+      let url, method, payload;
 
-      let url, method;
       if (editMode) {
-        url = `${BASE_URL}/roles/update/${selectedRole.id}`;
+        url = `${BASE_URL}/roles/update`;
         method = axios.put;
+        payload = {
+          id: selectedRole.id,
+          name: roleNameTrimmed,
+        };
       } else {
-        url = `${BASE_URL}/roles/add`;
+        url = `${BASE_URL}/roles/create`;
         method = axios.post;
+        payload = { name: roleNameTrimmed, isActive: true };
       }
 
       const res = await method(url, payload, axiosConfig);
@@ -214,19 +225,17 @@ const Role = () => {
   };
 
   const confirmStatusChange = async () => {
-    const { id, newStatus } = statusAction;
+    if (!ensureToken()) return;
+    const { id } = statusAction;
     setLoading(true);
     try {
       const res = await axios.put(
-        `${BASE_URL}/roles/update/${id}`,
-        { status: newStatus },
+        `${BASE_URL}/roles/status/${id}`,
+        null,
         axiosConfig
       );
       if (res.data?.status === 200) {
-        toast.success(
-          "Status Updated",
-          `Role ${newStatus === "y" ? "activated" : "deactivated"}`
-        );
+        toast.success("Status Updated", `Role status changed`);
         fetchRoles();
       } else {
         throw new Error(res.data?.message || "Status change failed");
@@ -240,7 +249,7 @@ const Role = () => {
     }
   };
 
-  // Pagination range with ellipsis
+  // Pagination helpers
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
@@ -368,7 +377,8 @@ const Role = () => {
                                 width: "42px",
                                 height: "22px",
                                 borderRadius: "50px",
-                                backgroundColor: role.status === "y" ? "#6366f1" : "#cbd5e1",
+                                // ✅ Use theme variables
+                                backgroundColor: role.status === "y" ? "var(--accent-indigo)" : "var(--border-medium)",
                                 position: "relative",
                                 transition: "0.2s",
                               }}
@@ -391,7 +401,7 @@ const Role = () => {
                               style={{
                                 fontSize: "12px",
                                 fontWeight: "500",
-                                color: role.status === "y" ? "#6366f1" : "#94a3b8",
+                                color: role.status === "y" ? "var(--accent-indigo)" : "var(--text-muted)",
                               }}
                             >
                               {role.status === "y" ? "Active" : "Inactive"}
@@ -428,7 +438,7 @@ const Role = () => {
               </table>
             </div>
 
-            {/* Pagination */}
+            {/* Pagination with rows per page dropdown */}
             {totalItems > 0 && (
               <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
