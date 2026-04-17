@@ -133,10 +133,7 @@ const Department = () => {
     setLoading(true);
     try {
       const res = await axios.get(`${BASE_URL}/departments/list?flag=0`, axiosConfig);
-      // if (res.data?.status === 200 && Array.isArray(res.data.response)) 
-if (res.data?.response && Array.isArray(res.data.response)) 
-
-        {
+      if (res.data?.response && Array.isArray(res.data.response)) {
         const mapped = res.data.response.map((d) => ({
           id: d.id,
           deptCode: d.code,
@@ -540,16 +537,33 @@ if (res.data?.response && Array.isArray(res.data.response))
           </div>
         </>
       ) : (
-        /* FORM VIEW */
+        /* FORM VIEW - CENTERED ONE LINE */
         <div className="emp-form-wrap">
           <form onSubmit={handleSubmit} noValidate>
             <div className="emp-form-section">
               <div className="emp-section-label">Department Information</div>
-              <div className="emp-form-grid" style={{ maxWidth: "500px" }}>
+              {/* 
+                Modified grid: flex row, centered, each field takes equal width 
+                On small screens it wraps into a column
+              */}
+              <div 
+                className="emp-form-grid" 
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  gap: "24px",
+                  maxWidth: "100%",
+                }}
+              >
                 {/* Department Code */}
                 <div
                   className={`emp-field ${isFieldErr("deptCode") ? "has-error" : ""} ${isFieldOk("deptCode") ? "has-ok" : ""
                     }`}
+                  style={{
+                    flex: "1 1 220px",
+                    minWidth: "200px",
+                  }}
                 >
                   <div className="emp-label-row">
                     <label>
@@ -573,6 +587,10 @@ if (res.data?.response && Array.isArray(res.data.response))
                 <div
                   className={`emp-field ${isFieldErr("name") ? "has-error" : ""} ${isFieldOk("name") ? "has-ok" : ""
                     }`}
+                  style={{
+                    flex: "1 1 220px",
+                    minWidth: "200px",
+                  }}
                 >
                   <div className="emp-label-row">
                     <label>
@@ -596,6 +614,10 @@ if (res.data?.response && Array.isArray(res.data.response))
                 <div
                   className={`emp-field ${isFieldErr("branchId") ? "has-error" : ""} ${isFieldOk("branchId") ? "has-ok" : ""
                     }`}
+                  style={{
+                    flex: "1 1 220px",
+                    minWidth: "200px",
+                  }}
                 >
                   <label>
                     Branch <span className="req">*</span>
