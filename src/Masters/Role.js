@@ -377,7 +377,6 @@ const Role = () => {
                                 width: "42px",
                                 height: "22px",
                                 borderRadius: "50px",
-                                // ✅ Use theme variables
                                 backgroundColor: role.status === "y" ? "var(--accent-indigo)" : "var(--border-medium)",
                                 position: "relative",
                                 transition: "0.2s",
@@ -438,7 +437,7 @@ const Role = () => {
               </table>
             </div>
 
-            {/* Pagination with rows per page dropdown */}
+            {/* Pagination */}
             {totalItems > 0 && (
               <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -481,12 +480,13 @@ const Role = () => {
           </div>
         </>
       ) : (
-        /* FORM VIEW */
+        /* FORM VIEW - WIDER INPUT */
         <div className="emp-form-wrap">
           <form onSubmit={handleSubmit} noValidate>
             <div className="emp-form-section">
               <div className="emp-section-label">Role Information</div>
-              <div className="emp-form-grid" style={{ maxWidth: "500px" }}>
+              {/* Increased maxWidth from 500px to 800px for wider input */}
+              <div className="emp-form-grid" style={{ maxWidth: "800px", width: "100%" }}>
                 <div
                   className={`emp-field ${isFieldErr("roleName") ? "has-error" : ""} ${
                     isFieldOk("roleName") ? "has-ok" : ""
@@ -505,6 +505,7 @@ const Role = () => {
                     maxLength={50}
                     onChange={(e) => handleChange("roleName", e.target.value)}
                     onBlur={() => handleBlur("roleName")}
+                    style={{ width: "150%" }}  // Ensure input fills the container
                   />
                   <FieldError msg={errors.roleName} />
                   <small className="emp-hint-text">2–50 characters, letters only</small>
