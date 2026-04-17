@@ -2,100 +2,153 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FaTasks, FaClock, FaCheckCircle, FaSpinner, FaSearch,
-  FaExclamationTriangle, FaArrowRight, FaPlus, FaEye,
-  FaChartBar, FaUserCheck, FaFire, FaCalendarAlt
+  FaExclamationTriangle, FaArrowRight, FaEye,
+  FaChartBar, FaFire,
 } from 'react-icons/fa';
-import { STORAGE_KEYS } from '../config/api.config';
+import { API_ENDPOINTS, STORAGE_KEYS, getAuthHeaders } from '../config/api.config';
+import { toast } from '../components/Toast';
+import LoadingSpinner from '../components/LoadingSpinner';
 
-/* ── helpers ── */
 const getUser = () => {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA)) || {}; } catch { return {}; }
 };
 
-const PRIORITY_COLORS = { Critical: '#9d174d', High: '#ef4444', Medium: '#d97706', Low: '#059669' };
-const PRIORITY_BG    = { Critical: '#fdf2f8', High: '#fee2e2', Medium: '#fef3c7', Low: '#d1fae5' };
+// ── status/priority badge helpers (unchanged from original) ──
+const PRIORITY_COLORS = { Critical: '#9d174d', HIGH: '#ef4444', MEDIUM: '#d97706', LOW: '#059669' };
+const PRIORITY_BG     = { Critical: '#fdf2f8', HIGH: '#fee2e2', MEDIUM: '#fef3c7', LOW: '#d1fae5' };
 
 const StatusBadge = ({ status }) => {
   const map = {
-    'Pending Approval': { bg: '#fef3c7', color: '#92400e' },
-    'In Progress':      { bg: '#dbeafe', color: '#1e40af' },
-    'Completed':        { bg: '#dcfce7', color: '#166534' },
-    'In Review':        { bg: '#f3e8ff', color: '#5b21b6' },
-    'Rejected':         { bg: '#fee2e2', color: '#991b1b' },
-    'Change Requested': { bg: '#fff7ed', color: '#c2410c' },
+    'PENDING_APPROVAL': { bg: '#fef3c7', color: '#92400e',  label: 'Pending Approval' },
+    'IN_PROGRESS':      { bg: '#dbeafe', color: '#1e40af',  label: 'In Progress' },
+    'COMPLETED':        { bg: '#dcfce7', color: '#166534',  label: 'Completed' },
+    'IN_REVIEW':        { bg: '#f3e8ff', color: '#5b21b6',  label: 'In Review' },
+    'REJECTED':         { bg: '#fee2e2', color: '#991b1b',  label: 'Rejected' },
+    'CHANGE_REQUESTED': { bg: '#fff7ed', color: '#c2410c',  label: 'Change Requested' },
   };
-  const s = map[status] || { bg: '#f1f5f9', color: '#475569' };
+  const s = map[status] || { bg: '#f1f5f9', color: '#475569', label: status };
   return (
     <span style={{ background: s.bg, color: s.color, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
-      {status}
+      {s.label}
     </span>
   );
 };
 
-const PriorityBadge = ({ priority }) => (
-  <span style={{
-    background: PRIORITY_BG[priority] || '#f1f5f9',
-    color: PRIORITY_COLORS[priority] || '#475569',
-    padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600
-  }}>{priority}</span>
+const PriorityBadge = ({ priority }) => {
+  // Handle both uppercase (from API) and title case
+  const p = (priority || '').toUpperCase() === 'HIGH' ? 'High' : 
+            (priority || '').toUpperCase() === 'MEDIUM' ? 'Medium' :
+            (priority || '').toUpperCase() === 'LOW' ? 'Low' :
+            (priority || '').charAt(0).toUpperCase() + (priority || '').slice(1).toLowerCase();
+  return (
+    <span style={{ background: PRIORITY_BG[p] || '#f1f5f9', color: PRIORITY_COLORS[p] || '#475569', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
+      {p}
+    </span>
+  );
+};
+
+const StatCard = ({ label, value, icon, iconBg, iconColor, sub, onClick }) => (
+  <div
+    onClick={onClick}
+    style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 18, padding: 20, cursor: onClick ? 'pointer' : 'default', transition: 'all .3s', boxShadow: '0 2px 8px rgba(99,102,241,.04)', position: 'relative', overflow: 'hidden' }}
+    onMouseEnter={e => { if (onClick) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 28px rgba(99,102,241,.10)'; } }}
+    onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 2px 8px rgba(99,102,241,.04)'; }}
+  >
+    <div style={{ width: 46, height: 46, borderRadius: 13, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor, fontSize: 20, marginBottom: 14 }}>{icon}</div>
+    <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, marginBottom: 4 }}>{label}</div>
+    <div style={{ fontSize: 30, fontWeight: 700, fontFamily: "'Sora',sans-serif", color: 'var(--text-primary)', lineHeight: 1.2 }}>{value}</div>
+    {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
+  </div>
 );
 
-/* ── mock data (replace with API) ── */
-const MOCK_TASKS = [
-  { id: 'T-001', title: 'Redesign User Onboarding Flow', status: 'In Progress', priority: 'High', assigneeName: 'Arjun Mehta', dept: 'Design', deadline: '2026-04-20', progress: 65, createdBy: 'Riya Sharma' },
-  { id: 'T-002', title: 'API Rate Limiting Implementation', status: 'Pending Approval', priority: 'Critical', assigneeName: 'Dev Patel', dept: 'Backend', deadline: '2026-04-15', progress: 0, createdBy: 'Karan Singh' },
-  { id: 'T-003', title: 'Monthly Performance Report Q1', status: 'Completed', priority: 'Medium', assigneeName: 'Priya Nair', dept: 'HR', deadline: '2026-04-10', progress: 100, createdBy: 'Riya Sharma' },
-  { id: 'T-004', title: 'Fix Authentication Bug on Mobile', status: 'In Review', priority: 'High', assigneeName: 'Karan Singh', dept: 'Engineering', deadline: '2026-04-12', progress: 85, createdBy: 'Arjun Mehta' },
-  { id: 'T-005', title: 'Set Up CI/CD Pipeline for Staging', status: 'Pending Approval', priority: 'Medium', assigneeName: 'Dev Patel', dept: 'DevOps', deadline: '2026-04-25', progress: 0, createdBy: 'Dev Patel' },
-  { id: 'T-006', title: 'User Research for New Dashboard', status: 'Change Requested', priority: 'Low', assigneeName: 'Priya Nair', dept: 'Design', deadline: '2026-04-30', progress: 30, createdBy: 'Riya Sharma' },
-];
-
 export default function TaskDashboard({ user }) {
-  const navigate = useNavigate();
+  const navigate    = useNavigate();
   const currentUser = user || getUser();
-  const [tasks] = useState(MOCK_TASKS);
 
+  const [tasks,   setTasks]   = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // ── fetch all tasks on mount ──
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const res  = await fetch(API_ENDPOINTS.GET_ALL_TASKS, { headers: getAuthHeaders() });
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.message || 'Failed to load tasks');
+        }
+        
+        // FIX: Extract tasks array from the response structure
+        // Based on the API response: { response: [...], status: 200, message: "success" }
+        let tasksArray = [];
+        
+        if (data.response && Array.isArray(data.response)) {
+          tasksArray = data.response;
+        } else if (Array.isArray(data)) {
+          tasksArray = data;
+        } else if (data.data && Array.isArray(data.data)) {
+          tasksArray = data.data;
+        } else {
+          console.warn('Unexpected API response structure:', data);
+          tasksArray = [];
+        }
+        
+        setTasks(tasksArray);
+      } catch (err) {
+        console.error('Error fetching tasks:', err);
+        toast.error('Load Error', err.message || 'Could not load tasks');
+        setTasks([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTasks();
+  }, []);
+
+  if (loading) return <LoadingSpinner message="Loading dashboard…" />;
+
+  // Add safety check before using filter
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  
+  // ── compute stats from task array ──
   const stats = {
-    total:   tasks.length,
-    pending: tasks.filter(t => t.status === 'Pending Approval').length,
-    active:  tasks.filter(t => t.status === 'In Progress').length,
-    review:  tasks.filter(t => t.status === 'In Review').length,
-    done:    tasks.filter(t => t.status === 'Completed').length,
-    change:  tasks.filter(t => t.status === 'Change Requested').length,
+    total:   safeTasks.length,
+    pending: safeTasks.filter(t => t.status === 'PENDING_APPROVAL').length,
+    active:  safeTasks.filter(t => t.status === 'IN_PROGRESS').length,
+    review:  safeTasks.filter(t => t.status === 'IN_REVIEW').length,
+    done:    safeTasks.filter(t => t.status === 'COMPLETED').length,
+    change:  safeTasks.filter(t => t.status === 'CHANGE_REQUESTED').length,
   };
 
   const deptLoad = Object.entries(
-    tasks.reduce((acc, t) => { acc[t.dept] = (acc[t.dept] || 0) + 1; return acc; }, {})
+    safeTasks.reduce((acc, t) => {
+      const d = t.department || 'Unknown';
+      acc[d] = (acc[d] || 0) + 1;
+      return acc;
+    }, {})
   ).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-  const priorityDist = ['Critical','High','Medium','Low'].map(p => ({
-    label: p,
-    count: tasks.filter(t => t.priority === p).length,
+  // Handle priority distribution with the actual priority values from API (HIGH, MEDIUM, LOW)
+  const priorityDist = ['HIGH', 'MEDIUM', 'LOW'].map(p => ({
+    label: p === 'HIGH' ? 'High' : p === 'MEDIUM' ? 'Medium' : 'Low',
+    count: safeTasks.filter(t => (t.priority || '').toUpperCase() === p).length,
   }));
 
-  const overdue = tasks.filter(t => new Date(t.deadline) < new Date() && t.status !== 'Completed');
-  const recent  = [...tasks].slice(0, 5);
-
-  const StatCard = ({ label, value, icon, iconBg, iconColor, sub, onClick }) => (
-    <div
-      onClick={onClick}
-      style={{
-        background: 'var(--card-bg)', border: '1px solid var(--border-light)',
-        borderRadius: 18, padding: 20, cursor: onClick ? 'pointer' : 'default',
-        transition: 'all .3s', boxShadow: '0 2px 8px rgba(99,102,241,.04)',
-        position: 'relative', overflow: 'hidden',
-      }}
-      onMouseEnter={e => { if (onClick) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 28px rgba(99,102,241,.10)'; } }}
-      onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 2px 8px rgba(99,102,241,.04)'; }}
-    >
-      <div style={{ width: 46, height: 46, borderRadius: 13, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor, fontSize: 20, marginBottom: 14 }}>
-        {icon}
-      </div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 30, fontWeight: 700, fontFamily: "'Sora',sans-serif", color: 'var(--text-primary)', lineHeight: 1.2 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
-    </div>
+  const overdue = safeTasks.filter(t =>
+    t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED'
   );
+
+  const recent = [...safeTasks]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5);
+
+  // Helper function to format assignee name
+  const formatAssignee = (assignedTo) => {
+    if (!assignedTo) return 'Unassigned';
+    // Remove "null" text if present (e.g., "ANIRUDH null" -> "ANIRUDH")
+    return assignedTo.replace(/\s+null\s*/g, '').trim();
+  };
 
   return (
     <div style={{ padding: '22px 24px', background: 'var(--bg-page)', minHeight: '100vh', animation: 'taskFadeUp .35s ease' }}>
@@ -104,7 +157,7 @@ export default function TaskDashboard({ user }) {
         .task-tr:hover td { background: #fafbff !important; cursor:pointer }
       `}</style>
 
-      {/* Page Header */}
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ width: 46, height: 46, background: 'linear-gradient(135deg,var(--accent-indigo),var(--accent-indigo-light))', borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 21, boxShadow: '0 4px 12px rgba(99,102,241,.25)' }}>
@@ -113,24 +166,10 @@ export default function TaskDashboard({ user }) {
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, fontFamily: "'Sora',sans-serif", letterSpacing: '-0.02em' }}>Task Dashboard</h1>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
-              Welcome back, {currentUser?.name || 'User'} · {new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
+              Welcome back, {currentUser?.name || currentUser?.firstName || 'User'} · {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
         </div>
-        {/* <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={() => navigate('/tasks')}
-            style={{ background: 'var(--bg-surface)', border: '1.5px solid var(--border-medium)', color: 'var(--text-secondary)', padding: '9px 18px', borderRadius: 11, fontWeight: 500, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}
-          >
-            <FaEye size={13} /> View All Tasks
-          </button>
-          <button
-            onClick={() => navigate('/tasks/create')}
-            style={{ background: 'linear-gradient(135deg,var(--accent-indigo),var(--accent-indigo-light))', border: 'none', color: '#fff', padding: '9px 20px', borderRadius: 11, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 12px rgba(99,102,241,.25)' }}
-          >
-            <FaPlus size={12} /> New Task
-          </button>
-        </div> */}
       </div>
 
       {/* Overdue Alert */}
@@ -140,7 +179,7 @@ export default function TaskDashboard({ user }) {
           <span style={{ fontSize: 13, fontWeight: 600, color: '#991b1b' }}>
             {overdue.length} overdue task{overdue.length > 1 ? 's' : ''} — {overdue.map(t => t.title).join(', ')}
           </span>
-          <button onClick={() => navigate('/tasks')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--danger)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button onClick={() => navigate('/TaskList')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--danger)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
             View <FaArrowRight size={10} />
           </button>
         </div>
@@ -148,11 +187,11 @@ export default function TaskDashboard({ user }) {
 
       {/* Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16, marginBottom: 22 }}>
-        <StatCard label="Total Tasks"       value={stats.total}   icon={<FaTasks />}             iconBg="#ede9fe" iconColor="var(--accent-indigo)" sub="All tasks"         onClick={() => navigate('/tasks')} />
-        <StatCard label="Pending Approval"  value={stats.pending} icon={<FaClock />}              iconBg="#fef3c7" iconColor="var(--accent-amber)"  sub="Awaiting review"  onClick={() => navigate('/tasks')} />
-        <StatCard label="In Progress"       value={stats.active}  icon={<FaSpinner />}            iconBg="#dbeafe" iconColor="#1d4ed8"              sub="Currently active" onClick={() => navigate('/tasks')} />
-        <StatCard label="In Review"         value={stats.review}  icon={<FaSearch />}             iconBg="#f3e8ff" iconColor="#7c3aed"              sub="Under review"     onClick={() => navigate('/tasks')} />
-        <StatCard label="Completed"         value={stats.done}    icon={<FaCheckCircle />}        iconBg="#d1fae5" iconColor="var(--accent-teal)"   sub="Done"             onClick={() => navigate('/tasks')} />
+        <StatCard label="Total Tasks"      value={stats.total}   icon={<FaTasks />}       iconBg="#ede9fe" iconColor="var(--accent-indigo)" sub="All tasks"         onClick={() => navigate('/TaskList')} />
+        <StatCard label="Pending Approval" value={stats.pending} icon={<FaClock />}        iconBg="#fef3c7" iconColor="var(--accent-amber)"  sub="Awaiting review"  onClick={() => navigate('/TaskList')} />
+        <StatCard label="In Progress"      value={stats.active}  icon={<FaSpinner />}      iconBg="#dbeafe" iconColor="#1d4ed8"              sub="Currently active" onClick={() => navigate('/TaskList')} />
+        <StatCard label="In Review"        value={stats.review}  icon={<FaSearch />}       iconBg="#f3e8ff" iconColor="#7c3aed"              sub="Under review"     onClick={() => navigate('/TaskList')} />
+        <StatCard label="Completed"        value={stats.done}    icon={<FaCheckCircle />}  iconBg="#d1fae5" iconColor="var(--accent-teal)"   sub="Done"             onClick={() => navigate('/TaskList')} />
       </div>
 
       {/* Charts Row */}
@@ -165,17 +204,17 @@ export default function TaskDashboard({ user }) {
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Tasks per dept</span>
           </div>
           <div style={{ padding: 20 }}>
-            {deptLoad.map(([dept, count]) => (
+            {deptLoad.length > 0 ? deptLoad.map(([dept, count]) => (
               <div key={dept} style={{ marginBottom: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{dept}</span>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{count}</span>
                 </div>
                 <div style={{ background: '#e8eaf6', borderRadius: 10, height: 8, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${(count / stats.total) * 100}%`, background: 'linear-gradient(90deg,var(--accent-indigo),var(--accent-indigo-light))', borderRadius: 10, transition: 'width .6s ease' }} />
+                  <div style={{ height: '100%', width: `${stats.total > 0 ? (count / stats.total) * 100 : 0}%`, background: 'linear-gradient(90deg,var(--accent-indigo),var(--accent-indigo-light))', borderRadius: 10, transition: 'width .6s ease' }} />
                 </div>
               </div>
-            ))}
+            )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', fontSize: 13 }}>No department data available</p>}
           </div>
         </div>
 
@@ -214,12 +253,12 @@ export default function TaskDashboard({ user }) {
             {priorityDist.map(({ label, count }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: PRIORITY_COLORS[label], display: 'inline-block' }} />
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: PRIORITY_COLORS[label.toUpperCase()] || '#475569', display: 'inline-block' }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{label}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 60, height: 6, background: '#e8eaf6', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${stats.total > 0 ? (count / stats.total) * 100 : 0}%`, background: PRIORITY_COLORS[label], borderRadius: 4 }} />
+                    <div style={{ height: '100%', width: `${stats.total > 0 ? (count / stats.total) * 100 : 0}%`, background: PRIORITY_COLORS[label.toUpperCase()] || '#475569', borderRadius: 4 }} />
                   </div>
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', width: 18, textAlign: 'right' }}>{count}</span>
                 </div>
@@ -237,53 +276,63 @@ export default function TaskDashboard({ user }) {
       <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 18, overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Recent Tasks</h3>
-          <button onClick={() => navigate('/tasks')} style={{ background: 'var(--bg-surface)', border: '1.5px solid var(--border-medium)', color: 'var(--accent-indigo)', padding: '6px 14px', borderRadius: 9, fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <button onClick={() => navigate('/TaskList')} style={{ background: 'var(--bg-surface)', border: '1.5px solid var(--border-medium)', color: 'var(--accent-indigo)', padding: '6px 14px', borderRadius: 9, fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
             View All <FaArrowRight size={10} />
           </button>
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
-            <thead>
-              <tr style={{ background: 'var(--bg-surface)', borderBottom: '1.5px solid var(--accent-indigo-pale)' }}>
-                {['Task ID','Title','Assignee','Priority','Status','Deadline','Progress',''].map(h => (
-                  <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--accent-indigo)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {recent.map(t => (
-                <tr key={t.id} className="task-tr" onClick={() => navigate('/tasks/detail', { state: { taskId: t.id } })}>
-                  <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: 12, background: '#ede9fe', padding: '2px 8px', borderRadius: 6, fontWeight: 600, color: 'var(--accent-indigo)' }}>{t.id}</span>
-                  </td>
-                  <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 13 }}>{t.title}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t.dept}</div>
-                  </td>
-                  <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9', fontSize: 13, color: 'var(--text-secondary)' }}>{t.assigneeName}</td>
-                  <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}><PriorityBadge priority={t.priority} /></td>
-                  <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}><StatusBadge status={t.status} /></td>
-                  <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9', fontFamily: 'monospace', fontSize: 12, color: 'var(--text-secondary)' }}>{t.deadline}</td>
-                  <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9', minWidth: 120 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ flex: 1, background: '#e8eaf6', borderRadius: 8, height: 7, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${t.progress}%`, background: t.progress >= 100 ? 'var(--success)' : 'linear-gradient(90deg,var(--accent-indigo),var(--accent-indigo-light))', borderRadius: 8 }} />
-                      </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', width: 28 }}>{t.progress}%</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}>
-                    <button
-                      onClick={e => { e.stopPropagation(); navigate('/tasks/detail', { state: { taskId: t.id } }); }}
-                      style={{ width: 32, height: 32, background: '#ede9fe', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-indigo)' }}
-                    >
-                      <FaEye size={13} />
-                    </button>
-                  </td>
+          {recent.length > 0 ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-surface)', borderBottom: '1.5px solid var(--accent-indigo-pale)' }}>
+                  {['Task ID','Title','Assignee','Priority','Status','Deadline','Progress',''].map(h => (
+                    <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--accent-indigo)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recent.map(t => (
+                  <tr key={t.id} className="task-tr" onClick={() => navigate('/TaskDetail', { state: { taskId: t.id } })}>
+                    <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 12, background: '#ede9fe', padding: '2px 8px', borderRadius: 6, fontWeight: 600, color: 'var(--accent-indigo)' }}>T-{String(t.id).padStart(3, '0')}</span>
+                    </td>
+                    <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 13 }}>{t.title}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t.department}</div>
+                    </td>
+                    <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9', fontSize: 13, color: 'var(--text-secondary)' }}>
+                      {formatAssignee(t.assignedTo)}
+                    </td>
+                    <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}><PriorityBadge priority={t.priority} /></td>
+                    <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}><StatusBadge status={t.status} /></td>
+                    <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9', fontFamily: 'monospace', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN') : '—'}
+                    </td>
+                    <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9', minWidth: 120 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, background: '#e8eaf6', borderRadius: 8, height: 7, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${t.progress || 0}%`, background: (t.progress || 0) >= 100 ? 'var(--success)' : 'linear-gradient(90deg,var(--accent-indigo),var(--accent-indigo-light))', borderRadius: 8 }} />
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', width: 28 }}>{t.progress || 0}%</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}>
+                      <button
+                        onClick={e => { e.stopPropagation(); navigate('/TaskDetail', { state: { taskId: t.id } }); }}
+                        style={{ width: 32, height: 32, background: '#ede9fe', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-indigo)' }}
+                      >
+                        <FaEye size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              No tasks found. Create your first task to get started!
+            </div>
+          )}
         </div>
       </div>
     </div>

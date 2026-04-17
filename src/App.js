@@ -34,6 +34,7 @@ import ChatBot from './components/ChatBot';
 
 
 
+
 import { ToastContainer } from './components/Toast';
 import { STORAGE_KEYS } from './config/api.config';
 import ApprovedLeaves from './Leave/ApproveRejectLeave';
@@ -41,6 +42,7 @@ import LeavePolicy from './Leave/LeavePolicy';
 import LeaveCalendar from './Leave/LeaveCalendar';
 import LeaveDashboard from './Leave/LeaveDashboard';
 import HolidayManagement from './Leave/HolidayManagement';
+import StartPerformanceReview from './Task/StartPerformanceReview';
 
 
 function App() {
@@ -138,6 +140,7 @@ function App() {
           <Route path="CreateTask" element={<CreateTask user={currentUser} />} />
           <Route path="TaskList" element={<TaskList user={currentUser} />} />
           <Route path="TaskDetail" element={<TaskDetail user={currentUser} />} />
+          <Route path="PerformanceReview" element={<StartPerformanceReview user={currentUser} />} />
 
 
 

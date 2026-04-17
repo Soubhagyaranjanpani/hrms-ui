@@ -61,10 +61,11 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   // Task Management section items
   const tasksItems = [
     { path: '/TaskDashboard', icon: <FaTachometerAlt />, label: 'Task Dashboard' },
-    { path: '/CreateTask', icon: <FaTasks />, label: 'Create Task' },
+    { path: '/CreateTask', icon: <FaTasks />, label: 'Create &Edit Task' },
     { path: '/TaskList', icon: <FaTasks />, label: 'My Tasks' },
     // { path: '/TaskDetail', icon: <FaTasks />, label: 'Task Detail' },
     { path: '/performance', icon: <FaChartLine />, label: 'Performance' },
+    { path: '/PerformanceReview', icon: <FaChartLine />, label: 'Performance Review' },
 
   ];
 
