@@ -8,11 +8,13 @@ import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Attendance from './pages/Attendance';
 import Payroll from './pages/Payroll';
+import SalaryStructure from './pages/SalaryStructure';
 import LeaveManagement from './Leave/LeaveManagement';
 import Recruitment from './pages/Recruitment';
 import Performance from './Task/Performance';
 import Training from './pages/Training';
 import Documents from './pages/Documents';
+import PayrollDashboard from './pages/PayrollDashboard';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Layout from './components/Layout';
@@ -116,8 +118,9 @@ function App() {
           <Route path="employees" element={<Employees user={currentUser} />} />
           <Route path="attendance" element={<Attendance user={currentUser} />} />
           <Route path="payroll" element={<Payroll user={currentUser} />} />
+          <Route path="salary-structure" element={<SalaryStructure user={currentUser} />} />
+          <Route path="payroll-dashboard" element={<PayrollDashboard user={currentUser} />} />
           <Route path="leaves" element={<LeaveManagement user={currentUser} />} />
-          <Route path="recruitment" element={<Recruitment user={currentUser} />} />
           <Route path="performance" element={<Performance user={currentUser} />} />
           <Route path="training" element={<Training user={currentUser} />} />
           <Route path="documents" element={<Documents user={currentUser} />} />
@@ -141,6 +144,8 @@ function App() {
           <Route path="TaskList" element={<TaskList user={currentUser} />} />
           <Route path="TaskDetail" element={<TaskDetail user={currentUser} />} />
           <Route path="PerformanceReview" element={<StartPerformanceReview user={currentUser} />} />
+          
+
 
 
 

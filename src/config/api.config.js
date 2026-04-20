@@ -90,7 +90,28 @@ export const API_ENDPOINTS = {
   CREATE_REVIEW: `${BASE_URL}/api/performance`,
 
   GET_EMPLOYEE_STATISTICS: `${BASE_URL}/api/tasks/stats`,
+
+
+
+ // ── Payroll ─────────────────────────────────
+  GET_PAYROLL:             `${BASE_URL}/api/payroll`,
+  GET_PAYROLL_STATS:       `${BASE_URL}/api/payroll/stats`,
+  GET_PAYROLL_MONTHS:      `${BASE_URL}/api/payroll/months`,
+  GET_PAYROLL_BY_ID:       (id) =>    `${BASE_URL}/api/payroll/${id}`,
+  GET_EMP_PAY_HISTORY:     (empId) => `${BASE_URL}/api/payroll/employee/${empId}`,
+  GENERATE_PAYROLL:        `${BASE_URL}/api/payroll/generate`,
+  UPDATE_PAYROLL:          (id) =>    `${BASE_URL}/api/payroll/${id}`,
+  APPROVE_PAYROLL:         `${BASE_URL}/api/payroll/approve`,
+  PROCESS_PAYROLL:         `${BASE_URL}/api/payroll/process`,
+  SAVE_SALARY_STRUCTURE:   `${BASE_URL}/api/payroll/structure`,
+  GET_ALL_STRUCTURES:      `${BASE_URL}/api/payroll/structure/all`,
+
+
 };
+
+
+
+
 
 // ── LocalStorage Keys ────────────────────────
 export const STORAGE_KEYS = {
@@ -107,4 +128,18 @@ export const getAuthHeaders = () => {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
   };
+};
+
+export const extractArray = (response) => {
+  if (!response) return [];
+  if (Array.isArray(response)) return response;
+  
+  // Handle different response structures
+  if (response.data && Array.isArray(response.data)) return response.data;
+  if (response.response && Array.isArray(response.response)) return response.response;
+  if (response.content && Array.isArray(response.content)) return response.content;
+  if (response.items && Array.isArray(response.items)) return response.items;
+  if (response.payload && Array.isArray(response.payload)) return response.payload;
+  
+  return [];
 };

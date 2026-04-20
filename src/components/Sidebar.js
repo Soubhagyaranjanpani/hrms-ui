@@ -5,7 +5,7 @@ import {
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog,
   FaBuilding, FaSitemap,
-  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks
+  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks,FaRupeeSign
 } from 'react-icons/fa';
 import { BsChevronDown, BsChevronRight } from 'react-icons/bs';
 import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
@@ -20,6 +20,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
 
   const menuItems = [
     { path: '/dashboard', icon: <FaTachometerAlt />, label: 'Dashboard' },
+    { path: '/documents', icon: <FaFileAlt />, label: 'All Documents' },
   ];
 
   // Employee section items
@@ -53,9 +54,11 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
 
   // Payroll section items
   const payrollItems = [
+    { path: '/payroll-dashboard', icon: <FaChartBar />, label: 'Payroll Dashboard' },
     { path: '/payroll', icon: <FaMoneyBillWave />, label: 'Payroll Management' },
-    // { path: '/payrollProcessing', icon: <FaMoneyBillWave />, label: 'Salary Processing' },
-    { path: '/reports', icon: <FaChartBar />, label: 'Payroll Reports' },
+    { path: '/salary-structure', icon: <FaRupeeSign />, label: 'Salary Structure' },
+    
+    // { path: '/reports', icon: <FaChartBar />, label: 'Payroll Reports' },
   ];
 
   // Task Management section items
@@ -71,9 +74,9 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
 
   // Documents section items
   const documentsItems = [
-    { path: '/documents', icon: <FaFileAlt />, label: 'All Documents' },
-    { path: '/documents/employee', icon: <FaFileAlt />, label: 'Employee Documents' },
-    { path: '/documents/company', icon: <FaFileAlt />, label: 'Company Documents' },
+    
+    // { path: '/documents/employee', icon: <FaFileAlt />, label: 'Employee Documents' },
+    // { path: '/documents/company', icon: <FaFileAlt />, label: 'Company Documents' },
   ];
 
   const toggleMaster = () => {
