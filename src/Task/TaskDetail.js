@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FaArrowLeft, FaCheck, FaTimes, FaComment, FaExchangeAlt,
@@ -202,6 +203,18 @@ export default function TaskDetail({ user }) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Add scroll listener to close dropdown when scrolling
+  useEffect(() => {
+    if (!dropdownState.open) return;
+    
+    const handleScroll = () => {
+      setDropdownState({ open: false, subtaskId: null, position: { top: 0, left: 0 } });
+    };
+    
+    window.addEventListener('scroll', handleScroll, true);
+    return () => window.removeEventListener('scroll', handleScroll, true);
+  }, [dropdownState.open]);
 
   const extractTaskFromResponse = (data) => {
     if (data.response && typeof data.response === 'object') return data.response;
@@ -546,11 +559,23 @@ export default function TaskDetail({ user }) {
 
   const handleStatusClick = (subtaskId, event) => {
     const rect = event.currentTarget.getBoundingClientRect();
+    
+    // Get viewport dimensions
+    const viewportHeight = window.innerHeight;
+    const dropdownHeight = 200; // Approximate height of dropdown
+    
+    let top = rect.bottom + 4;
+    
+    // If dropdown would go off screen, position it above the button
+    if (top + dropdownHeight > viewportHeight) {
+      top = rect.top - dropdownHeight - 4;
+    }
+    
     setDropdownState({
       open: true,
       subtaskId: subtaskId,
       position: {
-        top: rect.bottom + 4,
+        top: top,
         left: rect.left
       }
     });
@@ -615,7 +640,29 @@ export default function TaskDetail({ user }) {
         .subtask-spinner { width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .6s linear infinite; }
         @keyframes spin { to { transform:rotate(360deg); } }
         
-        .status-dropdown { position:fixed; background:var(--bg-white); border:1px solid var(--border-light); border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.15); z-index:9999; min-width:170px; overflow:hidden; }
+        .status-dropdown { 
+          position: fixed; 
+          background: var(--bg-white); 
+          border: 1px solid var(--border-light); 
+          border-radius: 10px; 
+          box-shadow: 0 4px 20px rgba(0,0,0,0.15); 
+          z-index: 99999; 
+          min-width: 170px; 
+          overflow: hidden;
+          animation: fadeIn 0.15s ease-out;
+        }
+        
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
         .status-dropdown-item { padding:10px 14px; font-size:12px; cursor:pointer; transition:background 0.2s; border:none; background:none; width:100%; text-align:left; display:flex; align-items:center; gap:8px; color:var(--text-primary); }
         .status-dropdown-item:hover { background:var(--bg-surface); }
         .status-dropdown-item:not(:last-child) { border-bottom:1px solid var(--border-light); }
@@ -913,7 +960,7 @@ export default function TaskDetail({ user }) {
               {/* Subtask Table */}
               {filteredSubtasks.length > 0 ? (
                 <>
-                  <div ref={tableContainerRef} style={{ overflowX: 'auto' }}>
+                  <div ref={tableContainerRef} style={{ overflowX: 'auto', overflowY: 'visible' }}>
                     <table className="subtask-table">
                       <thead>
                         <tr>
@@ -1047,14 +1094,16 @@ export default function TaskDetail({ user }) {
         </div>
       )}
 
-      {/* Fixed Position Status Dropdown */}
-      {dropdownState.open && openSubtask && availableStatuses.length > 0 && (
+      {/* Fixed Position Status Dropdown - Rendered at root level using Portal */}
+      {dropdownState.open && openSubtask && availableStatuses.length > 0 && ReactDOM.createPortal(
         <div
           ref={dropdownRef}
           className="status-dropdown"
           style={{
-            top: dropdownState.position.top,
-            left: dropdownState.position.left,
+            position: 'fixed',
+            top: `${dropdownState.position.top}px`,
+            left: `${dropdownState.position.left}px`,
+            zIndex: 99999,
           }}
         >
           {availableStatuses.map(status => {
@@ -1076,7 +1125,8 @@ export default function TaskDetail({ user }) {
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ACTIVITY TAB */}
