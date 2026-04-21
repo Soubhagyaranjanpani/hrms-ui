@@ -45,6 +45,7 @@ import LeaveCalendar from './Leave/LeaveCalendar';
 import LeaveDashboard from './Leave/LeaveDashboard';
 import HolidayManagement from './Leave/HolidayManagement';
 import StartPerformanceReview from './Task/StartPerformanceReview';
+import Skills from './Masters/Skills';
 
 
 function App() {
@@ -144,7 +145,7 @@ function App() {
           <Route path="TaskList" element={<TaskList user={currentUser} />} />
           <Route path="TaskDetail" element={<TaskDetail user={currentUser} />} />
           <Route path="PerformanceReview" element={<StartPerformanceReview user={currentUser} />} />
-          
+          <Route path="skills" element={<Skills user={currentUser}/>}/>
 
 
 

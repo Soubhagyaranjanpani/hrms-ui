@@ -5,7 +5,7 @@ import {
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog,
   FaBuilding, FaSitemap,
-  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks,FaRupeeSign
+  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks, FaRupeeSign
 } from 'react-icons/fa';
 import { BsChevronDown, BsChevronRight } from 'react-icons/bs';
 import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
@@ -49,7 +49,9 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/branch', icon: <FaBuilding />, label: 'Branches' },
     { path: '/department', icon: <FaSitemap />, label: 'Departments' },
     { path: '/role', icon: <FaUserTag />, label: 'Roles' },
-    { path: '/designation', icon: <FaUserTag />, label: 'Designation' },
+    { path: '/designation', icon: <FaCheck />, label: 'Designation' },
+    { path: '/skills', icon: <FaChartBar />, label: 'Skills' },
+
   ];
 
   // Payroll section items
@@ -57,7 +59,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/payroll-dashboard', icon: <FaChartBar />, label: 'Payroll Dashboard' },
     { path: '/payroll', icon: <FaMoneyBillWave />, label: 'Payroll Management' },
     { path: '/salary-structure', icon: <FaRupeeSign />, label: 'Salary Structure' },
-    
+
     // { path: '/reports', icon: <FaChartBar />, label: 'Payroll Reports' },
   ];
 
@@ -74,7 +76,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
 
   // Documents section items
   const documentsItems = [
-    
+
     // { path: '/documents/employee', icon: <FaFileAlt />, label: 'Employee Documents' },
     // { path: '/documents/company', icon: <FaFileAlt />, label: 'Company Documents' },
   ];
