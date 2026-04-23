@@ -17,17 +17,19 @@ const Profile = () => {
   const [formData, setFormData] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
-  // Password form state
+  // Username state for change password form
+  const [username, setUsername] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+
+  // Password form state (no confirm password)
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
+    newPassword: ''
   });
   const [passwordErrors, setPasswordErrors] = useState({});
   const [showPassword, setShowPassword] = useState({
     current: false,
-    new: false,
-    confirm: false
+    new: false
   });
   const [changingPassword, setChangingPassword] = useState(false);
 
@@ -68,6 +70,8 @@ const Profile = () => {
           qualifications: data.qualifications || [],
           skills: data.skills || [],
         });
+        // Initialize username from profile
+        setUsername(data.username || data.email || data.employeeCode || '');
       } else {
         throw new Error(res.data?.message || 'Failed to load profile');
       }
@@ -104,14 +108,18 @@ const Profile = () => {
 
   const handleChangePasswordView = () => {
     setIsChangingPassword(true);
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setUsername(profile?.username || profile?.email || profile?.employeeCode || '');
+    setUsernameError('');
+    setPasswordData({ currentPassword: '', newPassword: '' });
     setPasswordErrors({});
+    setShowPassword({ current: false, new: false });
   };
 
   const handleCancelPassword = () => {
     setIsChangingPassword(false);
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setPasswordData({ currentPassword: '', newPassword: '' });
     setPasswordErrors({});
+    setUsernameError('');
   };
 
   const handleChange = (e) => {
@@ -158,7 +166,11 @@ const Profile = () => {
     }
   };
 
-  // Password handlers
+  const handleUsernameChange = (e) => {
+    setUsername(e.target.value);
+    if (usernameError) setUsernameError('');
+  };
+
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
     setPasswordData(prev => ({ ...prev, [name]: value }));
@@ -167,8 +179,16 @@ const Profile = () => {
     }
   };
 
-  const validatePasswordForm = () => {
+  const validateForm = () => {
     const errors = {};
+    let usernameErr = '';
+
+    if (!username.trim()) {
+      usernameErr = 'Username is required';
+    } else if (username.trim().length < 3) {
+      usernameErr = 'Username must be at least 3 characters';
+    }
+
     if (!passwordData.currentPassword) {
       errors.currentPassword = 'Current password is required';
     }
@@ -177,20 +197,21 @@ const Profile = () => {
     } else if (passwordData.newPassword.length < 6) {
       errors.newPassword = 'Password must be at least 6 characters';
     }
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
-    }
+
+    setUsernameError(usernameErr);
     setPasswordErrors(errors);
-    return Object.keys(errors).length === 0;
+    return Object.keys(errors).length === 0 && !usernameErr;
   };
 
+  // ✅ FIXED: Send username, currentPassword, newPassword exactly as your API expects
   const handleChangePasswordSubmit = async (e) => {
     e.preventDefault();
-    if (!validatePasswordForm()) return;
+    if (!validateForm()) return;
 
     setChangingPassword(true);
     try {
       const payload = {
+        username: username.trim(),
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
       };
@@ -201,14 +222,18 @@ const Profile = () => {
         axiosConfig
       );
 
-      if (res.data?.status === 200) {
-        toast.success('Success', 'Password changed successfully');
-        setIsChangingPassword(false);
-        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        setPasswordErrors({});
-      } else {
+      if (res.data?.status !== 200) {
         throw new Error(res.data?.message || 'Password change failed');
       }
+
+      toast.success('Success', 'Password changed successfully');
+
+      // Refresh profile data (the backend may have updated something)
+      await fetchProfile();
+      setIsChangingPassword(false);
+      setPasswordData({ currentPassword: '', newPassword: '' });
+      setPasswordErrors({});
+      setUsernameError('');
     } catch (err) {
       console.error('Password change error:', err);
       toast.error('Error', err.response?.data?.message || 'Failed to change password');
@@ -231,30 +256,52 @@ const Profile = () => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
+  
 
-// ------------------- CHANGE PASSWORD VIEW (COMPACT) -------------------
-// ------------------- CHANGE PASSWORD VIEW (VERTICAL LAYOUT, COMPACT) -------------------
+  // ------------------- CHANGE PASSWORD VIEW -------------------
 if (isChangingPassword) {
   return (
-    <div>
-      {/* PAGE HEADER with Back button */}
+    // ⬇️ Outer div – NO BACKGROUND COLOR, only padding and layout
+    <div style={{
+      minHeight: '100vh',
+      padding: '24px 16px',
+    }}>
       <div className="page-header" style={{ justifyContent: 'space-between' }}>
         <div>
-          <h1 className="emp-title">Change Password</h1>
-          <p className="emp-subtitle">Enter your current password and choose a new one</p>
+          <h1 className="emp-title" style={{ color: 'var(--text-primary)' }}>Change Password</h1>
+          <p className="emp-subtitle" style={{ color: 'var(--text-muted)' }}>Update your username and password</p>
         </div>
         <button className="emp-back-btn" onClick={handleCancelPassword}>
           <FaArrowLeft size={12} /> Back
         </button>
       </div>
 
-      {/* Compact form wrapper */}
+      {/* Form container – white card on default background */}
       <div style={{ maxWidth: '480px', margin: '0 auto' }}>
-        <div className="emp-form-wrap">
+        <div className="emp-form-wrap" style={{ backgroundColor: '#fff', borderRadius: '18px', overflow: 'hidden' }}>
           <form onSubmit={handleChangePasswordSubmit}>
+            {/* Account Section - Username */}
+            <div className="emp-form-section">
+              <div className="emp-section-label">Account</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="emp-field">
+                  <label>Username <span className="req">*</span></label>
+                  <input
+                    type="text"
+                    name="username"
+                    value={username}
+                    onChange={handleUsernameChange}
+                    className={usernameError ? 'error' : ''}
+                    style={{ width: '100%' }}
+                  />
+                  {usernameError && <span className="field-err">{usernameError}</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Security Section - Passwords */}
             <div className="emp-form-section">
               <div className="emp-section-label">Security</div>
-              {/* VERTICAL LAYOUT - each field takes full width */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {/* Current Password */}
                 <div className="emp-field">
@@ -325,41 +372,6 @@ if (isChangingPassword) {
                     <span className="field-err">{passwordErrors.newPassword}</span>
                   )}
                 </div>
-
-                {/* Confirm New Password */}
-                <div className="emp-field">
-                  <label>Confirm New Password <span className="req">*</span></label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type={showPassword.confirm ? 'text' : 'password'}
-                      name="confirmPassword"
-                      value={passwordData.confirmPassword}
-                      onChange={handlePasswordChange}
-                      style={{ width: '100%', paddingRight: '40px' }}
-                      className={passwordErrors.confirmPassword ? 'error' : ''}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => togglePasswordVisibility('confirm')}
-                      style={{
-                        position: 'absolute',
-                        right: '10px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--text-muted)',
-                        padding: '4px',
-                      }}
-                    >
-                      {showPassword.confirm ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
-                    </button>
-                  </div>
-                  {passwordErrors.confirmPassword && (
-                    <span className="field-err">{passwordErrors.confirmPassword}</span>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -369,9 +381,9 @@ if (isChangingPassword) {
               </button>
               <button type="submit" className="emp-submit-btn" disabled={changingPassword}>
                 {changingPassword ? (
-                  <><span className="emp-spinner" /> Changing…</>
+                  <><span className="emp-spinner" /> Updating…</>
                 ) : (
-                  'Change Password'
+                  'Update Account'
                 )}
               </button>
             </div>
@@ -382,108 +394,7 @@ if (isChangingPassword) {
   );
 }
 
-  // ------------------- EDIT PROFILE VIEW -------------------
-  if (isEditing) {
-    return (
-      <div>
-        <div className="page-header" style={{ justifyContent: 'space-between' }}>
-          <div>
-            <h1 className="emp-title">Edit Profile</h1>
-            <p className="emp-subtitle">Update your personal and employment information</p>
-          </div>
-          <button className="emp-back-btn" onClick={handleCancelEdit}>
-            <FaArrowLeft size={12} /> Back
-          </button>
-        </div>
 
-        <div className="emp-form-wrap">
-          <form onSubmit={handleSubmit}>
-            <div className="emp-form-section">
-              <div className="emp-section-label">Personal Information</div>
-              <div className="emp-form-grid">
-                <div className="emp-field">
-                  <label>Full Name</label>
-                  <input type="text" name="name" value={formData.name} onChange={handleChange} />
-                </div>
-                <div className="emp-field">
-                  <label>Email</label>
-                  <input type="email" name="email" value={formData.email} onChange={handleChange} />
-                </div>
-                <div className="emp-field">
-                  <label>Phone</label>
-                  <input type="tel" name="phone" value={formData.phone} onChange={handleChange} />
-                </div>
-              </div>
-            </div>
-            <div className="emp-divider" />
-            <div className="emp-form-section">
-              <div className="emp-section-label">Employment Details</div>
-              <div className="emp-form-grid">
-                <div className="emp-field">
-                  <label>Designation / Role</label>
-                  <input type="text" name="role" value={formData.role} onChange={handleChange} />
-                </div>
-                <div className="emp-field">
-                  <label>Department</label>
-                  <input type="text" name="department" value={formData.department} onChange={handleChange} />
-                </div>
-                <div className="emp-field">
-                  <label>Branch</label>
-                  <input type="text" name="branch" value={formData.branch} onChange={handleChange} />
-                </div>
-                <div className="emp-field">
-                  <label>Manager Name</label>
-                  <input type="text" name="managerName" value={formData.managerName} onChange={handleChange} />
-                </div>
-                <div className="emp-field">
-                  <label>Joining Date</label>
-                  <input type="date" name="joiningDate" value={formData.joiningDate} onChange={handleChange} />
-                </div>
-              </div>
-            </div>
-            <div className="emp-divider" />
-            <div className="emp-form-section">
-              <div className="emp-section-label">Skills & Qualifications</div>
-              <div className="emp-form-grid">
-                <div className="emp-field">
-                  <label>Qualifications (comma separated)</label>
-                  <input
-                    type="text"
-                    name="qualifications"
-                    value={Array.isArray(formData.qualifications) ? formData.qualifications.join(', ') : formData.qualifications}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      qualifications: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-                    }))}
-                    placeholder="e.g., B.Tech, MBA"
-                  />
-                </div>
-                <div className="emp-field">
-                  <label>Skills (comma separated)</label>
-                  <input
-                    type="text"
-                    name="skills"
-                    value={Array.isArray(formData.skills) ? formData.skills.join(', ') : formData.skills}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-                    }))}
-                    placeholder="e.g., React, Java, Project Management"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="emp-form-footer">
-              <button type="button" className="emp-cancel-btn" onClick={handleCancelEdit}>Cancel</button>
-              <button type="submit" className="emp-submit-btn" disabled={submitting}>
-                {submitting ? <><span className="emp-spinner" /> Updating…</> : <><FaSave size={12} /> Save Changes</>}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
 
   // ------------------- READ-ONLY PROFILE VIEW -------------------
   return (
@@ -500,9 +411,6 @@ if (isChangingPassword) {
           <button className="emp-add-btn" onClick={handleChangePasswordView}>
             <FaKey size={13} /> Change Password
           </button>
-          <button className="emp-add-btn" onClick={handleEdit}>
-            <FaEdit size={13} /> Edit Profile
-          </button>
         </div>
       </div>
 
@@ -517,8 +425,6 @@ if (isChangingPassword) {
           </div>
           <div className="profile-pill-row">
             <span className="profile-pill"><FaUserTie /> Active Account</span>
-            {/* <span className="profile-pill"><FaBuilding /> {profile.department || '—'}</span> */}
-
           </div>
         </section>
 
@@ -601,3 +507,14 @@ if (isChangingPassword) {
 };
 
 export default Profile;
+
+
+
+
+
+
+
+
+
+
+
