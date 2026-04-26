@@ -48,6 +48,7 @@ import LeaveDashboard from './Leave/LeaveDashboard';
 import HolidayManagement from './Leave/HolidayManagement';
 import StartPerformanceReview from './Task/StartPerformanceReview';
 import Skills from './Masters/Skills';
+import LeaveTypes from './Masters/Leave';
 
 
 
@@ -148,9 +149,11 @@ function App() {
           <Route path="TaskList" element={<TaskList user={currentUser} />} />
           <Route path="TaskDetail" element={<TaskDetail user={currentUser} />} />
           <Route path="PerformanceReview" element={<StartPerformanceReview user={currentUser} />} />
-          <Route path="skills" element={<Skills user={currentUser}/>}/>
-          <Route path="SalaryConfig" element={<SalaryConfig user={currentUser}/>}/>
-          <Route path="EmployeeGrade" element={<EmployeeGrade user={currentUser}/>}/>
+          <Route path="skills" element={<Skills user={currentUser} />} />
+          <Route path="leave" element={<LeaveTypes user={currentUser} />} />
+
+          <Route path="SalaryConfig" element={<SalaryConfig user={currentUser} />} />
+          <Route path="EmployeeGrade" element={<EmployeeGrade user={currentUser} />} />
 
 
 

@@ -52,6 +52,8 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/role', icon: <FaUserTag />, label: 'Roles' },
     { path: '/designation', icon: <FaCheck />, label: 'Designation' },
     { path: '/skills', icon: <FaChartBar />, label: 'Skills' },
+    { path: '/leave', icon: <FaCalendarCheck />, label: 'Leave' },
+
 
   ];
 
