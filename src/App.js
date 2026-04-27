@@ -31,6 +31,8 @@ import CreateTask from './Task/CreateTask';
 import TaskList from './Task/TaskList';
 import TaskDetail from './Task/TaskDetail';
 import ChatBot from './components/ChatBot';
+import SalaryConfig from './pages/SalaryConfigPage';
+import EmployeeGrade from './pages/EmployeeGradePage';
 
 
 
@@ -46,6 +48,7 @@ import LeaveDashboard from './Leave/LeaveDashboard';
 import HolidayManagement from './Leave/HolidayManagement';
 import StartPerformanceReview from './Task/StartPerformanceReview';
 import Skills from './Masters/Skills';
+
 
 
 function App() {
@@ -146,6 +149,9 @@ function App() {
           <Route path="TaskDetail" element={<TaskDetail user={currentUser} />} />
           <Route path="PerformanceReview" element={<StartPerformanceReview user={currentUser} />} />
           <Route path="skills" element={<Skills user={currentUser}/>}/>
+          <Route path="SalaryConfig" element={<SalaryConfig user={currentUser}/>}/>
+          <Route path="EmployeeGrade" element={<EmployeeGrade user={currentUser}/>}/>
+
 
 
 

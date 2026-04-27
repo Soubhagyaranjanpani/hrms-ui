@@ -3,29 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import {
   FaUsers, FaTasks, FaRupeeSign, FaStar,
   FaUserPlus, FaLayerGroup, FaRobot, FaChevronRight, FaCircle,
-  FaUser, FaCheckCircle, FaClock, FaTrophy
+  FaUser, FaCheckCircle, FaClock, FaTrophy, FaSync
 } from 'react-icons/fa';
 import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
 import axios from 'axios';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 /* ─── helpers ──────────────────────────────────────────────────── */
+
 const getUser  = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA)) || {}; } catch { return {}; } };
 const getToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
 const axiosCfg = () => ({ headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' } });
 const fmtINR   = (n) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n || 0);
 const fmtLakh  = (n) => { const v = (n || 0) / 100000; return v >= 1 ? `₹${v.toFixed(2)}L` : `₹${fmtINR(n)}`; };
-const fmtK     = (n) => { const v = (n || 0) / 1000; return v >= 1 ? `₹${v.toFixed(1)}K` : `₹${fmtINR(n)}`; };
+const fmtK     = (n) => { const v = (n || 0) / 1000; return v >= 1 ? `₹${v.toFixed(1)}K` : `₹${fmtINR(n)}`; };  // ← FIXED: toified → toFixed
 const clean    = (n) => (n || '').replace(/\s*null\s*/gi, ' ').replace(/\s+/g, ' ').trim();
 const ini      = (n) => { const p = clean(n).split(' ').filter(Boolean); return (p.length > 1 ? p[0][0] + p[p.length - 1][0] : p[0]?.[0] || '?').toUpperCase(); };
 const cap      = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase().replace(/_/g, ' ') : '';
 
-/* ─── Design tokens ─────────────────────────────────────────────
-   Sidebar color extracted from screenshot: dark maroon/burgundy #6B1E2E
-   We use it as the brand accent for all interactive buttons.
-────────────────────────────────────────────────────────────────── */
-const BRAND   = '#6B1E2E';   // your sidebar active colour
-const BRAND_L = '#F9EEF0';   // very light tint of brand for hover states
+/* ─── Design tokens ───────────────────────────────────────────── */
+const BRAND   = '#6B1E2E';
+const BRAND_L = '#F9EEF0';
 
 const C = {
   bg:      '#F5F4F1',
@@ -37,7 +35,6 @@ const C = {
   text3:   '#9B9890',
 };
 
-/* KPI card colour schemes — each card gets its own vivid gradient bg */
 const KPI_COLORS = [
   { cardBg: 'linear-gradient(135deg,#6B1E2E 0%,#9B3347 100%)', icon: '#fff', label: '#ffc4cd', val: '#fff', sub: '#ffb3c0', bar: 'rgba(255,255,255,0.35)', barBg: 'rgba(255,255,255,0.15)' },
   { cardBg: 'linear-gradient(135deg,#1D4ED8 0%,#3B82F6 100%)', icon: '#fff', label: '#bfdbfe', val: '#fff', sub: '#93c5fd', bar: 'rgba(255,255,255,0.35)', barBg: 'rgba(255,255,255,0.15)' },
@@ -62,7 +59,6 @@ const BADGE = {
   Satisfactory: { bg: '#F1F5F9', color: '#475569', border: '#E2E8F0' },
 };
 
-// Activity module configurations with icons
 const ACTIVITY_CONFIG = {
   EMPLOYEE:    { bg: BRAND_L,    color: BRAND,     icon: <FaUser size={12} />,        label: 'Employee' },
   TASK:        { bg: '#EFF6FF',  color: '#1D4ED8', icon: <FaCheckCircle size={12} />, label: 'Task' },
@@ -100,7 +96,6 @@ const Stars = ({ n = 0 }) => (
 
 const HR = () => <div style={{ height: 1, background: C.border }} />;
 
-/* Brand button — matches sidebar colour */
 const BrandBtn = ({ children, onClick }) => (
   <button onClick={onClick}
     style={{ fontSize: 11, color: '#fff', background: BRAND, border: 'none', padding: '5px 12px', borderRadius: 5, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'inherit', transition: 'opacity .12s' }}
@@ -127,6 +122,202 @@ const StatTile = ({ label, value, bg, color }) => (
     <div style={{ fontSize: 18, fontWeight: 700, color, letterSpacing: '-0.03em' }}>{value}</div>
   </div>
 );
+
+/* ═══════════════════════════════════════════════════════════════
+   AI INSIGHT BANNER - Independent Auto-Refresh Component
+═══════════════════════════════════════════════════════════════ */
+const AIInsightBanner = ({ initialInsight }) => {
+  const [insight, setInsight] = useState(initialInsight || '');
+  const [countdown, setCountdown] = useState(10);
+  const [refreshSecs, setRefreshSecs] = useState(10);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState('');
+  const [isEnabled, setIsEnabled] = useState(true);
+
+  // Fetch AI config from backend on mount
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await axios.get(`${BASE_URL}/api/dashboard/ai-config`, axiosCfg());
+        const config = res.data?.response || res.data?.data || res.data || {};
+        if (config.refreshSeconds && config.refreshSeconds > 0) {
+          setRefreshSecs(config.refreshSeconds);
+          setCountdown(config.refreshSeconds);
+        }
+        if (config.enabled !== undefined) {
+          setIsEnabled(config.enabled);
+        }
+        if (config.lastGenerated) {
+          setLastUpdated(config.lastGenerated);
+        }
+      } catch (e) {
+        console.log('AI config fetch failed, using defaults');
+      }
+    };
+    fetchConfig();
+  }, []);
+
+  // Fetch only the AI insight (not full dashboard)
+  const fetchInsight = useCallback(async () => {
+    if (!isEnabled) return;
+    
+    setIsRefreshing(true);
+    try {
+      const r = await axios.get(`${BASE_URL}/api/dashboard/stats`, axiosCfg());
+      const data = r.data?.response || r.data?.data || r.data || {};
+      const newInsight = data.aiSummary;
+      if (newInsight && newInsight !== insight) {
+        setInsight(newInsight);
+        const now = new Date();
+        setLastUpdated(now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+    } catch (e) {
+      console.log('AI insight refresh failed');
+    }
+    setIsRefreshing(false);
+  }, [insight, isEnabled]);
+
+  // Countdown timer that triggers refresh
+  useEffect(() => {
+    if (!isEnabled) return;
+    
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          fetchInsight();
+          return refreshSecs;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [refreshSecs, fetchInsight, isEnabled]);
+
+  // Update from parent
+  useEffect(() => {
+    if (initialInsight && initialInsight !== insight) {
+      setInsight(initialInsight);
+    }
+  }, [initialInsight]);
+
+  if (!insight || !isEnabled) return null;
+
+  return (
+    <div className="a1" style={{
+      background: 'linear-gradient(135deg, #1E1B4B 0%, #2D1B69 100%)',
+      borderRadius: 12,
+      padding: '14px 20px',
+      marginBottom: 18,
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: 14,
+      border: '1px solid rgba(139,92,246,0.3)',
+      position: 'relative',
+      transition: 'opacity 0.3s ease',
+      opacity: isRefreshing ? 0.75 : 1
+    }}>
+      {/* Animated Icon */}
+      <div style={{
+        width: 36, height: 36,
+        borderRadius: 10,
+        background: isRefreshing 
+          ? 'linear-gradient(135deg, #F59E0B, #D97706)' 
+          : 'linear-gradient(135deg, #8B5CF6, #6366F1)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff',
+        flexShrink: 0,
+        boxShadow: isRefreshing 
+          ? '0 4px 12px rgba(245,158,11,0.4)' 
+          : '0 4px 12px rgba(139,92,246,0.4)',
+        animation: isRefreshing ? 'spin 1s linear infinite' : 'pulse 2s infinite',
+        transition: 'all 0.3s ease'
+      }}>
+        {isRefreshing ? <FaSync size={14} /> : <FaRobot size={16} />}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Header Row */}
+        <div style={{
+          fontSize: 10, fontWeight: 700,
+          color: '#A78BFA',
+          textTransform: 'uppercase',
+          letterSpacing: '.1em',
+          marginBottom: 6,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flexWrap: 'wrap'
+        }}>
+          <span>✨ AI-Powered Insight</span>
+          
+          {/* LIVE Badge */}
+          <span style={{
+            background: 'rgba(16,185,129,0.2)',
+            color: '#34d399',
+            padding: '2px 8px',
+            borderRadius: 4,
+            fontSize: 8,
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4
+          }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#34d399', animation: 'pulse 1.5s infinite' }} />
+            LIVE
+          </span>
+
+          {/* Countdown */}
+          <span style={{ 
+            marginLeft: 'auto', 
+            fontSize: 9, 
+            color: '#6B7280', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 5 
+          }}>
+            <FaClock size={9} />
+            Next update in {countdown}s
+          </span>
+        </div>
+
+        {/* Insight Text */}
+        <div style={{ 
+          fontSize: 13.5, 
+          color: '#E0E7FF', 
+          lineHeight: 1.6, 
+          fontWeight: 500,
+          transition: 'opacity 0.3s ease'
+        }}>
+          {insight}
+        </div>
+
+        {/* Footer Info */}
+        <div style={{ 
+          fontSize: 9, 
+          color: '#6B7280', 
+          marginTop: 8, 
+          display: 'flex', 
+          gap: 14,
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            🤖 Powered by Ari AI
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            📊 Real-time data analysis
+          </span>
+          {lastUpdated && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              🕐 Updated {lastUpdated}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* ═══════════════════════════════════════════════════════════════
    MAIN DASHBOARD
@@ -175,7 +366,6 @@ export default function Dashboard({ user }) {
   const maxDept  = Math.max(...depts.map(x => x.count || 0), 1);
   const maxTrend = Math.max(...trend.map(x => x.netPayroll || 0), 1);
 
-  /* Accurately derive task counts — backend JPA SUM bug fallback */
   const TC = useMemo(() => {
     const agg = {
       total:      s.totalTasks              || 0,
@@ -199,12 +389,10 @@ export default function Dashboard({ user }) {
       return c;
     }
     return agg;
-  }, [d]);
+  }, [d, tasks]);
 
-  /* Performance section visible if ANY of these exist */
   const hasPerfData = (s.avgPerformanceRating || 0) > 0 || perf.length > 0 || rtg.length > 0;
 
-  // Sort activities by timestamp (most recent first)
   const sortedActivities = useMemo(() => {
     return [...acts].sort((a, b) => {
       const timeA = a.activityTime || a.timestamp;
@@ -257,11 +445,12 @@ export default function Dashboard({ user }) {
     },
   ];
 
-  /* ── render ── */
   return (
     <div style={{ padding: '20px 24px', background: C.bg, minHeight: '100vh', fontFamily: "'Inter','DM Sans',sans-serif", fontSize: 13, color: C.text1 }}>
       <style>{`
         @keyframes fu { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .card  { background:${C.surface}; border:1px solid ${C.border}; border-radius:10px; overflow:hidden; }
         .cc    { cursor:pointer; transition:border-color .15s, box-shadow .15s; }
         .cc:hover { border-color:${C.border2}; box-shadow:0 3px 12px rgba(0,0,0,.07); }
@@ -298,7 +487,6 @@ export default function Dashboard({ user }) {
           </div>
         </div>
 
-        {/* Nav buttons — all use brand colour */}
         <div style={{ display: 'flex', gap: 7 }}>
           {[
             { l: 'Employees', i: <FaUsers size={11} />,     p: '/Employees' },
@@ -311,41 +499,26 @@ export default function Dashboard({ user }) {
         </div>
       </div>
 
-      {/* ═══ AI INSIGHT ════════════════════════════════════════════ */}
-      {s.aiSummary && (
-        <div className="a1" style={{ background: '#1E1B4B', borderRadius: 9, padding: '11px 16px', marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(139,92,246,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A78BFA', flexShrink: 0 }}>
-            <FaRobot size={13} />
-          </div>
-          <div>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#A78BFA', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 3 }}>AI Insight — {month}</div>
-            <div style={{ fontSize: 12.5, color: '#C7D2FE', lineHeight: 1.55 }}>{s.aiSummary}</div>
-          </div>
-        </div>
-      )}
+      {/* ═══ AI INSIGHT BANNER - Independent Refresh ══════════════ */}
+      <AIInsightBanner initialInsight={s.aiSummary} />
 
-      {/* ═══ KPI CARDS — each has its own vivid coloured background ═ */}
+      {/* ═══ KPI CARDS ════════════════════════════════════════════ */}
       <div className="a2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 12 }}>
         {kpis.map((k, idx) => {
           const kc = KPI_COLORS[idx];
           return (
             <div key={k.label} className="kpicard" onClick={() => navigate(k.route)} style={{ background: kc.cardBg }}>
-              {/* Subtle decorative circle */}
               <div style={{ position: 'absolute', top: -20, right: -20, width: 90, height: 90, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
-
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: kc.label, textTransform: 'uppercase', letterSpacing: '.08em' }}>{k.label}</div>
                 <div style={{ color: kc.icon, opacity: .9 }}>{k.icon}</div>
               </div>
-
               <div style={{ fontSize: 32, fontWeight: 800, color: kc.val, letterSpacing: '-0.04em', lineHeight: 1, marginBottom: 5, fontVariantNumeric: 'tabular-nums' }}>
                 {k.value}
               </div>
-
               <div style={{ fontSize: 11.5, color: kc.sub, fontWeight: 500, marginBottom: 12 }}>
                 {k.sub}
               </div>
-
               <Bar pct={k.pct} color={kc.bar} bg={kc.barBg} h={3} />
               {k.trend && <div style={{ fontSize: 10, color: kc.label, marginTop: 6, opacity: .85 }}>{k.trend}</div>}
             </div>
@@ -364,7 +537,6 @@ export default function Dashboard({ user }) {
             btnLabel="All Tasks"
             onBtn={() => navigate('/TaskList')}
           />
-
           <div style={{ padding: '8px 16px 10px', display: 'flex', gap: 5, flexWrap: 'wrap', borderBottom: `1px solid ${C.border}` }}>
             {[
               { l: 'Pending',  v: TC.pending,    bg: '#FFFBEB', c: '#92400E' },
@@ -376,7 +548,6 @@ export default function Dashboard({ user }) {
               <Pill key={p.l} bg={p.bg} color={p.c}>{p.v} {p.l}</Pill>
             ))}
           </div>
-
           {tasks.length === 0 ? (
             <div style={{ padding: '24px 16px', textAlign: 'center', color: C.text3, fontSize: 12 }}>
               No tasks — <span style={{ color: BRAND, cursor: 'pointer', fontWeight: 600 }} onClick={() => navigate('/TaskDashboard')}>create one →</span>
@@ -398,8 +569,7 @@ export default function Dashboard({ user }) {
                     <span>👤 {t.assignedTo}</span>
                     <span>📅 {t.dueDate}</span>
                     {t.priority && (
-                      <Pill
-                        bg={t.priority === 'HIGH' ? '#FFF1F2' : t.priority === 'MEDIUM' ? '#FFFBEB' : '#ECFDF5'}
+                      <Pill                        bg={t.priority === 'HIGH' ? '#FFF1F2' : t.priority === 'MEDIUM' ? '#FFFBEB' : '#ECFDF5'}
                         color={t.priority === 'HIGH' ? '#9F1239' : t.priority === 'MEDIUM' ? '#92400E' : '#065F46'}
                       >{cap(t.priority)}</Pill>
                     )}
@@ -411,7 +581,7 @@ export default function Dashboard({ user }) {
           })}
         </div>
 
-        {/* ─── PERFORMANCE — always shows if ANY perf data exists ── */}
+        {/* PERFORMANCE */}
         <div className="card">
           <CardHeader
             title="Performance"
@@ -424,8 +594,6 @@ export default function Dashboard({ user }) {
             onBtn={() => navigate('/Performance')}
           />
           <div style={{ padding: '14px 16px' }}>
-
-            {/* Avg rating block */}
             {(s.avgPerformanceRating || 0) > 0 ? (
               <div style={{ background: '#FFFBEB', borderRadius: 8, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, border: '1px solid #FDE68A' }}>
                 <div style={{ textAlign: 'center', flexShrink: 0 }}>
@@ -453,7 +621,6 @@ export default function Dashboard({ user }) {
               </div>
             )}
 
-            {/* Top performers */}
             {perf.length > 0 && (
               <>
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>Top Performers</div>
@@ -477,7 +644,6 @@ export default function Dashboard({ user }) {
               </>
             )}
 
-            {/* Rating breakdown */}
             {rtg.length > 0 && (
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>Rating Breakdown</div>
@@ -505,7 +671,7 @@ export default function Dashboard({ user }) {
           </div>
         </div>
 
-        {/* ACTIVITY - UPDATED with better icons and real timestamps */}
+        {/* ACTIVITY */}
         <div className="card">
           <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${C.border}` }}>
             <div>
@@ -532,8 +698,6 @@ export default function Dashboard({ user }) {
                   icon: <FaCircle size={10} />, 
                   label: a.module 
                 };
-                
-                // Determine timestamp display
                 const timestamp = a.timestamp || 'Recently';
                 const isRecent = timestamp.includes('min') || timestamp.includes('Just now') || timestamp === 'Recently';
                 
@@ -600,7 +764,6 @@ export default function Dashboard({ user }) {
         {/* RECENT EMPLOYEES */}
         <div className="card">
           <CardHeader title="Recent Joins" sub={`${s.totalEmployees || 0} total · ${s.newHiresThisMonth || 0} this month`} btnLabel="All Employees" onBtn={() => navigate('/Employees')} />
-
           {emps.length === 0 ? (
             <div style={{ padding: '24px 16px', textAlign: 'center', color: C.text3, fontSize: 12 }}>No employees yet</div>
           ) : emps.map((e, i) => (
@@ -622,7 +785,6 @@ export default function Dashboard({ user }) {
               {i < emps.length - 1 && <HR />}
             </React.Fragment>
           ))}
-
           <HR />
           <div style={{ padding: '10px 16px' }}>
             <button onClick={() => navigate('/Employees')}

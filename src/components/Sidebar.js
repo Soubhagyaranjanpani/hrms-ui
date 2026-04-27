@@ -31,6 +31,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy' },
     { path: '/attendance', icon: <FaCalendarCheck />, label: 'Attendance' },
     { path: '/training', icon: <FaChalkboardTeacher />, label: 'Training' },
+    { path: '/EmployeeGrade', icon: <FaUserTag />, label: 'Employee Grade' },
   ];
 
   // Leave section items
@@ -57,8 +58,11 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   // Payroll section items
   const payrollItems = [
     { path: '/payroll-dashboard', icon: <FaChartBar />, label: 'Payroll Dashboard' },
-    { path: '/payroll', icon: <FaMoneyBillWave />, label: 'Payroll Management' },
+    { path: '/SalaryConfig', icon: <FaCog />, label: 'Salary Configuration' },
+
     { path: '/salary-structure', icon: <FaRupeeSign />, label: 'Salary Structure' },
+    { path: '/payroll', icon: <FaMoneyBillWave />, label: 'Payroll Management' },
+
 
     // { path: '/reports', icon: <FaChartBar />, label: 'Payroll Reports' },
   ];
@@ -75,11 +79,11 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   ];
 
   // Documents section items
-  const documentsItems = [
+  // const documentsItems = [
 
-    // { path: '/documents/employee', icon: <FaFileAlt />, label: 'Employee Documents' },
-    // { path: '/documents/company', icon: <FaFileAlt />, label: 'Company Documents' },
-  ];
+  //    { path: '/documents/employee', icon: <FaFileAlt />, label: 'Employee Documents' },
+  //    { path: '/documents/company', icon: <FaFileAlt />, label: 'Company Documents' },
+  // ];
 
   const toggleMaster = () => {
     setMasterOpen(!masterOpen);
@@ -589,7 +593,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
         {/* Documents Items */}
         {(documentsOpen || sidebarCollapsed) && (
           <>
-            {documentsItems.map((item, index) => (
+            {/* {documentsItems.map((item, index) => (
               <li key={`documents-${index}`} style={{ margin: '3px 10px' }}>
                 <NavLink
                   to={item.path}
@@ -617,7 +621,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
                   {!sidebarCollapsed && <span>{item.label}</span>}
                 </NavLink>
               </li>
-            ))}
+            ))} */}
           </>
         )}
 

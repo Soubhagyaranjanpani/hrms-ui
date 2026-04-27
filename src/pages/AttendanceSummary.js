@@ -43,10 +43,8 @@ const AttendanceSummary = () => {
                            (summaryData.halfDays || 0)
         });
         
-        toast.success('Success', `Summary loaded for ${new Date(year, month - 1).toLocaleString('default', { month: 'long' })} ${year}`);
       } else {
         setSummary(null);
-        toast.info('No Data', 'No attendance data available for selected period');
       }
     } catch (error) {
       console.error('Error fetching summary:', error);

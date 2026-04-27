@@ -523,24 +523,7 @@ const AttendanceDashboard = () => {
           </div>
         </div>
 
-        {/* Info Card */}
-        <div style={{
-          background: '#f0fdf4',
-          borderRadius: '12px',
-          padding: '14px 20px',
-          marginTop: '20px',
-          border: '1px solid #bbf7d0'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <FaCheckCircle color="var(--accent-teal)" size={16} />
-            <div>
-              <p style={{ fontWeight: '600', color: '#166534', marginBottom: '2px', fontSize: '13px' }}>Attendance Policy</p>
-              <p style={{ fontSize: '12px', color: '#15803d' }}>
-                Working hours: 9:00 AM - 6:00 PM | Full day: 8+ hours | Half day: 4-8 hours | Below 4 hours: Absent
-              </p>
-            </div>
-          </div>
-        </div>
+      
       </div>
 
 
