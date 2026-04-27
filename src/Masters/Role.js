@@ -57,7 +57,6 @@ const Role = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchName, setSearchName] = useState("");
@@ -70,7 +69,6 @@ const Role = () => {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  // Auth
   const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
   const axiosConfig = {
     headers: {
@@ -88,7 +86,6 @@ const Role = () => {
     return true;
   };
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(searchName);
@@ -97,7 +94,6 @@ const Role = () => {
     return () => clearTimeout(t);
   }, [searchName]);
 
-  // Fetch roles
   const fetchRoles = useCallback(async () => {
     if (!ensureToken()) return;
     setLoading(true);
@@ -126,7 +122,6 @@ const Role = () => {
     fetchRoles();
   }, [fetchRoles]);
 
-  // Filter & pagination
   const filteredRoles = roles.filter((r) =>
     r.roleName?.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
@@ -135,7 +130,6 @@ const Role = () => {
   const startIndex = page * rowsPerPage;
   const currentRoles = filteredRoles.slice(startIndex, startIndex + rowsPerPage);
 
-  // Form handlers
   const handleChange = (field, value) => {
     const updated = { ...formData, [field]: value };
     setFormData(updated);
@@ -157,7 +151,6 @@ const Role = () => {
     setSelectedRole(null);
   };
 
-  // Create / Update
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!ensureToken()) return;
@@ -205,7 +198,6 @@ const Role = () => {
     }
   };
 
-  // Edit role
   const handleEdit = (role) => {
     if (role.status !== "y") {
       toast.warning("Inactive", "Cannot edit an inactive role");
@@ -217,7 +209,6 @@ const Role = () => {
     setView("form");
   };
 
-  // Status toggle
   const handleStatusToggle = (id, currentStatus, name) => {
     const newStatus = currentStatus === "y" ? "n" : "y";
     setStatusAction({ id, newStatus, name });
@@ -229,13 +220,9 @@ const Role = () => {
     const { id } = statusAction;
     setLoading(true);
     try {
-      const res = await axios.put(
-        `${BASE_URL}/roles/status/${id}`,
-        null,
-        axiosConfig
-      );
+      const res = await axios.put(`${BASE_URL}/roles/status/${id}`, null, axiosConfig);
       if (res.data?.status === 200) {
-        toast.success("Status Updated", `Role status changed`);
+        toast.success("Status Updated", "Role status changed");
         fetchRoles();
       } else {
         throw new Error(res.data?.message || "Status change failed");
@@ -249,7 +236,6 @@ const Role = () => {
     }
   };
 
-  // Pagination helpers
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
@@ -270,95 +256,120 @@ const Role = () => {
   const isFieldOk = (f) => touched[f] && !errors[f] && formData[f]?.trim();
   const isFieldErr = (f) => touched[f] && !!errors[f];
 
-  const handleRowsPerPageChange = (e) => {
-    setRowsPerPage(Number(e.target.value));
-    setPage(0);
-  };
-
   if (loading && view === "list" && roles.length === 0) {
     return <LoadingSpinner message="Loading roles..." />;
   }
 
   return (
-    <div className="emp-root">
-      {/* Header */}
-      <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
-        {view === "form" ? (
-          <>
-            <div>
-              <h1 className="emp-title">{editMode ? "Edit Role" : "Add Role"}</h1>
-              <p className="emp-subtitle">
-                {editMode ? "Update role information" : "Enter new role details"}
-              </p>
-            </div>
-            <button
-              className="emp-back-btn"
-              onClick={() => {
-                resetForm();
-                setView("list");
-              }}
-            >
-              <FaArrowLeft size={12} /> Back
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="emp-header-left">
+    <>
+      {/* Scrollbar hiding (matches Branch page) */}
+      <style>{`
+        html, body, #root, .emp-root, .emp-table-wrap, .emp-form-wrap, 
+        .emp-modal, .emp-modal-overlay, .emp-search-bar, .emp-pagination {
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+        html::-webkit-scrollbar, body::-webkit-scrollbar, #root::-webkit-scrollbar,
+        .emp-root::-webkit-scrollbar, .emp-table-wrap::-webkit-scrollbar,
+        .emp-form-wrap::-webkit-scrollbar, .emp-modal::-webkit-scrollbar,
+        .emp-modal-overlay::-webkit-scrollbar, .emp-search-bar::-webkit-scrollbar,
+        .emp-pagination::-webkit-scrollbar {
+          display: none !important;
+        }
+        .emp-root {
+          overflow-y: auto;
+          overflow-x: hidden;
+          height: 100vh;
+        }
+        .emp-table-wrap {
+          overflow-x: auto;
+          overflow-y: hidden;
+        }
+        .emp-form-wrap {
+          overflow-y: auto;
+          max-height: calc(100vh - 80px);
+        }
+      `}</style>
+
+      <div className="emp-root">
+        {/* Header */}
+        <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
+          {view === "form" ? (
+            <>
               <div>
-                <h1 className="emp-title">Role Directory</h1>
-                <p className="emp-subtitle">{totalItems} total roles</p>
+                <h1 className="emp-title">{editMode ? "Edit Role" : "Add Role"}</h1>
+                <p className="emp-subtitle">
+                  {editMode ? "Update role information" : "Enter new role details"}
+                </p>
+              </div>
+              <button
+                className="emp-back-btn"
+                onClick={() => {
+                  resetForm();
+                  setView("list");
+                }}
+              >
+                <FaArrowLeft size={12} /> Back
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="emp-header-left">
+                <div>
+                  <h1 className="emp-title">Role Directory</h1>
+                  <p className="emp-subtitle">{totalItems} total roles</p>
+                </div>
+              </div>
+              <button
+                className="emp-add-btn"
+                onClick={() => {
+                  resetForm();
+                  setView("form");
+                }}
+              >
+                <FaUserPlus size={13} /> Add Role
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* LIST VIEW */}
+        {view === "list" ? (
+          <>
+            <div className="emp-search-bar">
+              <div className="emp-search-wrap">
+                <FaSearch className="emp-search-icon" size={12} />
+                <input
+                  className="emp-search-input"
+                  type="text"
+                  placeholder="Search by role name…"
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                />
+                {searchName && (
+                  <button className="emp-search-clear" onClick={() => setSearchName("")}>
+                    <FaTimes size={11} />
+                  </button>
+                )}
               </div>
             </div>
-            <button
-              className="emp-add-btn"
-              onClick={() => {
-                resetForm();
-                setView("form");
-              }}
-            >
-              <FaUserPlus size={13} /> Add Role
-            </button>
-          </>
-        )}
-      </div>
 
-      {/* LIST VIEW */}
-      {view === "list" ? (
-        <>
-          <div className="emp-search-bar">
-            <div className="emp-search-wrap">
-              <FaSearch className="emp-search-icon" size={12} />
-              <input
-                className="emp-search-input"
-                type="text"
-                placeholder="Search by role name…"
-                value={searchName}
-                onChange={(e) => setSearchName(e.target.value)}
-              />
-              {searchName && (
-                <button className="emp-search-clear" onClick={() => setSearchName("")}>
-                  <FaTimes size={11} />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="emp-table-card">
-            <div className="emp-table-wrap">
-              <table className="emp-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 44 }}>#</th>
-                    <th>Role Name</th>
-                    <th style={{ width: 100 }}>Status</th>
-                    <th style={{ width: 70, textAlign: "center" }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentRoles.length > 0 ? (
-                    currentRoles.map((role, idx) => (
-                      <tr key={role.id} className="emp-row">
-                        <td className="emp-sno">{startIndex + idx + 1}</td>
+            <div className="emp-table-card">
+              <div className="emp-table-wrap">
+                <table className="emp-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 44 }}>#</th>
+                      <th>Role Name</th>
+                      <th style={{ width: 80 }}>Status</th>
+                      <th style={{ width: 70, textAlign: "center" }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentRoles.length > 0 ? (
+                      currentRoles.map((role, idx) => (
+                        <tr key={role.id} className="emp-row">
+                          <td className="emp-sno">{startIndex + idx + 1}</td>
                         <td>
                           <div className="emp-name">{role.roleName || "—"}</div>
                         </td>
@@ -368,14 +379,14 @@ const Role = () => {
                             style={{
                               display: "flex",
                               alignItems: "center",
-                              gap: "8px",
+                              gap: "6px",
                               cursor: "pointer",
                             }}
                           >
                             <div
                               style={{
-                                width: "42px",
-                                height: "22px",
+                                width: "28px",
+                                height: "16px",
                                 borderRadius: "50px",
                                 backgroundColor: role.status === "y" ? "var(--accent-indigo)" : "var(--border-medium)",
                                 position: "relative",
@@ -384,13 +395,13 @@ const Role = () => {
                             >
                               <div
                                 style={{
-                                  width: "18px",
-                                  height: "18px",
+                                  width: "12px",
+                                  height: "12px",
                                   borderRadius: "50%",
                                   backgroundColor: "white",
                                   position: "absolute",
                                   top: "2px",
-                                  left: role.status === "y" ? "22px" : "2px",
+                                  left: role.status === "y" ? "14px" : "2px",
                                   transition: "0.2s",
                                   boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
                                 }}
@@ -398,7 +409,7 @@ const Role = () => {
                             </div>
                             <span
                               style={{
-                                fontSize: "12px",
+                                fontSize: "11px",
                                 fontWeight: "500",
                                 color: role.status === "y" ? "var(--accent-indigo)" : "var(--text-muted)",
                               }}
@@ -421,151 +432,113 @@ const Role = () => {
                           </div>
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4" className="emp-empty">
-                        <div className="emp-empty-inner">
-                          <span className="emp-empty-icon">🔑</span>
-                          <p>No roles found</p>
-                          <small>Try a different search or add a new role</small>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {totalItems > 0 && (
-              <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <span className="emp-page-info">
-                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} roles
-                  </span>
-                </div>
-
-                <div className="emp-page-controls">
-                  <button
-                    className="emp-page-btn"
-                    disabled={page === 0}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    ← Prev
-                  </button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === "..." ? (
-                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                      ))
                     ) : (
-                      <button
-                        key={pg}
-                        className={`emp-page-num ${pg === page ? "active" : ""}`}
-                        onClick={() => setPage(pg)}
-                      >
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button
-                    className="emp-page-btn"
-                    disabled={page + 1 >= totalPages}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    Next →
-                  </button>
-                </div>
+                      <tr>
+                        <td colSpan="4" className="emp-empty">
+                          <div className="emp-empty-inner">
+                            <span className="emp-empty-icon">🔑</span>
+                            <p>No roles found</p>
+                            <small>Try a different search or add a new role</small>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
-        </>
-      ) : (
-        /* FORM VIEW - WIDER INPUT */
-        <div className="emp-form-wrap">
-          <form onSubmit={handleSubmit} noValidate>
-            <div className="emp-form-section">
-              <div className="emp-section-label">Role Information</div>
-              {/* Increased maxWidth from 500px to 800px for wider input */}
-              <div className="emp-form-grid" style={{ maxWidth: "800px", width: "100%" }}>
-                <div
-                  className={`emp-field ${isFieldErr("roleName") ? "has-error" : ""} ${
-                    isFieldOk("roleName") ? "has-ok" : ""
-                  }`}
-                >
-                  <div className="emp-label-row">
-                    <label>
-                      Role Name <span className="req">*</span>
-                    </label>
-                    <CharCount value={formData.roleName} max={50} />
+
+              {totalItems > 0 && (
+                <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <span className="emp-page-info">
+                      Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} roles
+                    </span>
                   </div>
-                  <input
-                    type="text"
-                    placeholder="e.g., Admin, Manager, Developer"
-                    value={formData.roleName}
-                    maxLength={50}
-                    onChange={(e) => handleChange("roleName", e.target.value)}
-                    onBlur={() => handleBlur("roleName")}
-                    style={{ width: "150%" }}  // Ensure input fills the container
-                  />
-                  <FieldError msg={errors.roleName} />
-                  <small className="emp-hint-text">2–50 characters, letters only</small>
+                  <div className="emp-page-controls">
+                    <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                    {getPaginationRange().map((pg, i) =>
+                      pg === "..." ? (
+                        <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                      ) : (
+                        <button key={pg} className={`emp-page-num ${pg === page ? "active" : ""}`} onClick={() => setPage(pg)}>
+                          {pg + 1}
+                        </button>
+                      )
+                    )}
+                    <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          /* ========== REDESIGNED FORM – EXACTLY LIKE BRANCH PAGE ========== */
+          <div className="emp-form-wrap">
+            <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
+              <div className="emp-form-section-compact">
+                <div className="emp-section-label">Role Information</div>
+                <div className="emp-form-grid-3col">
+                  {/* Role Name */}
+                  <div className={`emp-field-compact ${isFieldErr('roleName') ? 'has-error' : ''} ${isFieldOk('roleName') ? 'has-ok' : ''}`}>
+                    <div className="emp-label-row">
+                      <label>Role Name <span className="req">*</span></label>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder=" Developer"
+                      value={formData.roleName}
+                      maxLength={50}
+                      onChange={(e) => handleChange('roleName', e.target.value)}
+                      onBlur={() => handleBlur('roleName')}
+                    />
+                    <FieldError msg={errors.roleName} />
+                  </div>
+                  {/* <div></div> */}
+                  {/* <div></div> */}
                 </div>
               </div>
-            </div>
 
-            <div className="emp-form-footer">
-              <button
-                type="button"
-                className="emp-cancel-btn"
-                onClick={() => {
-                  resetForm();
-                  setView("list");
-                }}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="emp-submit-btn" disabled={submitting}>
-                {submitting ? (
-                  <><span className="emp-spinner" /> {editMode ? "Updating…" : "Creating…"}</>
-                ) : (
-                  <><FaSave size={12} /> {editMode ? "Update Role" : "Create Role"}</>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+              {/* Form Actions */}
+               <div className="emp-form-actions">
+                <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView('list'); }}>
+                  Cancel
+                </button>
+                <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  {submitting
+                    ? <><span className="emp-spinner" /> {editMode ? 'Updating…' : 'Creating…'}</>
+                    : <><FaSave size={12} /> {editMode ? 'Update Branch' : 'Create Branch'}</>
+                  }
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
-      {/* Status Confirmation Modal */}
-      {showStatusModal && (
-        <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
-          <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="emp-modal-icon">
-              {statusAction.newStatus === "y" ? "✅" : "⛔"}
-            </div>
-            <h3 className="emp-modal-title">Confirm Status Change</h3>
-            <p className="emp-modal-body">
-              Are you sure you want to{" "}
-              <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
-              <strong>{statusAction.name}</strong>?
-            </p>
-            <p className="emp-modal-warn">
-              {statusAction.newStatus === "n"
-                ? "Inactive roles cannot be edited until reactivated."
-                : "Active roles will be available for selection."}
-            </p>
-            <div className="emp-modal-actions">
-              <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>
-                Cancel
-              </button>
-              <button className="emp-modal-confirm" onClick={confirmStatusChange}>
-                Confirm
-              </button>
+        {/* Status Confirmation Modal */}
+        {showStatusModal && (
+          <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
+            <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="emp-modal-icon">{statusAction.newStatus === "y" ? "✅" : "⛔"}</div>
+              <h3 className="emp-modal-title">Confirm Status Change</h3>
+              <p className="emp-modal-body">
+                Are you sure you want to <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
+                <strong>{statusAction.name}</strong>?
+              </p>
+              <p className="emp-modal-warn">
+                {statusAction.newStatus === "n"
+                  ? "Inactive roles cannot be edited until reactivated."
+                  : "Active roles will be available for selection."}
+              </p>
+              <div className="emp-modal-actions">
+                <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>Cancel</button>
+                <button className="emp-modal-confirm" onClick={confirmStatusChange}>Confirm</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 };
 

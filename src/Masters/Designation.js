@@ -57,7 +57,6 @@ const Designation = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchName, setSearchName] = useState("");
@@ -70,7 +69,6 @@ const Designation = () => {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  // Auth
   const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
   const axiosConfig = {
     headers: {
@@ -88,7 +86,6 @@ const Designation = () => {
     return true;
   };
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(searchName);
@@ -97,30 +94,20 @@ const Designation = () => {
     return () => clearTimeout(t);
   }, [searchName]);
 
-  // Fetch designations - CORRECTED API PATH
   const fetchDesignations = useCallback(async () => {
     if (!ensureToken()) return;
     setLoading(true);
     try {
-      // ✅ Use /api/designations/list (as per your working endpoint)
       const res = await axios.get(`${BASE_URL}/api/designations/list?flag=0`, axiosConfig);
-      
-      // Debug: log the full response to verify structure
-      console.log("Designation API Response:", res.data);
-      
       if (res.data?.status === 200 && Array.isArray(res.data.response)) {
         const mapped = res.data.response.map((d) => ({
           id: d.id,
-          // Backend may use "name" or "designationName"
           designationName: d.name || d.designationName || "",
-          // Backend may use "isActive" or "active" or "status"
           status: (d.isActive === true || d.active === true || d.status === "y") ? "y" : "n",
         }));
         setDesignations(mapped);
-        console.log("Mapped designations:", mapped);
       } else {
         setDesignations([]);
-        toast.warning("No Data", "No designations found in response");
       }
     } catch (err) {
       console.error("Fetch error:", err);
@@ -135,7 +122,6 @@ const Designation = () => {
     fetchDesignations();
   }, [fetchDesignations]);
 
-  // Filter & pagination
   const filteredDesignations = designations.filter((d) =>
     d.designationName?.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
@@ -144,7 +130,6 @@ const Designation = () => {
   const startIndex = page * rowsPerPage;
   const currentDesignations = filteredDesignations.slice(startIndex, startIndex + rowsPerPage);
 
-  // Form handlers
   const handleChange = (field, value) => {
     const updated = { ...formData, [field]: value };
     setFormData(updated);
@@ -166,7 +151,6 @@ const Designation = () => {
     setSelectedDesignation(null);
   };
 
-  // Create / Update
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!ensureToken()) return;
@@ -185,14 +169,11 @@ const Designation = () => {
       let url, method, payload;
 
       if (editMode) {
-        url = `${BASE_URL}/api/designations/update`;  
+        url = `${BASE_URL}/api/designations/update`;
         method = axios.put;
-        payload = {
-          id: selectedDesignation.id,
-          name: nameTrimmed,
-        };
+        payload = { id: selectedDesignation.id, name: nameTrimmed };
       } else {
-        url = `${BASE_URL}/api/designations/create`;   
+        url = `${BASE_URL}/api/designations/create`;
         method = axios.post;
         payload = { name: nameTrimmed };
       }
@@ -214,7 +195,6 @@ const Designation = () => {
     }
   };
 
-  // Edit designation
   const handleEdit = (designation) => {
     if (designation.status !== "y") {
       toast.warning("Inactive", "Cannot edit an inactive designation");
@@ -226,7 +206,6 @@ const Designation = () => {
     setView("form");
   };
 
-  // Status toggle
   const handleStatusToggle = (id, currentStatus, name) => {
     const newStatus = currentStatus === "y" ? "n" : "y";
     setStatusAction({ id, newStatus, name });
@@ -238,13 +217,9 @@ const Designation = () => {
     const { id } = statusAction;
     setLoading(true);
     try {
-      const res = await axios.put(
-        `${BASE_URL}/api/designations/status/${id}`,
-        null,
-        axiosConfig
-      );
+      const res = await axios.put(`${BASE_URL}/api/designations/status/${id}`, null, axiosConfig);
       if (res.data?.status === 200) {
-        toast.success("Status Updated", `Designation status changed`);
+        toast.success("Status Updated", "Designation status changed");
         fetchDesignations();
       } else {
         throw new Error(res.data?.message || "Status change failed");
@@ -258,7 +233,6 @@ const Designation = () => {
     }
   };
 
-  // Pagination helpers
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
@@ -279,304 +253,261 @@ const Designation = () => {
   const isFieldOk = (f) => touched[f] && !errors[f] && formData[f]?.trim();
   const isFieldErr = (f) => touched[f] && !!errors[f];
 
-  const handleRowsPerPageChange = (e) => {
-    setRowsPerPage(Number(e.target.value));
-    setPage(0);
-  };
-
   if (loading && view === "list" && designations.length === 0) {
     return <LoadingSpinner message="Loading designations..." />;
   }
 
   return (
-    <div className="emp-root">
-      {/* Header */}
-      <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
-        {view === "form" ? (
-          <>
-            <div>
-              <h1 className="emp-title">{editMode ? "Edit Designation" : "Add Designation"}</h1>
-              <p className="emp-subtitle">
-                {editMode ? "Update designation information" : "Enter new designation details"}
-              </p>
-            </div>
-            <button
-              className="emp-back-btn"
-              onClick={() => {
-                resetForm();
-                setView("list");
-              }}
-            >
-              <FaArrowLeft size={12} /> Back
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="emp-header-left">
+    <>
+      <div className="emp-root">
+        {/* Header */}
+        <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
+          {view === "form" ? (
+            <>
               <div>
-                <h1 className="emp-title">Designation Directory</h1>
-                <p className="emp-subtitle">{totalItems} total designations</p>
+                <h1 className="emp-title">{editMode ? "Edit Designation" : "Add Designation"}</h1>
+                <p className="emp-subtitle">
+                  {editMode ? "Update designation information" : "Enter new designation details"}
+                </p>
               </div>
-            </div>
-            <button
-              className="emp-add-btn"
-              onClick={() => {
-                resetForm();
-                setView("form");
-              }}
-            >
-              <FaUserPlus size={13} /> Add Designation
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* LIST VIEW */}
-      {view === "list" ? (
-        <>
-          <div className="emp-search-bar">
-            <div className="emp-search-wrap">
-              <FaSearch className="emp-search-icon" size={12} />
-              <input
-                className="emp-search-input"
-                type="text"
-                placeholder="Search by designation name…"
-                value={searchName}
-                onChange={(e) => setSearchName(e.target.value)}
-              />
-              {searchName && (
-                <button className="emp-search-clear" onClick={() => setSearchName("")}>
-                  <FaTimes size={11} />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="emp-table-card">
-            <div className="emp-table-wrap">
-              <table className="emp-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 44 }}>#</th>
-                    <th>Designation Name</th>
-                    <th style={{ width: 100 }}>Status</th>
-                    <th style={{ width: 70, textAlign: "center" }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentDesignations.length > 0 ? (
-                    currentDesignations.map((designation, idx) => (
-                      <tr key={designation.id} className="emp-row">
-                        <td className="emp-sno">{startIndex + idx + 1}</td>
-                        <td>
-                          <div className="emp-name">{designation.designationName || "—"}</div>
-                        </td>
-                        <td>
-                          <div
-                            onClick={() =>
-                              handleStatusToggle(designation.id, designation.status, designation.designationName)
-                            }
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                              cursor: "pointer",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "42px",
-                                height: "22px",
-                                borderRadius: "50px",
-                                backgroundColor:
-                                  designation.status === "y" ? "var(--accent-indigo)" : "var(--border-medium)",
-                                position: "relative",
-                                transition: "0.2s",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "18px",
-                                  height: "18px",
-                                  borderRadius: "50%",
-                                  backgroundColor: "white",
-                                  position: "absolute",
-                                  top: "2px",
-                                  left: designation.status === "y" ? "22px" : "2px",
-                                  transition: "0.2s",
-                                  boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
-                                }}
-                              />
-                            </div>
-                            <span
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: "500",
-                                color: designation.status === "y" ? "var(--accent-indigo)" : "var(--text-muted)",
-                              }}
-                            >
-                              {designation.status === "y" ? "Active" : "Inactive"}
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="emp-actions">
-                            <button
-                              className="emp-act emp-act--edit"
-                              onClick={() => handleEdit(designation)}
-                              title={designation.status !== "y" ? "Cannot edit inactive designation" : "Edit"}
-                              style={{ opacity: designation.status !== "y" ? 0.5 : 1 }}
-                              disabled={designation.status !== "y"}
-                            >
-                              <FaEdit size={12} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4" className="emp-empty">
-                        <div className="emp-empty-inner">
-                          <span className="emp-empty-icon">🏷️</span>
-                          <p>No designations found</p>
-                          <small>Try a different search or add a new designation</small>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {totalItems > 0 && (
-              <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <span className="emp-page-info">
-                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} designations
-                  </span>
-                </div>
-
-                <div className="emp-page-controls">
-                  <button
-                    className="emp-page-btn"
-                    disabled={page === 0}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    ← Prev
-                  </button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === "..." ? (
-                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
-                    ) : (
-                      <button
-                        key={pg}
-                        className={`emp-page-num ${pg === page ? "active" : ""}`}
-                        onClick={() => setPage(pg)}
-                      >
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button
-                    className="emp-page-btn"
-                    disabled={page + 1 >= totalPages}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    Next →
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      ) : (
-        /* FORM VIEW */
-        <div className="emp-form-wrap">
-          <form onSubmit={handleSubmit} noValidate>
-            <div className="emp-form-section">
-              <div className="emp-section-label">Designation Information</div>
-              <div className="emp-form-grid" style={{ maxWidth: "800px", width: "100%" }}>
-                <div
-                  className={`emp-field ${isFieldErr("designationName") ? "has-error" : ""} ${
-                    isFieldOk("designationName") ? "has-ok" : ""
-                  }`}
-                >
-                  <div className="emp-label-row">
-                    <label>
-                      Designation Name <span className="req">*</span>
-                    </label>
-                    <CharCount value={formData.designationName} max={50} />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="e.g., Software Engineer, Team Lead, HR Manager"
-                    value={formData.designationName}
-                    maxLength={50}
-                    onChange={(e) => handleChange("designationName", e.target.value)}
-                    onBlur={() => handleBlur("designationName")}
-                    style={{ width: "100%" }}
-                  />
-                  <FieldError msg={errors.designationName} />
-                  <small className="emp-hint-text">2–50 characters, letters only</small>
-                </div>
-              </div>
-            </div>
-
-            <div className="emp-form-footer">
               <button
-                type="button"
-                className="emp-cancel-btn"
+                className="emp-back-btn"
                 onClick={() => {
                   resetForm();
                   setView("list");
                 }}
               >
-                Cancel
+                <FaArrowLeft size={12} /> Back
               </button>
-              <button type="submit" className="emp-submit-btn" disabled={submitting}>
-                {submitting ? (
-                  <><span className="emp-spinner" /> {editMode ? "Updating…" : "Creating…"}</>
-                ) : (
-                  <><FaSave size={12} /> {editMode ? "Update Designation" : "Create Designation"}</>
-                )}
+            </>
+          ) : (
+            <>
+              <div className="emp-header-left">
+                <div>
+                  <h1 className="emp-title">Designation Directory</h1>
+                  <p className="emp-subtitle">{totalItems} total designations</p>
+                </div>
+              </div>
+              <button
+                className="emp-add-btn"
+                onClick={() => {
+                  resetForm();
+                  setView("form");
+                }}
+              >
+                <FaUserPlus size={13} /> Add Designation
               </button>
-            </div>
-          </form>
+            </>
+          )}
         </div>
-      )}
 
-      {/* Status Confirmation Modal */}
-      {showStatusModal && (
-        <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
-          <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="emp-modal-icon">
-              {statusAction.newStatus === "y" ? "✅" : "⛔"}
+        {/* LIST VIEW */}
+        {view === "list" ? (
+          <>
+            <div className="emp-search-bar">
+              <div className="emp-search-wrap">
+                <FaSearch className="emp-search-icon" size={12} />
+                <input
+                  className="emp-search-input"
+                  type="text"
+                  placeholder="Search by designation name…"
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                />
+                {searchName && (
+                  <button className="emp-search-clear" onClick={() => setSearchName("")}>
+                    <FaTimes size={11} />
+                  </button>
+                )}
+              </div>
             </div>
-            <h3 className="emp-modal-title">Confirm Status Change</h3>
-            <p className="emp-modal-body">
-              Are you sure you want to{" "}
-              <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
-              <strong>{statusAction.name}</strong>?
-            </p>
-            <p className="emp-modal-warn">
-              {statusAction.newStatus === "n"
-                ? "Inactive designations cannot be edited until reactivated."
-                : "Active designations will be available for selection."}
-            </p>
-            <div className="emp-modal-actions">
-              <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>
-                Cancel
-              </button>
-              <button className="emp-modal-confirm" onClick={confirmStatusChange}>
-                Confirm
-              </button>
+
+            <div className="emp-table-card">
+              <div className="emp-table-wrap">
+                <table className="emp-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 44 }}>#</th>
+                      <th>Designation Name</th>
+                      <th style={{ width: 100 }}>Status</th>
+                      <th style={{ width: 70, textAlign: "center" }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentDesignations.length > 0 ? (
+                      currentDesignations.map((designation, idx) => (
+                        <tr key={designation.id} className="emp-row">
+                          <td className="emp-sno">{startIndex + idx + 1}</td>
+                          <td>
+                            <div className="emp-name">{designation.designationName || "—"}</div>
+                          </td>
+                          <td>
+                            <div
+                              onClick={() => handleStatusToggle(designation.id, designation.status, designation.designationName)}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "28px",
+                                  height: "16px",
+                                  borderRadius: "50px",
+                                  backgroundColor: designation.status === "y" ? "var(--accent-indigo)" : "var(--border-medium)",
+                                  position: "relative",
+                                  transition: "0.2s",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: "12px",
+                                    height: "12px",
+                                    borderRadius: "50%",
+                                    backgroundColor: "white",
+                                    position: "absolute",
+                                    top: "2px",
+                                    left: designation.status === "y" ? "14px" : "2px",
+                                    transition: "0.2s",
+                                    boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                                  }}
+                                />
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: "500",
+                                  color: designation.status === "y" ? "var(--accent-indigo)" : "var(--text-muted)",
+                                }}
+                              >
+                                {designation.status === "y" ? "Active" : "Inactive"}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="emp-actions">
+                              <button
+                                className="emp-act emp-act--edit"
+                                onClick={() => handleEdit(designation)}
+                                title={designation.status !== "y" ? "Cannot edit inactive designation" : "Edit"}
+                                style={{ opacity: designation.status !== "y" ? 0.5 : 1 }}
+                                disabled={designation.status !== "y"}
+                              >
+                                <FaEdit size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="emp-empty">
+                          <div className="emp-empty-inner">
+                            <span className="emp-empty-icon">🏷️</span>
+                            <p>No designations found</p>
+                            <small>Try a different search or add a new designation</small>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalItems > 0 && (
+                <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <span className="emp-page-info">
+                      Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} designations
+                    </span>
+                  </div>
+                  <div className="emp-page-controls">
+                    <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                    {getPaginationRange().map((pg, i) =>
+                      pg === "..." ? (
+                        <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                      ) : (
+                        <button key={pg} className={`emp-page-num ${pg === page ? "active" : ""}`} onClick={() => setPage(pg)}>
+                          {pg + 1}
+                        </button>
+                      )
+                    )}
+                    <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          /* ========== FORM VIEW – EXACTLY LIKE BRANCH PAGE ========== */
+          <div className="emp-form-wrap">
+            <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
+              <div className="emp-form-section-compact">
+                <div className="emp-section-label">Designation Information</div>
+                <div className="emp-form-grid-3col">
+                  {/* Designation Name */}
+                  <div className={`emp-field-compact ${isFieldErr('designationName') ? 'has-error' : ''} ${isFieldOk('designationName') ? 'has-ok' : ''}`}>
+                    <div className="emp-label-row">
+                      <label>Designation Name <span className="req">*</span></label>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Designation Name"
+                      value={formData.designationName}
+                      maxLength={50}
+                      onChange={(e) => handleChange('designationName', e.target.value)}
+                      onBlur={() => handleBlur('designationName')}
+                    />
+                    <FieldError msg={errors.designationName} />
+                  </div>
+                  {/* Empty columns to keep 3‑col alignment */}
+                  <div></div>
+                  <div></div>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+               <div className="emp-form-actions">
+                <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView('list'); }}>
+                  Cancel
+                </button>
+                <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  {submitting
+                    ? <><span className="emp-spinner" /> {editMode ? 'Updating…' : 'Creating…'}</>
+                    : <><FaSave size={12} /> {editMode ? 'Update Branch' : 'Create Branch'}</>
+                  }
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Status Confirmation Modal */}
+        {showStatusModal && (
+          <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
+            <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="emp-modal-icon">{statusAction.newStatus === "y" ? "✅" : "⛔"}</div>
+              <h3 className="emp-modal-title">Confirm Status Change</h3>
+              <p className="emp-modal-body">
+                Are you sure you want to <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
+                <strong>{statusAction.name}</strong>?
+              </p>
+              <p className="emp-modal-warn">
+                {statusAction.newStatus === "n"
+                  ? "Inactive designations cannot be edited until reactivated."
+                  : "Active designations will be available for selection."}
+              </p>
+              <div className="emp-modal-actions">
+                <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>Cancel</button>
+                <button className="emp-modal-confirm" onClick={confirmStatusChange}>Confirm</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 };
 

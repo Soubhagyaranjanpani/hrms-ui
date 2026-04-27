@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import {
   FaSearch, FaEdit, FaArrowLeft, FaSave, FaExclamationCircle, FaUserPlus, FaTimes
@@ -8,7 +7,7 @@ import { toast } from "../components/Toast";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { BASE_URL, STORAGE_KEYS } from "../config/api.config";
 
-/* ─── Validation Rules (unchanged) ─── */
+/* ─── Validation Rules ─── */
 const RULES = {
   branchCode: {
     required: true,
@@ -169,6 +168,7 @@ const Branch = () => {
 
   const handleChange = (field, value) => {
     if (field === "branchCode") value = value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+    if (field === "pincode") value = value.replace(/\D/g, "").slice(0, 6);
     const updated = { ...formData, [field]: value };
     setFormData(updated);
     if (touched[field]) {
@@ -331,361 +331,359 @@ const Branch = () => {
   const isFieldOk = (f) => touched[f] && !errors[f] && formData[f]?.trim();
   const isFieldErr = (f) => touched[f] && !!errors[f];
 
-  const handleRowsPerPageChange = (e) => {
-    setRowsPerPage(Number(e.target.value));
-    setPage(0);
-  };
-
   if (loading && view === "list" && branches.length === 0) {
     return <LoadingSpinner message="Loading branches..." />;
   }
 
   return (
-    <div className="emp-root">
-      {/* Header */}
-      <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
-        {view === "form" ? (
-          <>
-            <div>
-              <h1 className="emp-title">{editMode ? "Edit Branch" : "Add Branch"}</h1>
-              <p className="emp-subtitle">
-                {editMode ? "Update branch information" : "Enter new branch details"}
-              </p>
-            </div>
-            <button
-              className="emp-back-btn"
-              onClick={() => {
-                resetForm();
-                setView("list");
-              }}
-            >
-              <FaArrowLeft size={12} /> Back
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="emp-header-left">
+    <>
+      <div className="emp-root">
+        {/* Header */}
+        <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
+          {view === "form" ? (
+            <>
               <div>
-                <h1 className="emp-title">Branch Directory</h1>
-                <p className="emp-subtitle">{totalItems} total branches</p>
+                <h1 className="emp-title">{editMode ? "Edit Branch" : "Add Branch"}</h1>
+                <p className="emp-subtitle">
+                  {editMode ? "Update branch information" : "Enter new branch details"}
+                </p>
+              </div>
+              <button
+                className="emp-back-btn"
+                onClick={() => {
+                  resetForm();
+                  setView("list");
+                }}
+              >
+                <FaArrowLeft size={12} /> Back
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="emp-header-left">
+                <div>
+                  <h1 className="emp-title">Branch Directory</h1>
+                  <p className="emp-subtitle">{totalItems} total branches</p>
+                </div>
+              </div>
+              <button
+                className="emp-add-btn"
+                onClick={() => {
+                  resetForm();
+                  setView("form");
+                }}
+              >
+                <FaUserPlus size={13} /> Add Branch
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* LIST VIEW */}
+        {view === "list" ? (
+          <>
+            <div className="emp-search-bar">
+              <div className="emp-search-wrap">
+                <FaSearch className="emp-search-icon" size={12} />
+                <input
+                  className="emp-search-input"
+                  type="text"
+                  placeholder="Search by name, code, or city…"
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                />
+                {searchName && (
+                  <button className="emp-search-clear" onClick={() => setSearchName("")}>
+                    <FaTimes size={11} />
+                  </button>
+                )}
               </div>
             </div>
-            <button
-              className="emp-add-btn"
-              onClick={() => {
-                resetForm();
-                setView("form");
-              }}
-            >
-              <FaUserPlus size={13} /> Add Branch
-            </button>
-          </>
-        )}
-      </div>
 
-      {/* LIST VIEW */}
-      {view === "list" ? (
-        <>
-          <div className="emp-search-bar">
-            <div className="emp-search-wrap">
-              <FaSearch className="emp-search-icon" size={12} />
-              <input
-                className="emp-search-input"
-                type="text"
-                placeholder="Search by name, code, or city…"
-                value={searchName}
-                onChange={(e) => setSearchName(e.target.value)}
-              />
-              {searchName && (
-                <button className="emp-search-clear" onClick={() => setSearchName("")}>
-                  <FaTimes size={11} />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="emp-table-card">
-            <div className="emp-table-wrap">
-              <table className="emp-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 44 }}>#</th>
-                    <th>Code</th>
-                    <th>Branch Name</th>
-                    <th>Address</th>
-                    <th>City</th>
-                    <th>State</th>
-                    <th>Country</th>
-                    <th>Pincode</th>
-                    <th style={{ width: 100 }}>Status</th>
-                    <th style={{ width: 70, textAlign: "center" }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentBranches.length > 0 ? (
-                    currentBranches.map((branch, idx) => (
-                      <tr key={branch.id} className="emp-row">
-                        <td className="emp-sno">{startIndex + idx + 1}</td>
-                        <td>{branch.branchCode || "—"}</td>
-                        <td><div className="emp-name">{branch.branchName || "—"}</div></td>
-                        <td>{branch.address || "—"}</td>
-                        <td>{branch.city || "—"}</td>
-                        <td>{branch.state || "—"}</td>
-                        <td>{branch.country || "—"}</td>
-                        <td>{branch.pincode || "—"}</td>
-                        <td>
-                          <div
-                            onClick={() => handleStatusToggle(branch.id, branch.status, branch.branchName)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                              cursor: "pointer",
-                            }}
-                          >
+            <div className="emp-table-card">
+              <div className="emp-table-wrap">
+                <table className="emp-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 44 }}>#</th>
+                      <th>Code</th>
+                      <th>Branch Name</th>
+                      <th>Address</th>
+                      <th>City</th>
+                      <th>State</th>
+                      <th>Country</th>
+                      <th>Pincode</th>
+                      <th style={{ width: 80 }}>Status</th>
+                      <th style={{ width: 70, textAlign: "center" }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentBranches.length > 0 ? (
+                      currentBranches.map((branch, idx) => (
+                        <tr key={branch.id} className="emp-row">
+                          <td className="emp-sno">{startIndex + idx + 1}</td>
+                          <td>{branch.branchCode || "—"}</td>
+                          <td><div className="emp-name">{branch.branchName || "—"}</div></td>
+                          <td>{branch.address || "—"}</td>
+                          <td>{branch.city || "—"}</td>
+                          <td>{branch.state || "—"}</td>
+                          <td>{branch.country || "—"}</td>
+                          <td>{branch.pincode || "—"}</td>
+                          <td>
                             <div
+                              onClick={() => handleStatusToggle(branch.id, branch.status, branch.branchName)}
                               style={{
-                                width: "42px",
-                                height: "22px",
-                                borderRadius: "50px",
-                                // ✅ FIX: use theme variable for active color
-                                backgroundColor: branch.status === "y" ? "var(--accent-indigo)" : "var(--border-medium)",
-                                position: "relative",
-                                transition: "0.2s",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                cursor: "pointer",
                               }}
                             >
                               <div
                                 style={{
-                                  width: "18px",
-                                  height: "18px",
-                                  borderRadius: "50%",
-                                  backgroundColor: "white",
-                                  position: "absolute",
-                                  top: "2px",
-                                  left: branch.status === "y" ? "22px" : "2px",
+                                  width: "28px",
+                                  height: "16px",
+                                  borderRadius: "50px",
+                                  backgroundColor: branch.status === "y" ? "var(--accent-indigo)" : "var(--border-medium)",
+                                  position: "relative",
                                   transition: "0.2s",
-                                  boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
                                 }}
-                              />
+                              >
+                                <div
+                                  style={{
+                                    width: "12px",
+                                    height: "12px",
+                                    borderRadius: "50%",
+                                    backgroundColor: "white",
+                                    position: "absolute",
+                                    top: "2px",
+                                    left: branch.status === "y" ? "14px" : "2px",
+                                    transition: "0.2s",
+                                    boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                                  }}
+                                />
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: "500",
+                                  color: branch.status === "y" ? "var(--accent-indigo)" : "var(--text-muted)",
+                                }}
+                              >
+                                {branch.status === "y" ? "Active" : "Inactive"}
+                              </span>
                             </div>
-                            <span
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: "500",
-                                color: branch.status === "y" ? "var(--accent-indigo)" : "var(--text-muted)",
-                              }}
-                            >
-                              {branch.status === "y" ? "Active" : "Inactive"}
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="emp-actions">
-                            <button
-                              className="emp-act emp-act--edit"
-                              onClick={() => handleEdit(branch)}
-                              title={branch.status !== "y" ? "Cannot edit inactive branch" : "Edit"}
-                              style={{ opacity: branch.status !== "y" ? 0.5 : 1 }}
-                              disabled={branch.status !== "y"}
-                            >
-                              <FaEdit size={12} />
-                            </button>
+                          </td>
+                          <td>
+                            <div className="emp-actions">
+                              <button
+                                className="emp-act emp-act--edit"
+                                onClick={() => handleEdit(branch)}
+                                title={branch.status !== "y" ? "Cannot edit inactive branch" : "Edit"}
+                                style={{ opacity: branch.status !== "y" ? 0.5 : 1 }}
+                                disabled={branch.status !== "y"}
+                              >
+                                <FaEdit size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="10" className="emp-empty">
+                          <div className="emp-empty-inner">
+                            <span className="emp-empty-icon">🏢</span>
+                            <p>No branches found</p>
+                            <small>Try a different search or add a new branch</small>
                           </div>
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="10" className="emp-empty">
-                        <div className="emp-empty-inner">
-                          <span className="emp-empty-icon">🏢</span>
-                          <p>No branches found</p>
-                          <small>Try a different search or add a new branch</small>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {totalItems > 0 && (
-              <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <span className="emp-page-info">
-                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} branches
-                  </span>
-                </div>
-
-                <div className="emp-page-controls">
-                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === "..." ? (
-                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
-                    ) : (
-                      <button key={pg} className={`emp-page-num ${pg === page ? "active" : ""}`} onClick={() => setPage(pg)}>
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
-                </div>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
-        </>
-      ) : (
-        /* FORM VIEW (unchanged, same as before) */
-        <div className="emp-form-wrap">
-          <form onSubmit={handleSubmit} noValidate>
-            <div className="emp-form-section">
-              <div className="emp-section-label">Branch Information</div>
-              <div className="emp-form-grid">
-                <div className={`emp-field ${isFieldErr("branchCode") ? "has-error" : ""} ${isFieldOk("branchCode") ? "has-ok" : ""}`}>
-                  <div className="emp-label-row">
+
+              {totalItems > 0 && (
+                <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <span className="emp-page-info">
+                      Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} branches
+                    </span>
+                  </div>
+                  <div className="emp-page-controls">
+                    <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                    {getPaginationRange().map((pg, i) =>
+                      pg === "..." ? (
+                        <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                      ) : (
+                        <button key={pg} className={`emp-page-num ${pg === page ? "active" : ""}`} onClick={() => setPage(pg)}>
+                          {pg + 1}
+                        </button>
+                      )
+                    )}
+                    <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          /* ========== FORM VIEW – EXACTLY MATCHING EMPLOYEE FORM STRUCTURE ========== */
+
+          <div className="emp-form-wrap">
+            <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
+
+              <div className="emp-form-section-compact">
+                <div className="emp-section-label">Branch Information</div>
+                <div className="emp-form-grid-3col">
+
+                  {/* Branch Code */}
+                  <div className={`emp-field-compact ${isFieldErr('branchCode') ? 'has-error' : ''} ${isFieldOk('branchCode') ? 'has-ok' : ''}`}>
                     <label>Branch Code <span className="req">*</span></label>
-                    <CharCount value={formData.branchCode} max={20} />
+                    <input
+                      type="text"
+                      placeholder="Full branch code"
+                      value={formData.branchCode}
+                      maxLength={20}
+                      onChange={(e) => handleChange('branchCode', e.target.value)}
+                      onBlur={() => handleBlur('branchCode')}
+                    />
+                    <FieldError msg={errors.branchCode} />
                   </div>
-                  <input
-                    type="text"
-                    placeholder="e.g., BLR-HQ"
-                    value={formData.branchCode}
-                    maxLength={20}
-                    onChange={(e) => handleChange("branchCode", e.target.value)}
-                    onBlur={() => handleBlur("branchCode")}
-                  />
-                  <FieldError msg={errors.branchCode} />
-                  <small className="emp-hint-text">Uppercase letters, numbers, hyphens</small>
-                </div>
 
-                <div className={`emp-field ${isFieldErr("branchName") ? "has-error" : ""} ${isFieldOk("branchName") ? "has-ok" : ""}`}>
-                  <div className="emp-label-row">
+                  {/* Branch Name */}
+                  <div className={`emp-field-compact ${isFieldErr('branchName') ? 'has-error' : ''} ${isFieldOk('branchName') ? 'has-ok' : ''}`}>
                     <label>Branch Name <span className="req">*</span></label>
-                    <CharCount value={formData.branchName} max={100} />
+                    <input
+                      type="text"
+                      placeholder="Full branch name"
+                      value={formData.branchName}
+                      maxLength={100}
+                      onChange={(e) => handleChange('branchName', e.target.value)}
+                      onBlur={() => handleBlur('branchName')}
+                    />
+                    <FieldError msg={errors.branchName} />
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Full branch name"
-                    value={formData.branchName}
-                    maxLength={100}
-                    onChange={(e) => handleChange("branchName", e.target.value)}
-                    onBlur={() => handleBlur("branchName")}
-                  />
-                  <FieldError msg={errors.branchName} />
-                  <small className="emp-hint-text">2–100 characters, letters, numbers, spaces, &, -</small>
+
+                  {/* Address Textarea (now in same 3‑column row) */}
+                  <div className={`emp-field-compact ${isFieldErr('address') ? 'has-error' : ''}`}>
+                    <label>Address<span className="req">*</span></label>
+
+                    <textarea
+                      rows={2}
+                      placeholder="Street, area, landmark"
+                      value={formData.address}
+                      maxLength={100}
+                      onChange={(e) => handleChange('address', e.target.value)}
+                      onBlur={() => handleBlur('address')}
+                    />
+                    <FieldError msg={errors.address} />
+                  </div>
+
+                  {/* City */}
+                  <div className={`emp-field-compact ${isFieldErr('city') ? 'has-error' : ''}`} style={{ marginTop: '-20px' }}>
+                    <label>City<span className="req">*</span></label>
+
+                    <input
+                      type="text"
+                      placeholder="City"
+                      value={formData.city}
+                      maxLength={6}
+                      onChange={(e) => handleChange('city', e.target.value)}
+                      onBlur={() => handleBlur('city')}
+                    />
+                    <FieldError msg={errors.city} />
+                  </div>
+
+                  {/* State */}
+                  <div className={`emp-field-compact ${isFieldErr('state') ? 'has-error' : ''}`} style={{ marginTop: '-20px' }}>
+
+                    <label>Pincode<span className="req">*</span></label>
+                    <input
+                      type="text"
+                      placeholder="State"
+                      value={formData.state}
+                      maxLength={50}
+                      onChange={(e) => handleChange('state', e.target.value)}
+                      onBlur={() => handleBlur('state')}
+                    />
+                    <FieldError msg={errors.state} />
+                  </div>
+
+                  {/* Country */}
+                  <div className={`emp-field-compact ${isFieldErr('country') ? 'has-error' : ''}`} style={{ marginTop: '-20px' }}>
+                    <label>Country<span className="req">*</span></label>
+
+                    <input
+                      type="text"
+                      placeholder="Country"
+                      value={formData.country}
+                      maxLength={50}
+                      onChange={(e) => handleChange('country', e.target.value)}
+                      onBlur={() => handleBlur('country')}
+                    />
+                    <FieldError msg={errors.country} />
+                  </div>
+
+                  {/* Pincode + two empty divs to keep 3 columns */}
+                  <div className={`emp-field-compact ${isFieldErr('pincode') ? 'has-error' : ''}`}>
+                    <label>Pincode<span className="req">*</span></label>
+                    <input
+                      type="text"
+                      placeholder="6-digit pincode"
+                      value={formData.pincode}
+                      maxLength={6}
+                      onChange={(e) => handleChange('pincode', e.target.value)}
+                      onBlur={() => handleBlur('pincode')}
+                    />
+                    <FieldError msg={errors.pincode} />
+                  </div>
+                  {/* <div></div> */}
+                  {/* <div></div> */}
                 </div>
               </div>
-            </div>
 
-            <div className="emp-divider" />
-
-            <div className="emp-form-section">
-              <div className="emp-section-label">Address Details</div>
-              <div className="emp-form-grid">
-                <div className={`emp-field ${isFieldErr("address") ? "has-error" : ""}`} style={{ gridColumn: "span 2" }}>
-                  <div className="emp-label-row">
-                    <label>Address</label>
-                    <CharCount value={formData.address} max={200} />
-                  </div>
-                  <textarea
-                    rows={2}
-                    placeholder="Street, area, landmark"
-                    value={formData.address}
-                    maxLength={200}
-                    onChange={(e) => handleChange("address", e.target.value)}
-                    onBlur={() => handleBlur("address")}
-                  />
-                  <FieldError msg={errors.address} />
-                </div>
-
-                <div className={`emp-field ${isFieldErr("city") ? "has-error" : ""}`}>
-                  <label>City</label>
-                  <input
-                    type="text"
-                    placeholder="City"
-                    value={formData.city}
-                    maxLength={50}
-                    onChange={(e) => handleChange("city", e.target.value)}
-                    onBlur={() => handleBlur("city")}
-                  />
-                  <FieldError msg={errors.city} />
-                </div>
-
-                <div className={`emp-field ${isFieldErr("state") ? "has-error" : ""}`}>
-                  <label>State</label>
-                  <input
-                    type="text"
-                    placeholder="State"
-                    value={formData.state}
-                    maxLength={50}
-                    onChange={(e) => handleChange("state", e.target.value)}
-                    onBlur={() => handleBlur("state")}
-                  />
-                  <FieldError msg={errors.state} />
-                </div>
-
-                <div className={`emp-field ${isFieldErr("country") ? "has-error" : ""}`}>
-                  <label>Country</label>
-                  <input
-                    type="text"
-                    placeholder="Country"
-                    value={formData.country}
-                    maxLength={50}
-                    onChange={(e) => handleChange("country", e.target.value)}
-                    onBlur={() => handleBlur("country")}
-                  />
-                  <FieldError msg={errors.country} />
-                </div>
-
-                <div className={`emp-field ${isFieldErr("pincode") ? "has-error" : ""}`}>
-                  <label>Pincode</label>
-                  <input
-                    type="text"
-                    placeholder="6-digit pincode"
-                    value={formData.pincode}
-                    maxLength={6}
-                    onChange={(e) => handleChange("pincode", e.target.value.replace(/\D/g, ""))}
-                    onBlur={() => handleBlur("pincode")}
-                  />
-                  <FieldError msg={errors.pincode} />
-                  <small className="emp-hint-text">6-digit Indian pincode</small>
-                </div>
+              {/* Form Actions */}
+              <div className="emp-form-actions">
+                <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView('list'); }}>
+                  Cancel
+                </button>
+                <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  {submitting
+                    ? <><span className="emp-spinner" /> {editMode ? 'Updating…' : 'Creating…'}</>
+                    : <><FaSave size={12} /> {editMode ? 'Update Branch' : 'Create Branch'}</>
+                  }
+                </button>
               </div>
-            </div>
+            </form>
+          </div>
+        )}
 
-            <div className="emp-form-footer">
-              <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView("list"); }}>Cancel</button>
-              <button type="submit" className="emp-submit-btn" disabled={submitting}>
-                {submitting ? <><span className="emp-spinner" /> {editMode ? "Updating…" : "Creating…"}</> : <><FaSave size={12} /> {editMode ? "Update Branch" : "Create Branch"}</>}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Status Confirmation Modal */}
-      {showStatusModal && (
-        <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
-          <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="emp-modal-icon">{statusAction.newStatus === "y" ? "✅" : "⛔"}</div>
-            <h3 className="emp-modal-title">Confirm Status Change</h3>
-            <p className="emp-modal-body">
-              Are you sure you want to <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
-              <strong>{statusAction.name}</strong>?
-            </p>
-            <p className="emp-modal-warn">
-              {statusAction.newStatus === "n"
-                ? "Inactive branches cannot be edited until reactivated."
-                : "Active branches will be available for selection."}
-            </p>
-            <div className="emp-modal-actions">
-              <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>Cancel</button>
-              <button className="emp-modal-confirm" onClick={confirmStatusChange}>Confirm</button>
+        {/* Status Confirmation Modal */}
+        {showStatusModal && (
+          <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
+            <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="emp-modal-icon">{statusAction.newStatus === "y" ? "✅" : "⛔"}</div>
+              <h3 className="emp-modal-title">Confirm Status Change</h3>
+              <p className="emp-modal-body">
+                Are you sure you want to <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
+                <strong>{statusAction.name}</strong>?
+              </p>
+              <p className="emp-modal-warn">
+                {statusAction.newStatus === "n"
+                  ? "Inactive branches cannot be edited until reactivated."
+                  : "Active branches will be available for selection."}
+              </p>
+              <div className="emp-modal-actions">
+                <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>Cancel</button>
+                <button className="emp-modal-confirm" onClick={confirmStatusChange}>Confirm</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 };
 

@@ -67,7 +67,6 @@ const Department = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchName, setSearchName] = useState("");
@@ -80,11 +79,9 @@ const Department = () => {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  // For branch dropdown
   const [branches, setBranches] = useState([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
 
-  // Auth
   const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
   const axiosConfig = {
     headers: {
@@ -102,7 +99,6 @@ const Department = () => {
     return true;
   };
 
-  // Fetch branches for dropdown
   const fetchBranches = async () => {
     setLoadingBranches(true);
     try {
@@ -118,7 +114,6 @@ const Department = () => {
     }
   };
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(searchName);
@@ -127,7 +122,6 @@ const Department = () => {
     return () => clearTimeout(t);
   }, [searchName]);
 
-  // Fetch departments
   const fetchDepartments = useCallback(async () => {
     if (!ensureToken()) return;
     setLoading(true);
@@ -160,7 +154,6 @@ const Department = () => {
     fetchBranches();
   }, [fetchDepartments]);
 
-  // Filter & pagination
   const filteredDepartments = departments.filter((d) =>
     d.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
     d.deptCode?.toLowerCase().includes(debouncedSearch.toLowerCase())
@@ -170,7 +163,6 @@ const Department = () => {
   const startIndex = page * rowsPerPage;
   const currentDepartments = filteredDepartments.slice(startIndex, startIndex + rowsPerPage);
 
-  // Form handlers
   const handleChange = (field, value) => {
     if (field === "deptCode") value = value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
     const updated = { ...formData, [field]: value };
@@ -193,12 +185,10 @@ const Department = () => {
     setSelectedDepartment(null);
   };
 
-  // Create / Update
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!ensureToken()) return;
 
-    // Validate all fields
     const errCode = validate("deptCode", formData.deptCode);
     const errName = validate("name", formData.name);
     const errBranch = validate("branchId", formData.branchId);
@@ -254,7 +244,6 @@ const Department = () => {
     }
   };
 
-  // Edit department
   const handleEdit = (dept) => {
     if (dept.status !== "y") {
       toast.warning("Inactive", "Cannot edit an inactive department");
@@ -270,7 +259,6 @@ const Department = () => {
     setView("form");
   };
 
-  // Status toggle
   const handleStatusToggle = (id, currentStatus, name) => {
     const newStatus = currentStatus === "y" ? "n" : "y";
     setStatusAction({ id, newStatus, name });
@@ -282,11 +270,7 @@ const Department = () => {
     const { id } = statusAction;
     setLoading(true);
     try {
-      const res = await axios.put(
-        `${BASE_URL}/departments/status/${id}`,
-        null,
-        axiosConfig
-      );
+      const res = await axios.put(`${BASE_URL}/departments/status/${id}`, null, axiosConfig);
       if (res.data?.status === 200) {
         toast.success("Status Updated", "Department status changed");
         fetchDepartments();
@@ -302,7 +286,6 @@ const Department = () => {
     }
   };
 
-  // Pagination helpers
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
@@ -323,376 +306,291 @@ const Department = () => {
   const isFieldOk = (f) => touched[f] && !errors[f] && formData[f]?.trim();
   const isFieldErr = (f) => touched[f] && !!errors[f];
 
-  const handleRowsPerPageChange = (e) => {
-    setRowsPerPage(Number(e.target.value));
-    setPage(0);
-  };
-
   if (loading && view === "list" && departments.length === 0) {
     return <LoadingSpinner message="Loading departments..." />;
   }
 
   return (
-    <div className="emp-root">
-      {/* Header */}
-      <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
-        {view === "form" ? (
-          <>
-            <div>
-              <h1 className="emp-title">{editMode ? "Edit Department" : "Add Department"}</h1>
-              <p className="emp-subtitle">
-                {editMode ? "Update department information" : "Enter new department details"}
-              </p>
-            </div>
-            <button
-              className="emp-back-btn"
-              onClick={() => {
-                resetForm();
-                setView("list");
-              }}
-            >
-              <FaArrowLeft size={12} /> Back
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="emp-header-left">
+    <>
+      <div className="emp-root">
+        {/* Header */}
+        <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
+          {view === "form" ? (
+            <>
               <div>
-                <h1 className="emp-title">Department Directory</h1>
-                <p className="emp-subtitle">{totalItems} total departments</p>
+                <h1 className="emp-title">{editMode ? "Edit Department" : "Add Department"}</h1>
+                <p className="emp-subtitle">
+                  {editMode ? "Update department information" : "Enter new department details"}
+                </p>
               </div>
-            </div>
-            <button
-              className="emp-add-btn"
-              onClick={() => {
-                resetForm();
-                setView("form");
-              }}
-            >
-              <FaUserPlus size={13} /> Add Department
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* LIST VIEW */}
-      {view === "list" ? (
-        <>
-          <div className="emp-search-bar">
-            <div className="emp-search-wrap">
-              <FaSearch className="emp-search-icon" size={12} />
-              <input
-                className="emp-search-input"
-                type="text"
-                placeholder="Search by name or code…"
-                value={searchName}
-                onChange={(e) => setSearchName(e.target.value)}
-              />
-              {searchName && (
-                <button className="emp-search-clear" onClick={() => setSearchName("")}>
-                  <FaTimes size={11} />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="emp-table-card">
-            <div className="emp-table-wrap">
-              <table className="emp-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 44 }}>#</th>
-                    <th>Code</th>
-                    <th>Department Name</th>
-                    <th>Branch</th>
-                    <th style={{ width: 100 }}>Status</th>
-                    <th style={{ width: 70, textAlign: "center" }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentDepartments.length > 0 ? (
-                    currentDepartments.map((dept, idx) => (
-                      <tr key={dept.id} className="emp-row">
-                        <td className="emp-sno">{startIndex + idx + 1}</td>
-                        <td>{dept.deptCode || "—"}</td>
-                        <td>
-                          <div className="emp-name">{dept.name || "—"}</div>
-                        </td>
-                        <td>{dept.branchName || "—"}</td>
-                        <td>
-                          <div
-                            onClick={() => handleStatusToggle(dept.id, dept.status, dept.name)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                              cursor: "pointer",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "42px",
-                                height: "22px",
-                                borderRadius: "50px",
-                                backgroundColor: dept.status === "y" ? "var(--accent-indigo)" : "var(--border-medium)",
-                                position: "relative",
-                                transition: "0.2s",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "18px",
-                                  height: "18px",
-                                  borderRadius: "50%",
-                                  backgroundColor: "white",
-                                  position: "absolute",
-                                  top: "2px",
-                                  left: dept.status === "y" ? "22px" : "2px",
-                                  transition: "0.2s",
-                                  boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
-                                }}
-                              />
-                            </div>
-                            <span
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: "500",
-                                color: dept.status === "y" ? "var(--accent-indigo)" : "var(--text-muted)",
-                              }}
-                            >
-                              {dept.status === "y" ? "Active" : "Inactive"}
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="emp-actions">
-                            <button
-                              className="emp-act emp-act--edit"
-                              onClick={() => handleEdit(dept)}
-                              title={dept.status !== "y" ? "Cannot edit inactive department" : "Edit"}
-                              style={{ opacity: dept.status !== "y" ? 0.5 : 1 }}
-                              disabled={dept.status !== "y"}
-                            >
-                              <FaEdit size={12} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="6" className="emp-empty">
-                        <div className="emp-empty-inner">
-                          <span className="emp-empty-icon">🏢</span>
-                          <p>No departments found</p>
-                          <small>Try a different search or add a new department</small>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {totalItems > 0 && (
-              <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <span className="emp-page-info">
-                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} departments
-                  </span>
-                </div>
-
-                <div className="emp-page-controls">
-                  <button
-                    className="emp-page-btn"
-                    disabled={page === 0}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    ← Prev
-                  </button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === "..." ? (
-                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
-                    ) : (
-                      <button
-                        key={pg}
-                        className={`emp-page-num ${pg === page ? "active" : ""}`}
-                        onClick={() => setPage(pg)}
-                      >
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button
-                    className="emp-page-btn"
-                    disabled={page + 1 >= totalPages}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    Next →
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      ) : (
-        /* FORM VIEW - CENTERED ONE LINE */
-        <div className="emp-form-wrap">
-          <form onSubmit={handleSubmit} noValidate>
-            <div className="emp-form-section">
-              <div className="emp-section-label">Department Information</div>
-              {/* 
-                Modified grid: flex row, centered, each field takes equal width 
-                On small screens it wraps into a column
-              */}
-              <div 
-                className="emp-form-grid" 
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  justifyContent: "center",
-                  gap: "24px",
-                  maxWidth: "100%",
-                }}
-              >
-                {/* Department Code */}
-                <div
-                  className={`emp-field ${isFieldErr("deptCode") ? "has-error" : ""} ${isFieldOk("deptCode") ? "has-ok" : ""
-                    }`}
-                  style={{
-                    flex: "1 1 220px",
-                    minWidth: "200px",
-                  }}
-                >
-                  <div className="emp-label-row">
-                    <label>
-                      Department Code <span className="req">*</span>
-                    </label>
-                    <CharCount value={formData.deptCode} max={20} />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="e.g., DEPT001"
-                    value={formData.deptCode}
-                    maxLength={20}
-                    onChange={(e) => handleChange("deptCode", e.target.value)}
-                    onBlur={() => handleBlur("deptCode")}
-                  />
-                  <FieldError msg={errors.deptCode} />
-                  <small className="emp-hint-text">Uppercase letters, numbers, hyphens</small>
-                </div>
-
-                {/* Department Name */}
-                <div
-                  className={`emp-field ${isFieldErr("name") ? "has-error" : ""} ${isFieldOk("name") ? "has-ok" : ""
-                    }`}
-                  style={{
-                    flex: "1 1 220px",
-                    minWidth: "200px",
-                  }}
-                >
-                  <div className="emp-label-row">
-                    <label>
-                      Department Name <span className="req">*</span>
-                    </label>
-                    <CharCount value={formData.name} max={50} />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="e.g., IT, HR, Finance"
-                    value={formData.name}
-                    maxLength={50}
-                    onChange={(e) => handleChange("name", e.target.value)}
-                    onBlur={() => handleBlur("name")}
-                  />
-                  <FieldError msg={errors.name} />
-                  <small className="emp-hint-text">2–50 characters, letters only</small>
-                </div>
-
-                {/* Branch Dropdown */}
-                <div
-                  className={`emp-field ${isFieldErr("branchId") ? "has-error" : ""} ${isFieldOk("branchId") ? "has-ok" : ""
-                    }`}
-                  style={{
-                    flex: "1 1 220px",
-                    minWidth: "200px",
-                  }}
-                >
-                  <label>
-                    Branch <span className="req">*</span>
-                  </label>
-                  <select
-                    value={formData.branchId}
-                    onChange={(e) => handleChange("branchId", e.target.value)}
-                    onBlur={() => handleBlur("branchId")}
-                    disabled={loadingBranches}
-                  >
-                    <option value="">Select branch</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldError msg={errors.branchId} />
-                </div>
-              </div>
-            </div>
-
-            <div className="emp-form-footer">
               <button
-                type="button"
-                className="emp-cancel-btn"
+                className="emp-back-btn"
                 onClick={() => {
                   resetForm();
                   setView("list");
                 }}
               >
-                Cancel
+                <FaArrowLeft size={12} /> Back
               </button>
-              <button type="submit" className="emp-submit-btn" disabled={submitting}>
-                {submitting ? (
-                  <><span className="emp-spinner" /> {editMode ? "Updating…" : "Creating…"}</>
-                ) : (
-                  <><FaSave size={12} /> {editMode ? "Update Department" : "Create Department"}</>
-                )}
+            </>
+          ) : (
+            <>
+              <div className="emp-header-left">
+                <div>
+                  <h1 className="emp-title">Department Directory</h1>
+                  <p className="emp-subtitle">{totalItems} total departments</p>
+                </div>
+              </div>
+              <button
+                className="emp-add-btn"
+                onClick={() => {
+                  resetForm();
+                  setView("form");
+                }}
+              >
+                <FaUserPlus size={13} /> Add Department
               </button>
-            </div>
-          </form>
+            </>
+          )}
         </div>
-      )}
 
-      {/* Status Confirmation Modal */}
-      {showStatusModal && (
-        <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
-          <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="emp-modal-icon">
-              {statusAction.newStatus === "y" ? "✅" : "⛔"}
+        {/* LIST VIEW */}
+        {view === "list" ? (
+          <>
+            <div className="emp-search-bar">
+              <div className="emp-search-wrap">
+                <FaSearch className="emp-search-icon" size={12} />
+                <input
+                  className="emp-search-input"
+                  type="text"
+                  placeholder="Search by name or code…"
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                />
+                {searchName && (
+                  <button className="emp-search-clear" onClick={() => setSearchName("")}>
+                    <FaTimes size={11} />
+                  </button>
+                )}
+              </div>
             </div>
-            <h3 className="emp-modal-title">Confirm Status Change</h3>
-            <p className="emp-modal-body">
-              Are you sure you want to{" "}
-              <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
-              <strong>{statusAction.name}</strong>?
-            </p>
-            <p className="emp-modal-warn">
-              {statusAction.newStatus === "n"
-                ? "Inactive departments cannot be edited until reactivated."
-                : "Active departments will be available for selection."}
-            </p>
-            <div className="emp-modal-actions">
-              <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>
-                Cancel
-              </button>
-              <button className="emp-modal-confirm" onClick={confirmStatusChange}>
-                Confirm
-              </button>
+
+            <div className="emp-table-card">
+              <div className="emp-table-wrap">
+                <table className="emp-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 44 }}>#</th>
+                      <th>Code</th>
+                      <th>Department Name</th>
+                      <th>Branch</th>
+                      <th style={{ width: 80 }}>Status</th>
+                      <th style={{ width: 70, textAlign: "center" }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentDepartments.length > 0 ? (
+                      currentDepartments.map((dept, idx) => (
+                        <tr key={dept.id} className="emp-row">
+                          <td className="emp-sno">{startIndex + idx + 1}</td>
+                          <td>{dept.deptCode || "—"}</td>
+                          <td><div className="emp-name">{dept.name || "—"}</div></td>
+                          <td>{dept.branchName || "—"}</td>
+                          <td>
+                            <div
+                              onClick={() => handleStatusToggle(dept.id, dept.status, dept.name)}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "28px",
+                                  height: "16px",
+                                  borderRadius: "50px",
+                                  backgroundColor: dept.status === "y" ? "var(--accent-indigo)" : "var(--border-medium)",
+                                  position: "relative",
+                                  transition: "0.2s",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: "12px",
+                                    height: "12px",
+                                    borderRadius: "50%",
+                                    backgroundColor: "white",
+                                    position: "absolute",
+                                    top: "2px",
+                                    left: dept.status === "y" ? "14px" : "2px",
+                                    transition: "0.2s",
+                                    boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                                  }}
+                                />
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: "500",
+                                  color: dept.status === "y" ? "var(--accent-indigo)" : "var(--text-muted)",
+                                }}
+                              >
+                                {dept.status === "y" ? "Active" : "Inactive"}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="emp-actions">
+                              <button
+                                className="emp-act emp-act--edit"
+                                onClick={() => handleEdit(dept)}
+                                title={dept.status !== "y" ? "Cannot edit inactive department" : "Edit"}
+                                style={{ opacity: dept.status !== "y" ? 0.5 : 1 }}
+                                disabled={dept.status !== "y"}
+                              >
+                                <FaEdit size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="6" className="emp-empty">
+                          <div className="emp-empty-inner">
+                            <span className="emp-empty-icon">🏢</span>
+                            <p>No departments found</p>
+                            <small>Try a different search or add a new department</small>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalItems > 0 && (
+                <div className="emp-pagination" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <span className="emp-page-info">
+                      Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} departments
+                    </span>
+                  </div>
+                  <div className="emp-page-controls">
+                    <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                    {getPaginationRange().map((pg, i) =>
+                      pg === "..." ? (
+                        <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                      ) : (
+                        <button key={pg} className={`emp-page-num ${pg === page ? "active" : ""}`} onClick={() => setPage(pg)}>
+                          {pg + 1}
+                        </button>
+                      )
+                    )}
+                    <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          /* ========== FORM VIEW – EXACTLY LIKE BRANCH PAGE (with char counter & hint) ========== */
+          <div className="emp-form-wrap">
+            <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
+              <div className="emp-form-section-compact">
+                <div className="emp-section-label">Department Information</div>
+                <div className="emp-form-grid-3col">
+                  {/* Department Code */}
+                  <div className={`emp-field-compact ${isFieldErr('deptCode') ? 'has-error' : ''} ${isFieldOk('deptCode') ? 'has-ok' : ''}`}>
+                    <div className="emp-label-row">
+                      <label>Department Code <span className="req">*</span></label>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Department Code"
+                      value={formData.deptCode}
+                      maxLength={20}
+                      onChange={(e) => handleChange('deptCode', e.target.value)}
+                      onBlur={() => handleBlur('deptCode')}
+                    />
+                    <FieldError msg={errors.deptCode} />
+                  </div>
+
+                  {/* Department Name */}
+                  <div className={`emp-field-compact ${isFieldErr('name') ? 'has-error' : ''} ${isFieldOk('name') ? 'has-ok' : ''}`}>
+                    <div className="emp-label-row">
+                      <label>Department Name <span className="req">*</span></label>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Department Name"
+                      value={formData.name}
+                      maxLength={50}
+                      onChange={(e) => handleChange('name', e.target.value)}
+                      onBlur={() => handleBlur('name')}
+                    />
+                    <FieldError msg={errors.name} />
+                  </div>
+
+                  {/* Branch Dropdown */}
+                  <div className={`emp-field-compact ${isFieldErr('branchId') ? 'has-error' : ''} ${isFieldOk('branchId') ? 'has-ok' : ''}`}>
+                    <label>Branch <span className="req">*</span></label>
+                    <select
+                      value={formData.branchId}
+                      onChange={(e) => handleChange('branchId', e.target.value)}
+                      onBlur={() => handleBlur('branchId')}
+                      disabled={loadingBranches}
+                    >
+                      <option value="">Select branch</option>
+                      {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                    <FieldError msg={errors.branchId} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="emp-form-actions">
+                <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView('list'); }}>
+                  Cancel
+                </button>
+                <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  {submitting
+                    ? <><span className="emp-spinner" /> {editMode ? 'Updating…' : 'Creating…'}</>
+                    : <><FaSave size={12} /> {editMode ? 'Update Department' : 'Create Department'}</>
+                  }
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Status Confirmation Modal */}
+        {showStatusModal && (
+          <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
+            <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="emp-modal-icon">{statusAction.newStatus === "y" ? "✅" : "⛔"}</div>
+              <h3 className="emp-modal-title">Confirm Status Change</h3>
+              <p className="emp-modal-body">
+                Are you sure you want to <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
+                <strong>{statusAction.name}</strong>?
+              </p>
+              <p className="emp-modal-warn">
+                {statusAction.newStatus === "n"
+                  ? "Inactive departments cannot be edited until reactivated."
+                  : "Active departments will be available for selection."}
+              </p>
+              <div className="emp-modal-actions">
+                <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>Cancel</button>
+                <button className="emp-modal-confirm" onClick={confirmStatusChange}>Confirm</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 };
 
