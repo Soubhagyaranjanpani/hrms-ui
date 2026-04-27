@@ -504,7 +504,6 @@ const LeaveTypes = () => {
                       onBlur={() => handleBlur('maxDaysPerYear')}
                     />
                     <FieldError msg={errors.maxDaysPerYear} />
-                    <small className="emp-hint-text">Between 1 and 365 days</small>
                   </div>
 
                   {/* Empty third column to keep 3‑col alignment */}
@@ -513,18 +512,6 @@ const LeaveTypes = () => {
               </div>
 
               {/* Form Actions */}
-              {/* <div className="emp-form-actions">
-                <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView('list'); }}>
-                  Cancel
-                </button>
-                <button type="submit" className="emp-submit-btn" disabled={submitting}>
-                  {submitting
-                    ? <><span className="emp-spinner" /> {editMode ? 'Updating…' : 'Creating…'}</>
-                    : <><FaSave size={12} /> {editMode ? 'Update Leave Type' : 'Create Leave Type'}</>
-                  }
-                </button>
-              </div> */}
-
                <div className="emp-form-actions">
                 <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView('list'); }}>
                   Cancel
