@@ -38,11 +38,15 @@ const RULES = {
     pattern: /^[6-9]\d{9}$/,
     patternMsg: 'Enter a valid 10-digit Indian mobile number'
   },
-  address:      { required: false, maxLen: 200 },
-  branchId:     { required: true },
+  address: { required: false, maxLen: 200 },
+  branchId: { required: true },
   departmentId: { required: true },
-  roleId:       { required: true },
-  joiningDate:  { required: false }
+  roleId: { required: true },
+  gradeId: { required: false },
+  joiningDate: { required: false },
+  bankAccount: { required: false, pattern: /^\d{9,18}$/, patternMsg: '9-18 digits only' },
+  uan: { required: false, pattern: /^\d{12}$/, patternMsg: '12 digits required' },
+  pan: { required: false, pattern: /^[A-Z]{5}[0-9]{4}[A-Z]$/, patternMsg: 'Format: ABCDE1234F' }
 };
 
 const validate = (field, value, editMode = false) => {
@@ -63,7 +67,7 @@ const validate = (field, value, editMode = false) => {
 
 const validateAll = (formData, editMode) => {
   const errors = {};
-  const fields = ['name', 'email', 'phone', 'address', 'branchId', 'departmentId', 'roleId', 'joiningDate'];
+  const fields = ['name', 'email', 'phone', 'address', 'branchId', 'departmentId', 'roleId', 'gradeId', 'joiningDate', 'bankAccount', 'uan', 'pan'];
   if (!editMode) fields.push('password');
   fields.forEach(f => {
     const err = validate(f, formData[f], editMode);
@@ -80,35 +84,25 @@ const FieldError = ({ msg }) =>
     </span>
   ) : null;
 
-const CharCount = ({ value, max }) => {
-  const len = (value || '').length;
-  const warn = len > max * 0.85;
-  return (
-    <span className="char-count" style={{ color: warn ? '#f97316' : '#8b92b8' }}>
-      {len}/{max}
-    </span>
-  );
-};
-
 /* ═══════════════════════════════════════════════════════
    Main Component
 ═══════════════════════════════════════════════════════ */
 const Employees = ({ user }) => {
-  const [view, setView]                 = useState('list');
-  const [editMode, setEditMode]         = useState(false);
+  const [view, setView] = useState('list');
+  const [editMode, setEditMode] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  const [employees, setEmployees]       = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [submitting, setSubmitting]     = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [page, setPage]                 = useState(0);
-  const [size]                          = useState(5);
-  const [totalPages, setTotalPages]     = useState(0);
+  const [page, setPage] = useState(0);
+  const [size] = useState(5);
+  const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
-  const [searchName, setSearchName]     = useState('');
-  const [filterActive]                  = useState(null);
+  const [searchName, setSearchName] = useState('');
+  const [filterActive] = useState(null);
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -117,21 +111,24 @@ const Employees = ({ user }) => {
   const [formData, setFormData] = useState({
     name: '', email: '', password: '', phone: '',
     joiningDate: '', roleId: '', departmentId: '',
-    branchId: '', address: '', profilePicture: ''
+    branchId: '', gradeId: '', address: '', profilePicture: '', bankAccount: '',
+    uan: '', pan: ''
   });
-  const [errors, setErrors]   = useState({});
+  const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  const [branches, setBranches]           = useState([]);
-  const [departments, setDepartments]     = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [allDepartments, setAllDepartments] = useState([]);
-  const [roles, setRoles]                 = useState([]);
-  const [loadingBranches, setLoadingBranches]       = useState(false);
+  const [roles, setRoles] = useState([]);
+  const [grades, setGrades] = useState([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
-  const [loadingRoles, setLoadingRoles]             = useState(false);
+  const [loadingRoles, setLoadingRoles] = useState(false);
+  const [loadingGrades, setLoadingGrades] = useState(false);
 
   const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
-  const axiosConfig  = {
+  const axiosConfig = {
     headers: {
       Authorization: `Bearer ${getAuthToken()}`,
       'Content-Type': 'application/json'
@@ -153,7 +150,6 @@ const Employees = ({ user }) => {
       if (filterActive !== null) url += `&isActive=${filterActive}`;
       const res = await axios.get(url, axiosConfig);
       if (res.data?.status === 200 && res.data?.response) {
-        // Clean the employee names to remove "null" string
         const cleanedEmployees = (res.data.response.content || []).map(emp => ({
           ...emp,
           name: cleanName(emp.name)
@@ -168,15 +164,12 @@ const Employees = ({ user }) => {
     } finally { setLoading(false); }
   }, [page, size, debouncedSearch, filterActive]);
 
-  // Function to clean name by removing "null" string
   const cleanName = (name) => {
     if (!name) return '';
-    // Remove "null" string (case insensitive) from the name
     let cleaned = name.replace(/\s+null\s*/gi, ' ').replace(/\s+null$/i, '');
     cleaned = cleaned.replace(/^null\s+/i, '');
-    // Trim extra spaces
     cleaned = cleaned.trim();
-    return cleaned || name; // Return cleaned name or original if cleaning removed everything
+    return cleaned || name;
   };
 
   const fetchBranches = async () => {
@@ -209,13 +202,24 @@ const Employees = ({ user }) => {
     finally { setLoadingRoles(false); }
   };
 
+  const fetchGrades = async () => {
+    setLoadingGrades(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/api/grades`, axiosConfig);
+      if (res.data?.status === 200) {
+        setGrades(res.data.response || []);
+      }
+    } catch { toast.error('Error', 'Failed to fetch grades'); }
+    finally { setLoadingGrades(false); }
+  };
+
   const filterDepartmentsByBranch = (branchId) => {
     if (!branchId) { setDepartments(allDepartments); return; }
     setDepartments(allDepartments.filter(d => d.branchId === parseInt(branchId)));
   };
 
   useEffect(() => {
-    fetchEmployees(); fetchBranches(); fetchRoles(); fetchAllDepartments();
+    fetchEmployees(); fetchBranches(); fetchRoles(); fetchAllDepartments(); fetchGrades();
   }, []);
   useEffect(() => {
     if (view === 'list') fetchEmployees();
@@ -225,6 +229,7 @@ const Employees = ({ user }) => {
   const handleChange = (field, value) => {
     if (field === 'phone') value = value.replace(/\D/g, '').slice(0, 10);
     if (field === 'name' && /\d/.test(value)) return;
+    if (field === 'pan') value = value.toUpperCase();
 
     const updated = { ...formData, [field]: value };
     setFormData(updated);
@@ -242,56 +247,106 @@ const Employees = ({ user }) => {
     const updated = { ...formData, branchId, departmentId: '' };
     setFormData(updated);
     filterDepartmentsByBranch(branchId);
-    if (touched.branchId)     setErrors(prev => ({ ...prev, branchId: validate('branchId', branchId) }));
+    if (touched.branchId) setErrors(prev => ({ ...prev, branchId: validate('branchId', branchId) }));
     if (touched.departmentId) setErrors(prev => ({ ...prev, departmentId: 'This field is required' }));
   };
 
   /* ─── Submit ─── */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const allFields = ['name','email','phone','password','branchId','departmentId','roleId','joiningDate','address'];
+
+    const allFields = [
+      'name', 'email', 'phone', 'password',
+      'branchId', 'departmentId', 'roleId', 'gradeId',
+      'joiningDate', 'address',
+      'bankAccount', 'uan', 'pan'
+    ];
+
     setTouched(allFields.reduce((a, f) => ({ ...a, [f]: true }), {}));
+
     const errs = validateAll(formData, editMode);
     setErrors(errs);
+
     if (Object.keys(errs).length > 0) {
       toast.warning('Validation Error', 'Please fix the highlighted fields');
       return;
     }
+
     setSubmitting(true);
+
     try {
       if (editMode) {
-        const res = await axios.put(`${BASE_URL}/api/employees/${selectedEmployee.id}`, {
-          name: formData.name.trim(), email: formData.email.trim(),
-          phone: formData.phone, joiningDate: formData.joiningDate,
-          roleId: parseInt(formData.roleId), departmentId: parseInt(formData.departmentId),
-          branchId: parseInt(formData.branchId), address: formData.address.trim(),
-          profilePicture: formData.profilePicture
-        }, axiosConfig);
+        const res = await axios.put(
+          `${BASE_URL}/api/employees/${selectedEmployee.id}`,
+          {
+            name: formData.name.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone,
+            joiningDate: formData.joiningDate,
+            roleId: parseInt(formData.roleId),
+            departmentId: parseInt(formData.departmentId),
+            branchId: parseInt(formData.branchId),
+            gradeId: formData.gradeId ? parseInt(formData.gradeId) : null,
+            address: formData.address.trim(),
+            profilePicture: formData.profilePicture,
+            bankAccount: formData.bankAccount,
+            uan: formData.uan,
+            pan: formData.pan
+          },
+          axiosConfig
+        );
+
         if (res.data?.status === 200) {
           toast.success('Success', 'Employee updated successfully');
-          resetForm(); setView('list'); fetchEmployees();
-        } else { toast.error('Error', res.data?.message || 'Failed to update'); }
+          resetForm();
+          setView('list');
+          fetchEmployees();
+        } else {
+          toast.error('Error', res.data?.message || 'Failed to update');
+        }
+
       } else {
-        const res = await axios.post(`${BASE_URL}/api/employees/create`, {
-          email: formData.email.trim(), password: formData.password,
-          name: formData.name.trim(), phone: formData.phone,
-          joiningDate: formData.joiningDate, roleId: parseInt(formData.roleId),
-          departmentId: parseInt(formData.departmentId), branchId: parseInt(formData.branchId),
-          address: formData.address.trim(), profilePicture: formData.profilePicture
-        }, axiosConfig);
+        const res = await axios.post(
+          `${BASE_URL}/api/employees/create`,
+          {
+            email: formData.email.trim(),
+            password: formData.password,
+            name: formData.name.trim(),
+            phone: formData.phone,
+            joiningDate: formData.joiningDate,
+            roleId: parseInt(formData.roleId),
+            departmentId: parseInt(formData.departmentId),
+            branchId: parseInt(formData.branchId),
+            gradeId: formData.gradeId ? parseInt(formData.gradeId) : null,
+            address: formData.address.trim(),
+            profilePicture: formData.profilePicture,
+            bankAccount: formData.bankAccount,
+            uan: formData.uan,
+            pan: formData.pan
+          },
+          axiosConfig
+        );
+
         if (res.data?.status === 200) {
           toast.success('Success', 'Employee created successfully');
-          resetForm(); setView('list'); fetchEmployees();
-        } else { toast.error('Error', res.data?.message || 'Failed to create'); }
+          resetForm();
+          setView('list');
+          fetchEmployees();
+        } else {
+          toast.error('Error', res.data?.message || 'Failed to create');
+        }
       }
+
     } catch (err) {
       toast.error('Error', err.response?.data?.message || 'Something went wrong');
-    } finally { setSubmitting(false); }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   /* ─── Delete ─── */
   const confirmDelete = (emp) => { setEmployeeToDelete(emp); setShowDeleteModal(true); };
-  const handleDelete  = async () => {
+  const handleDelete = async () => {
     if (!employeeToDelete) return;
     try {
       const res = await axios.delete(`${BASE_URL}/api/employees/${employeeToDelete.id}`, axiosConfig);
@@ -308,8 +363,9 @@ const Employees = ({ user }) => {
     const fd = {
       name: cleanName(emp.name || ''), email: emp.email || '', password: '',
       phone: emp.phone || '', joiningDate: emp.joiningDate || '',
-      roleId: '', departmentId: '', branchId: '',
-      address: emp.address || '', profilePicture: emp.profilePicture || ''
+      roleId: '', departmentId: '', branchId: '', gradeId: '',
+      address: emp.address || '', profilePicture: emp.profilePicture || '',
+      bankAccount: emp.bankAccount || '', uan: emp.uan || '', pan: emp.pan || ''
     };
     if (emp.branchName) {
       const branch = branches.find(b => b.name === emp.branchName);
@@ -323,12 +379,20 @@ const Employees = ({ user }) => {
       const role = roles.find(r => r.name === emp.roleName);
       if (role) fd.roleId = role.id;
     }
+    if (emp.gradeId) {
+      fd.gradeId = emp.gradeId;
+    }
     setFormData(fd); setErrors({}); setTouched({});
     setEditMode(true); setView('form');
   };
 
   const resetForm = () => {
-    setFormData({ name:'',email:'',password:'',phone:'',joiningDate:'',roleId:'',departmentId:'',branchId:'',address:'',profilePicture:'' });
+    setFormData({ 
+      name: '', email: '', password: '', phone: '', 
+      joiningDate: '', roleId: '', departmentId: '', 
+      branchId: '', gradeId: '', address: '', 
+      profilePicture: '', bankAccount: '', uan: '', pan: '' 
+    });
     setErrors({}); setTouched({});
     setEditMode(false); setSelectedEmployee(null);
   };
@@ -336,39 +400,35 @@ const Employees = ({ user }) => {
   /* ─── Helpers ─── */
   const formatDate = (d) => {
     if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+    return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  // Helper function to get initials from full name (cleaned)
   const getInitials = (fullName) => {
     if (!fullName) return '?';
     const cleanedName = cleanName(fullName);
     const nameParts = cleanedName.trim().split(/\s+/);
     if (nameParts.length === 1) {
-      // Only first name, take first character
       return nameParts[0].charAt(0).toUpperCase();
     }
-    // First name + last name initials
     const firstInitial = nameParts[0].charAt(0);
     const lastInitial = nameParts[nameParts.length - 1].charAt(0);
     return (firstInitial + lastInitial).toUpperCase();
   };
 
   const avatarColors = [
-    { bg:'#ede9fe', color:'#5b21b6' }, { bg:'#fff0e8', color:'#c2410c' },
-    { bg:'#d1fae5', color:'#065f46' }, { bg:'#fef3c7', color:'#92400e' },
-    { bg:'#e0e7ff', color:'#3730a3' }, { bg:'#fce7f3', color:'#9d174d' },
+    { bg: '#ede9fe', color: '#5b21b6' }, { bg: '#fff0e8', color: '#c2410c' },
+    { bg: '#d1fae5', color: '#065f46' }, { bg: '#fef3c7', color: '#92400e' },
+    { bg: '#e0e7ff', color: '#3730a3' }, { bg: '#fce7f3', color: '#9d174d' },
   ];
   const getAvatarColor = (name = '') => avatarColors[(name.charCodeAt(0) || 0) % avatarColors.length];
 
-  const isFieldOk  = (f) => touched[f] && !errors[f] && (typeof formData[f] === 'string' ? formData[f].trim() : formData[f]);
+  const isFieldOk = (f) => touched[f] && !errors[f] && (typeof formData[f] === 'string' ? formData[f].trim() : formData[f]);
   const isFieldErr = (f) => touched[f] && !!errors[f];
 
-  /* ─── Pagination range with ellipsis ─── */
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
-    const left  = Math.max(0, page - delta);
+    const left = Math.max(0, page - delta);
     const right = Math.min(totalPages - 1, page + delta);
     if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
     for (let i = left; i <= right; i++) range.push(i);
@@ -380,45 +440,33 @@ const Employees = ({ user }) => {
     return <LoadingSpinner message="Loading employees..." />;
   }
 
-  /* ════════════════════════════════════════════════
-     RENDER
-  ════════════════════════════════════════════════ */
   return (
     <div className="emp-root">
-
-      {/* ── Header ── */}
-      <div className="emp-header" style={view === 'form' ? { justifyContent: 'space-between' } : {}}>
+      <div className="emp-header">
+        <div>
+          <h1 className="emp-title">
+            {view === 'form' ? (editMode ? 'Edit Employee' : 'Add Employee') : 'Employee Directory'}
+          </h1>
+          <p className="emp-subtitle">
+            {view === 'form' 
+              ? (editMode ? 'Update employee information' : 'Enter new employee details')
+              : `${totalElements} total employees`
+            }
+          </p>
+        </div>
         {view === 'form' ? (
-          // Form view: title on left, back button on right
-          <>
-            <div>
-              <h1 className="emp-title">{editMode ? 'Edit Employee' : 'Add Employee'}</h1>
-              <p className="emp-subtitle">{editMode ? 'Update employee information' : 'Enter new employee details'}</p>
-            </div>
-            <button className="emp-back-btn" onClick={() => { setView('list'); resetForm(); }}>
-              <FaArrowLeft size={12} /> Back
-            </button>
-          </>
+          <button className="emp-back-btn" onClick={() => { setView('list'); resetForm(); }}>
+            <FaArrowLeft size={12} /> Back
+          </button>
         ) : (
-          // List view: original layout
-          <>
-            <div className="emp-header-left">
-              <div>
-                <h1 className="emp-title">Employee Directory</h1>
-                <p className="emp-subtitle">{totalElements} total employees</p>
-              </div>
-            </div>
-            <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
-              <FaUserPlus size={13} /> Add Employee
-            </button>
-          </>
+          <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
+            <FaUserPlus size={13} /> Add Employee
+          </button>
         )}
       </div>
 
-      {/* ════════════ LIST VIEW ════════════ */}
       {view === 'list' ? (
         <>
-          {/* Search */}
           <div className="emp-search-bar">
             <div className="emp-search-wrap">
               <FaSearch className="emp-search-icon" size={12} />
@@ -437,39 +485,36 @@ const Employees = ({ user }) => {
             </div>
           </div>
 
-          {/* Table */}
           <div className="emp-table-card">
             <div className="emp-table-wrap">
               <table className="emp-table">
                 <thead>
                   <tr>
-                    <th style={{ width:44 }}>#</th>
+                    <th style={{ width: 44 }}>#</th>
                     <th>Employee</th>
                     <th>Department</th>
                     <th>Role</th>
                     <th>Branch</th>
                     <th>Joined</th>
-                    <th style={{ width:80, textAlign:'center' }}>Actions</th>
+                    <th style={{ width: 80, textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {employees.length > 0 ? employees.map((emp, idx) => {
                     const cleanedName = cleanName(emp.name);
                     const ac = getAvatarColor(cleanedName);
-                    // Get initials properly from cleaned name
                     const initials = getInitials(cleanedName);
                     return (
                       <tr key={emp.id} className="emp-row">
                         <td className="emp-sno">{page * size + idx + 1}</td>
                         <td>
                           <div className="emp-info-cell">
-                            <div className="emp-avatar" style={{ background:ac.bg, color:ac.color }}>
+                            <div className="emp-avatar" style={{ background: ac.bg, color: ac.color }}>
                               {initials}
                             </div>
                             <div>
                               <div className="emp-name">{cleanedName || '—'}</div>
                               <div className="emp-email">{emp.email}</div>
-                              {/* {emp.phone && <div className="emp-phone">{emp.phone}</div>} */}
                             </div>
                           </div>
                         </td>
@@ -512,7 +557,6 @@ const Employees = ({ user }) => {
               </table>
             </div>
 
-            {/* ── Pagination ── */}
             {totalPages > 1 && (
               <div className="emp-pagination">
                 <span className="emp-page-info">
@@ -554,22 +598,15 @@ const Employees = ({ user }) => {
           </div>
         </>
       ) : (
-
-        /* ════════════ FORM VIEW ════════════ */
         <div className="emp-form-wrap">
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
 
-            {/* Personal Information */}
-            <div className="emp-form-section">
+            <div className="emp-form-section-compact">
               <div className="emp-section-label">Personal Information</div>
-              <div className="emp-form-grid">
-
-                {/* Full Name */}
-                <div className={`emp-field ${isFieldErr('name')?'has-error':''} ${isFieldOk('name')?'has-ok':''}`}>
-                  <div className="emp-label-row">
-                    <label>Full Name <span className="req">*</span></label>
-                    <CharCount value={formData.name} max={50} />
-                  </div>
+              <div className="emp-form-grid-3col">
+                
+                <div className={`emp-field-compact ${isFieldErr('name') ? 'has-error' : ''} ${isFieldOk('name') ? 'has-ok' : ''}`}>
+                  <label>Full Name <span className="req">*</span></label>
                   <input
                     type="text"
                     placeholder="Enter full name"
@@ -579,15 +616,10 @@ const Employees = ({ user }) => {
                     onBlur={() => handleBlur('name')}
                   />
                   <FieldError msg={errors.name} />
-                  <small className="emp-hint-text">2–50 characters, letters only</small>
                 </div>
 
-                {/* Email */}
-                <div className={`emp-field ${isFieldErr('email')?'has-error':''} ${isFieldOk('email')?'has-ok':''}`}>
-                  <div className="emp-label-row">
-                    <label>Email Address <span className="req">*</span></label>
-                    <CharCount value={formData.email} max={100} />
-                  </div>
+                <div className={`emp-field-compact ${isFieldErr('email') ? 'has-error' : ''} ${isFieldOk('email') ? 'has-ok' : ''}`}>
+                  <label>Email <span className="req">*</span></label>
                   <input
                     type="email"
                     placeholder="example@company.com"
@@ -596,21 +628,13 @@ const Employees = ({ user }) => {
                     onChange={(e) => handleChange('email', e.target.value)}
                     onBlur={() => handleBlur('email')}
                     disabled={editMode}
-                    style={editMode ? { opacity:0.6, cursor:'not-allowed' } : {}}
                   />
-                  {editMode
-                    ? <small className="emp-hint-text">Email cannot be changed after creation</small>
-                    : <FieldError msg={errors.email} />
-                  }
+                  <FieldError msg={errors.email} />
                 </div>
 
-                {/* Password — create only */}
                 {!editMode && (
-                  <div className={`emp-field ${isFieldErr('password')?'has-error':''} ${isFieldOk('password')?'has-ok':''}`}>
-                    <div className="emp-label-row">
-                      <label>Password <span className="req">*</span></label>
-                      <CharCount value={formData.password} max={32} />
-                    </div>
+                  <div className={`emp-field-compact ${isFieldErr('password') ? 'has-error' : ''} ${isFieldOk('password') ? 'has-ok' : ''}`}>
+                    <label>Password <span className="req">*</span></label>
                     <input
                       type="password"
                       placeholder="Min 6 chars, letters + numbers"
@@ -620,41 +644,68 @@ const Employees = ({ user }) => {
                       onBlur={() => handleBlur('password')}
                     />
                     <FieldError msg={errors.password} />
-                    <small className="emp-hint-text">6–32 characters, must include a letter and a number</small>
                   </div>
                 )}
 
-                {/* Phone */}
-                <div className={`emp-field ${isFieldErr('phone')?'has-error':''} ${isFieldOk('phone')?'has-ok':''}`}>
-                  <div className="emp-label-row">
-                    <label>Phone Number</label>
-                    <span className="char-count" style={{ color: formData.phone.length === 10 ? '#10b981' : '#8b92b8' }}>
-                      {formData.phone.length}/10
-                    </span>
-                  </div>
+                <div className={`emp-field-compact ${isFieldErr('phone') ? 'has-error' : ''} ${isFieldOk('phone') ? 'has-ok' : ''}`}>
+                  <label>Phone</label>
                   <input
                     type="tel"
-                    placeholder="10-digit mobile number"
+                    placeholder="10-digit mobile"
                     value={formData.phone}
                     maxLength={10}
                     onChange={(e) => handleChange('phone', e.target.value)}
                     onBlur={() => handleBlur('phone')}
                   />
                   <FieldError msg={errors.phone} />
-                  <small className="emp-hint-text">Indian mobile number starting with 6–9</small>
+                </div>
+
+                <div className={`emp-field-compact ${isFieldErr('bankAccount') ? 'has-error' : ''} ${isFieldOk('bankAccount') ? 'has-ok' : ''}`}>
+                  <label>Bank Account</label>
+                  <input
+                    type="text"
+                    placeholder="Account number"
+                    value={formData.bankAccount}
+                    maxLength={20}
+                    onChange={(e) => handleChange('bankAccount', e.target.value)}
+                    onBlur={() => handleBlur('bankAccount')}
+                  />
+                  <FieldError msg={errors.bankAccount} />
+                </div>
+
+                <div className={`emp-field-compact ${isFieldErr('uan') ? 'has-error' : ''} ${isFieldOk('uan') ? 'has-ok' : ''}`}>
+                  <label>UAN</label>
+                  <input
+                    type="text"
+                    placeholder="12-digit UAN"
+                    value={formData.uan}
+                    maxLength={12}
+                    onChange={(e) => handleChange('uan', e.target.value)}
+                    onBlur={() => handleBlur('uan')}
+                  />
+                  <FieldError msg={errors.uan} />
+                </div>
+
+                <div className={`emp-field-compact ${isFieldErr('pan') ? 'has-error' : ''} ${isFieldOk('pan') ? 'has-ok' : ''}`}>
+                  <label>PAN</label>
+                  <input
+                    type="text"
+                    placeholder="ABCDE1234F"
+                    value={formData.pan}
+                    maxLength={10}
+                    onChange={(e) => handleChange('pan', e.target.value)}
+                    onBlur={() => handleBlur('pan')}
+                  />
+                  <FieldError msg={errors.pan} />
                 </div>
               </div>
             </div>
 
-            <div className="emp-divider" />
-
-            {/* Work Details */}
-            <div className="emp-form-section">
+            <div className="emp-form-section-compact">
               <div className="emp-section-label">Work Details</div>
-              <div className="emp-form-grid">
-
-                {/* Branch */}
-                <div className={`emp-field ${isFieldErr('branchId')?'has-error':''} ${isFieldOk('branchId')?'has-ok':''}`}>
+              <div className="emp-form-grid-3col">
+                
+                <div className={`emp-field-compact ${isFieldErr('branchId') ? 'has-error' : ''} ${isFieldOk('branchId') ? 'has-ok' : ''}`}>
                   <label>Branch <span className="req">*</span></label>
                   <select
                     value={formData.branchId}
@@ -668,8 +719,7 @@ const Employees = ({ user }) => {
                   <FieldError msg={errors.branchId} />
                 </div>
 
-                {/* Department */}
-                <div className={`emp-field ${isFieldErr('departmentId')?'has-error':''} ${isFieldOk('departmentId')?'has-ok':''}`}>
+                <div className={`emp-field-compact ${isFieldErr('departmentId') ? 'has-error' : ''} ${isFieldOk('departmentId') ? 'has-ok' : ''}`}>
                   <label>Department <span className="req">*</span></label>
                   <select
                     value={formData.departmentId}
@@ -683,8 +733,7 @@ const Employees = ({ user }) => {
                   <FieldError msg={errors.departmentId} />
                 </div>
 
-                {/* Role */}
-                <div className={`emp-field ${isFieldErr('roleId')?'has-error':''} ${isFieldOk('roleId')?'has-ok':''}`}>
+                <div className={`emp-field-compact ${isFieldErr('roleId') ? 'has-error' : ''} ${isFieldOk('roleId') ? 'has-ok' : ''}`}>
                   <label>Role <span className="req">*</span></label>
                   <select
                     value={formData.roleId}
@@ -698,8 +747,23 @@ const Employees = ({ user }) => {
                   <FieldError msg={errors.roleId} />
                 </div>
 
-                {/* Joining Date */}
-                <div className="emp-field">
+                <div className={`emp-field-compact ${isFieldErr('gradeId') ? 'has-error' : ''} ${isFieldOk('gradeId') ? 'has-ok' : ''}`}>
+                  <label>Grade</label>
+                  <select
+                    value={formData.gradeId}
+                    onChange={(e) => handleChange('gradeId', e.target.value)}
+                    onBlur={() => handleBlur('gradeId')}
+                    disabled={loadingGrades}
+                  >
+                    <option value="">Select grade (optional)</option>
+                    {grades.map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                  <FieldError msg={errors.gradeId} />
+                </div>
+
+                <div className="emp-field-compact">
                   <label>Joining Date</label>
                   <input
                     type="date"
@@ -707,24 +771,16 @@ const Employees = ({ user }) => {
                     max={new Date().toISOString().split('T')[0]}
                     onChange={(e) => handleChange('joiningDate', e.target.value)}
                   />
-                  <small className="emp-hint-text">Cannot be a future date</small>
                 </div>
               </div>
             </div>
 
-            <div className="emp-divider" />
-
-            {/* Address */}
-            <div className="emp-form-section">
-              <div className="emp-section-label">Additional Info</div>
-              <div className={`emp-field ${isFieldErr('address')?'has-error':''}`} style={{ maxWidth:'100%' }}>
-                <div className="emp-label-row">
-                  <label>Address</label>
-                  <CharCount value={formData.address} max={200} />
-                </div>
+            <div className="emp-form-section-compact">
+              <div className="emp-section-label">Address (Optional)</div>
+              <div className={`emp-field-compact-full ${isFieldErr('address') ? 'has-error' : ''}`}>
                 <textarea
-                  rows={3}
-                  placeholder="Enter address (optional)"
+                  rows={2}
+                  placeholder="Enter address"
                   value={formData.address}
                   maxLength={200}
                   onChange={(e) => handleChange('address', e.target.value)}
@@ -734,15 +790,14 @@ const Employees = ({ user }) => {
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="emp-form-footer">
+            <div className="emp-form-actions">
               <button type="button" className="emp-cancel-btn" onClick={() => { setView('list'); resetForm(); }}>
                 Cancel
               </button>
               <button type="submit" className="emp-submit-btn" disabled={submitting}>
                 {submitting
                   ? <><span className="emp-spinner" /> {editMode ? 'Updating…' : 'Creating…'}</>
-                  : <><FaSave size={12} /> {editMode ? 'Update Employee' : 'Create Employee'}</>
+                  : <><FaSave size={12} /> {editMode ? 'Update' : 'Create'}</>
                 }
               </button>
             </div>
@@ -750,7 +805,6 @@ const Employees = ({ user }) => {
         </div>
       )}
 
-      {/* ── Delete Modal ── */}
       {showDeleteModal && employeeToDelete && (
         <div className="emp-modal-overlay" onClick={() => setShowDeleteModal(false)}>
           <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
@@ -767,8 +821,6 @@ const Employees = ({ user }) => {
           </div>
         </div>
       )}
-
-      
     </div>
   );
 };

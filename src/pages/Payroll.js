@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   FaSearch, FaEdit, FaSave, FaTimes, FaArrowLeft,
   FaPlus, FaEye, FaDownload, FaCheckCircle, FaClock,
   FaRupeeSign, FaExclamationCircle, FaCheck, FaPrint,
-  FaPaperPlane, FaBan,
+  FaPaperPlane, FaBan, FaChevronLeft, FaChevronRight,
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -300,7 +299,6 @@ const ProcessModal = ({ yearMonth, payroll, onClose, onDone, axiosConfig }) => {
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════ */
 export default function PayrollRun({ user }) {
-  const navigate = useNavigate();
 
   const [view, setView] = useState('list');
   const [editMode, setEditMode] = useState(false);
@@ -326,6 +324,10 @@ export default function PayrollRun({ user }) {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
+  // 🔥 PAGINATION
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 5;
+
   const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
   const axiosConfig = { headers: { Authorization: `Bearer ${getAuthToken()}`, 'Content-Type': 'application/json' } };
 
@@ -343,6 +345,10 @@ export default function PayrollRun({ user }) {
       setPayroll(Array.isArray(arr) ? arr : []);
       setMonths(Array.isArray(mArr) && mArr.length ? mArr : [month]);
       setSelectedRecords(new Set());
+      // Auto-switch to first available month if current month is empty
+      if (arr.length === 0 && Array.isArray(mArr) && mArr.length > 0 && month !== mArr[0]) {
+        setSelectedMonth(mArr[0]);
+      }
     } catch (err) {
       toast.error('Error', err.response?.data?.message || 'Failed to load payroll');
       setPayroll([]);
@@ -357,6 +363,11 @@ export default function PayrollRun({ user }) {
       || (p.department || '').toLowerCase().includes(search.toLowerCase());
     return byStatus && bySearch;
   });
+
+  // 🔥 PAGINATION LOGIC
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginatedData = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
 
   const counts = { DRAFT: 0, PENDING: 0, APPROVED: 0, PROCESSED: 0 };
   payroll.forEach(p => { if (counts[p.status] !== undefined) counts[p.status]++; });
@@ -647,12 +658,12 @@ export default function PayrollRun({ user }) {
               <th style={{ width: 44 }}>#</th><th>Employee</th><th>Department</th><th>Working / LOP</th><th>Gross</th><th>Deductions</th><th>Net Salary</th><th>Status</th><th style={{ width: 100, textAlign: 'center' }}>Actions</th>
             </tr></thead>
             <tbody>
-              {filtered.length > 0 ? filtered.map((p, idx) => {
+              {paginatedData.length > 0 ? paginatedData.map((p, idx) => {
                 const name = cleanName(p.employee); const ac = getAvatarColor(name); const isSelected = selectedRecords.has(p.id);
                 return (
                   <tr key={p.id} className="emp-row" style={{ background: isSelected ? '#f5f3ff' : undefined }}>
                     <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={isSelected} onChange={() => toggleSelect(p.id)} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--accent-indigo)' }} /></td>
-                    <td className="emp-sno" onClick={() => setPayslipRecord(p)}>{idx + 1}</td>
+                    <td className="emp-sno" onClick={() => setPayslipRecord(p)}>{(currentPage - 1) * PAGE_SIZE + idx + 1}</td>
                     <td onClick={() => setPayslipRecord(p)}><div className="emp-info-cell"><div className="emp-avatar" style={{ background: ac.bg, color: ac.color }}>{getInitials(name)}</div><div><div className="emp-name">{name || '—'}</div><div className="emp-email">{p.employeeCode}</div></div></div></td>
                     <td onClick={() => setPayslipRecord(p)}>{p.department ? <span className="emp-pill emp-pill--indigo">{p.department}</span> : <span className="emp-dash">—</span>}</td>
                     <td onClick={() => setPayslipRecord(p)} style={{ fontSize: 13 }}><span style={{ fontWeight: 600 }}>{p.paidDays || 0}/{p.workingDays || 0}</span>{(p.lopDays || 0) > 0 && <span style={{ marginLeft: 6, fontSize: 10, background: '#fee2e2', color: '#991b1b', padding: '1px 6px', borderRadius: 10, fontWeight: 600 }}>LOP: {p.lopDays}</span>}</td>
@@ -670,6 +681,29 @@ export default function PayrollRun({ user }) {
               }) : <tr><td colSpan="10" className="emp-empty"><div className="emp-empty-inner"><span className="emp-empty-icon"><FaRupeeSign /></span><p>No records found</p><small>{payroll.length === 0 ? 'Click "Generate Records" to create payroll.' : 'Try adjusting your filters.'}</small></div></td></tr>}
             </tbody>
           </table></div></div>
+
+          {/* 🔥 PAGINATION CONTROLS */}
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16 }}>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                style={{ padding: '6px 12px', border: '1px solid var(--border-medium)', borderRadius: 8, background: 'var(--bg-white)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <FaChevronLeft size={11} /> Prev
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button key={i} onClick={() => setCurrentPage(i + 1)}
+                  style={{ padding: '6px 12px', border: '1px solid var(--border-medium)', borderRadius: 8, background: currentPage === i + 1 ? 'var(--accent-indigo)' : 'var(--bg-white)', color: currentPage === i + 1 ? '#fff' : 'var(--text-primary)', cursor: 'pointer', fontWeight: currentPage === i + 1 ? 700 : 400, minWidth: 32 }}>
+                  {i + 1}
+                </button>
+              ))}
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                style={{ padding: '6px 12px', border: '1px solid var(--border-medium)', borderRadius: 8, background: 'var(--bg-white)', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                Next <FaChevronRight size={11} />
+              </button>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+                Page {currentPage} of {totalPages} ({filtered.length} records)
+              </span>
+            </div>
+          )}
 
           {selectedRecords.size > 0 && (
             <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderRadius: 40, padding: '8px 16px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: 16, zIndex: 100 }}>

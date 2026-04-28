@@ -3172,4 +3172,210 @@ h1, h2, h3, h4, h5, h6 {
             justify-content: center;
           }
         }
+
+
+        /* ══════════ Compact Form Styles ══════════ */
+.emp-form-compact {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.emp-form-section-compact {
+  margin-bottom: 16px;
+}
+
+.emp-section-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e5e7eb;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* 3-column grid for compact fields */
+.emp-form-grid-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+/* Compact field wrapper */
+.emp-field-compact {
+  position: relative;
+}
+
+.emp-field-compact label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.emp-field-compact input,
+.emp-field-compact select,
+.emp-field-compact textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  font-size: 13px;
+  transition: all 0.2s;
+  background: #fff;
+}
+
+.emp-field-compact input:focus,
+.emp-field-compact select:focus,
+.emp-field-compact textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+
+.emp-field-compact input:disabled,
+.emp-field-compact select:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Full width field */
+.emp-field-compact-full {
+  width: 100%;
+}
+
+.emp-field-compact-full textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  font-size: 13px;
+  resize: vertical;
+  min-height: 45px;
+}
+
+/* Validation states */
+.emp-field-compact.has-error input,
+.emp-field-compact.has-error select,
+.emp-field-compact.has-error textarea {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.emp-field-compact.has-ok input,
+.emp-field-compact.has-ok select,
+.emp-field-compact.has-ok textarea {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+/* Field error message */
+.field-err {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #ef4444;
+  font-size: 11px;
+  margin-top: 3px;
+}
+
+/* Required asterisk */
+.req {
+  color: #ef4444;
+}
+
+/* Form actions - more compact */
+.emp-form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.emp-cancel-btn {
+  padding: 8px 20px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.emp-cancel-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.emp-submit-btn {
+  padding: 8px 20px;
+  background: #6366f1;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.emp-submit-btn:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.emp-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Responsive: 2 columns on tablets */
+@media (max-width: 1024px) {
+  .emp-form-grid-3col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Responsive: 1 column on mobile */
+@media (max-width: 640px) {
+  .emp-form-grid-3col {
+    grid-template-columns: 1fr;
+  }
+  
+  .emp-form-actions {
+    flex-direction: column-reverse;
+  }
+  
+  .emp-cancel-btn,
+  .emp-submit-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Spinner for submit button */
+.emp-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
       

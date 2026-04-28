@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   FaUsers, FaTasks, FaRupeeSign, FaStar,
   FaUserPlus, FaLayerGroup, FaRobot, FaChevronRight, FaCircle,
@@ -16,7 +15,7 @@ const getToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
 const axiosCfg = () => ({ headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' } });
 const fmtINR   = (n) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n || 0);
 const fmtLakh  = (n) => { const v = (n || 0) / 100000; return v >= 1 ? `₹${v.toFixed(2)}L` : `₹${fmtINR(n)}`; };
-const fmtK     = (n) => { const v = (n || 0) / 1000; return v >= 1 ? `₹${v.toFixed(1)}K` : `₹${fmtINR(n)}`; };  // ← FIXED: toified → toFixed
+const fmtK     = (n) => { const v = (n || 0) / 1000; return v >= 1 ? `₹${v.toFixed(1)}K` : `₹${fmtINR(n)}`; };
 const clean    = (n) => (n || '').replace(/\s*null\s*/gi, ' ').replace(/\s+/g, ' ').trim();
 const ini      = (n) => { const p = clean(n).split(' ').filter(Boolean); return (p.length > 1 ? p[0][0] + p[p.length - 1][0] : p[0]?.[0] || '?').toUpperCase(); };
 const cap      = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase().replace(/_/g, ' ') : '';
@@ -124,206 +123,9 @@ const StatTile = ({ label, value, bg, color }) => (
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   AI INSIGHT BANNER - Independent Auto-Refresh Component
-═══════════════════════════════════════════════════════════════ */
-const AIInsightBanner = ({ initialInsight }) => {
-  const [insight, setInsight] = useState(initialInsight || '');
-  const [countdown, setCountdown] = useState(10);
-  const [refreshSecs, setRefreshSecs] = useState(10);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState('');
-  const [isEnabled, setIsEnabled] = useState(true);
-
-  // Fetch AI config from backend on mount
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const res = await axios.get(`${BASE_URL}/api/dashboard/ai-config`, axiosCfg());
-        const config = res.data?.response || res.data?.data || res.data || {};
-        if (config.refreshSeconds && config.refreshSeconds > 0) {
-          setRefreshSecs(config.refreshSeconds);
-          setCountdown(config.refreshSeconds);
-        }
-        if (config.enabled !== undefined) {
-          setIsEnabled(config.enabled);
-        }
-        if (config.lastGenerated) {
-          setLastUpdated(config.lastGenerated);
-        }
-      } catch (e) {
-        console.log('AI config fetch failed, using defaults');
-      }
-    };
-    fetchConfig();
-  }, []);
-
-  // Fetch only the AI insight (not full dashboard)
-  const fetchInsight = useCallback(async () => {
-    if (!isEnabled) return;
-    
-    setIsRefreshing(true);
-    try {
-      const r = await axios.get(`${BASE_URL}/api/dashboard/stats`, axiosCfg());
-      const data = r.data?.response || r.data?.data || r.data || {};
-      const newInsight = data.aiSummary;
-      if (newInsight && newInsight !== insight) {
-        setInsight(newInsight);
-        const now = new Date();
-        setLastUpdated(now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      }
-    } catch (e) {
-      console.log('AI insight refresh failed');
-    }
-    setIsRefreshing(false);
-  }, [insight, isEnabled]);
-
-  // Countdown timer that triggers refresh
-  useEffect(() => {
-    if (!isEnabled) return;
-    
-    const timer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          fetchInsight();
-          return refreshSecs;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [refreshSecs, fetchInsight, isEnabled]);
-
-  // Update from parent
-  useEffect(() => {
-    if (initialInsight && initialInsight !== insight) {
-      setInsight(initialInsight);
-    }
-  }, [initialInsight]);
-
-  if (!insight || !isEnabled) return null;
-
-  return (
-    <div className="a1" style={{
-      background: 'linear-gradient(135deg, #1E1B4B 0%, #2D1B69 100%)',
-      borderRadius: 12,
-      padding: '14px 20px',
-      marginBottom: 18,
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: 14,
-      border: '1px solid rgba(139,92,246,0.3)',
-      position: 'relative',
-      transition: 'opacity 0.3s ease',
-      opacity: isRefreshing ? 0.75 : 1
-    }}>
-      {/* Animated Icon */}
-      <div style={{
-        width: 36, height: 36,
-        borderRadius: 10,
-        background: isRefreshing 
-          ? 'linear-gradient(135deg, #F59E0B, #D97706)' 
-          : 'linear-gradient(135deg, #8B5CF6, #6366F1)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#fff',
-        flexShrink: 0,
-        boxShadow: isRefreshing 
-          ? '0 4px 12px rgba(245,158,11,0.4)' 
-          : '0 4px 12px rgba(139,92,246,0.4)',
-        animation: isRefreshing ? 'spin 1s linear infinite' : 'pulse 2s infinite',
-        transition: 'all 0.3s ease'
-      }}>
-        {isRefreshing ? <FaSync size={14} /> : <FaRobot size={16} />}
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Header Row */}
-        <div style={{
-          fontSize: 10, fontWeight: 700,
-          color: '#A78BFA',
-          textTransform: 'uppercase',
-          letterSpacing: '.1em',
-          marginBottom: 6,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          flexWrap: 'wrap'
-        }}>
-          <span>✨ AI-Powered Insight</span>
-          
-          {/* LIVE Badge */}
-          <span style={{
-            background: 'rgba(16,185,129,0.2)',
-            color: '#34d399',
-            padding: '2px 8px',
-            borderRadius: 4,
-            fontSize: 8,
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4
-          }}>
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#34d399', animation: 'pulse 1.5s infinite' }} />
-            LIVE
-          </span>
-
-          {/* Countdown */}
-          <span style={{ 
-            marginLeft: 'auto', 
-            fontSize: 9, 
-            color: '#6B7280', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 5 
-          }}>
-            <FaClock size={9} />
-            Next update in {countdown}s
-          </span>
-        </div>
-
-        {/* Insight Text */}
-        <div style={{ 
-          fontSize: 13.5, 
-          color: '#E0E7FF', 
-          lineHeight: 1.6, 
-          fontWeight: 500,
-          transition: 'opacity 0.3s ease'
-        }}>
-          {insight}
-        </div>
-
-        {/* Footer Info */}
-        <div style={{ 
-          fontSize: 9, 
-          color: '#6B7280', 
-          marginTop: 8, 
-          display: 'flex', 
-          gap: 14,
-          flexWrap: 'wrap'
-        }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            🤖 Powered by Ari AI
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            📊 Real-time data analysis
-          </span>
-          {lastUpdated && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              🕐 Updated {lastUpdated}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════════════════════════
    MAIN DASHBOARD
 ═══════════════════════════════════════════════════════════════ */
 export default function Dashboard({ user }) {
-  const navigate = useNavigate();
   const cu = user || getUser();
 
   const [d, setD]   = useState(null);
@@ -445,6 +247,11 @@ export default function Dashboard({ user }) {
     },
   ];
 
+  // Navigation helper (replaces useNavigate)
+  const navigate = (path) => {
+    window.location.href = path;
+  };
+
   return (
     <div style={{ padding: '20px 24px', background: C.bg, minHeight: '100vh', fontFamily: "'Inter','DM Sans',sans-serif", fontSize: 13, color: C.text1 }}>
       <style>{`
@@ -498,9 +305,6 @@ export default function Dashboard({ user }) {
           ))}
         </div>
       </div>
-
-      {/* ═══ AI INSIGHT BANNER - Independent Refresh ══════════════ */}
-      <AIInsightBanner initialInsight={s.aiSummary} />
 
       {/* ═══ KPI CARDS ════════════════════════════════════════════ */}
       <div className="a2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 12 }}>
@@ -556,7 +360,7 @@ export default function Dashboard({ user }) {
             const sm = STATUS[t.status] || STATUS.DRAFT;
             return (
               <React.Fragment key={t.id}>
-                <div className="rh" onClick={() => navigate(`/TaskDetail/${t.id}`)} style={{ padding: '10px 16px', cursor: 'pointer', transition: 'background .1s' }}>
+                <div className="rh" style={{ padding: '10px 16px', cursor: 'pointer', transition: 'background .1s' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
                     <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: 8 }}>{t.title}</span>
                     <Pill bg={sm.bg} color={sm.color}>{sm.label}</Pill>
@@ -569,7 +373,7 @@ export default function Dashboard({ user }) {
                     <span>👤 {t.assignedTo}</span>
                     <span>📅 {t.dueDate}</span>
                     {t.priority && (
-                      <Pill                        bg={t.priority === 'HIGH' ? '#FFF1F2' : t.priority === 'MEDIUM' ? '#FFFBEB' : '#ECFDF5'}
+                      <Pill bg={t.priority === 'HIGH' ? '#FFF1F2' : t.priority === 'MEDIUM' ? '#FFFBEB' : '#ECFDF5'}
                         color={t.priority === 'HIGH' ? '#9F1239' : t.priority === 'MEDIUM' ? '#92400E' : '#065F46'}
                       >{cap(t.priority)}</Pill>
                     )}
@@ -594,30 +398,20 @@ export default function Dashboard({ user }) {
             onBtn={() => navigate('/Performance')}
           />
           <div style={{ padding: '14px 16px' }}>
-            {(s.avgPerformanceRating || 0) > 0 ? (
-              <div style={{ background: '#FFFBEB', borderRadius: 8, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, border: '1px solid #FDE68A' }}>
-                <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                  <div style={{ fontSize: 34, fontWeight: 800, color: '#D97706', letterSpacing: '-0.05em', lineHeight: 1 }}>{(s.avgPerformanceRating || 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 9, color: '#92400E', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.07em', marginTop: 2 }}>out of 5</div>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <Stars n={s.avgPerformanceRating} />
-                  <div style={{ fontSize: 11, color: '#92400E', marginTop: 6 }}>
-                    {(s.outstandingEmployees || 0) > 0 ? `${s.outstandingEmployees} outstanding · ` : ''}{s.performanceReviewsDone} reviewed
-                  </div>
-                  <div style={{ marginTop: 8 }}><Bar pct={(s.avgPerformanceRating / 5) * 100} color='#F59E0B' bg='#FDE68A44' h={4} /></div>
-                </div>
-              </div>
-            ) : perf.length > 0 ? (
+            {perf.length > 0 ? (
               <div style={{ background: '#FFFBEB', borderRadius: 8, padding: '10px 14px', marginBottom: 14, border: '1px solid #FDE68A' }}>
-                <div style={{ fontSize: 11, color: '#92400E', fontWeight: 600, marginBottom: 4 }}>Top performer ratings available</div>
+                <div style={{ fontSize: 11, color: '#92400E', fontWeight: 600, marginBottom: 4 }}>
+                  {(s.avgPerformanceRating || 0) > 0 ? `Average: ${(s.avgPerformanceRating || 0).toFixed(1)}/5 · ` : ''}
+                  {perf.length} top performers
+                </div>
                 <Stars n={perf[0]?.rating || 0} />
-                <div style={{ fontSize: 10, color: '#92400E', marginTop: 4 }}>Highest: {perf[0]?.rating?.toFixed(1)}/5</div>
+                {perf[0]?.rating > 0 && (
+                  <div style={{ fontSize: 10, color: '#92400E', marginTop: 4 }}>Highest: {perf[0]?.rating?.toFixed(1)}/5</div>
+                )}
               </div>
             ) : (
               <div style={{ background: '#FFFBEB', borderRadius: 8, padding: '12px 14px', marginBottom: 14, textAlign: 'center', border: '1px solid #FDE68A' }}>
                 <div style={{ fontSize: 11, color: '#92400E', fontWeight: 500 }}>No performance reviews yet</div>
-                <div style={{ fontSize: 10, color: C.text3, marginTop: 3 }}>Reviews will appear here once added</div>
               </div>
             )}
 
@@ -636,7 +430,7 @@ export default function Dashboard({ user }) {
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <div style={{ fontSize: 15, fontWeight: 800, color: '#D97706' }}>{p.rating?.toFixed(1)}</div>
-                        <span style={{ background: bm.bg, color: bm.color, border: `1px solid ${bm.border}`, padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600 }}>{p.badge}</span>
+                        <Pill bg={bm.bg} color={bm.color}>{p.badge}</Pill>
                       </div>
                     </div>
                   );
@@ -665,9 +459,7 @@ export default function Dashboard({ user }) {
               </div>
             )}
 
-            {!hasPerfData && (
-              <div style={{ textAlign: 'center', padding: '12px 0', color: C.text3, fontSize: 12 }}>No performance data yet</div>
-            )}
+            {!hasPerfData && <div style={{ textAlign: 'center', padding: '12px 0', color: C.text3, fontSize: 12 }}>No performance data yet</div>}
           </div>
         </div>
 
@@ -678,75 +470,28 @@ export default function Dashboard({ user }) {
               <div style={{ fontSize: 13, fontWeight: 600, color: C.text1 }}>Recent Activity</div>
               <div style={{ fontSize: 11, color: C.text3, marginTop: 1 }}>Last 7 days · {sortedActivities.length} events</div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <FaClock size={10} color={C.text3} />
-              <span style={{ fontSize: 10, color: C.text3 }}>Real-time</span>
-            </div>
           </div>
 
           {sortedActivities.length === 0 ? (
-            <div style={{ padding: '32px 16px', textAlign: 'center', color: C.text3, fontSize: 12 }}>
-              <FaClock size={24} style={{ marginBottom: 8, opacity: 0.3 }} />
-              <div>No recent activity</div>
-              <div style={{ fontSize: 10, marginTop: 4 }}>Activities will appear here</div>
-            </div>
+            <div style={{ padding: '32px 16px', textAlign: 'center', color: C.text3, fontSize: 12 }}>No recent activity</div>
           ) : (
             <div style={{ maxHeight: 380, overflowY: 'auto' }}>
               {sortedActivities.slice(0, 8).map((a, i) => {
-                const config = ACTIVITY_CONFIG[a.module] || { 
-                  bg: C.bg, color: C.text2, 
-                  icon: <FaCircle size={10} />, 
-                  label: a.module 
-                };
+                const config = ACTIVITY_CONFIG[a.module] || { bg: C.bg, color: C.text2, icon: <FaCircle size={10} />, label: a.module };
                 const timestamp = a.timestamp || 'Recently';
-                const isRecent = timestamp.includes('min') || timestamp.includes('Just now') || timestamp === 'Recently';
-                
                 return (
                   <React.Fragment key={i}>
-                    <div className="rh" style={{ padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12, transition: 'background .1s' }}>
-                      <div style={{ 
-                        width: 32, height: 32, borderRadius: 8, 
-                        background: config.bg, color: config.color, 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                        fontSize: 13, flexShrink: 0,
-                        border: `1px solid ${config.color}22`
-                      }}>
+                    <div className="rh" style={{ padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: config.bg, color: config.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0, border: `1px solid ${config.color}22` }}>
                         {config.icon}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                          <span style={{ 
-                            fontSize: 10, fontWeight: 700, 
-                            color: config.color, 
-                            textTransform: 'uppercase', 
-                            letterSpacing: '.05em',
-                            background: config.bg,
-                            padding: '2px 6px',
-                            borderRadius: 3
-                          }}>
-                            {config.label}
-                          </span>
-                          <span style={{ 
-                            fontSize: 9, color: isRecent ? '#10B981' : C.text3, 
-                            display: 'flex', alignItems: 'center', gap: 3,
-                            flexShrink: 0
-                          }}>
-                            {isRecent && <FaCircle size={4} color="#10B981" />}
-                            {timestamp}
-                          </span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: config.color, textTransform: 'uppercase', letterSpacing: '.05em', background: config.bg, padding: '2px 6px', borderRadius: 3 }}>{config.label}</span>
+                          <span style={{ fontSize: 9, color: C.text3, flexShrink: 0 }}>{timestamp}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: C.text2, fontWeight: 500, lineHeight: 1.5, marginTop: 4, marginBottom: 3 }}>
-                          {a.action}
-                        </div>
-                        <div style={{ fontSize: 10, color: C.text3, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span>by {a.actor}</span>
-                          {a.type && (
-                            <>
-                              <span>•</span>
-                              <span style={{ textTransform: 'capitalize' }}>{a.type}</span>
-                            </>
-                          )}
-                        </div>
+                        <div style={{ fontSize: 12, color: C.text2, fontWeight: 500, lineHeight: 1.5, marginTop: 4, marginBottom: 3 }}>{a.action}</div>
+                        <div style={{ fontSize: 10, color: C.text3 }}>by {a.actor}</div>
                       </div>
                     </div>
                     {i < sortedActivities.length - 1 && <HR />}
@@ -768,7 +513,7 @@ export default function Dashboard({ user }) {
             <div style={{ padding: '24px 16px', textAlign: 'center', color: C.text3, fontSize: 12 }}>No employees yet</div>
           ) : emps.map((e, i) => (
             <React.Fragment key={e.id || i}>
-              <div className="rh" onClick={() => navigate('/Employees')} style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', transition: 'background .1s' }}>
+              <div className="rh" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', transition: 'background .1s' }}>
                 <Av name={e.name} sz={34} r={8} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</div>
@@ -785,16 +530,6 @@ export default function Dashboard({ user }) {
               {i < emps.length - 1 && <HR />}
             </React.Fragment>
           ))}
-          <HR />
-          <div style={{ padding: '10px 16px' }}>
-            <button onClick={() => navigate('/Employees')}
-              style={{ width: '100%', padding: '7px', border: `1.5px dashed ${BRAND}55`, borderRadius: 7, background: 'transparent', color: BRAND, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'background .12s', fontFamily: 'inherit' }}
-              onMouseEnter={e => e.currentTarget.style.background = BRAND_L}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              <FaUserPlus size={11} /> Add New Employee
-            </button>
-          </div>
         </div>
 
         {/* DEPARTMENTS */}
@@ -838,46 +573,9 @@ export default function Dashboard({ user }) {
               <StatTile label="Pending"        value={s.pendingPayrollCount || 0}                                            bg='#FFFBEB' color='#D97706' />
             </div>
 
-            {trend.length > 0 ? (
-              <>
-                <div style={{ fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>6-Month Trend</div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 52 }}>
-                  {trend.slice(-6).map((t, i, arr) => {
-                    const h = Math.max((t.netPayroll / maxTrend) * 46, 4);
-                    const isL = i === arr.length - 1;
-                    return (
-                      <div key={t.yearMonth || i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                        <div style={{ width: '100%', height: `${h}px`, background: isL ? BRAND : `${BRAND}55`, borderRadius: '3px 3px 2px 2px', transition: 'height .6s ease' }} />
-                        <div style={{ fontSize: 9, color: isL ? BRAND : C.text3, fontWeight: isL ? 700 : 400 }}>{t.label}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
+            {slips.length === 0 && (
               <div style={{ padding: '10px 12px', background: '#ECFDF5', borderRadius: 7, fontSize: 11, color: '#065F46', fontWeight: 500, textAlign: 'center', border: '1px solid #A7F3D0' }}>
-                Generate payroll to see trends here
-              </div>
-            )}
-
-            {slips.length > 0 && (
-              <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: C.text3, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>Recent Payslips</div>
-                {slips.map((p, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderBottom: i < slips.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Av name={p.employeeName} sz={26} r={7} />
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: C.text1 }}>{p.employeeName}</div>
-                        <div style={{ fontSize: 10, color: C.text3 }}>{p.payrollMonth}</div>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#065F46' }}>{fmtK(p.netSalary)}</div>
-                      <Pill bg='#ECFDF5' color='#065F46'>{cap(p.status)}</Pill>
-                    </div>
-                  </div>
-                ))}
+                Generate payroll to see payslips here
               </div>
             )}
           </div>

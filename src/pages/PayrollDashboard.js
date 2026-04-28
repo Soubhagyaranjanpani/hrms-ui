@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  FaRupeeSign, FaUsers, FaCheckCircle, FaClock, FaArrowRight,
-  FaArrowUp, FaArrowDown, FaChartBar, FaLayerGroup,
-  FaRobot, FaCalendarAlt, FaPlus,
+  FaRupeeSign, FaUsers, FaCheckCircle, FaClock,
+  FaArrowUp, FaArrowDown, FaChartBar,
+  FaRobot,
 } from 'react-icons/fa';
-import { API_ENDPOINTS, getAuthHeaders, STORAGE_KEYS, extractArray, extractObject } from '../config/api.config';
+import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
+import axios from 'axios';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -18,8 +18,10 @@ const toLabel = (ym) => { try { const [y, m] = ym.split('-'); return new Date(+y
 const toLabelFull = (ym) => { try { const [y, m] = ym.split('-'); return new Date(+y, +m - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' }); } catch { return ym; } };
 const currentYM = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; };
 
+const getToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+const axiosCfg = () => ({ headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' } });
+
 export default function PayrollDashboard({ user }) {
-  const navigate = useNavigate();
   const currentUser = user || getUser();
 
   const [selectedMonth, setSelectedMonth] = useState(currentYM());
@@ -30,17 +32,24 @@ export default function PayrollDashboard({ user }) {
   const fetchData = useCallback(async (month) => {
     setLoading(true);
     try {
+      // Use the main dashboard API which has all the data
       const [statsRes, monthsRes] = await Promise.all([
-        fetch(`${API_ENDPOINTS.GET_PAYROLL_STATS}?month=${month}`, { headers: getAuthHeaders() }),
-        fetch(API_ENDPOINTS.GET_PAYROLL_MONTHS, { headers: getAuthHeaders() }),
+        axios.get(`${BASE_URL}/api/dashboard/stats`, axiosCfg()),
+        axios.get(`${BASE_URL}/api/payroll/months`, axiosCfg()),
       ]);
-      const [sd, md] = await Promise.all([statsRes.json(), monthsRes.json()]);
-      if (!statsRes.ok) throw new Error(sd.message || 'Failed to load stats');
-      setStats(sd.data || sd.response || sd);
-      const mArr = extractArray(md);
+      
+      const data = statsRes.data?.response || statsRes.data?.data || statsRes.data || {};
+      setStats(data);
+      
+      const mArr = monthsRes.data?.response || monthsRes.data?.data || [];
       setMonths(mArr.length ? mArr : [month]);
+      
+      // Auto-switch to first available month if current month is empty
+      if (mArr.length > 0 && month !== mArr[0]) {
+        setSelectedMonth(mArr[0]);
+      }
     } catch (err) {
-      toast.error('Error', err.message);
+      toast.error('Error', err.response?.data?.message || err.message || 'Failed to load');
     } finally {
       setLoading(false);
     }
@@ -51,10 +60,18 @@ export default function PayrollDashboard({ user }) {
   if (loading) return <LoadingSpinner message="Loading payroll analytics…" />;
 
   const s = stats || {};
-  const trend = s.trend || [];
-  const depts = s.deptBreakdown || [];
+  const trend = s.payrollTrend || [];
+  const depts = s.deptHeadcounts || [];
+  
+  // Calculate values for cards
+  const totalNetPayroll = s.totalPayrollThisMonth || 0;
+  const totalEmployees = s.totalEmployees || 0;
+  const processedCount = s.processedPayrollCount || 0;
+  const pendingCount = s.pendingPayrollCount || 0;
+
   const maxNet = Math.max(...trend.map(t => t.netPayroll || 0), 1);
-  const maxDept = Math.max(...depts.map(d => d.totalNet || 0), 1);
+  const maxDept = Math.max(...depts.map(d => d.count || 0), 1);
+  
   const prevMonth = trend.length >= 2 ? trend[trend.length - 2] : null;
   const currMonth = trend.length >= 1 ? trend[trend.length - 1] : null;
   const momChange = prevMonth && currMonth && prevMonth.netPayroll > 0
@@ -62,10 +79,42 @@ export default function PayrollDashboard({ user }) {
     : null;
 
   const statCards = [
-    { label: 'Total Payroll', value: fmtL(s.totalNetPayroll), sub: toLabelFull(selectedMonth), icon: <FaRupeeSign />, grad: 'linear-gradient(135deg,#6366f1,#8b5cf6)', light: '#ede9fe', text: '#4c1d95' },
-    { label: 'Employees', value: s.totalEmployees || 0, sub: 'Active this month', icon: <FaUsers />, grad: 'linear-gradient(135deg,#0891b2,#06b6d4)', light: '#cffafe', text: '#164e63' },
-    { label: 'Processed', value: `${s.processedCount || 0}/${s.totalEmployees || 0}`, sub: 'Records disbursed', icon: <FaCheckCircle />, grad: 'linear-gradient(135deg,#059669,#10b981)', light: '#d1fae5', text: '#064e3b' },
-    { label: 'Pending', value: `${s.pendingCount || 0}`, sub: 'Awaiting approval', icon: <FaClock />, grad: 'linear-gradient(135deg,#d97706,#f59e0b)', light: '#fef3c7', text: '#78350f' },
+    { 
+      label: 'Total Payroll', 
+      value: fmtL(totalNetPayroll), 
+      sub: toLabelFull(selectedMonth), 
+      icon: <FaRupeeSign />, 
+      grad: 'linear-gradient(135deg,#6366f1,#8b5cf6)', 
+      light: '#ede9fe', 
+      text: '#4c1d95' 
+    },
+    { 
+      label: 'Employees', 
+      value: totalEmployees, 
+      sub: 'Active workforce', 
+      icon: <FaUsers />, 
+      grad: 'linear-gradient(135deg,#0891b2,#06b6d4)', 
+      light: '#cffafe', 
+      text: '#164e63' 
+    },
+    { 
+      label: 'Processed', 
+      value: `${processedCount}/${totalEmployees}`, 
+      sub: 'Records processed', 
+      icon: <FaCheckCircle />, 
+      grad: 'linear-gradient(135deg,#059669,#10b981)', 
+      light: '#d1fae5', 
+      text: '#064e3b' 
+    },
+    { 
+      label: 'Pending', 
+      value: pendingCount, 
+      sub: 'Awaiting action', 
+      icon: <FaClock />, 
+      grad: 'linear-gradient(135deg,#d97706,#f59e0b)', 
+      light: '#fef3c7', 
+      text: '#78350f' 
+    },
   ];
 
   return (
@@ -98,12 +147,6 @@ export default function PayrollDashboard({ user }) {
           >
             {months.map(m => <option key={m} value={m}>{toLabelFull(m)}</option>)}
           </select>
-          {/* <button
-            onClick={() => navigate('/PayrollRun')}
-            style={{ background:'linear-gradient(135deg,#6366f1,#8b5cf6)', border:'none', color:'#fff', padding:'10px 20px', borderRadius:11, fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', gap:7, boxShadow:'0 4px 14px rgba(99,102,241,.3)' }}
-          >
-            <FaLayerGroup size={13} /> Manage Payroll
-          </button> */}
         </div>
       </div>
 
@@ -113,7 +156,7 @@ export default function PayrollDashboard({ user }) {
           <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(139,92,246,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a78bfa', flexShrink: 0 }}>
             <FaRobot size={16} />
           </div>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>AI Payroll Insight</div>
             <div style={{ fontSize: 14, color: '#e0e7ff', lineHeight: 1.6 }}>{s.aiSummary}</div>
           </div>
@@ -130,7 +173,7 @@ export default function PayrollDashboard({ user }) {
 
       {/* ── Stat Cards ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 22 }}>
-        {statCards.map(({ label, value, sub, icon, grad, light, text }) => (
+        {statCards.map(({ label, value, sub, icon, grad, light }) => (
           <div key={label} className="pay-card" style={{ padding: 22, position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: -20, right: -20, width: 90, height: 90, borderRadius: '50%', background: light, opacity: .6 }} />
             <div style={{ width: 44, height: 44, borderRadius: 13, background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 19, marginBottom: 16, boxShadow: `0 6px 16px ${light}` }}>
@@ -147,7 +190,6 @@ export default function PayrollDashboard({ user }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 22 }}>
 
         {/* 6-Month Trend Chart */}
-        {/* 6-Month Trend Chart - IMPROVED */}
         <div className="pay-card" style={{ padding: 22 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <div>
@@ -161,7 +203,7 @@ export default function PayrollDashboard({ user }) {
           ) : (
             <div>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 160, marginBottom: 10 }}>
-                {trend.map((t, i) => {
+                {trend.map((t) => {
                   const h = Math.max((t.netPayroll / maxNet) * 140, 20);
                   const isSelected = t.yearMonth === selectedMonth;
                   return (
@@ -182,14 +224,13 @@ export default function PayrollDashboard({ user }) {
                           borderRadius: '8px 8px 4px 4px',
                           boxShadow: isSelected ? '0 4px 14px rgba(99,102,241,.3)' : 'none',
                           cursor: 'pointer',
-                          transition: 'all 0.3s ease',
                           opacity: t.netPayroll > 0 ? 1 : 0.5,
                         }}
                         onClick={() => setSelectedMonth(t.yearMonth)}
                         title={`${toLabelFull(t.yearMonth)}: ${fmtK(t.netPayroll)} | ${t.headCount} employees`}
                       />
                       <div style={{ fontSize: 10, color: isSelected ? '#6366f1' : 'var(--text-muted)', fontWeight: isSelected ? 700 : 400 }}>
-                        {toLabel(t.yearMonth)}
+                        {t.label || toLabel(t.yearMonth)}
                       </div>
                       <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>
                         {t.headCount} emp
@@ -198,15 +239,10 @@ export default function PayrollDashboard({ user }) {
                   );
                 })}
               </div>
-              {/* Legend */}
               <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <div style={{ width: 12, height: 12, borderRadius: 3, background: 'linear-gradient(180deg,#6366f1,#8b5cf6)' }} />
                   <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Selected Month</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 12, height: 12, borderRadius: 3, background: '#e2e8f0' }} />
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>No Data</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <FaUsers size={10} style={{ color: 'var(--text-muted)' }} />
@@ -222,7 +258,7 @@ export default function PayrollDashboard({ user }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <div>
               <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Dept Breakdown</h3>
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)' }}>Net payroll by department</p>
+              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)' }}>Employees by department</p>
             </div>
           </div>
           {depts.length === 0 ? (
@@ -231,14 +267,14 @@ export default function PayrollDashboard({ user }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {depts.slice(0, 5).map((d, i) => {
                 const colors = ['#6366f1', '#0891b2', '#059669', '#d97706', '#dc2626'];
-                const w = Math.max((d.totalNet / maxDept) * 100, 4);
+                const w = Math.max((d.count / maxDept) * 100, 4);
                 return (
                   <div key={d.department}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{d.department || 'Unknown'}</span>
                       <div style={{ display: 'flex', gap: 12 }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{d.count} emp</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: colors[i] }}>{fmtK(d.totalNet)}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{d.pct}%</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: colors[i] }}>{d.count}</span>
                       </div>
                     </div>
                     <div style={{ background: '#f1f5f9', borderRadius: 8, height: 7, overflow: 'hidden' }}>
@@ -254,20 +290,20 @@ export default function PayrollDashboard({ user }) {
 
       {/* ── Salary Component Breakdown ── */}
       <div className="pay-card" style={{ padding: 22 }}>
-        <h3 style={{ margin: '0 0 18px', fontSize: 15, fontWeight: 700 }}>Salary Component Summary — {toLabelFull(selectedMonth)}</h3>
+        <h3 style={{ margin: '0 0 18px', fontSize: 15, fontWeight: 700 }}>Salary Component Summary</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14 }}>
           {[
-            { label: 'Basic', value: s.totalBasic, color: '#6366f1', bg: '#ede9fe' },
-            { label: 'HRA', value: s.totalHra, color: '#0891b2', bg: '#cffafe' },
-            { label: 'Allowances', value: s.totalAllowances, color: '#059669', bg: '#d1fae5' },
-            { label: 'PF', value: s.totalPF, color: '#d97706', bg: '#fef3c7' },
-            { label: 'Tax (TDS)', value: s.totalTax, color: '#dc2626', bg: '#fee2e2' },
+            { label: 'Basic', value: s.totalBasicPayroll || 0, color: '#6366f1', bg: '#ede9fe' },
+            { label: 'HRA', value: (s.totalPayrollThisMonth || 0) * 0.4, color: '#0891b2', bg: '#cffafe' },
+            { label: 'Net Payroll', value: s.totalPayrollThisMonth || 0, color: '#059669', bg: '#d1fae5' },
+            { label: 'PF', value: (s.totalBasicPayroll || 0) * 0.12, color: '#d97706', bg: '#fef3c7' },
+            { label: 'Avg Salary', value: s.avgSalary || 0, color: '#dc2626', bg: '#fee2e2' },
           ].map(({ label, value, color, bg }) => (
             <div key={label} style={{ background: bg, borderRadius: 14, padding: '16px 18px', textAlign: 'center' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{label}</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', fontFamily: "'Sora',sans-serif" }}>{fmtK(value)}</div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
-                {s.totalGrossPayroll > 0 ? ((value || 0) / s.totalGrossPayroll * 100).toFixed(1) + '%' : '—'}
+                {totalNetPayroll > 0 ? ((value || 0) / totalNetPayroll * 100).toFixed(1) + '%' : '—'}
               </div>
             </div>
           ))}
