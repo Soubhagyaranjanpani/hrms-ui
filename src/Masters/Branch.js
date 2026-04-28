@@ -639,8 +639,6 @@ const Branch = () => {
                     />
                     <FieldError msg={errors.pincode} />
                   </div>
-                  {/* <div></div> */}
-                  {/* <div></div> */}
                 </div>
               </div>
 

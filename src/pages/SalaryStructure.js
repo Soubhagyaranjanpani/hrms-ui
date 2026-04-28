@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   FaSearch, FaEdit, FaSave, FaTimes, FaArrowLeft,
   FaExclamationCircle, FaRupeeSign, FaUserPlus, FaCog,
-  FaChevronLeft, FaChevronRight,
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -79,10 +78,9 @@ const DEDUCTIONS = [
 const PAGE_SIZE = 5;
 
 /* ═══════════════════════════════════════════════════════
-   COMPONENT
+   COMPONENT (Branch‑style UI)
 ═══════════════════════════════════════════════════════ */
 const SalaryStructure = ({ user }) => {
-
   const [view, setView] = useState('list');
   const [editMode, setEditMode] = useState(false);
   const [selectedStruct, setSelectedStruct] = useState(null);
@@ -93,7 +91,8 @@ const SalaryStructure = ({ user }) => {
   const [submitting, setSubmitting] = useState(false);
 
   const [search, setSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  // Branch‑style pagination: zero‑based page
+  const [page, setPage] = useState(0);
 
   const [formData, setFormData] = useState(emptyForm());
   const [errors, setErrors] = useState({});
@@ -193,11 +192,13 @@ const SalaryStructure = ({ user }) => {
   );
 
   // Reset page on search
-  useEffect(() => { setCurrentPage(1); }, [search]);
+  useEffect(() => { setPage(0); }, [search]);
 
-  // Pagination
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginatedStructures = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // Pagination (zero‑based)
+  const totalItems = filtered.length;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  const startIndex = page * PAGE_SIZE;
+  const paginatedStructures = filtered.slice(startIndex, startIndex + PAGE_SIZE);
 
   // Smart calculation from CTC
   const calculateFromCTC = (ctcValue) => {
@@ -205,7 +206,6 @@ const SalaryStructure = ({ user }) => {
     if (ctc === 0) return;
 
     const cfg = salaryConfig;
-
     const basicPct = cfg.BASIC_PCT;
     const hraPct = cfg.HRA_PCT;
     const daPct = cfg.DA_PCT;
@@ -226,7 +226,6 @@ const SalaryStructure = ({ user }) => {
     const cessPct = cfg.CESS_PCT;
 
     const monthlyCTC = ctc / 12;
-
     const monthlyBasic = basicPct ? (ctc * basicPct / 100) / 12 : monthlyCTC;
     const monthlyDA = daPct ? monthlyBasic * daPct / 100 : 0;
     const monthlyHRA = hraPct ? monthlyBasic * hraPct / 100 : 0;
@@ -394,176 +393,198 @@ const SalaryStructure = ({ user }) => {
   const isFieldOk = (f) => touched[f] && !errors[f] && formData[f] !== '';
   const isFieldErr = (f) => touched[f] && !!errors[f];
 
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) {
+      range.push(0);
+      if (left > 1) range.push('...');
+    }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) {
+      if (right < totalPages - 2) range.push('...');
+      range.push(totalPages - 1);
+    }
+    return range;
+  };
+
   if (loading && view === 'list' && structures.length === 0)
     return <LoadingSpinner message="Loading salary structures…" />;
 
   return (
-    <div className="emp-root">
-      {/* Header */}
-      <div className="emp-header" style={view === 'form' ? { justifyContent: 'space-between' } : {}}>
-        {view === 'form' ? (
-          <>
-            <div>
-              <h1 className="emp-title">{editMode ? 'Edit Salary Structure' : 'Add Salary Structure'}</h1>
-              <p className="emp-subtitle">
-                {editMode && selectedStruct ? `${cleanName(selectedStruct.employeeName)} — update salary components` : 'Set up salary components for an employee'}
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button className="emp-back-btn" onClick={() => setShowConfigPanel(!showConfigPanel)} style={{ background: showConfigPanel ? '#ede9fe' : 'var(--bg-surface)' }}>
-                <FaCog size={12} /> {showConfigPanel ? 'Hide Config' : 'Config'}
-              </button>
-              <button className="emp-back-btn" onClick={() => { setView('list'); resetForm(); }}>
-                <FaArrowLeft size={12} /> Back
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="emp-header-left">
+    <>
+  
+      <div className="emp-root">
+        {/* Header */}
+        <div className="emp-header" style={view === 'form' ? { justifyContent: 'space-between' } : {}}>
+          {view === 'form' ? (
+            <>
               <div>
-                <h1 className="emp-title">Salary Structures</h1>
-                <p className="emp-subtitle">{structures.length} employees configured</p>
+                <h1 className="emp-title">{editMode ? 'Edit Salary Structure' : 'Add Salary Structure'}</h1>
+                <p className="emp-subtitle">
+                  {editMode && selectedStruct ? `${cleanName(selectedStruct.employeeName)} — update salary components` : 'Set up salary components for an employee'}
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="emp-back-btn" onClick={() => setShowConfigPanel(!showConfigPanel)}>
+                  <FaCog size={12} /> {showConfigPanel ? 'Hide Config' : 'Config'}
+                </button>
+                <button className="emp-back-btn" onClick={() => { setView('list'); resetForm(); }}>
+                  <FaArrowLeft size={12} /> Back
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="emp-header-left">
+                <div>
+                  <h1 className="emp-title">Salary Structures</h1>
+                  <p className="emp-subtitle">{structures.length} employees configured</p>
+                </div>
+              </div>
+              <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
+                <FaUserPlus size={13} /> Add Structure
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* LIST VIEW */}
+        {view === 'list' && (
+          <>
+            <div className="emp-search-bar">
+              <div className="emp-search-wrap">
+                <FaSearch className="emp-search-icon" size={12} />
+                <input className="emp-search-input" type="text" placeholder="Search employee or department…" value={search} onChange={e => setSearch(e.target.value)} />
+                {search && <button className="emp-search-clear" onClick={() => setSearch('')}><FaTimes size={11} /></button>}
               </div>
             </div>
-            <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
-              <FaUserPlus size={13} /> Add Structure
-            </button>
-          </>
-        )}
-      </div>
 
-      {/* ════ LIST VIEW ════ */}
-      {view === 'list' && (
-        <>
-          <div className="emp-search-bar">
-            <div className="emp-search-wrap">
-              <FaSearch className="emp-search-icon" size={12} />
-              <input className="emp-search-input" type="text" placeholder="Search employee or department…" value={search} onChange={e => setSearch(e.target.value)} />
-              {search && <button className="emp-search-clear" onClick={() => setSearch('')}><FaTimes size={11} /></button>}
-            </div>
-          </div>
-
-          <div className="emp-table-card">
-            <div className="emp-table-wrap">
-              <table className="emp-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 44 }}>#</th>
-                    <th>Employee</th>
-                    <th>Department</th>
-                    <th>Basic</th>
-                    <th>Gross (Monthly)</th>
-                    <th>Deductions</th>
-                    <th>Net (Monthly)</th>
-                    <th style={{ width: 80, textAlign: 'center' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedStructures.length > 0 ? paginatedStructures.map((s, idx) => {
-                    const name = cleanName(s.employeeName);
-                    const ac = getAvatarColor(name);
-                    const gross = (s.basicSalary || 0) + (s.dearnessAllowance || 0) + (s.hra || 0) + (s.travelAllow || 0) + (s.medicalAllow || 0) + (s.specialAllow || 0) + (s.bonusAmount || 0);
-                    const deducts = (s.providentFund || 0) + (s.npsEmployee || 0) + (s.esiEmployee || 0) + (s.professionalTax || 0) + (s.incomeTax || 0) + (s.healthEduCess || 0);
-                    return (
-                      <tr key={s.id || idx} className="emp-row">
-                        <td className="emp-sno">{(currentPage - 1) * PAGE_SIZE + idx + 1}</td>
-                        <td>
-                          <div className="emp-info-cell">
-                            <div className="emp-avatar" style={{ background: ac.bg, color: ac.color }}>{getInitials(name)}</div>
-                            <div>
-                              <div className="emp-name">{name || '—'}</div>
-                              <div className="emp-email">{s.employeeCode || ''}</div>
+            <div className="emp-table-card">
+              <div className="emp-table-wrap">
+                <table className="emp-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 44 }}>#</th>
+                      <th>Employee</th>
+                      <th>Department</th>
+                      <th>Basic</th>
+                      <th>Gross (Monthly)</th>
+                      <th>Deductions</th>
+                      <th>Net (Monthly)</th>
+                      <th style={{ width: 70, textAlign: 'center' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedStructures.length > 0 ? paginatedStructures.map((s, idx) => {
+                      const name = cleanName(s.employeeName);
+                      const ac = getAvatarColor(name);
+                      const gross = (s.basicSalary || 0) + (s.dearnessAllowance || 0) + (s.hra || 0) + (s.travelAllow || 0) + (s.medicalAllow || 0) + (s.specialAllow || 0) + (s.bonusAmount || 0);
+                      const deducts = (s.providentFund || 0) + (s.npsEmployee || 0) + (s.esiEmployee || 0) + (s.professionalTax || 0) + (s.incomeTax || 0) + (s.healthEduCess || 0);
+                      return (
+                        <tr key={s.id || idx} className="emp-row">
+                          <td className="emp-sno">{startIndex + idx + 1}</td>
+                          <td>
+                            <div className="emp-info-cell">
+                              <div className="emp-avatar" style={{ background: ac.bg, color: ac.color }}>{getInitials(name)}</div>
+                              <div>
+                                <div className="emp-name">{name || '—'}</div>
+                                <div className="emp-email">{s.employeeCode || ''}</div>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td>{s.department ? <span className="emp-pill emp-pill--indigo">{s.department}</span> : <span className="emp-dash">—</span>}</td>
-                        <td style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>₹{fmt(s.basicSalary)}</td>
-                        <td style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>₹{fmt(gross)}</td>
-                        <td style={{ fontSize: 13, color: '#dc2626' }}>-₹{fmt(deducts)}</td>
-                        <td style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-indigo)', fontFamily: "'Sora',sans-serif" }}>₹{fmt(gross - deducts)}</td>
-                        <td>
-                          <div className="emp-actions">
-                            <button className="emp-act emp-act--edit" onClick={() => handleEdit(s)} title="Edit structure"><FaEdit size={12} /></button>
+                          </td>
+                          <td>{s.department ? <span className="emp-pill emp-pill--indigo">{s.department}</span> : <span className="emp-dash">—</span>}</td>
+                          <td style={{ fontSize: 13, fontWeight: 600 }}>₹{fmt(s.basicSalary)}</td>
+                          <td style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>₹{fmt(gross)}</td>
+                          <td style={{ fontSize: 13, color: '#dc2626' }}>-₹{fmt(deducts)}</td>
+                          <td style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-indigo)', fontFamily: "'Sora',sans-serif" }}>₹{fmt(gross - deducts)}</td>
+                          <td>
+                            <div className="emp-actions">
+                              <button className="emp-act emp-act--edit" onClick={() => handleEdit(s)} title="Edit structure"><FaEdit size={12} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }) : (
+                      <tr>
+                        <td colSpan="8" className="emp-empty">
+                          <div className="emp-empty-inner">
+                            <span className="emp-empty-icon"><FaRupeeSign /></span>
+                            <p>No salary structures found</p>
+                            <small>Click "Add Structure" to set up an employee's salary</small>
                           </div>
                         </td>
                       </tr>
-                    );
-                  }) : (
-                    <tr>
-                      <td colSpan="8" className="emp-empty">
-                        <div className="emp-empty-inner">
-                          <span className="emp-empty-icon"><FaRupeeSign /></span>
-                          <p>No salary structures found</p>
-                          <small>Click "Add Structure" to set up an employee's salary</small>
-                        </div>
-                      </td>
-                    </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Pagination – Branch style */}
+            {totalItems > 0 && (
+              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap', marginTop: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="emp-page-info">
+                    Showing {startIndex + 1}–{Math.min(startIndex + PAGE_SIZE, totalItems)} of {totalItems} structures
+                  </span>
+                </div>
+                <div className="emp-page-controls">
+                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                    ) : (
+                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
+                        {pg + 1}
+                      </button>
+                    )
                   )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16 }}>
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                style={{ padding: '6px 12px', border: '1px solid var(--border-medium)', borderRadius: 8, background: 'var(--bg-white)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1 }}>
-                <FaChevronLeft size={11} />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => (
-                <button key={i} onClick={() => setCurrentPage(i + 1)}
-                  style={{ padding: '6px 12px', border: '1px solid var(--border-medium)', borderRadius: 8, background: currentPage === i + 1 ? 'var(--accent-indigo)' : 'var(--bg-white)', color: currentPage === i + 1 ? '#fff' : 'var(--text-primary)', cursor: 'pointer', fontWeight: currentPage === i + 1 ? 700 : 400 }}>
-                  {i + 1}
-                </button>
-              ))}
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                style={{ padding: '6px 12px', border: '1px solid var(--border-medium)', borderRadius: 8, background: 'var(--bg-white)', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1 }}>
-                <FaChevronRight size={11} />
-              </button>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ════ FORM VIEW ════ */}
-      {view === 'form' && (
-        <div className="emp-form-wrap">
-          {showConfigPanel && (
-            <div style={{ background: '#f5f3ff', borderRadius: 16, padding: 20, marginBottom: 20, border: '1.5px solid #c4b5fd' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#7c3aed', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <FaCog /> Configuration Settings
+                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-                {Object.entries(salaryConfig).map(([key, value]) => (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <label style={{ fontSize: 11, flex: 1, color: '#6b7280', textTransform: 'capitalize' }}>
-                      {key.replace(/_/g, ' ').toLowerCase()}
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={value}
-                      onChange={e => handleConfigUpdate(key, e.target.value)}
-                      style={{ width: 90, padding: '6px 8px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, textAlign: 'right' }}
-                    />
-                    <span style={{ fontSize: 10, color: '#9ca3af', width: 20 }}>
-                      {key.includes('PCT') || key.includes('PERCENTAGE') ? '%' : key.includes('FIXED') || key.includes('MIN') || key.includes('MAX') ? '₹' : ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
+          </>
+        )}
 
-          <form onSubmit={handleSubmit} noValidate>
-            {!editMode && (
-              <>
-                <div className="emp-form-section">
+        {/* FORM VIEW – Branch‑style compact form */}
+        {view === 'form' && (
+          <div className="emp-form-wrap">
+            {showConfigPanel && (
+              <div style={{ background: '#f5f3ff', borderRadius: 16, padding: 20, marginBottom: 20, border: '1.5px solid #c4b5fd' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#7c3aed', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FaCog /> Configuration Settings
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+                  {Object.entries(salaryConfig).map(([key, value]) => (
+                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ fontSize: 11, flex: 1, color: '#6b7280', textTransform: 'capitalize' }}>
+                        {key.replace(/_/g, ' ').toLowerCase()}
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={value}
+                        onChange={e => handleConfigUpdate(key, e.target.value)}
+                        style={{ width: 90, padding: '6px 8px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, textAlign: 'right' }}
+                      />
+                      <span style={{ fontSize: 10, color: '#9ca3af', width: 20 }}>
+                        {key.includes('PCT') || key.includes('PERCENTAGE') ? '%' : key.includes('FIXED') || key.includes('MIN') || key.includes('MAX') ? '₹' : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
+              {!editMode && (
+                <div className="emp-form-section-compact">
                   <div className="emp-section-label">Select Employee</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
-                    <div className="emp-field">
+                  <div className="emp-form-grid-3col">
+                    <div className="emp-field-compact">
                       <label>Grade</label>
                       <select value={filterGrade} onChange={e => { setFilterGrade(e.target.value); setFilterBranch(''); setFilterDepartment(''); }}>
                         <option value="">All Grades</option>
@@ -572,23 +593,21 @@ const SalaryStructure = ({ user }) => {
                         ))}
                       </select>
                     </div>
-                    <div className="emp-field">
+                    <div className="emp-field-compact">
                       <label>Branch</label>
                       <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)}>
                         <option value="">All Branches</option>
                         {branches.map((b, i) => <option key={i} value={b.name || b}>{b.name || b}</option>)}
                       </select>
                     </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
-                    <div className="emp-field">
+                    <div className="emp-field-compact">
                       <label>Department</label>
                       <select value={filterDepartment} onChange={e => setFilterDepartment(e.target.value)}>
                         <option value="">All Departments</option>
                         {filteredDepartments.map((d, i) => <option key={i} value={d.name || d}>{d.name || d}</option>)}
                       </select>
                     </div>
-                    <div className={`emp-field ${isFieldErr('employeeId') ? 'has-error' : ''}`}>
+                    <div className={`emp-field-compact ${isFieldErr('employeeId') ? 'has-error' : ''}`}>
                       <label>Employee <span className="req">*</span></label>
                       <select value={formData.employeeId} onChange={e => handleChange('employeeId', e.target.value)} onBlur={() => handleBlur('employeeId')}>
                         <option value="">{filteredEmployees.length > 0 ? `Select (${filteredEmployees.length} available)` : 'No employees'}</option>
@@ -602,86 +621,78 @@ const SalaryStructure = ({ user }) => {
                     </div>
                   </div>
                 </div>
-                <div className="emp-divider" />
-              </>
-            )}
+              )}
 
-            <div className="emp-form-section">
-              <div className="emp-section-label" style={{ color: '#7c3aed' }}>CTC Details</div>
-              <div className="emp-form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                <div className={`emp-field ${isFieldErr('ctc') ? 'has-error' : ''}`}>
-                  <label>Annual CTC (₹) <span className="req">*</span></label>
-                  <div style={{ position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>₹</span>
-                    <input type="number" placeholder="e.g., 600000" value={formData.ctc} onChange={e => handleChange('ctc', e.target.value)} style={{ paddingLeft: 22, fontSize: 16, fontWeight: 600 }} />
+              <div className="emp-form-section-compact">
+                <div className="emp-section-label" style={{ color: '#7c3aed' }}>CTC Details</div>
+                <div className="emp-form-grid-3col">
+                  <div className={`emp-field-compact ${isFieldErr('ctc') ? 'has-error' : ''}`}>
+                    <label>Annual CTC (₹) <span className="req">*</span></label>
+                    <input type="number" placeholder="e.g., 600000" value={formData.ctc} onChange={e => handleChange('ctc', e.target.value)} style={{ fontSize: 16, fontWeight: 600 }} />
+                    <FieldError msg={errors.ctc} />
                   </div>
-                </div>
-                <div className="emp-field" style={{ background: 'var(--bg-surface)', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Monthly CTC</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: '#7c3aed', fontFamily: "'Sora',sans-serif" }}>₹{fmt(parseFloat(formData.ctc || 0) / 12)}</div>
+                  <div className="emp-field-compact" style={{ background: 'var(--bg-surface)', borderRadius: 12, padding: '8px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', border: '1px solid var(--border-light)' }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Monthly CTC</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: '#7c3aed', fontFamily: "'Sora',sans-serif" }}>₹{fmt(parseFloat(formData.ctc || 0) / 12)}</div>
+                  </div>
+                  <div></div> {/* keep 3‑col alignment */}
                 </div>
               </div>
-            </div>
 
-            <div className="emp-divider" />
-
-            <div className="emp-form-section">
-              <div className="emp-section-label" style={{ color: '#059669' }}>💰 Earnings (Monthly)</div>
-              <div className="emp-form-grid">
-                {EARNINGS.map(({ key, label, required }) => (
-                  <div key={key} className={`emp-field ${isFieldErr(key) ? 'has-error' : ''} ${isFieldOk(key) ? 'has-ok' : ''}`}>
-                    <label>{label} {required && <span className="req">*</span>}</label>
-                    <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>₹</span>
-                      <input type="number" min="0" placeholder="0" value={formData[key]} onChange={e => handleChange(key, e.target.value)} onBlur={() => handleBlur(key)} style={{ paddingLeft: 22 }} />
+              {/* Earnings */}
+              <div className="emp-form-section-compact">
+                <div className="emp-section-label" style={{ color: '#059669' }}>💰 Earnings (Monthly)</div>
+                <div className="emp-form-grid-3col">
+                  {EARNINGS.map(({ key, label, required }) => (
+                    <div key={key} className={`emp-field-compact ${isFieldErr(key) ? 'has-error' : ''} ${isFieldOk(key) ? 'has-ok' : ''}`}>
+                      <label>{label} {required && <span className="req">*</span>}</label>
+                      <input type="number" min="0" placeholder="0" value={formData[key]} onChange={e => handleChange(key, e.target.value)} onBlur={() => handleBlur(key)} />
+                      <FieldError msg={errors[key]} />
                     </div>
-                    <FieldError msg={errors[key]} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Deductions */}
+              <div className="emp-form-section-compact">
+                <div className="emp-section-label" style={{ color: '#dc2626' }}>📉 Deductions & Contributions (Monthly)</div>
+                <div className="emp-form-grid-3col">
+                  {DEDUCTIONS.map(({ key, label }) => (
+                    <div key={key} className="emp-field-compact">
+                      <label>{label}</label>
+                      <input type="number" min="0" placeholder="0" value={formData[key]} onChange={e => handleChange(key, e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Summary cards */}
+              <div className="emp-summary-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, margin: '20px 0', background: 'var(--bg-surface)', borderRadius: 14, padding: '16px 20px', border: '1px solid var(--border-light)' }}>
+                {[
+                  { label: 'Gross / Month', value: liveGross, color: '#059669' },
+                  { label: 'Deductions', value: liveDeduct, color: '#dc2626' },
+                  { label: 'Net / Month', value: liveNet, color: 'var(--accent-indigo)' },
+                  { label: 'Annual CTC', value: parseFloat(formData.ctc) || 0, color: '#7c3aed' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: "'Sora',sans-serif" }}>₹{fmt(value)}</div>
                   </div>
                 ))}
               </div>
-            </div>
 
-            <div className="emp-divider" />
-
-            <div className="emp-form-section">
-              <div className="emp-section-label" style={{ color: '#dc2626' }}>📉 Deductions & Contributions (Monthly)</div>
-              <div className="emp-form-grid">
-                {DEDUCTIONS.map(({ key, label }) => (
-                  <div key={key} className="emp-field">
-                    <label>{label}</label>
-                    <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>₹</span>
-                      <input type="number" min="0" placeholder="0" value={formData[key]} onChange={e => handleChange(key, e.target.value)} style={{ paddingLeft: 22 }} />
-                    </div>
-                  </div>
-                ))}
+              {/* Form Actions */}
+              <div className="emp-form-actions">
+                <button type="button" className="emp-cancel-btn" onClick={() => { setView('list'); resetForm(); }}>Cancel</button>
+                <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  {submitting ? <><span className="emp-spinner" /> Saving…</> : <><FaSave size={12} /> {editMode ? 'Update Structure' : 'Save Structure'}</>}
+                </button>
               </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, margin: '0 0 20px', background: 'var(--bg-surface)', borderRadius: 14, padding: '16px 20px', border: '1px solid var(--border-light)' }}>
-              {[
-                { label: 'Gross / Month', value: liveGross, color: '#059669' },
-                { label: 'Deductions', value: liveDeduct, color: '#dc2626' },
-                { label: 'Net / Month', value: liveNet, color: 'var(--accent-indigo)' },
-                { label: 'Annual CTC', value: parseFloat(formData.ctc) || 0, color: '#7c3aed' },
-              ].map(({ label, value, color }) => (
-                <div key={label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: "'Sora',sans-serif" }}>₹{fmt(value)}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="emp-form-footer">
-              <button type="button" className="emp-cancel-btn" onClick={() => { setView('list'); resetForm(); }}>Cancel</button>
-              <button type="submit" className="emp-submit-btn" disabled={submitting}>
-                {submitting ? <><span className="emp-spinner" /> Saving…</> : <><FaSave size={12} /> {editMode ? 'Update Structure' : 'Save Structure'}</>}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
+            </form>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 
