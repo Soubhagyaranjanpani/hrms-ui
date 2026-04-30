@@ -28,6 +28,41 @@ const emptyForm = () => ({
   isActive: true,
 });
 
+// Helper functions for field styling (missing previously)
+const isFieldOk = (field, touched, errors, formData) => touched[field] && !errors[field] && formData[field]?.trim();
+const isFieldErr = (field, touched, errors) => touched[field] && !!errors[field];
+
+// Small toggle switch (defined to avoid undefined component)
+const ToggleSwitchSmall = ({ checked, onChange, disabled }) => (
+  <div
+    style={{
+      width: "28px",
+      height: "16px",
+      borderRadius: "50px",
+      backgroundColor: checked ? "var(--accent-indigo)" : "var(--border-medium)",
+      position: "relative",
+      transition: "background-color 0.2s ease",
+      cursor: disabled ? "not-allowed" : "pointer",
+      opacity: disabled ? 0.6 : 1,
+    }}
+    onClick={() => !disabled && onChange(!checked)}
+  >
+    <div
+      style={{
+        width: "12px",
+        height: "12px",
+        borderRadius: "50%",
+        backgroundColor: "white",
+        position: "absolute",
+        top: "2px",
+        left: checked ? "14px" : "2px",
+        transition: "left 0.2s ease",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+      }}
+    />
+  </div>
+);
+
 const EmployeeGradePage = () => {
   const [grades, setGrades] = useState([]);
   const [filteredGrades, setFilteredGrades] = useState([]);
@@ -213,54 +248,54 @@ const EmployeeGradePage = () => {
 
       {showForm ? (
         <div className="emp-form-wrap">
-          <form onSubmit={handleSubmit} noValidate>
-            <div className="emp-form-section">
+          <form onSubmit={handleSubmit} className="emp-form-compact">
+            <div className="emp-form-section-compact">
               <div className="emp-section-label">Grade Details</div>
-              <div className="emp-form-grid">
-                <div className={`emp-field ${errors.code ? 'has-error' : ''}`}>
-                  <label>Grade Code <span className="req">*</span></label>
+              <div className="emp-form-grid-3col">
+                <div className={`emp-field-compact ${isFieldErr('code', touched, errors) ? 'has-error' : ''} ${isFieldOk('code', touched, errors, formData) ? 'has-ok' : ''}`}>
+                  <label className="required">Grade Code</label>
                   <input type="text" placeholder="e.g., L1, M1" value={formData.code} onChange={e => handleChange('code', e.target.value.toUpperCase())} onBlur={() => handleBlur('code')} disabled={editMode} />
                   <FieldError msg={errors.code} />
-                  <small className="emp-hint-text">Unique identifier (cannot change after creation)</small>
+                  <small className="task-hint-text">Unique identifier (cannot change after creation)</small>
                 </div>
-                <div className={`emp-field ${errors.name ? 'has-error' : ''}`}>
-                  <label>Grade Name <span className="req">*</span></label>
+                <div className={`emp-field-compact ${isFieldErr('name', touched, errors) ? 'has-error' : ''} ${isFieldOk('name', touched, errors, formData) ? 'has-ok' : ''}`}>
+                  <label className="required">Grade Name</label>
                   <input type="text" placeholder="e.g., Level 1" value={formData.name} onChange={e => handleChange('name', e.target.value)} onBlur={() => handleBlur('name')} />
                   <FieldError msg={errors.name} />
                 </div>
-                <div className={`emp-field ${errors.level ? 'has-error' : ''}`}>
-                  <label>Level Number <span className="req">*</span></label>
+                <div className={`emp-field-compact ${isFieldErr('level', touched, errors) ? 'has-error' : ''} ${isFieldOk('level', touched, errors, formData) ? 'has-ok' : ''}`}>
+                  <label className="required">Level Number</label>
                   <input type="number" min="1" placeholder="e.g., 1" value={formData.level} onChange={e => handleChange('level', e.target.value)} onBlur={() => handleBlur('level')} />
                   <FieldError msg={errors.level} />
-                  <small className="emp-hint-text">Higher number = higher grade</small>
+                  <small className="task-hint-text">Higher number = higher grade</small>
                 </div>
-                <div className="emp-field">
+                <div className="emp-field-compact">
                   <label>Grade Pay (₹)</label>
                   <input type="number" min="0" placeholder="e.g., 5400" value={formData.gradePay} onChange={e => handleChange('gradePay', e.target.value)} />
                 </div>
-                <div className="emp-field">
+                <div className="emp-field-compact">
                   <label>Min Salary (₹)</label>
                   <input type="number" min="0" placeholder="e.g., 40000" value={formData.minSalary} onChange={e => handleChange('minSalary', e.target.value)} />
                 </div>
-                <div className="emp-field">
+                <div className="emp-field-compact">
                   <label>Max Salary (₹)</label>
                   <input type="number" min="0" placeholder="e.g., 60000" value={formData.maxSalary} onChange={e => handleChange('maxSalary', e.target.value)} />
                 </div>
-                <div className="emp-field" style={{ gridColumn: 'span 2' }}>
+                <div className="emp-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label>Description</label>
                   <textarea rows={2} placeholder="Brief description…" value={formData.description} onChange={e => handleChange('description', e.target.value)} />
                 </div>
-                <div className="emp-field" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="emp-field-compact" style={{ gridColumn: 'span 3', display: 'flex', alignItems: 'center', gap: 12 }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={formData.isActive} onChange={e => handleChange('isActive', e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--accent-indigo)' }} />
+                    <ToggleSwitchSmall checked={formData.isActive} onChange={(val) => handleChange('isActive', val)} />
                     <span style={{ fontWeight: 600 }}>Active</span>
                   </label>
                 </div>
               </div>
             </div>
-            <div className="emp-form-footer">
+            <div className="emp-form-actions">
               <button type="button" className="emp-cancel-btn" onClick={() => setShowForm(false)}>Cancel</button>
-              <button type="submit" className="emp-submit-btn" disabled={submitting}>
+              <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                 {submitting ? <><span className="emp-spinner" /> Saving…</> : <><FaSave size={12} /> {editMode ? 'Update Grade' : 'Create Grade'}</>}
               </button>
             </div>
