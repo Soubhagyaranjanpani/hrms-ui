@@ -1,4 +1,5 @@
 // File: frontend/src/pages/EmployeeGradePage.jsx
+
 import React, { useState, useEffect } from 'react';
 import {
   FaSearch, FaPlus, FaEdit, FaSave, FaTimes,

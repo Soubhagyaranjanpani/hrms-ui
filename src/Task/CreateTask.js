@@ -7,53 +7,30 @@ import LoadingSpinner from '../components/LoadingSpinner';
 
 // Helper to extract array from various API response formats
 const extractArray = (data) => {
-  if (data?.response && Array.isArray(data.response)) {
-    return data.response;
-  }
-  if (data?.response?.content && Array.isArray(data.response.content)) {
-    return data.response.content;
-  }
-  if (Array.isArray(data)) {
-    return data;
-  }
-  if (data?.data && Array.isArray(data.data)) {
-    return data.data;
-  }
-  if (data?.data?.content && Array.isArray(data.data.content)) {
-    return data.data.content;
-  }
-  if (data?.content && Array.isArray(data.content)) {
-    return data.content;
-  }
-
+  if (data?.response && Array.isArray(data.response)) return data.response;
+  if (data?.response?.content && Array.isArray(data.response.content)) return data.response.content;
+  if (Array.isArray(data)) return data;
+  if (data?.data && Array.isArray(data.data)) return data.data;
+  if (data?.data?.content && Array.isArray(data.data.content)) return data.data.content;
+  if (data?.content && Array.isArray(data.content)) return data.content;
   console.warn('Unexpected data format:', data);
   return [];
 };
 
-// Helper to clean employee name (remove "null")
 const cleanEmployeeName = (name) => {
   if (!name) return '';
   return name.replace(/\s+null\s*/gi, '').trim();
 };
 
-// Helper to get auth headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
-  return {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 };
 
 const getUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA)) || {};
-  } catch {
-    return {};
-  }
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA)) || {}; } catch { return {}; }
 };
 
-// Priority Enum matching backend
 const PRIORITIES = [
   { code: 'LOW', display: 'Low' },
   { code: 'MEDIUM', display: 'Medium' },
@@ -83,7 +60,6 @@ export default function CreateTask({ user }) {
   const location = useLocation();
   const currentUser = user || getUser();
 
-  // Get edit data from navigation state
   const taskToEdit = location.state?.taskToEdit;
   const isEditing = location.state?.isEditing || false;
 
@@ -111,38 +87,22 @@ export default function CreateTask({ user }) {
   const [touched, setTouched] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch all dropdown data first
+  // Fetch dropdown data
   useEffect(() => {
     const fetchDropdowns = async () => {
       try {
-        console.log('Fetching branches from:', API_ENDPOINTS.GET_ACTIVE_BRANCHES);
-        console.log('Fetching employees from:', `${API_ENDPOINTS.GET_EMPLOYEES}?page=0&size=100`);
-
         const [branchRes, empRes, deptRes] = await Promise.all([
           fetch(API_ENDPOINTS.GET_ACTIVE_BRANCHES, { headers: getAuthHeaders() }),
           fetch(`${API_ENDPOINTS.GET_EMPLOYEES}?page=0&size=100`, { headers: getAuthHeaders() }),
           fetch(API_ENDPOINTS.GET_ACTIVE_DEPARTMENTS, { headers: getAuthHeaders() })
         ]);
-
         const branchData = await branchRes.json();
         const empData = await empRes.json();
         const deptData = await deptRes.json();
 
-        console.log('Branch Data:', branchData);
-        console.log('Employee Data:', empData);
-        console.log('Department Data:', deptData);
-
-        const branchArray = extractArray(branchData);
-        const employeeArray = extractArray(empData);
-        const deptArray = extractArray(deptData);
-
-        console.log('Extracted Branches:', branchArray);
-        console.log('Extracted Employees:', employeeArray);
-        console.log('Extracted Departments:', deptArray);
-
-        setBranches(branchArray);
-        setEmployees(employeeArray);
-        setDepartments(deptArray);
+        setBranches(extractArray(branchData));
+        setEmployees(extractArray(empData));
+        setDepartments(extractArray(deptData));
         setDataLoaded(true);
       } catch (err) {
         console.error('Dropdown fetch error:', err);
@@ -154,57 +114,45 @@ export default function CreateTask({ user }) {
     fetchDropdowns();
   }, []);
 
-  // Pre-fill form when editing and data is loaded
+  // Pre-fill form when editing
   useEffect(() => {
     if (isEditing && taskToEdit && dataLoaded) {
-      console.log('Editing task with full data:', taskToEdit);
-      
-      // Format date from ISO string to YYYY-MM-DD
       let formattedDeadline = '';
       if (taskToEdit.dueDate) {
         const date = new Date(taskToEdit.dueDate);
         formattedDeadline = date.toISOString().split('T')[0];
       }
 
-      // Get priority - handle both uppercase and title case
       let priority = 'MEDIUM';
       if (taskToEdit.priority) {
-        const upperPriority = taskToEdit.priority.toUpperCase();
-        if (PRIORITIES.some(p => p.code === upperPriority)) {
-          priority = upperPriority;
-        }
+        const upper = taskToEdit.priority.toUpperCase();
+        if (PRIORITIES.some(p => p.code === upper)) priority = upper;
       }
 
-      // Find branch ID from branch name or use existing branchId
       let branchId = '';
-      if (taskToEdit.branchId) {
-        branchId = String(taskToEdit.branchId);
-      } else if (taskToEdit.branchName && branches.length > 0) {
-        const foundBranch = branches.find(b => b.name === taskToEdit.branchName);
-        if (foundBranch) branchId = String(foundBranch.id);
+      if (taskToEdit.branchId) branchId = String(taskToEdit.branchId);
+      else if (taskToEdit.branchName && branches.length) {
+        const found = branches.find(b => b.name === taskToEdit.branchName);
+        if (found) branchId = String(found.id);
       }
 
-      // Find department ID
       let deptId = '';
-      if (taskToEdit.departmentId) {
-        deptId = String(taskToEdit.departmentId);
-      } else if (taskToEdit.departmentName && departments.length > 0) {
-        const foundDept = departments.find(d => d.name === taskToEdit.departmentName);
-        if (foundDept) deptId = String(foundDept.id);
+      if (taskToEdit.departmentId) deptId = String(taskToEdit.departmentId);
+      else if (taskToEdit.departmentName && departments.length) {
+        const found = departments.find(d => d.name === taskToEdit.departmentName);
+        if (found) deptId = String(found.id);
       }
 
-      // Find assignee ID
       let assigneeId = '';
-      if (taskToEdit.assignedToId) {
-        assigneeId = String(taskToEdit.assignedToId);
-      } else if (taskToEdit.assignedTo && employees.length > 0) {
-        const foundEmp = employees.find(e => 
+      if (taskToEdit.assignedToId) assigneeId = String(taskToEdit.assignedToId);
+      else if (taskToEdit.assignedTo && employees.length) {
+        const found = employees.find(e =>
           cleanEmployeeName(e.name) === cleanEmployeeName(taskToEdit.assignedTo)
         );
-        if (foundEmp) assigneeId = String(foundEmp.id);
+        if (found) assigneeId = String(found.id);
       }
 
-      const newForm = {
+      setForm({
         title: taskToEdit.title || '',
         description: taskToEdit.description || '',
         assignee: assigneeId,
@@ -215,59 +163,33 @@ export default function CreateTask({ user }) {
         effort: taskToEdit.effort || taskToEdit.effortEstimate || '',
         tags: taskToEdit.tags || '',
         note: taskToEdit.note || '',
-      };
-
-      console.log('Setting form with:', newForm);
-      setForm(newForm);
+      });
     }
   }, [isEditing, taskToEdit, dataLoaded, branches, departments, employees]);
 
-  // Filter departments based on selected branch
+  // Filter departments based on branch
   useEffect(() => {
-    if (form.branch && departments.length > 0) {
-      const branchId = parseInt(form.branch);
-      const filtered = departments.filter(
-        dept => dept.branchId === branchId
-      );
-      console.log(`Filtered departments for branch ${branchId}:`, filtered);
-      setFilteredDepts(filtered);
-    } else {
-      setFilteredDepts([]);
-    }
+    if (form.branch && departments.length) {
+      setFilteredDepts(departments.filter(d => d.branchId === parseInt(form.branch)));
+    } else setFilteredDepts([]);
   }, [form.branch, departments]);
 
-  // Filter employees based on selected branch and department
+  // Filter employees based on branch and department
   useEffect(() => {
-    if (employees.length > 0) {
-      let filtered = [...employees];
-
-      // Filter by branch if selected
-      if (form.branch) {
-        const branchId = parseInt(form.branch);
-        const selectedBranch = branches.find(b => b.id === branchId);
-        if (selectedBranch) {
-          filtered = filtered.filter(emp =>
-            emp.branchName === selectedBranch.name
-          );
-        }
-      }
-
-      // Filter by department if selected
-      if (form.dept) {
-        const deptId = parseInt(form.dept);
-        const selectedDept = departments.find(d => d.id === deptId);
-        if (selectedDept) {
-          filtered = filtered.filter(emp =>
-            emp.departmentName === selectedDept.name
-          );
-        }
-      }
-
-      console.log('Filtered employees:', filtered);
-      setFilteredEmployees(filtered);
-    } else {
+    if (!employees.length) {
       setFilteredEmployees([]);
+      return;
     }
+    let filtered = [...employees];
+    if (form.branch) {
+      const branchObj = branches.find(b => b.id === parseInt(form.branch));
+      if (branchObj) filtered = filtered.filter(emp => emp.branchName === branchObj.name);
+    }
+    if (form.dept) {
+      const deptObj = departments.find(d => d.id === parseInt(form.dept));
+      if (deptObj) filtered = filtered.filter(emp => emp.departmentName === deptObj.name);
+    }
+    setFilteredEmployees(filtered);
   }, [employees, form.branch, form.dept, branches, departments]);
 
   const validateField = (field, value) => {
@@ -278,36 +200,22 @@ export default function CreateTask({ user }) {
     if (field === 'title' && value && value.trim().length > 100)
       return 'Maximum 100 characters allowed';
     if (field === 'deadline' && value) {
-      const selectedDate = new Date(value);
+      const selected = new Date(value);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      if (selectedDate < today) {
-        return 'Deadline cannot be in the past';
-      }
+      if (selected < today) return 'Deadline cannot be in the past';
     }
     return '';
   };
 
   const handleChange = (field, value) => {
     if (field === 'title' && value.length > 100) return;
-    
     setForm(prev => {
       const newForm = { ...prev, [field]: value };
-      
-      // Reset dependent fields when branch changes
-      if (field === 'branch') {
-        newForm.dept = '';
-        newForm.assignee = '';
-      }
-      
-      // Reset assignee when department changes
-      if (field === 'dept') {
-        newForm.assignee = '';
-      }
-      
+      if (field === 'branch') { newForm.dept = ''; newForm.assignee = ''; }
+      if (field === 'dept') newForm.assignee = '';
       return newForm;
     });
-    
     if (touched[field])
       setErrors(prev => ({ ...prev, [field]: validateField(field, value) }));
   };
@@ -328,13 +236,11 @@ export default function CreateTask({ user }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     const allFields = ['title', 'assignee', 'branch', 'dept', 'deadline'];
     setTouched(allFields.reduce((a, f) => ({ ...a, [f]: true }), {}));
-
     const errs = validateAll();
     setErrors(errs);
-    if (Object.keys(errs).length > 0) {
+    if (Object.keys(errs).length) {
       toast.warning('Validation Error', 'Please fix the highlighted fields');
       return;
     }
@@ -351,12 +257,9 @@ export default function CreateTask({ user }) {
       tags: form.tags || null,
     };
 
-    console.log('Submitting payload:', payload);
-
     setSubmitting(true);
     try {
       let url, method;
-      
       if (isEditing && taskToEdit) {
         url = API_ENDPOINTS.UPDATE_TASK(taskToEdit.id);
         method = 'PUT';
@@ -364,29 +267,13 @@ export default function CreateTask({ user }) {
         url = API_ENDPOINTS.CREATE_TASK;
         method = 'POST';
       }
-
-      const res = await fetch(url, {
-        method: method,
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
-
+      const res = await fetch(url, { method, headers: getAuthHeaders(), body: JSON.stringify(payload) });
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || `Failed to ${isEditing ? 'update' : 'create'} task`);
-      }
-
-      toast.success(
-        isEditing ? 'Task Updated' : 'Task Created', 
-        `"${form.title}" has been ${isEditing ? 'updated' : 'submitted'} successfully`
-      );
-      
-      // Navigate back to task list
+      if (!res.ok) throw new Error(data.message || `Failed to ${isEditing ? 'update' : 'create'} task`);
+      toast.success(isEditing ? 'Task Updated' : 'Task Created', `"${form.title}" has been ${isEditing ? 'updated' : 'submitted'} successfully`);
       navigate('/TaskList');
-
     } catch (err) {
-      console.error('Task operation error:', err);
+      console.error(err);
       toast.error('Error', err.message || 'Something went wrong');
     } finally {
       setSubmitting(false);
@@ -395,62 +282,36 @@ export default function CreateTask({ user }) {
 
   const isFieldErr = (f) => touched[f] && !!errors[f];
   const isFieldOk = (f) => touched[f] && !errors[f] && form[f];
-
-  const getPriorityColor = (priorityCode) => {
-    const colors = {
-      'LOW': '#10b981',
-      'MEDIUM': '#3b82f6',
-      'HIGH': '#f59e0b',
-      'CRITICAL': '#ef4444'
-    };
-    return colors[priorityCode] || '#6b7280';
-  };
+  const getPriorityColor = (code) => ({ LOW: '#10b981', MEDIUM: '#3b82f6', HIGH: '#f59e0b', CRITICAL: '#ef4444' }[code] || '#6b7280');
 
   if (loadingDrops) return <LoadingSpinner message="Loading form data…" />;
 
   return (
-    <div className="task-root">
-      <div className="task-header">
-        <div className="task-header-left">
-          <button 
-            onClick={() => navigate('/TaskList')} 
-            style={{ 
-              background: 'var(--bg-surface)', 
-              border: '1.5px solid var(--border-medium)', 
-              color: 'var(--text-secondary)', 
-              padding: '8px 14px', 
-              borderRadius: 10, 
-              fontSize: 13, 
-              fontWeight: 500, 
-              cursor: 'pointer', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 6,
-              marginRight: 12
-            }}
-          >
-            <FaArrowLeft size={11} /> Back
-          </button>
-          <div>
-            <h1 className="task-title">
-              {isEditing ? 'Edit Task' : 'Create New Task'}
-            </h1>
-            <p className="task-subtitle">
-              {isEditing ? 'Update the task details below' : 'Fill in the details below to submit a task'}
-            </p>
-          </div>
+    <div className="emp-root">
+      {/* Header like Branch page */}
+      <div className="emp-header" style={{ justifyContent: 'space-between' }}>
+        <div>
+          <h1 className="emp-title">{isEditing ? 'Edit Task' : 'Create New Task'}</h1>
+          <p className="emp-subtitle">
+            {isEditing ? 'Update the task details below' : 'Fill in the details below to submit a task'}
+          </p>
         </div>
+        <button className="emp-back-btn" onClick={() => navigate('/TaskList')}>
+          <FaArrowLeft size={12} /> Back
+        </button>
       </div>
 
-      <div className="task-form-wrap">
-        <form onSubmit={handleSubmit} noValidate>
+      <div className="emp-form-wrap">
+        <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
 
-          <div className="task-form-section">
-            <div className="task-section-label">Task Information</div>
-            <div className="task-form-grid">
+          {/* Task Information Section */}
+          <div className="emp-form-section-compact">
+            <div className="emp-section-label">Task Information</div>
+            <div className="emp-form-grid-3col">
 
-              <div className={`task-field ${isFieldErr('title') ? 'has-error' : ''} ${isFieldOk('title') ? 'has-ok' : ''}`}>
-                <div className="task-label-row">
+              {/* Task Title (full width? but we keep 3-col, let title span 3 cols?) */}
+              <div className={`emp-field-compact ${isFieldErr('title') ? 'has-error' : ''} ${isFieldOk('title') ? 'has-ok' : ''}`} style={{ gridColumn: 'span 3' }}>
+                <div className="task-label-row" style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <label>Task Title <span className="req">*</span></label>
                   <CharCount value={form.title} max={100} />
                 </div>
@@ -463,29 +324,30 @@ export default function CreateTask({ user }) {
                   onBlur={() => handleBlur('title')}
                 />
                 <FieldError msg={errors.title} />
-                <small className="task-hint-text">3–100 characters, descriptive title</small>
+                <small className="task-hint-text" style={{ fontSize: 11, color: 'var(--text-muted)' }}>3–100 characters, descriptive title</small>
               </div>
 
-              <div className="task-field">
+              {/* Description (full width) */}
+              <div className="emp-field-compact" style={{ gridColumn: 'span 3' }}>
                 <label>Description</label>
                 <textarea
-                  rows={4}
+                  rows={3}
                   placeholder="Describe the task — goals, requirements, acceptance criteria…"
                   value={form.description}
                   onChange={(e) => handleChange('description', e.target.value)}
                 />
-                <small className="task-hint-text">Optional, but recommended</small>
+                <small className="task-hint-text" style={{ fontSize: 11, color: 'var(--text-muted)' }}>Optional, but recommended</small>
               </div>
             </div>
           </div>
 
-          <div className="task-divider" />
+          {/* Assignment & Details Section */}
+          <div className="emp-form-section-compact">
+            <div className="emp-section-label">Assignment & Details</div>
+            <div className="emp-form-grid-3col">
 
-          <div className="task-form-section">
-            <div className="task-section-label">Assignment & Details</div>
-            <div className="task-form-grid two-col">
-
-              <div className={`task-field ${isFieldErr('branch') ? 'has-error' : ''}`}>
+              {/* Branch */}
+              <div className={`emp-field-compact ${isFieldErr('branch') ? 'has-error' : ''}`}>
                 <label>Branch <span className="req">*</span></label>
                 <select
                   value={form.branch}
@@ -493,20 +355,13 @@ export default function CreateTask({ user }) {
                   onBlur={() => handleBlur('branch')}
                 >
                   <option value="">Select branch</option>
-                  {branches.length > 0 ? (
-                    branches.map(b => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} 
-                      </option>
-                    ))
-                  ) : (
-                    <option value="" disabled>No branches available</option>
-                  )}
+                  {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
                 <FieldError msg={errors.branch} />
               </div>
 
-              <div className={`task-field ${isFieldErr('dept') ? 'has-error' : ''}`}>
+              {/* Department */}
+              <div className={`emp-field-compact ${isFieldErr('dept') ? 'has-error' : ''}`}>
                 <label>Department <span className="req">*</span></label>
                 <select
                   value={form.dept}
@@ -516,22 +371,16 @@ export default function CreateTask({ user }) {
                 >
                   <option value="">
                     {!form.branch ? 'Select branch first' :
-                      filteredDepts.length === 0 ? 'No departments available' :
-                        'Select department'}
+                     filteredDepts.length === 0 ? 'No departments' : 'Select department'}
                   </option>
-                  {filteredDepts.map(d => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
+                  {filteredDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
                 <FieldError msg={errors.dept} />
-                {!form.branch && (
-                  <small className="task-hint-text">Please select a branch first</small>
-                )}
+                {!form.branch && <small style={{ fontSize: 10, color: 'var(--text-muted)' }}>Select branch first</small>}
               </div>
 
-              <div className={`task-field ${isFieldErr('assignee') ? 'has-error' : ''}`}>
+              {/* Assignee */}
+              <div className={`emp-field-compact ${isFieldErr('assignee') ? 'has-error' : ''}`}>
                 <label>Assign To <span className="req">*</span></label>
                 <select
                   value={form.assignee}
@@ -540,44 +389,33 @@ export default function CreateTask({ user }) {
                   disabled={!form.branch || !form.dept || filteredEmployees.length === 0}
                 >
                   <option value="">
-                    {!form.branch || !form.dept ? 'Select branch and department first' :
-                      filteredEmployees.length === 0 ? 'No employees available' :
-                        'Select assignee'}
+                    {!form.branch || !form.dept ? 'Select branch & dept first' :
+                     filteredEmployees.length === 0 ? 'No employees' : 'Select assignee'}
                   </option>
-                  {filteredEmployees.map(m => {
-                    const cleanName = cleanEmployeeName(m.name);
-                    return (
-                      <option key={m.id} value={m.id}>
-                        {cleanName} {m.roleName ? `· ${m.roleName}` : ''}
-                      </option>
-                    );
-                  })}
+                  {filteredEmployees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {cleanEmployeeName(emp.name)} {emp.roleName ? `· ${emp.roleName}` : ''}
+                    </option>
+                  ))}
                 </select>
                 <FieldError msg={errors.assignee} />
-                {(!form.branch || !form.dept) && (
-                  <small className="task-hint-text">Please select branch and department first</small>
-                )}
+                {(!form.branch || !form.dept) && <small style={{ fontSize: 10, color: 'var(--text-muted)' }}>Select branch and department first</small>}
               </div>
 
-              <div className="task-field">
+              {/* Priority */}
+              <div className="emp-field-compact">
                 <label>Priority</label>
                 <select
                   value={form.priority}
                   onChange={(e) => handleChange('priority', e.target.value)}
-                  style={{
-                    borderColor: getPriorityColor(form.priority),
-                    fontWeight: '500'
-                  }}
+                  style={{ borderColor: getPriorityColor(form.priority), fontWeight: 500 }}
                 >
-                  {PRIORITIES.map(p => (
-                    <option key={p.code} value={p.code}>
-                      {p.display}
-                    </option>
-                  ))}
+                  {PRIORITIES.map(p => <option key={p.code} value={p.code}>{p.display}</option>)}
                 </select>
               </div>
 
-              <div className={`task-field ${isFieldErr('deadline') ? 'has-error' : ''}`}>
+              {/* Deadline */}
+              <div className={`emp-field-compact ${isFieldErr('deadline') ? 'has-error' : ''}`}>
                 <label>Deadline <span className="req">*</span></label>
                 <input
                   type="date"
@@ -587,10 +425,10 @@ export default function CreateTask({ user }) {
                   min={new Date().toISOString().split('T')[0]}
                 />
                 <FieldError msg={errors.deadline} />
-                <small className="task-hint-text">Cannot be a past date</small>
               </div>
 
-              <div className="task-field">
+              {/* Effort Estimate */}
+              <div className="emp-field-compact">
                 <label>Estimated Effort</label>
                 <input
                   type="text"
@@ -598,49 +436,45 @@ export default function CreateTask({ user }) {
                   value={form.effort}
                   onChange={(e) => handleChange('effort', e.target.value)}
                 />
-                <small className="task-hint-text">Optional time estimate</small>
+                <small style={{ fontSize: 10, color: 'var(--text-muted)' }}>Optional</small>
               </div>
 
-              <div className="task-field">
-                <label>Tags (comma-separated)</label>
+              {/* Tags */}
+              <div className="emp-field-compact">
+                <label>Tags</label>
                 <input
                   type="text"
                   placeholder="e.g., Frontend, UX, Bug"
                   value={form.tags}
                   onChange={(e) => handleChange('tags', e.target.value)}
                 />
-                <small className="task-hint-text">Add relevant tags for categorization</small>
+                <small style={{ fontSize: 10, color: 'var(--text-muted)' }}>Comma‑separated</small>
               </div>
             </div>
           </div>
 
-          <div className="task-divider" />
-
-          <div className="task-form-section">
-            <div className="task-section-label">Additional Notes</div>
-            <div className="task-field">
-              <label>Internal Note (optional)</label>
+          {/* Additional Notes Section */}
+          <div className="emp-form-section-compact">
+            <div className="emp-section-label">Additional Notes</div>
+            <div className="emp-field-compact" style={{ gridColumn: 'span 3' }}>
               <textarea
-                rows={3}
+                rows={2}
                 placeholder="Any special instructions, references, or context for the assignee…"
                 value={form.note}
                 onChange={(e) => handleChange('note', e.target.value)}
               />
-              <small className="task-hint-text">This will be visible to the assignee</small>
+              <small style={{ fontSize: 10, color: 'var(--text-muted)' }}>Visible to the assignee</small>
             </div>
           </div>
 
-          <div className="task-form-footer">
-            <button
-              type="button"
-              className="task-cancel-footer-btn"
-              onClick={() => navigate('/TaskList')}
-            >
+          {/* Form Actions */}
+          <div className="emp-form-actions">
+            <button type="button" className="emp-cancel-btn" onClick={() => navigate('/TaskList')}>
               Cancel
             </button>
-            <button type="submit" className="task-submit-btn" disabled={submitting}>
+            <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
               {submitting
-                ? <><span className="task-spinner" /> {isEditing ? 'Updating...' : 'Creating...'}</>
+                ? <><span className="emp-spinner" /> {isEditing ? 'Updating…' : 'Creating…'}</>
                 : <><FaSave size={12} /> {isEditing ? 'Update Task' : 'Create Task'}</>
               }
             </button>

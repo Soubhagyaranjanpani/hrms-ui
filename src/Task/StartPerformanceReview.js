@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FaStar, FaArrowLeft, FaSave, FaUser, FaChartLine, FaTasks, 
-  FaClock, FaCheckCircle, FaExclamationTriangle, FaSpinner, FaInfoCircle, FaCalendarAlt
+  FaClock, FaCheckCircle, FaExclamationTriangle, FaSpinner, FaInfoCircle, FaCalendarAlt, FaExclamationCircle
 } from 'react-icons/fa';
 import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
 import { toast } from '../components/Toast';
@@ -28,20 +28,25 @@ const getAuthHeaders = () => {
   return { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 };
 
-// ── Format date to "DD MMM YYYY" ──
 const formatDateLabel = (dateStr) => {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-// ── Build reviewCycle string from two dates ──
 const buildReviewCycle = (from, to) => {
   if (!from || !to) return '';
   return `${formatDateLabel(from)} - ${formatDateLabel(to)}`;
 };
 
-// ── Interactive Star Rating ──
+const FieldError = ({ msg }) =>
+  msg ? (
+    <span className="field-err">
+      <FaExclamationCircle size={10} /> {msg}
+    </span>
+  ) : null;
+
+// ── Interactive Star Rating (centered) ──
 const StarRating = ({ rating, onRatingChange, size = 32, editable = true }) => {
   const [hoverRating, setHoverRating] = useState(0);
   const [selectedRating, setSelectedRating] = useState(rating || 0);
@@ -66,34 +71,34 @@ const StarRating = ({ rating, onRatingChange, size = 32, editable = true }) => {
   const displayRating = hoverRating || selectedRating;
 
   return (
-    <div className="star-rating-container">
-      <div className="stars-wrapper">
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', gap: '8px' }}>
         {[0, 1, 2, 3, 4].map((index) => {
           const fillPercent = Math.max(0, Math.min(1, displayRating - index)) * 100;
           return (
             <div
               key={index}
-              className="star-item"
+              style={{ position: 'relative', display: 'inline-block', cursor: editable ? 'pointer' : 'default' }}
               onMouseMove={(e) => handleMouseMove(e, index)}
               onMouseLeave={() => setHoverRating(0)}
               onClick={(e) => handleClick(e, index)}
-              style={{ cursor: editable ? 'pointer' : 'default' }}
             >
-              <div className="star-background"><FaStar size={size} /></div>
-              <div className="star-fill" style={{ width: `${fillPercent}%` }}><FaStar size={size} /></div>
+              <div style={{ color: '#d1d5db' }}><FaStar size={size} /></div>
+              <div style={{ position: 'absolute', top: 0, left: 0, overflow: 'hidden', width: `${fillPercent}%`, color: '#fbbf24' }}>
+                <FaStar size={size} />
+              </div>
             </div>
           );
         })}
       </div>
-      <div className="rating-value">
-        <span className="rating-number">{displayRating.toFixed(1)}</span>
-        <span className="rating-max">/ 5.0</span>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+        <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>{displayRating.toFixed(1)}</span>
+        <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>/ 5.0</span>
       </div>
     </div>
   );
 };
 
-// ════════════════════════════════════════════════
 const StartPerformanceReview = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -111,14 +116,14 @@ const StartPerformanceReview = () => {
     totalGoals: '',
     achievedGoals: '',
     improvementPercent: '',
-    fromDate: '',   // NEW
-    toDate: '',     // NEW
+    fromDate: '',
+    toDate: '',
   });
 
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  // ── Fetch employees ──
+  // Fetch employees
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
@@ -136,7 +141,7 @@ const StartPerformanceReview = () => {
     fetchEmployees();
   }, []);
 
-  // ── Fetch stats ──
+  // Fetch employee stats
   const fetchEmployeeStats = async (employeeId) => {
     if (!employeeId) return;
     setLoadingStats(true);
@@ -172,7 +177,7 @@ const StartPerformanceReview = () => {
     }
   };
 
-  // ── Handlers ──
+  // Handlers
   const handleEmployeeChange = (e) => {
     const employeeId = e.target.value;
     setFormData(prev => ({ ...prev, employeeId, rating: 0, totalGoals: '', achievedGoals: '', improvementPercent: '' }));
@@ -191,14 +196,12 @@ const StartPerformanceReview = () => {
     const { name, value } = e.target;
     let newFormData = { ...formData, [name]: value };
 
-    // Auto-calculate improvement %
     if ((name === 'totalGoals' || name === 'achievedGoals') && newFormData.totalGoals && newFormData.achievedGoals) {
       const total = parseFloat(newFormData.totalGoals) || 0;
       const achieved = parseFloat(newFormData.achievedGoals) || 0;
       if (total > 0) newFormData.improvementPercent = ((achieved / total) * 100).toFixed(1);
     }
 
-    // If toDate is before fromDate, clear toDate
     if (name === 'fromDate' && newFormData.toDate && value > newFormData.toDate) {
       newFormData.toDate = '';
     }
@@ -265,7 +268,6 @@ const StartPerformanceReview = () => {
     return '#ef4444';
   };
 
-  // ── Submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) { toast.warning('Validation Error', 'Please fix the highlighted fields'); return; }
@@ -278,7 +280,7 @@ const StartPerformanceReview = () => {
         totalGoals: parseInt(formData.totalGoals),
         achievedGoals: parseInt(formData.achievedGoals),
         improvementPercent: formData.improvementPercent || null,
-        reviewCycle: buildReviewCycle(formData.fromDate, formData.toDate), // "01 Apr 2026 - 30 Jun 2026"
+        reviewCycle: buildReviewCycle(formData.fromDate, formData.toDate),
       };
 
       const response = await fetch(API_ENDPOINTS.GET_PERFORMANCE, {
@@ -308,300 +310,188 @@ const StartPerformanceReview = () => {
     return total > 0 ? Math.round((achieved / total) * 100) : 0;
   };
 
+  const fieldErrClass = (field) => (errors[field] && touched[field] ? 'has-error' : '');
+  const fieldOkClass = (field) => (touched[field] && !errors[field] && formData[field] ? 'has-ok' : '');
+
   if (loadingEmployees) return <LoadingSpinner message="Loading employees…" />;
 
-  // ── Render ──
   return (
-    <div className="perf-review-container">
-      {/* Header */}
-      <div className="perf-header">
-        <button className="perf-back-btn" onClick={() => navigate('/performance')}>
-          <FaArrowLeft size={16} /> Back to Performance
-        </button>
+    <div className="emp-root">
+      {/* Header with back button on the right */}
+      <div className="emp-header" style={{ justifyContent: 'space-between' }}>
         <div>
-          <h1 className="perf-title">Start Performance Review</h1>
-          <p className="perf-subtitle">Evaluate employee performance and set goals</p>
+          <h1 className="emp-title">Start Performance Review</h1>
+          <p className="emp-subtitle">Evaluate employee performance and set goals</p>
         </div>
+        <button className="emp-back-btn" onClick={() => navigate('/performance')}>
+          <FaArrowLeft size={12} /> Back
+        </button>
       </div>
 
-      <div className="perf-form-card">
-        <form onSubmit={handleSubmit}>
+      <div className="emp-form-wrap">
+        <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
 
-          {/* ── Employee Selection ── */}
-          <div className="perf-section">
-            <div className="perf-section-header">
-              <FaUser className="perf-section-icon" />
-              <h3>Select Employee</h3>
-            </div>
-            <div className={`perf-field ${errors.employeeId && touched.employeeId ? 'has-error' : ''}`}>
-              <label className="perf-label required">Employee</label>
-              <select name="employeeId" value={formData.employeeId} onChange={handleEmployeeChange} onBlur={() => handleBlur('employeeId')} className="perf-select">
-                <option value="">Choose an employee...</option>
-                {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name} • {emp.departmentName || 'No Department'} • {emp.roleName || 'No Role'}
-                  </option>
-                ))}
-              </select>
-              {errors.employeeId && touched.employeeId && <span className="perf-error">{errors.employeeId}</span>}
+          {/* Employee Selection Section */}
+          <div className="emp-form-section-compact">
+            <div className="emp-section-label">Select Employee</div>
+            <div className="emp-form-grid-3col">
+              <div className={`emp-field-compact ${fieldErrClass('employeeId')} ${fieldOkClass('employeeId')}`} style={{ gridColumn: 'span 3' }}>
+                <label className="required">Employee</label>
+                <select
+                  name="employeeId"
+                  value={formData.employeeId}
+                  onChange={handleEmployeeChange}
+                  onBlur={() => handleBlur('employeeId')}
+                >
+                  <option value="">Choose an employee...</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} • {emp.departmentName || 'No Dept'} • {emp.roleName || 'No Role'}
+                    </option>
+                  ))}
+                </select>
+                <FieldError msg={errors.employeeId} />
+              </div>
             </div>
           </div>
 
-          {/* ── Employee Stats ── */}
+          {/* Employee Statistics */}
           {loadingStats && (
-            <div className="perf-stats-loading"><FaSpinner className="spinner" /> Loading employee statistics...</div>
+            <div className="emp-form-section-compact" style={{ textAlign: 'center', padding: '20px' }}>
+              <FaSpinner className="emp-spinner" /> Loading employee statistics...
+            </div>
           )}
           {employeeStats && !loadingStats && (
-            <div className="perf-stats-section">
-              <div className="perf-section-header">
-                <FaChartLine className="perf-section-icon" />
-                <h3>Employee Statistics</h3>
+            <div className="emp-form-section-compact">
+              <div className="emp-section-label">Employee Statistics</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16, marginBottom: 16 }}>
+                <div className="stats-card" style={{ padding: 16, background: 'var(--bg-surface)', borderRadius: 12, borderLeft: '3px solid var(--accent-indigo)' }}>
+                  <FaTasks style={{ fontSize: 24, color: 'var(--accent-indigo)' }} />
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Total Tasks</div>
+                  <div style={{ fontSize: 24, fontWeight: 700 }}>{employeeStats.totalAssigned || 0}</div>
+                </div>
+                <div className="stats-card" style={{ padding: 16, background: 'var(--bg-surface)', borderRadius: 12, borderLeft: '3px solid #f59e0b' }}>
+                  <FaClock style={{ fontSize: 24, color: '#f59e0b' }} />
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>In Progress</div>
+                  <div style={{ fontSize: 24, fontWeight: 700 }}>{employeeStats.inProgress || 0}</div>
+                </div>
+                <div className="stats-card" style={{ padding: 16, background: 'var(--bg-surface)', borderRadius: 12, borderLeft: '3px solid #10b981' }}>
+                  <FaCheckCircle style={{ fontSize: 24, color: '#10b981' }} />
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Completed</div>
+                  <div style={{ fontSize: 24, fontWeight: 700 }}>{employeeStats.completed || 0}</div>
+                </div>
+                <div className="stats-card" style={{ padding: 16, background: 'var(--bg-surface)', borderRadius: 12, borderLeft: '3px solid #ef4444' }}>
+                  <FaExclamationTriangle style={{ fontSize: 24, color: '#ef4444' }} />
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Overdue</div>
+                  <div style={{ fontSize: 24, fontWeight: 700 }}>{employeeStats.overdue || 0}</div>
+                </div>
+                <div className="stats-card" style={{ padding: 16, background: 'var(--bg-surface)', borderRadius: 12, borderLeft: '3px solid #3b82f6' }}>
+                  <FaInfoCircle style={{ fontSize: 24, color: '#3b82f6' }} />
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Pending Approval</div>
+                  <div style={{ fontSize: 24, fontWeight: 700 }}>{employeeStats.pendingApproval || 0}</div>
+                </div>
               </div>
-              <div className="perf-stats-grid">
-                <div className="perf-stat-card"><FaTasks className="stat-icon" /><div className="stat-content"><span className="stat-label">Total Tasks</span><span className="stat-value">{employeeStats.totalAssigned || 0}</span></div></div>
-                <div className="perf-stat-card warning"><FaClock className="stat-icon" /><div className="stat-content"><span className="stat-label">In Progress</span><span className="stat-value">{employeeStats.inProgress || 0}</span></div></div>
-                <div className="perf-stat-card success"><FaCheckCircle className="stat-icon" /><div className="stat-content"><span className="stat-label">Completed</span><span className="stat-value">{employeeStats.completed || 0}</span></div></div>
-                <div className="perf-stat-card danger"><FaExclamationTriangle className="stat-icon" /><div className="stat-content"><span className="stat-label">Overdue</span><span className="stat-value">{employeeStats.overdue || 0}</span></div></div>
-                <div className="perf-stat-card info"><FaInfoCircle className="stat-icon" /><div className="stat-content"><span className="stat-label">Pending Approval</span><span className="stat-value">{employeeStats.pendingApproval || 0}</span></div></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#ede9fe', borderRadius: 10, color: 'var(--accent-indigo)', fontSize: 13 }}>
+                <FaInfoCircle size={12} />
+                <span>Goals have been auto-filled based on task statistics. You can adjust them below.</span>
               </div>
-              <div className="perf-auto-fill-note"><FaInfoCircle size={12} /><span>Goals have been auto-filled based on task statistics. You can adjust them below.</span></div>
             </div>
           )}
 
-          {/* ── Star Rating ── */}
-          <div className="perf-section">
-            <div className="perf-section-header">
-              <FaStar className="perf-section-icon" />
-              <h3>Performance Rating</h3>
-            </div>
-            <div className={`perf-field ${errors.rating && touched.rating ? 'has-error' : ''}`}>
-              <label className="perf-label required">Rating (1–5 Stars)</label>
-              <div className="perf-rating-wrapper">
+          {/* Star Rating Section */}
+          <div className="emp-form-section-compact">
+            <div className="emp-section-label">Performance Rating</div>
+            <div className={`emp-field-compact ${fieldErrClass('rating')}`}>
+              <label className="required">Rating (1–5 Stars)</label>
+              <div style={{ padding: '16px', background: 'var(--bg-surface)', borderRadius: '12px', display: 'flex', justifyContent: 'center' }}>
                 <StarRating rating={formData.rating} onRatingChange={handleRatingChange} size={40} />
               </div>
               {formData.rating > 0 && (
-                <div className="perf-rating-status">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
                   <span>Performance Level:</span>
-                  <span className="status-badge" style={{ backgroundColor: `${getStatusColor(formData.rating)}20`, color: getStatusColor(formData.rating) }}>
+                  <span style={{ padding: '4px 12px', borderRadius: 20, fontWeight: 600, backgroundColor: `${getStatusColor(formData.rating)}20`, color: getStatusColor(formData.rating) }}>
                     {getStatusFromRating(formData.rating)}
                   </span>
                 </div>
               )}
-              {errors.rating && touched.rating && <span className="perf-error">{errors.rating}</span>}
+              <FieldError msg={errors.rating} />
             </div>
           </div>
 
-          {/* ── Goals ── */}
-          <div className="perf-section">
-            <div className="perf-section-header">
-              <FaChartLine className="perf-section-icon" />
-              <h3>Goal Setting</h3>
-            </div>
-            <div className="perf-goals-grid">
-              <div className={`perf-field ${errors.totalGoals && touched.totalGoals ? 'has-error' : ''}`}>
-                <label className="perf-label required">Total Goals</label>
-                <input type="number" name="totalGoals" value={formData.totalGoals} onChange={handleInputChange} onBlur={() => handleBlur('totalGoals')} min="1" placeholder="e.g., 10" className="perf-input" />
-                {errors.totalGoals && touched.totalGoals && <span className="perf-error">{errors.totalGoals}</span>}
+          {/* Goal Setting Section */}
+          <div className="emp-form-section-compact">
+            <div className="emp-section-label">Goal Setting</div>
+            <div className="emp-form-grid-3col">
+              <div className={`emp-field-compact ${fieldErrClass('totalGoals')}`}>
+                <label className="required">Total Goals</label>
+                <input type="number" name="totalGoals" value={formData.totalGoals} onChange={handleInputChange} onBlur={() => handleBlur('totalGoals')} min="1" placeholder="e.g., 10" />
+                <FieldError msg={errors.totalGoals} />
               </div>
-              <div className={`perf-field ${errors.achievedGoals && touched.achievedGoals ? 'has-error' : ''}`}>
-                <label className="perf-label required">Achieved Goals</label>
-                <input type="number" name="achievedGoals" value={formData.achievedGoals} onChange={handleInputChange} onBlur={() => handleBlur('achievedGoals')} min="0" max={formData.totalGoals || 999} placeholder="e.g., 8" className="perf-input" />
-                {errors.achievedGoals && touched.achievedGoals && <span className="perf-error">{errors.achievedGoals}</span>}
+              <div className={`emp-field-compact ${fieldErrClass('achievedGoals')}`}>
+                <label className="required">Achieved Goals</label>
+                <input type="number" name="achievedGoals" value={formData.achievedGoals} onChange={handleInputChange} onBlur={() => handleBlur('achievedGoals')} min="0" max={formData.totalGoals || 999} placeholder="e.g., 8" />
+                <FieldError msg={errors.achievedGoals} />
               </div>
             </div>
 
             {formData.totalGoals > 0 && (
-              <div className="perf-progress-section">
-                <div className="progress-header">
+              <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-surface)', borderRadius: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
                   <span>Goal Achievement Progress</span>
-                  <span className="progress-percent">{calculateGoalPercentage()}%</span>
+                  <span style={{ fontWeight: 600, color: 'var(--accent-indigo)' }}>{calculateGoalPercentage()}%</span>
                 </div>
-                <div className="progress-bar-wrapper">
-                  <div className="progress-bar-fill" style={{ width: `${calculateGoalPercentage()}%` }} />
+                <div style={{ height: 8, background: '#e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${calculateGoalPercentage()}%`, background: 'linear-gradient(90deg, var(--accent-indigo), #818cf8)', borderRadius: 10 }} />
                 </div>
               </div>
             )}
 
-            <div className="perf-improvement-field">
-              <label className="perf-label">Improvement Percentage</label>
-              <div className="improvement-input-wrapper">
-                <input type="text" name="improvementPercent" value={formData.improvementPercent} placeholder="Auto-calculated" className="perf-input" readOnly />
-                <span className="percent-symbol">%</span>
+            <div className="emp-field-compact">
+              <label>Improvement Percentage</label>
+              <div style={{ position: 'relative' }}>
+                <input type="text" name="improvementPercent" value={formData.improvementPercent} placeholder="Auto-calculated" readOnly style={{ paddingRight: 40 }} />
+                <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: 600 }}>%</span>
               </div>
-              <small className="perf-hint">Automatically calculated based on achieved vs total goals</small>
+              <small className="task-hint-text">Automatically calculated based on achieved vs total goals</small>
             </div>
           </div>
 
-          {/* ── Review Period (Date Range) ── NEW SECTION ── */}
-          <div className="perf-section">
-            <div className="perf-section-header">
-              <FaCalendarAlt className="perf-section-icon" />
-              <h3>Review Period</h3>
-            </div>
-
-            <div className="perf-goals-grid">
-              {/* From Date */}
-              <div className={`perf-field ${errors.fromDate && touched.fromDate ? 'has-error' : ''}`}>
-                <label className="perf-label required">Start Date</label>
-                <input
-                  type="date"
-                  name="fromDate"
-                  value={formData.fromDate}
-                  max={today}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('fromDate')}
-                  className="perf-input"
-                />
-                {errors.fromDate && touched.fromDate && <span className="perf-error">{errors.fromDate}</span>}
+          {/* Review Period (Date Range) Section */}
+          <div className="emp-form-section-compact">
+            <div className="emp-section-label">Review Period</div>
+            <div className="emp-form-grid-3col">
+              <div className={`emp-field-compact ${fieldErrClass('fromDate')}`}>
+                <label className="required">Start Date</label>
+                <input type="date" name="fromDate" value={formData.fromDate} max={today} onChange={handleInputChange} onBlur={() => handleBlur('fromDate')} />
+                <FieldError msg={errors.fromDate} />
               </div>
-
-              {/* To Date */}
-              <div className={`perf-field ${errors.toDate && touched.toDate ? 'has-error' : ''}`}>
-                <label className="perf-label required">End Date</label>
-                <input
-                  type="date"
-                  name="toDate"
-                  value={formData.toDate}
-                  min={formData.fromDate || undefined}
-                  max={today}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('toDate')}
-                  className="perf-input"
-                  disabled={!formData.fromDate}
-                />
-                {errors.toDate && touched.toDate && <span className="perf-error">{errors.toDate}</span>}
-                {!formData.fromDate && <small className="perf-hint">Select start date first</small>}
+              <div className={`emp-field-compact ${fieldErrClass('toDate')}`}>
+                <label className="required">End Date</label>
+                <input type="date" name="toDate" value={formData.toDate} min={formData.fromDate || undefined} max={today} onChange={handleInputChange} onBlur={() => handleBlur('toDate')} disabled={!formData.fromDate} />
+                <FieldError msg={errors.toDate} />
+                {!formData.fromDate && <small className="task-hint-text">Select start date first</small>}
               </div>
             </div>
-
-            {/* Preview the saved string */}
             {formData.fromDate && formData.toDate && (
-              <div className="perf-cycle-preview">
-                <FaCalendarAlt size={13} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#ede9fe', borderRadius: 10, color: 'var(--accent-indigo)', fontSize: 13, marginTop: 4 }}>
+                <FaCalendarAlt size={12} />
                 <span>Review cycle will be saved as: <strong>{buildReviewCycle(formData.fromDate, formData.toDate)}</strong></span>
               </div>
             )}
           </div>
 
-          {/* ── Actions ── */}
-          <div className="perf-actions">
+          {/* Form Actions */}
+          <div className="emp-form-actions">
             <button type="button" className="emp-cancel-btn" onClick={() => navigate('/performance')} disabled={loading}>
               Cancel
             </button>
-            <button type="submit" className="emp-submit-btn" disabled={loading}>
-              {loading
-                ? <><span className="emp-spinner" /> Starting Review...</>
-                : <><FaSave size={14} /> Start Review</>
-              }
+            <button type="submit" className="emp-add-btn" disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              {loading ? <><span className="emp-spinner" /> Starting Review...</> : <><FaSave size={12} /> Start Review</>}
             </button>
           </div>
 
         </form>
       </div>
-
-      <style jsx>{`
-        /* ── Container & Header ── */
-        .perf-review-container { max-width: 900px; margin: 0 auto; padding: 24px; }
-        .perf-header { margin-bottom: 32px; }
-        .perf-back-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--bg-surface); border: 1.5px solid var(--border-medium); border-radius: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; margin-bottom: 16px; }
-        .perf-back-btn:hover { background: var(--border-light); border-color: var(--accent-indigo); color: var(--accent-indigo); }
-        .perf-title { font-family: 'Sora', sans-serif; font-size: 28px; font-weight: 700; color: var(--text-primary); margin: 0 0 8px 0; }
-        .perf-subtitle { font-size: 14px; color: var(--text-muted); margin: 0; }
-
-        /* ── Form Card ── */
-        .perf-form-card { background: var(--card-bg); border: 1px solid var(--border-light); border-radius: 20px; padding: 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
-
-        /* ── Sections ── */
-        .perf-section { margin-bottom: 32px; }
-        .perf-section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border-light); }
-        .perf-section-header h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary); }
-        .perf-section-icon { color: var(--accent-indigo); font-size: 18px; }
-
-        /* ── Fields ── */
-        .perf-field { margin-bottom: 20px; }
-        .perf-field.has-error .perf-input, .perf-field.has-error .perf-select { border-color: var(--danger); }
-        .perf-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
-        .perf-label.required::after { content: ' *'; color: var(--danger); }
-        .perf-input, .perf-select { width: 100%; padding: 10px 14px; border: 1.5px solid var(--border-medium); border-radius: 10px; font-size: 14px; color: var(--text-primary); background: var(--card-bg); transition: all 0.2s; box-sizing: border-box; }
-        .perf-input:focus, .perf-select:focus { outline: none; border-color: var(--accent-indigo); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
-        .perf-input:disabled { opacity: 0.5; cursor: not-allowed; }
-        .perf-error { display: block; color: var(--danger); font-size: 12px; margin-top: 6px; }
-        .perf-hint { display: block; font-size: 12px; color: var(--text-muted); margin-top: 6px; }
-
-        /* ── Stats ── */
-        .perf-stats-loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 24px; background: var(--bg-surface); border-radius: 12px; margin-bottom: 24px; color: var(--text-muted); }
-        .perf-stats-section { margin-bottom: 32px; }
-        .perf-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 16px; }
-        .perf-stat-card { display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--bg-surface); border-radius: 12px; border-left: 3px solid var(--accent-indigo); }
-        .perf-stat-card.warning { border-left-color: #f59e0b; }
-        .perf-stat-card.success { border-left-color: #10b981; }
-        .perf-stat-card.danger  { border-left-color: #ef4444; }
-        .perf-stat-card.info    { border-left-color: #3b82f6; }
-        .stat-icon { font-size: 24px; color: var(--accent-indigo); }
-        .perf-stat-card.warning .stat-icon { color: #f59e0b; }
-        .perf-stat-card.success .stat-icon { color: #10b981; }
-        .perf-stat-card.danger  .stat-icon { color: #ef4444; }
-        .perf-stat-card.info    .stat-icon { color: #3b82f6; }
-        .stat-content { display: flex; flex-direction: column; }
-        .stat-label { font-size: 12px; color: var(--text-muted); }
-        .stat-value { font-size: 24px; font-weight: 700; color: var(--text-primary); }
-        .perf-auto-fill-note { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #ede9fe; border-radius: 10px; color: var(--accent-indigo); font-size: 13px; }
-
-        /* ── Star Rating ── */
-        .perf-rating-wrapper { padding: 16px; background: var(--bg-surface); border-radius: 12px; display: flex; justify-content: center; }
-        .star-rating-container { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-        .stars-wrapper { display: flex; gap: 8px; }
-        .star-item { position: relative; display: inline-block; }
-        .star-background { color: #d1d5db; }
-        .star-fill { position: absolute; top: 0; left: 0; overflow: hidden; color: #fbbf24; }
-        .rating-value { display: flex; align-items: baseline; gap: 4px; }
-        .rating-number { font-size: 24px; font-weight: 700; color: var(--text-primary); }
-        .rating-max { font-size: 14px; color: var(--text-muted); }
-        .perf-rating-status { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; font-size: 14px; }
-        .status-badge { padding: 4px 12px; border-radius: 20px; font-weight: 600; }
-
-        /* ── Goals Grid ── */
-        .perf-goals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-        .perf-progress-section { margin-bottom: 24px; padding: 16px; background: var(--bg-surface); border-radius: 12px; }
-        .progress-header { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
-        .progress-percent { font-weight: 600; color: var(--accent-indigo); }
-        .progress-bar-wrapper { height: 8px; background: #e5e7eb; border-radius: 10px; overflow: hidden; }
-        .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent-indigo), #818cf8); border-radius: 10px; transition: width 0.3s ease; }
-        .perf-improvement-field { margin-bottom: 20px; }
-        .improvement-input-wrapper { position: relative; }
-        .improvement-input-wrapper .perf-input { padding-right: 40px; }
-        .percent-symbol { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-weight: 600; }
-
-        /* ── Review Period Preview ── */
-        .perf-cycle-preview {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 12px 16px;
-          background: #ede9fe;
-          border-radius: 10px;
-          color: var(--accent-indigo);
-          font-size: 13px;
-          margin-top: 4px;
-        }
-        .perf-cycle-preview strong { font-weight: 700; }
-
-        /* ── Actions — reuse emp-submit-btn / emp-cancel-btn from global CSS ── */
-        .perf-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border-light); }
-
-        /* ── Spinner ── */
-        .spinner { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-        /* ── Responsive ── */
-        @media (max-width: 768px) {
-          .perf-review-container { padding: 16px; }
-          .perf-form-card { padding: 20px; }
-          .perf-goals-grid { grid-template-columns: 1fr; }
-          .perf-stats-grid { grid-template-columns: 1fr; }
-          .perf-actions { flex-direction: column-reverse; }
-        }
-      `}</style>
     </div>
   );
 };

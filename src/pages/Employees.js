@@ -76,7 +76,6 @@ const validateAll = (formData, editMode) => {
   return errors;
 };
 
-/* ─── Sub-components ─── */
 const FieldError = ({ msg }) =>
   msg ? (
     <span className="field-err">
@@ -84,9 +83,6 @@ const FieldError = ({ msg }) =>
     </span>
   ) : null;
 
-/* ═══════════════════════════════════════════════════════
-   Main Component
-═══════════════════════════════════════════════════════ */
 const Employees = ({ user }) => {
   const [view, setView] = useState('list');
   const [editMode, setEditMode] = useState(false);
@@ -135,13 +131,11 @@ const Employees = ({ user }) => {
     }
   };
 
-  /* Debounce search */
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedSearch(searchName); setPage(0); }, 500);
     return () => clearTimeout(t);
   }, [searchName]);
 
-  /* ─── Fetch employees ─── */
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
     try {
@@ -206,9 +200,7 @@ const Employees = ({ user }) => {
     setLoadingGrades(true);
     try {
       const res = await axios.get(`${BASE_URL}/api/grades`, axiosConfig);
-      if (res.data?.status === 200) {
-        setGrades(res.data.response || []);
-      }
+      if (res.data?.status === 200) setGrades(res.data.response || []);
     } catch { toast.error('Error', 'Failed to fetch grades'); }
     finally { setLoadingGrades(false); }
   };
@@ -225,7 +217,6 @@ const Employees = ({ user }) => {
     if (view === 'list') fetchEmployees();
   }, [page, debouncedSearch, filterActive]);
 
-  /* ─── Field handlers ─── */
   const handleChange = (field, value) => {
     if (field === 'phone') value = value.replace(/\D/g, '').slice(0, 10);
     if (field === 'name' && /\d/.test(value)) return;
@@ -251,7 +242,6 @@ const Employees = ({ user }) => {
     if (touched.departmentId) setErrors(prev => ({ ...prev, departmentId: 'This field is required' }));
   };
 
-  /* ─── Submit ─── */
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -344,7 +334,6 @@ const Employees = ({ user }) => {
     }
   };
 
-  /* ─── Delete ─── */
   const confirmDelete = (emp) => { setEmployeeToDelete(emp); setShowDeleteModal(true); };
   const handleDelete = async () => {
     if (!employeeToDelete) return;
@@ -357,7 +346,6 @@ const Employees = ({ user }) => {
     } catch (err) { toast.error('Error', err.response?.data?.message || 'Failed to delete'); }
   };
 
-  /* ─── Edit ─── */
   const handleEdit = (emp) => {
     setSelectedEmployee(emp);
     const fd = {
@@ -397,7 +385,6 @@ const Employees = ({ user }) => {
     setEditMode(false); setSelectedEmployee(null);
   };
 
-  /* ─── Helpers ─── */
   const formatDate = (d) => {
     if (!d) return '—';
     return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -442,26 +429,27 @@ const Employees = ({ user }) => {
 
   return (
     <div className="emp-root">
-      <div className="emp-header">
-        <div>
-          <h1 className="emp-title">
-            {view === 'form' ? (editMode ? 'Edit Employee' : 'Add Employee') : 'Employee Directory'}
-          </h1>
-          <p className="emp-subtitle">
-            {view === 'form' 
-              ? (editMode ? 'Update employee information' : 'Enter new employee details')
-              : `${totalElements} total employees`
-            }
-          </p>
-        </div>
-        {view === 'form' ? (
-          <button className="emp-back-btn" onClick={() => { setView('list'); resetForm(); }}>
-            <FaArrowLeft size={12} /> Back
-          </button>
+      <div className="emp-header" style={{ justifyContent: view !== 'list' ? 'space-between' : 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        {view !== 'list' ? (
+          <>
+            <div>
+              <h1 className="emp-title">{editMode ? 'Edit Employee' : 'Add Employee'}</h1>
+              <p className="emp-subtitle">{editMode ? 'Update employee information' : 'Enter new employee details'}</p>
+            </div>
+            <button className="emp-back-btn" onClick={() => { setView('list'); resetForm(); }}>
+              <FaArrowLeft size={12} /> Back to List
+            </button>
+          </>
         ) : (
-          <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
-            <FaUserPlus size={13} /> Add Employee
-          </button>
+          <>
+            <div>
+              <h1 className="emp-title">Employee Directory</h1>
+              <p className="emp-subtitle">{totalElements} total employees</p>
+            </div>
+            <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
+              <FaUserPlus size={13} /> Add Employee
+            </button>
+          </>
         )}
       </div>
 
@@ -599,14 +587,13 @@ const Employees = ({ user }) => {
         </>
       ) : (
         <div className="emp-form-wrap">
-          <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
-
+          <form onSubmit={handleSubmit} className="emp-form-compact">
+            {/* Personal Information */}
             <div className="emp-form-section-compact">
               <div className="emp-section-label">Personal Information</div>
               <div className="emp-form-grid-3col">
-                
                 <div className={`emp-field-compact ${isFieldErr('name') ? 'has-error' : ''} ${isFieldOk('name') ? 'has-ok' : ''}`}>
-                  <label>Full Name <span className="req">*</span></label>
+                  <label className="required">Full Name</label>
                   <input
                     type="text"
                     placeholder="Enter full name"
@@ -619,7 +606,7 @@ const Employees = ({ user }) => {
                 </div>
 
                 <div className={`emp-field-compact ${isFieldErr('email') ? 'has-error' : ''} ${isFieldOk('email') ? 'has-ok' : ''}`}>
-                  <label>Email <span className="req">*</span></label>
+                  <label className="required">Email</label>
                   <input
                     type="email"
                     placeholder="example@company.com"
@@ -634,7 +621,7 @@ const Employees = ({ user }) => {
 
                 {!editMode && (
                   <div className={`emp-field-compact ${isFieldErr('password') ? 'has-error' : ''} ${isFieldOk('password') ? 'has-ok' : ''}`}>
-                    <label>Password <span className="req">*</span></label>
+                    <label className="required">Password</label>
                     <input
                       type="password"
                       placeholder="Min 6 chars, letters + numbers"
@@ -701,12 +688,14 @@ const Employees = ({ user }) => {
               </div>
             </div>
 
+            <div className="emp-divider" />
+
+            {/* Work Details */}
             <div className="emp-form-section-compact">
               <div className="emp-section-label">Work Details</div>
               <div className="emp-form-grid-3col">
-                
                 <div className={`emp-field-compact ${isFieldErr('branchId') ? 'has-error' : ''} ${isFieldOk('branchId') ? 'has-ok' : ''}`}>
-                  <label>Branch <span className="req">*</span></label>
+                  <label className="required">Branch</label>
                   <select
                     value={formData.branchId}
                     onChange={(e) => handleBranchChange(e.target.value)}
@@ -720,12 +709,11 @@ const Employees = ({ user }) => {
                 </div>
 
                 <div className={`emp-field-compact ${isFieldErr('departmentId') ? 'has-error' : ''} ${isFieldOk('departmentId') ? 'has-ok' : ''}`}>
-                  <label>Department <span className="req">*</span></label>
+                  <label className="required">Department</label>
                   <select
                     value={formData.departmentId}
                     onChange={(e) => handleChange('departmentId', e.target.value)}
                     onBlur={() => handleBlur('departmentId')}
-                    disabled={!formData.branchId || loadingDepartments}
                   >
                     <option value="">{!formData.branchId ? 'Select branch first' : 'Select department'}</option>
                     {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -734,7 +722,7 @@ const Employees = ({ user }) => {
                 </div>
 
                 <div className={`emp-field-compact ${isFieldErr('roleId') ? 'has-error' : ''} ${isFieldOk('roleId') ? 'has-ok' : ''}`}>
-                  <label>Role <span className="req">*</span></label>
+                  <label className="required">Role</label>
                   <select
                     value={formData.roleId}
                     onChange={(e) => handleChange('roleId', e.target.value)}
@@ -756,9 +744,7 @@ const Employees = ({ user }) => {
                     disabled={loadingGrades}
                   >
                     <option value="">Select grade (optional)</option>
-                    {grades.map(g => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
+                    {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
                   <FieldError msg={errors.gradeId} />
                 </div>
@@ -775,9 +761,12 @@ const Employees = ({ user }) => {
               </div>
             </div>
 
+            <div className="emp-divider" />
+
+            {/* Address */}
             <div className="emp-form-section-compact">
               <div className="emp-section-label">Address (Optional)</div>
-              <div className={`emp-field-compact-full ${isFieldErr('address') ? 'has-error' : ''}`}>
+              <div className={`emp-field-compact ${isFieldErr('address') ? 'has-error' : ''} ${isFieldOk('address') ? 'has-ok' : ''}`} style={{ gridColumn: 'span 3' }}>
                 <textarea
                   rows={2}
                   placeholder="Enter address"
@@ -794,10 +783,10 @@ const Employees = ({ user }) => {
               <button type="button" className="emp-cancel-btn" onClick={() => { setView('list'); resetForm(); }}>
                 Cancel
               </button>
-              <button type="submit" className="emp-submit-btn" disabled={submitting}>
+              <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                 {submitting
                   ? <><span className="emp-spinner" /> {editMode ? 'Updating…' : 'Creating…'}</>
-                  : <><FaSave size={12} /> {editMode ? 'Update' : 'Create'}</>
+                  : <><FaSave size={12} /> {editMode ? 'Update Employee' : 'Create Employee'}</>
                 }
               </button>
             </div>
