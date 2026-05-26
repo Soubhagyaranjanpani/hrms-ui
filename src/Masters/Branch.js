@@ -7,7 +7,7 @@ import { toast } from "../components/Toast";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { BASE_URL, STORAGE_KEYS } from "../config/api.config";
 
-/* ─── Validation Rules ─── */
+/* ─── Validation Rules (unchanged) ─── */
 const RULES = {
   branchCode: {
     required: true,
@@ -153,14 +153,23 @@ const Branch = () => {
     fetchBranches();
   }, [fetchBranches]);
 
-  const filteredBranches = branches.filter((b) => {
-    const query = debouncedSearch.toLowerCase();
-    return (
-      b.branchName?.toLowerCase().includes(query) ||
-      b.branchCode?.toLowerCase().includes(query) ||
-      b.city?.toLowerCase().includes(query)
-    );
-  });
+  // 🔁 FILTER + SORT: active first (status 'y'), then inactive ('n')
+  const filteredBranches = branches
+    .filter((b) => {
+      const query = debouncedSearch.toLowerCase();
+      return (
+        b.branchName?.toLowerCase().includes(query) ||
+        b.branchCode?.toLowerCase().includes(query) ||
+        b.city?.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => {
+      // Active (y) comes before inactive (n)
+      if (a.status === "y" && b.status === "n") return -1;
+      if (a.status === "n" && b.status === "y") return 1;
+      return 0;
+    });
+
   const totalItems = filteredBranches.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
@@ -529,8 +538,7 @@ const Branch = () => {
             </div>
           </>
         ) : (
-          /* ========== FORM VIEW – EXACTLY MATCHING EMPLOYEE FORM STRUCTURE ========== */
-
+          /* ========== FORM VIEW – exactly as original ========== */
           <div className="emp-form-wrap">
             <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
 
@@ -538,7 +546,6 @@ const Branch = () => {
                 <div className="emp-section-label">Branch Information</div>
                 <div className="emp-form-grid-3col">
 
-                  {/* Branch Code */}
                   <div className={`emp-field-compact ${isFieldErr('branchCode') ? 'has-error' : ''} ${isFieldOk('branchCode') ? 'has-ok' : ''}`}>
                     <label>Branch Code <span className="req">*</span></label>
                     <input
@@ -552,7 +559,6 @@ const Branch = () => {
                     <FieldError msg={errors.branchCode} />
                   </div>
 
-                  {/* Branch Name */}
                   <div className={`emp-field-compact ${isFieldErr('branchName') ? 'has-error' : ''} ${isFieldOk('branchName') ? 'has-ok' : ''}`}>
                     <label>Branch Name <span className="req">*</span></label>
                     <input
@@ -566,10 +572,8 @@ const Branch = () => {
                     <FieldError msg={errors.branchName} />
                   </div>
 
-                  {/* Address Textarea (now in same 3‑column row) */}
                   <div className={`emp-field-compact ${isFieldErr('address') ? 'has-error' : ''}`}>
                     <label>Address<span className="req">*</span></label>
-
                     <textarea
                       rows={2}
                       placeholder="Street, area, landmark"
@@ -581,10 +585,8 @@ const Branch = () => {
                     <FieldError msg={errors.address} />
                   </div>
 
-                  {/* City */}
                   <div className={`emp-field-compact ${isFieldErr('city') ? 'has-error' : ''}`} style={{ marginTop: '-20px' }}>
                     <label>City<span className="req">*</span></label>
-
                     <input
                       type="text"
                       placeholder="City"
@@ -596,10 +598,8 @@ const Branch = () => {
                     <FieldError msg={errors.city} />
                   </div>
 
-                  {/* State */}
                   <div className={`emp-field-compact ${isFieldErr('state') ? 'has-error' : ''}`} style={{ marginTop: '-20px' }}>
-
-                    <label>Pincode<span className="req">*</span></label>
+                    <label>State<span className="req">*</span></label>
                     <input
                       type="text"
                       placeholder="State"
@@ -611,10 +611,8 @@ const Branch = () => {
                     <FieldError msg={errors.state} />
                   </div>
 
-                  {/* Country */}
                   <div className={`emp-field-compact ${isFieldErr('country') ? 'has-error' : ''}`} style={{ marginTop: '-20px' }}>
                     <label>Country<span className="req">*</span></label>
-
                     <input
                       type="text"
                       placeholder="Country"
@@ -626,7 +624,6 @@ const Branch = () => {
                     <FieldError msg={errors.country} />
                   </div>
 
-                  {/* Pincode + two empty divs to keep 3 columns */}
                   <div className={`emp-field-compact ${isFieldErr('pincode') ? 'has-error' : ''}`}>
                     <label>Pincode<span className="req">*</span></label>
                     <input
@@ -642,7 +639,6 @@ const Branch = () => {
                 </div>
               </div>
 
-              {/* Form Actions */}
               <div className="emp-form-actions">
                 <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView('list'); }}>
                   Cancel

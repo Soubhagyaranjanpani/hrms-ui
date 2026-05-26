@@ -105,11 +105,19 @@ const Skills = () => {
     return () => clearTimeout(t);
   }, [searchName]);
 
-  // Filter & pagination
-  const filteredSkills = skillsData.filter((s) =>
-    s.employeeName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-    s.skillName.toLowerCase().includes(debouncedSearch.toLowerCase())
-  );
+  // 🔁 FILTER + SORT: active first (status 'y'), then inactive ('n')
+  const filteredSkills = skillsData
+    .filter((s) =>
+      s.employeeName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      s.skillName.toLowerCase().includes(debouncedSearch.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Active (y) comes before inactive (n)
+      if (a.status === "y" && b.status === "n") return -1;
+      if (a.status === "n" && b.status === "y") return 1;
+      return 0;
+    });
+
   const totalItems = filteredSkills.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
@@ -255,7 +263,7 @@ const Skills = () => {
 
   return (
     <>
-    
+
       <div className="emp-root">
         {/* Header */}
         <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
@@ -450,7 +458,7 @@ const Skills = () => {
                     </div>
                     <input
                       type="text"
-                      placeholder="React, Java, Communication"
+                      placeholder="e.g., React, Java, Communication"
                       value={formData.skillName}
                       maxLength={50}
                       onChange={(e) => handleChange('skillName', e.target.value)}
@@ -486,7 +494,7 @@ const Skills = () => {
                 <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                   {submitting
                     ? <><span className="emp-spinner" /> {editMode ? 'Updating…' : 'Creating…'}</>
-                    : <><FaSave size={12} /> {editMode ? 'Update Branch' : 'Create Branch'}</>
+                    : <><FaSave size={12} /> {editMode ? 'Update Skill' : 'Create Skill'}</>
                   }
                 </button>
               </div>

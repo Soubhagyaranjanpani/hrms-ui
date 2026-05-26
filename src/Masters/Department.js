@@ -154,10 +154,19 @@ const Department = () => {
     fetchBranches();
   }, [fetchDepartments]);
 
-  const filteredDepartments = departments.filter((d) =>
-    d.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-    d.deptCode?.toLowerCase().includes(debouncedSearch.toLowerCase())
-  );
+  // 🔁 FILTER + SORT: active first (status 'y'), then inactive ('n')
+  const filteredDepartments = departments
+    .filter((d) =>
+      d.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      d.deptCode?.toLowerCase().includes(debouncedSearch.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Active (y) comes before inactive (n)
+      if (a.status === "y" && b.status === "n") return -1;
+      if (a.status === "n" && b.status === "y") return 1;
+      return 0;
+    });
+
   const totalItems = filteredDepartments.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
@@ -496,7 +505,7 @@ const Department = () => {
             </div>
           </>
         ) : (
-          /* ========== FORM VIEW – EXACTLY LIKE BRANCH PAGE (with char counter & hint) ========== */
+          /* ========== FORM VIEW – EXACTLY LIKE BRANCH PAGE ========== */
           <div className="emp-form-wrap">
             <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
               <div className="emp-form-section-compact">

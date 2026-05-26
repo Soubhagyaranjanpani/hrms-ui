@@ -122,9 +122,18 @@ const Role = () => {
     fetchRoles();
   }, [fetchRoles]);
 
-  const filteredRoles = roles.filter((r) =>
-    r.roleName?.toLowerCase().includes(debouncedSearch.toLowerCase())
-  );
+  // 🔁 FILTER + SORT: active first (status 'y'), then inactive ('n')
+  const filteredRoles = roles
+    .filter((r) =>
+      r.roleName?.toLowerCase().includes(debouncedSearch.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Active (y) comes before inactive (n)
+      if (a.status === "y" && b.status === "n") return -1;
+      if (a.status === "n" && b.status === "y") return 1;
+      return 0;
+    });
+
   const totalItems = filteredRoles.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
@@ -262,35 +271,6 @@ const Role = () => {
 
   return (
     <>
-      {/* Scrollbar hiding (matches Branch page) */}
-      <style>{`
-        html, body, #root, .emp-root, .emp-table-wrap, .emp-form-wrap, 
-        .emp-modal, .emp-modal-overlay, .emp-search-bar, .emp-pagination {
-          scrollbar-width: none !important;
-          -ms-overflow-style: none !important;
-        }
-        html::-webkit-scrollbar, body::-webkit-scrollbar, #root::-webkit-scrollbar,
-        .emp-root::-webkit-scrollbar, .emp-table-wrap::-webkit-scrollbar,
-        .emp-form-wrap::-webkit-scrollbar, .emp-modal::-webkit-scrollbar,
-        .emp-modal-overlay::-webkit-scrollbar, .emp-search-bar::-webkit-scrollbar,
-        .emp-pagination::-webkit-scrollbar {
-          display: none !important;
-        }
-        .emp-root {
-          overflow-y: auto;
-          overflow-x: hidden;
-          height: 100vh;
-        }
-        .emp-table-wrap {
-          overflow-x: auto;
-          overflow-y: hidden;
-        }
-        .emp-form-wrap {
-          overflow-y: auto;
-          max-height: calc(100vh - 80px);
-        }
-      `}</style>
-
       <div className="emp-root">
         {/* Header */}
         <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
@@ -486,7 +466,7 @@ const Role = () => {
                     </div>
                     <input
                       type="text"
-                      placeholder=" Developer"
+                      placeholder="e.g., Developer"
                       value={formData.roleName}
                       maxLength={50}
                       onChange={(e) => handleChange('roleName', e.target.value)}
@@ -494,20 +474,18 @@ const Role = () => {
                     />
                     <FieldError msg={errors.roleName} />
                   </div>
-                  {/* <div></div> */}
-                  {/* <div></div> */}
                 </div>
               </div>
 
               {/* Form Actions */}
-               <div className="emp-form-actions">
+              <div className="emp-form-actions">
                 <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView('list'); }}>
                   Cancel
                 </button>
                 <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                   {submitting
                     ? <><span className="emp-spinner" /> {editMode ? 'Updating…' : 'Creating…'}</>
-                    : <><FaSave size={12} /> {editMode ? 'Update Branch' : 'Create Branch'}</>
+                    : <><FaSave size={12} /> {editMode ? 'Update Role' : 'Create Role'}</>
                   }
                 </button>
               </div>

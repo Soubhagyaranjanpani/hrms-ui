@@ -122,9 +122,18 @@ const Designation = () => {
     fetchDesignations();
   }, [fetchDesignations]);
 
-  const filteredDesignations = designations.filter((d) =>
-    d.designationName?.toLowerCase().includes(debouncedSearch.toLowerCase())
-  );
+  // 🔁 FILTER + SORT: active first (status 'y'), then inactive ('n')
+  const filteredDesignations = designations
+    .filter((d) =>
+      d.designationName?.toLowerCase().includes(debouncedSearch.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Active (y) comes before inactive (n)
+      if (a.status === "y" && b.status === "n") return -1;
+      if (a.status === "n" && b.status === "y") return 1;
+      return 0;
+    });
+
   const totalItems = filteredDesignations.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
@@ -454,7 +463,7 @@ const Designation = () => {
                     </div>
                     <input
                       type="text"
-                      placeholder="Designation Name"
+                      placeholder="e.g., Senior Software Engineer"
                       value={formData.designationName}
                       maxLength={50}
                       onChange={(e) => handleChange('designationName', e.target.value)}
@@ -469,14 +478,14 @@ const Designation = () => {
               </div>
 
               {/* Form Actions */}
-               <div className="emp-form-actions">
+              <div className="emp-form-actions">
                 <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView('list'); }}>
                   Cancel
                 </button>
                 <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                   {submitting
                     ? <><span className="emp-spinner" /> {editMode ? 'Updating…' : 'Creating…'}</>
-                    : <><FaSave size={12} /> {editMode ? 'Update Branch' : 'Create Branch'}</>
+                    : <><FaSave size={12} /> {editMode ? 'Update Designation' : 'Create Designation'}</>
                   }
                 </button>
               </div>
