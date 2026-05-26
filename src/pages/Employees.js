@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   FaSearch, FaEdit, FaTrash, FaUserPlus, FaTimes,
-  FaArrowLeft, FaSave, FaCheckCircle, FaTimesCircle,
-  FaExclamationCircle
+  FaArrowLeft, FaSave, FaExclamationCircle
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
 import axios from 'axios';
 
-/* ─── Validation Rules ─── */
+/* ─── Validation Rules (unchanged) ─── */
 const RULES = {
   name: {
     required: true,
@@ -88,18 +87,16 @@ const Employees = ({ user }) => {
   const [editMode, setEditMode] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  const [employees, setEmployees] = useState([]);
+  const [allEmployees, setAllEmployees] = useState([]);      // full list from API
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // Local pagination
   const [page, setPage] = useState(0);
-  const [size] = useState(5);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
+  const [rowsPerPage] = useState(5);
 
+  // Client‑side search (no debounce – instant like Branch page)
   const [searchName, setSearchName] = useState('');
-  const [filterActive] = useState(null);
-  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
@@ -131,32 +128,61 @@ const Employees = ({ user }) => {
     }
   };
 
-  useEffect(() => {
-    const t = setTimeout(() => { setDebouncedSearch(searchName); setPage(0); }, 500);
-    return () => clearTimeout(t);
-  }, [searchName]);
-
+  // ──────────────── FETCH ALL EMPLOYEES (client‑side search + pagination) ────────────────
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
     try {
-      let url = `${BASE_URL}/api/employees?page=${page}&size=${size}`;
-      if (debouncedSearch) url += `&name=${debouncedSearch}`;
-      if (filterActive !== null) url += `&isActive=${filterActive}`;
-      const res = await axios.get(url, axiosConfig);
+      // Fetch all employees in one go (adjust size as needed)
+      const res = await axios.get(`${BASE_URL}/api/employees?page=0&size=1000`, axiosConfig);
       if (res.data?.status === 200 && res.data?.response) {
-        const cleanedEmployees = (res.data.response.content || []).map(emp => ({
+        const cleaned = (res.data.response.content || []).map(emp => ({
           ...emp,
           name: cleanName(emp.name)
         }));
-        setEmployees(cleanedEmployees);
-        setTotalPages(res.data.response.totalPages || 0);
-        setTotalElements(res.data.response.totalElements || 0);
-      } else { setEmployees([]); }
+        setAllEmployees(cleaned);
+      } else {
+        setAllEmployees([]);
+      }
     } catch (err) {
       toast.error('Error', err.response?.data?.message || 'Failed to fetch employees');
-      setEmployees([]);
-    } finally { setLoading(false); }
-  }, [page, size, debouncedSearch, filterActive]);
+      setAllEmployees([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Client‑side filtering (matches Branch page style)
+  const filteredEmployees = allEmployees.filter(emp => {
+    const query = searchName.toLowerCase().trim();
+    if (!query) return true;
+    return (
+      emp.name?.toLowerCase().includes(query) ||
+      emp.email?.toLowerCase().includes(query) ||
+      emp.departmentName?.toLowerCase().includes(query) ||
+      emp.roleName?.toLowerCase().includes(query) ||
+      emp.branchName?.toLowerCase().includes(query)
+    );
+  });
+
+  // Local pagination
+  const totalItems = filteredEmployees.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setPage(0);
+  }, [searchName]);
+
+  // Fetch data once on mount
+  useEffect(() => {
+    fetchEmployees();
+    fetchBranches();
+    fetchRoles();
+    fetchAllDepartments();
+    fetchGrades();
+  }, []);
 
   const cleanName = (name) => {
     if (!name) return '';
@@ -210,13 +236,7 @@ const Employees = ({ user }) => {
     setDepartments(allDepartments.filter(d => d.branchId === parseInt(branchId)));
   };
 
-  useEffect(() => {
-    fetchEmployees(); fetchBranches(); fetchRoles(); fetchAllDepartments(); fetchGrades();
-  }, []);
-  useEffect(() => {
-    if (view === 'list') fetchEmployees();
-  }, [page, debouncedSearch, filterActive]);
-
+  // ──────────────── All form handlers (unchanged) ────────────────
   const handleChange = (field, value) => {
     if (field === 'phone') value = value.replace(/\D/g, '').slice(0, 10);
     if (field === 'name' && /\d/.test(value)) return;
@@ -290,11 +310,10 @@ const Employees = ({ user }) => {
           toast.success('Success', 'Employee updated successfully');
           resetForm();
           setView('list');
-          fetchEmployees();
+          fetchEmployees(); // refresh the list
         } else {
           toast.error('Error', res.data?.message || 'Failed to update');
         }
-
       } else {
         const res = await axios.post(
           `${BASE_URL}/api/employees/create`,
@@ -326,7 +345,6 @@ const Employees = ({ user }) => {
           toast.error('Error', res.data?.message || 'Failed to create');
         }
       }
-
     } catch (err) {
       toast.error('Error', err.response?.data?.message || 'Something went wrong');
     } finally {
@@ -423,7 +441,7 @@ const Employees = ({ user }) => {
     return range;
   };
 
-  if (loading && view === 'list' && employees.length === 0) {
+  if (loading && view === 'list' && allEmployees.length === 0) {
     return <LoadingSpinner message="Loading employees..." />;
   }
 
@@ -444,7 +462,7 @@ const Employees = ({ user }) => {
           <>
             <div>
               <h1 className="emp-title">Employee Directory</h1>
-              <p className="emp-subtitle">{totalElements} total employees</p>
+              <p className="emp-subtitle">{totalItems} total employees</p>
             </div>
             <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
               <FaUserPlus size={13} /> Add Employee
@@ -461,7 +479,7 @@ const Employees = ({ user }) => {
               <input
                 className="emp-search-input"
                 type="text"
-                placeholder="Search by name…"
+                placeholder="Search by name, email, department, role or branch…"
                 value={searchName}
                 onChange={(e) => setSearchName(e.target.value)}
               />
@@ -488,13 +506,13 @@ const Employees = ({ user }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {employees.length > 0 ? employees.map((emp, idx) => {
+                  {currentEmployees.length > 0 ? currentEmployees.map((emp, idx) => {
                     const cleanedName = cleanName(emp.name);
                     const ac = getAvatarColor(cleanedName);
                     const initials = getInitials(cleanedName);
                     return (
                       <tr key={emp.id} className="emp-row">
-                        <td className="emp-sno">{page * size + idx + 1}</td>
+                        <td className="emp-sno">{startIndex + idx + 1}</td>
                         <td>
                           <div className="emp-info-cell">
                             <div className="emp-avatar" style={{ background: ac.bg, color: ac.color }}>
@@ -546,46 +564,31 @@ const Employees = ({ user }) => {
             </div>
 
             {totalPages > 1 && (
-              <div className="emp-pagination">
-                <span className="emp-page-info">
-                  Showing {page * size + 1}–{Math.min((page + 1) * size, totalElements)} of {totalElements} employees
-                </span>
+              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="emp-page-info">
+                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+                  </span>
+                </div>
                 <div className="emp-page-controls">
-                  <button
-                    className="emp-page-btn"
-                    disabled={page === 0}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    ← Prev
-                  </button>
-
+                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
                   {getPaginationRange().map((pg, i) =>
-                    pg === '...'
-                      ? <span key={`dots-${i}`} className="emp-page-dots">…</span>
-                      : (
-                        <button
-                          key={pg}
-                          className={`emp-page-num ${pg === page ? 'active' : ''}`}
-                          onClick={() => setPage(pg)}
-                        >
-                          {pg + 1}
-                        </button>
-                      )
+                    pg === '...' ? (
+                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                    ) : (
+                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
+                        {pg + 1}
+                      </button>
+                    )
                   )}
-
-                  <button
-                    className="emp-page-btn"
-                    disabled={page + 1 >= totalPages}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    Next →
-                  </button>
+                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
                 </div>
               </div>
             )}
           </div>
         </>
       ) : (
+        // Form view (unchanged – copy from your original)
         <div className="emp-form-wrap">
           <form onSubmit={handleSubmit} className="emp-form-compact">
             {/* Personal Information */}
