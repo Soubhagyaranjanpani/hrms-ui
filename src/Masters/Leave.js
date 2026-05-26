@@ -124,7 +124,7 @@ const LeaveTypes = () => {
     if (!ensureToken()) return;
     setLoading(true);
     try {
-      const res = await axios.get(`${BASE_URL}/api/leave-type`, getAuthConfig());
+      const res = await axios.get(`${BASE_URL}/api/leave-type?flag=0`, getAuthConfig());
       let dataArray = [];
       if (res.data?.status === 200 && Array.isArray(res.data.response)) {
         dataArray = res.data.response;
@@ -146,9 +146,17 @@ const LeaveTypes = () => {
     fetchLeaveTypes();
   }, [fetchLeaveTypes]);
 
-  const filteredItems = leaveTypes.filter((item) =>
-    item.name?.toLowerCase().includes(debouncedSearch.toLowerCase())
-  );
+  // 🔁 FILTER + SORT: active (isActive === true) first, then inactive
+  const filteredItems = leaveTypes
+    .filter((item) =>
+      item.name?.toLowerCase().includes(debouncedSearch.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+      return 0;
+    });
+
   const totalItems = filteredItems.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
@@ -198,7 +206,6 @@ const LeaveTypes = () => {
 
       let res;
       if (editMode) {
-        // For edit, we keep the existing status (we don't allow status change in form)
         const existing = leaveTypes.find(lt => lt.id === selectedItem.id);
         payload.isActive = existing ? existing.isActive : true;
         res = await axios.put(`${BASE_URL}/api/leave-type/${selectedItem.id}`, payload, getAuthConfig());
@@ -243,13 +250,14 @@ const LeaveTypes = () => {
 
   const confirmStatusChange = async () => {
     if (!ensureToken()) return;
+
     const { id, newStatus } = statusAction;
     setStatusUpdating(true);
+
     try {
-      const fetchRes = await axios.get(`${BASE_URL}/api/leave-type/${id}`, getAuthConfig());
-      const existing = fetchRes.data?.response || fetchRes.data;
-      if (!existing || !existing.id) {
-        throw new Error("Could not retrieve current leave type data");
+      const existing = leaveTypes.find((item) => item.id === id);
+      if (!existing) {
+        throw new Error("Leave type not found");
       }
 
       const updatePayload = {
@@ -259,20 +267,27 @@ const LeaveTypes = () => {
       };
 
       const res = await axios.put(`${BASE_URL}/api/leave-type/${id}`, updatePayload, getAuthConfig());
+
       if (res.status >= 200 && res.status < 300) {
         toast.success(`Leave type ${newStatus ? "activated" : "deactivated"}`);
-        await fetchLeaveTypes();
-        setPage(0);
-      } else {
-        throw new Error(res.data?.message || "Status change failed");
+
+        // Instant UI update (no full refetch needed, but fetchLeaveTypes is also fine)
+        setLeaveTypes((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, isActive: newStatus } : item
+          )
+        );
+        setShowStatusModal(false);
       }
     } catch (err) {
-      console.error("Status change error:", err);
-      toast.error("Error", err.response?.data?.message || "Failed to change status");
+      console.error("Status update error:", err);
+      if (err.response?.status === 401) {
+        toast.error("Unauthorized", "Token expired. Please login again.");
+      } else {
+        toast.error("Error", err.response?.data?.message || "Failed to update status");
+      }
     } finally {
       setStatusUpdating(false);
-      setShowStatusModal(false);
-      setStatusAction({ id: null, newStatus: null, name: "" });
     }
   };
 
@@ -469,7 +484,7 @@ const LeaveTypes = () => {
             </div>
           </>
         ) : (
-          /* ========== REDESIGNED FORM – EXACTLY LIKE BRANCH PAGE ========== */
+          /* ========== FORM ========== */
           <div className="emp-form-wrap">
             <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
               <div className="emp-form-section-compact">
@@ -512,14 +527,14 @@ const LeaveTypes = () => {
               </div>
 
               {/* Form Actions */}
-               <div className="emp-form-actions">
+              <div className="emp-form-actions">
                 <button type="button" className="emp-cancel-btn" onClick={() => { resetForm(); setView('list'); }}>
                   Cancel
                 </button>
                 <button type="submit" className="emp-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                   {submitting
                     ? <><span className="emp-spinner" /> {editMode ? 'Updating…' : 'Creating…'}</>
-                    : <><FaSave size={12} /> {editMode ? 'Update Branch' : 'Create Branch'}</>
+                    : <><FaSave size={12} /> {editMode ? 'Update Leave Type' : 'Create Leave Type'}</>
                   }
                 </button>
               </div>
