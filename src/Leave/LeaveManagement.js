@@ -77,21 +77,31 @@ const LeaveManagement = ({ user }) => {
     }
   }, []);
 
-  // Fetch leave types
-  const fetchLeaveTypes = useCallback(async () => {
-    try {
-      const response = await axios.get(`${API_ENDPOINTS.BASE_URL || 'http://localhost:8080/hrms'}/api/leave-type`, {
+// Fetch leave types
+const fetchLeaveTypes = useCallback(async () => {
+  try {
+    const response = await axios.get(
+      API_ENDPOINTS.LEAVE_TYPES,  
+      {
         headers: getAuthHeaders(),
-      });
-      const types = Array.isArray(response.data) ? response.data : [];
-      setLeaveTypes(types);
-      if (types.length === 0) toast.warning('No Leave Types', 'No leave types available');
-    } catch (error) {
-      console.error('Error fetching leave types:', error);
-      toast.error('Error', 'Failed to load leave types');
-      setLeaveTypes([]);
+        params: { flag: 1 }  // Pass flag as query parameter
+      }
+    );
+
+    const types = Array.isArray(response.data) ? response.data : [];
+
+    setLeaveTypes(types);
+
+    if (types.length === 0) {
+      toast.warning('No Leave Types', 'No leave types available');
     }
-  }, []);
+
+  } catch (error) {
+    console.error('Error fetching leave types:', error);
+    toast.error('Error', 'Failed to load leave types');
+    setLeaveTypes([]);
+  }
+}, []);
 
   // Fetch my leaves
   const fetchMyLeaves = useCallback(async () => {

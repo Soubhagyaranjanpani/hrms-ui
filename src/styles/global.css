@@ -3378,4 +3378,115 @@ h1, h2, h3, h4, h5, h6 {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-      
+     
+/* Bulk Upload Button */
+.emp-bulk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.emp-bulk-btn:hover {
+  background: #4f46e5;
+}
+
+/* Bulk Modal */
+.emp-bulk-modal {
+  max-width: 500px;
+}
+
+/* File Dropzone */
+.emp-bulk-upload-area {
+  margin: 20px 0;
+}
+
+.emp-file-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.emp-file-dropzone:hover {
+  border-color: #6366f1;
+  background: #f8f9ff;
+}
+
+.emp-file-dropzone.has-file {
+  border-color: #6366f1;
+  background: #f8f9ff;
+  border-style: solid;
+}
+
+.emp-file-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: #fee2e2;
+  color: #dc2626;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.emp-file-remove-btn:hover {
+  background: #fecaca;
+}
+
+/* Bulk Info Section */
+.emp-bulk-info {
+  background: #f8f9ff;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e0e7ff;
+}
+
+.emp-template-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: white;
+  color: #6366f1;
+  border: 1px solid #6366f1;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.emp-template-download-btn:hover {
+  background: #6366f1;
+  color: white;
+}
+
+/* Spinner animation (if not already present) */
+.emp-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

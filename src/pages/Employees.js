@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FaSearch, FaEdit, FaTrash, FaUserPlus, FaTimes,
-  FaArrowLeft, FaSave, FaExclamationCircle
+  FaArrowLeft, FaSave, FaExclamationCircle, FaUpload, FaDownload
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -87,7 +87,7 @@ const Employees = ({ user }) => {
   const [editMode, setEditMode] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  const [allEmployees, setAllEmployees] = useState([]);      // full list from API
+  const [allEmployees, setAllEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -95,11 +95,17 @@ const Employees = ({ user }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
 
-  // Client‑side search (no debounce – instant like Branch page)
+  // Client‑side search
   const [searchName, setSearchName] = useState('');
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
+
+  // Bulk upload states
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     name: '', email: '', password: '', phone: '',
@@ -128,11 +134,10 @@ const Employees = ({ user }) => {
     }
   };
 
-  // ──────────────── FETCH ALL EMPLOYEES (client‑side search + pagination) ────────────────
+  // ──────────────── FETCH ALL EMPLOYEES ────────────────
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch all employees in one go (adjust size as needed)
       const res = await axios.get(`${BASE_URL}/api/employees?page=0&size=1000`, axiosConfig);
       if (res.data?.status === 200 && res.data?.response) {
         const cleaned = (res.data.response.content || []).map(emp => ({
@@ -151,7 +156,7 @@ const Employees = ({ user }) => {
     }
   }, []);
 
-  // Client‑side filtering (matches Branch page style)
+  // Client‑side filtering
   const filteredEmployees = allEmployees.filter(emp => {
     const query = searchName.toLowerCase().trim();
     if (!query) return true;
@@ -236,6 +241,111 @@ const Employees = ({ user }) => {
     setDepartments(allDepartments.filter(d => d.branchId === parseInt(branchId)));
   };
 
+  // ──────────────── BULK UPLOAD HANDLERS (FIXED) ────────────────
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    const allowedExtensions = ['.xlsx', '.xls', '.csv'];
+    const fileName = file.name.toLowerCase();
+    const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+    
+    if (!hasValidExtension) {
+      toast.error('Invalid File', 'Please upload an Excel (.xlsx, .xls) or CSV file');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File Too Large', 'File size should not exceed 5MB');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    
+    setSelectedFile(file);
+  };
+
+  const handleBulkUpload = async () => {
+    if (!selectedFile) {
+      toast.warning('No File', 'Please select a file to upload');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      // IMPORTANT: For multipart/form-data, do NOT set Content-Type header
+      // Let the browser set it automatically with the correct boundary parameter
+      const uploadConfig = {
+        headers: {
+          Authorization: `Bearer ${getAuthToken()}`
+          // Content-Type is automatically set by browser for FormData
+        }
+      };
+
+      const res = await axios.post(
+        `${BASE_URL}/api/employees/bulk-upload`,
+        formData,
+        uploadConfig
+      );
+
+      if (res.data?.status === 200) {
+        toast.success('Success', res.data?.message || 'Employees uploaded successfully');
+        setShowBulkUploadModal(false);
+        setSelectedFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        fetchEmployees(); // Refresh the list
+      } else {
+        toast.error('Error', res.data?.message || 'Failed to upload employees');
+      }
+    } catch (err) {
+      console.error('Bulk upload error:', err);
+      const errorMessage = err.response?.data?.message || 'Failed to upload employees';
+      toast.error('Upload Failed', errorMessage);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const downloadSampleTemplate = () => {
+    // Create a sample CSV template
+    const headers = [
+      'Name', 'Email', 'Password', 'Phone', 'Branch ID', 
+      'Department ID', 'Role ID', 'Grade ID', 'Joining Date',
+      'Address', 'Bank Account', 'UAN', 'PAN'
+    ];
+    
+    const sampleData = [
+      'John Doe', 'john@example.com', 'pass123', '9876543210', '1',
+      '1', '1', '1', '2024-01-01',
+      '123 Main St', '1234567890', '123456789012', 'ABCDE1234F'
+    ];
+    
+    const csvContent = [
+      headers.join(','),
+      sampleData.join(',')
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'employee_bulk_upload_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success('Template Downloaded', 'Fill in the template and upload it back');
+  };
+
   // ──────────────── All form handlers (unchanged) ────────────────
   const handleChange = (field, value) => {
     if (field === 'phone') value = value.replace(/\D/g, '').slice(0, 10);
@@ -310,7 +420,7 @@ const Employees = ({ user }) => {
           toast.success('Success', 'Employee updated successfully');
           resetForm();
           setView('list');
-          fetchEmployees(); // refresh the list
+          fetchEmployees();
         } else {
           toast.error('Error', res.data?.message || 'Failed to update');
         }
@@ -464,9 +574,14 @@ const Employees = ({ user }) => {
               <h1 className="emp-title">Employee Directory</h1>
               <p className="emp-subtitle">{totalItems} total employees</p>
             </div>
-            <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
-              <FaUserPlus size={13} /> Add Employee
-            </button>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button className="emp-bulk-btn" onClick={() => setShowBulkUploadModal(true)}>
+                <FaUpload size={13} /> Bulk Upload
+              </button>
+              <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
+                <FaUserPlus size={13} /> Add Employee
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -588,7 +703,7 @@ const Employees = ({ user }) => {
           </div>
         </>
       ) : (
-        // Form view (unchanged – copy from your original)
+        // Form view
         <div className="emp-form-wrap">
           <form onSubmit={handleSubmit} className="emp-form-compact">
             {/* Personal Information */}
@@ -797,6 +912,7 @@ const Employees = ({ user }) => {
         </div>
       )}
 
+      {/* Delete Modal */}
       {showDeleteModal && employeeToDelete && (
         <div className="emp-modal-overlay" onClick={() => setShowDeleteModal(false)}>
           <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
@@ -809,6 +925,123 @@ const Employees = ({ user }) => {
             <div className="emp-modal-actions">
               <button className="emp-modal-cancel" onClick={() => setShowDeleteModal(false)}>Cancel</button>
               <button className="emp-modal-confirm" onClick={handleDelete}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Upload Modal */}
+      {showBulkUploadModal && (
+        <div className="emp-modal-overlay" onClick={() => { 
+          if (!uploading) {
+            setShowBulkUploadModal(false); 
+            setSelectedFile(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+          }
+        }}>
+          <div className="emp-modal emp-bulk-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="emp-modal-icon" style={{ background: '#e0e7ff', color: '#4338ca' }}>
+              <FaUpload size={18} />
+            </div>
+            <h3 className="emp-modal-title">Bulk Upload Employees</h3>
+            <p className="emp-modal-body">
+              Upload an Excel or CSV file containing employee data.
+            </p>
+            
+            <div className="emp-bulk-upload-area">
+              <div 
+                className={`emp-file-dropzone ${selectedFile ? 'has-file' : ''}`}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                  disabled={uploading}
+                />
+                
+                {!selectedFile ? (
+                  <>
+                    <FaUpload size={24} style={{ color: '#6366f1', marginBottom: '8px' }} />
+                    <p style={{ margin: '0 0 4px 0', fontWeight: 500 }}>Click to select file</p>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                      Supported formats: .xlsx, .xls, .csv (Max 5MB)
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '24px' }}>📄</span>
+                      <div style={{ textAlign: 'left' }}>
+                        <p style={{ margin: 0, fontWeight: 500, fontSize: '14px' }}>{selectedFile.name}</p>
+                        <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                          {(selectedFile.size / 1024).toFixed(2)} KB
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="emp-file-remove-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      disabled={uploading}
+                    >
+                      <FaTimes size={10} /> Remove
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="emp-bulk-info">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <FaDownload size={14} style={{ color: '#6366f1' }} />
+                <span style={{ fontSize: '13px', fontWeight: 500 }}>Download Template</span>
+              </div>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#666' }}>
+                Don't have the correct format? Download our template and fill in the data.
+              </p>
+              <button
+                type="button"
+                className="emp-template-download-btn"
+                onClick={downloadSampleTemplate}
+              >
+                <FaDownload size={12} /> Download Sample Template
+              </button>
+            </div>
+
+            <div className="emp-modal-actions" style={{ marginTop: '20px' }}>
+              <button 
+                className="emp-modal-cancel" 
+                onClick={() => {
+                  setShowBulkUploadModal(false);
+                  setSelectedFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+                disabled={uploading}
+              >
+                Cancel
+              </button>
+              <button 
+                className="emp-modal-confirm" 
+                onClick={handleBulkUpload}
+                disabled={!selectedFile || uploading}
+                style={{ 
+                  background: uploading || !selectedFile ? '#ccc' : '#6366f1',
+                  cursor: uploading || !selectedFile ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {uploading ? (
+                  <><span className="emp-spinner" style={{ width: '14px', height: '14px' }} /> Uploading...</>
+                ) : (
+                  <><FaUpload size={12} /> Upload Employees</>
+                )}
+              </button>
             </div>
           </div>
         </div>

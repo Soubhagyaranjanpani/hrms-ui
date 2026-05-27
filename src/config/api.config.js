@@ -1,6 +1,8 @@
-export const BASE_URL = "http://localhost:8080/hrms";
+// export const BASE_URL = "http://localhost:8080/hrms";
+export const BASE_URL = "http://103.133.215.182:8081/hrms";
 
-// export const BASE_URL = "http://103.133.215.182:8081/hrms";
+
+// export const BASE_URL = "http://192.168.1.200:8081/hrms";
 
 export const API_ENDPOINTS = {
   // ── Auth / Employee ──────────────────────────
@@ -105,6 +107,11 @@ export const API_ENDPOINTS = {
   PROCESS_PAYROLL:         `${BASE_URL}/api/payroll/process`,
   SAVE_SALARY_STRUCTURE:   `${BASE_URL}/api/payroll/structure`,
   GET_ALL_STRUCTURES:      `${BASE_URL}/api/payroll/structure/all`,
+
+   REPORT_TYPES: `${BASE_URL}/api/reports/types`,
+  REPORT_GENERATE: `${BASE_URL}/api/reports/generate`,
+  REPORT_DOWNLOAD_EXCEL: `${BASE_URL}/api/reports/download/excel`,
+  REPORT_DOWNLOAD_PDF: `${BASE_URL}/api/reports/download/pdf`,
 
 
 };

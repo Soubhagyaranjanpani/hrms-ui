@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FaUsers, FaTasks, FaRupeeSign, FaStar,
   FaUserPlus, FaLayerGroup, FaRobot, FaChevronRight, FaCircle,
@@ -127,6 +128,7 @@ const StatTile = ({ label, value, bg, color }) => (
 ═══════════════════════════════════════════════════════════════ */
 export default function Dashboard({ user }) {
   const cu = user || getUser();
+  const navigate = useNavigate();
 
   const [d, setD]   = useState(null);
   const [lx, setLx] = useState(true);
@@ -246,11 +248,6 @@ export default function Dashboard({ user }) {
       icon:   <FaStar size={18} />, route: '/Performance',
     },
   ];
-
-  // Navigation helper (replaces useNavigate)
-  const navigate = (path) => {
-    window.location.href = path;
-  };
 
   return (
     <div style={{ padding: '20px 24px', background: C.bg, minHeight: '100vh', fontFamily: "'Inter','DM Sans',sans-serif", fontSize: 13, color: C.text1 }}>

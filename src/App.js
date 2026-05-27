@@ -154,6 +154,7 @@ function App() {
 
           <Route path="SalaryConfig" element={<SalaryConfig user={currentUser} />} />
           <Route path="EmployeeGrade" element={<EmployeeGrade user={currentUser} />} />
+          <Route path="reports" element={<Reports user={currentUser} />} />
 
 
 

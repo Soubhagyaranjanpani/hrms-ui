@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   FaTachometerAlt, FaUsers, FaCalendarCheck, FaMoneyBillWave,
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog,
   FaBuilding, FaSitemap,
-  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks, FaRupeeSign
+  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks, FaRupeeSign, FaSignOutAlt
 } from 'react-icons/fa';
 import { BsChevronDown, BsChevronRight } from 'react-icons/bs';
 import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
@@ -17,101 +17,94 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   const [payrollOpen, setPayrollOpen] = useState(true);
   const [documentsOpen, setDocumentsOpen] = useState(true);
   const [tasksOpen, setTasksOpen] = useState(true);
+  const [userRole, setUserRole] = useState(null);
 
+  useEffect(() => {
+    // Get user role from localStorage or your auth context
+    // Convert to proper case for comparison
+    const role = localStorage.getItem('roleName') || 'Employee';
+    // Normalize role: capitalize first letter, rest lowercase
+    const normalizedRole = role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+    console.log('User Role:', role, 'Normalized:', normalizedRole); // For debugging
+    setUserRole(normalizedRole);
+  }, []);
+
+  // Menu items accessible to all roles
   const menuItems = [
-    { path: '/dashboard', icon: <FaTachometerAlt />, label: 'Dashboard' },
-    { path: '/documents', icon: <FaFileAlt />, label: 'All Documents' },
+    { path: '/dashboard', icon: <FaTachometerAlt />, label: 'Dashboard', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/documents', icon: <FaFileAlt />, label: 'All Documents', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/reports', icon: <FaChartBar />, label: 'Reports', roles: ['Admin', 'Hr', 'Manager'] },
   ];
 
-  // Employee section items
+  // Employee section items with role restrictions
   const employeeItems = [
-    { path: '/employees', icon: <FaUsers />, label: 'Employee ' },
-    { path: 'attendance-dashboard', icon: <FaChartLine />, label: 'Attendance Dashboard' },
-    { path: 'attendance-summary', icon: <FaChartPie />, label: 'Attendance Summary' },
-    { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy' },
-    { path: '/attendance', icon: <FaCalendarCheck />, label: 'Attendance' },
-    { path: '/training', icon: <FaChalkboardTeacher />, label: 'Training' },
-    { path: '/EmployeeGrade', icon: <FaUserTag />, label: 'Employee Grade' },
+    { path: '/employees', icon: <FaUsers />, label: 'Employee', roles: ['Admin', 'Hr', 'Manager'] },
+    { path: '/attendance-dashboard', icon: <FaChartLine />, label: 'Attendance Dashboard', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/attendance-summary', icon: <FaChartPie />, label: 'Attendance Summary', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy', roles: ['Admin', 'Hr'] },
+    { path: '/attendance', icon: <FaCalendarCheck />, label: 'Attendance', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/EmployeeGrade', icon: <FaUserTag />, label: 'Employee Grade', roles: ['Admin', 'Hr'] },
   ];
 
-  // Leave section items
+  // Leave section items with role restrictions
   const leaveItems = [
-    { path: '/LeaveDashboard', icon: <FaChartLine />, label: 'Leave Dashboard' },
-    { path: '/leaves', icon: <FaPlane />, label: 'Apply Leave' },
-    { path: '/approvedLeaves', icon: <FaCheck />, label: 'Approve & Reject leave' },
-    { path: '/leavePolicy', icon: <FaCog />, label: 'Leave Policy' },
-    // { path: '/leaveCalendar', icon: <FaChartBar />, label: 'Leave Calendar' },
-    { path: '/holidays', icon: <FaLeaf />, label: 'Holiday Management' },
-
-
+    { path: '/LeaveDashboard', icon: <FaChartLine />, label: 'Leave Dashboard', roles: ['Admin', 'Hr', 'Manager'] },
+    { path: '/leaves', icon: <FaPlane />, label: 'Apply Leave', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/approvedLeaves', icon: <FaCheck />, label: 'Approve & Reject leave', roles: ['Admin', 'Hr', 'Manager'] },
+    { path: '/leavePolicy', icon: <FaCog />, label: 'Leave Policy', roles: ['Admin', 'Hr'] },
+    { path: '/holidays', icon: <FaLeaf />, label: 'Holiday Management', roles: ['Admin', 'Hr'] },
   ];
 
+  // Master section items - only for Admin
   const masterItems = [
-    { path: '/branch', icon: <FaBuilding />, label: 'Branches' },
-    { path: '/department', icon: <FaSitemap />, label: 'Departments' },
-    { path: '/role', icon: <FaUserTag />, label: 'Roles' },
-    { path: '/designation', icon: <FaCheck />, label: 'Designation' },
-    { path: '/skills', icon: <FaChartBar />, label: 'Skills' },
-    { path: '/leave', icon: <FaCalendarCheck />, label: 'Leave' },
-
-
+    { path: '/branch', icon: <FaBuilding />, label: 'Branches', roles: ['Admin'] },
+    { path: '/department', icon: <FaSitemap />, label: 'Departments', roles: ['Admin'] },
+    { path: '/role', icon: <FaUserTag />, label: 'Roles', roles: ['Admin'] },
+    { path: '/designation', icon: <FaCheck />, label: 'Designation', roles: ['Admin'] },
+    { path: '/leave', icon: <FaCalendarCheck />, label: 'Leave', roles: ['Admin'] },
   ];
 
-  // Payroll section items
+  // Payroll section items - only Admin and HR
   const payrollItems = [
-    { path: '/payroll-dashboard', icon: <FaChartBar />, label: 'Payroll Dashboard' },
-    { path: '/SalaryConfig', icon: <FaCog />, label: 'Salary Configuration' },
-
-    { path: '/salary-structure', icon: <FaRupeeSign />, label: 'Salary Structure' },
-    { path: '/payroll', icon: <FaMoneyBillWave />, label: 'Payroll Management' },
-
-
-    // { path: '/reports', icon: <FaChartBar />, label: 'Payroll Reports' },
+    { path: '/payroll-dashboard', icon: <FaChartBar />, label: 'Payroll Dashboard', roles: ['Admin', 'Hr'] },
+    { path: '/SalaryConfig', icon: <FaCog />, label: 'Salary Configuration', roles: ['Admin', 'Hr'] },
+    { path: '/salary-structure', icon: <FaRupeeSign />, label: 'Salary Structure', roles: ['Admin', 'Hr'] },
+    { path: '/payroll', icon: <FaMoneyBillWave />, label: 'Payroll Management', roles: ['Admin', 'Hr'] },
   ];
 
-  // Task Management section items
+  // Task Management items - all roles
   const tasksItems = [
-    { path: '/TaskDashboard', icon: <FaTachometerAlt />, label: 'Task Dashboard' },
-    { path: '/CreateTask', icon: <FaTasks />, label: 'Create &Edit Task' },
-    { path: '/TaskList', icon: <FaTasks />, label: 'My Tasks' },
-    // { path: '/TaskDetail', icon: <FaTasks />, label: 'Task Detail' },
-    { path: '/performance', icon: <FaChartLine />, label: 'Performance' },
-    { path: '/PerformanceReview', icon: <FaChartLine />, label: 'Performance Review' },
-
+    { path: '/TaskDashboard', icon: <FaTachometerAlt />, label: 'Task Dashboard', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/CreateTask', icon: <FaTasks />, label: 'Create & Edit Task', roles: ['Admin', 'Hr', 'Manager'] },
+    { path: '/TaskList', icon: <FaTasks />, label: 'My Tasks', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/performance', icon: <FaChartLine />, label: 'Performance', roles: ['Admin', 'Hr', 'Manager'] },
+    { path: '/PerformanceReview', icon: <FaChartLine />, label: 'Performance Review', roles: ['Admin', 'Hr', 'Manager'] },
   ];
 
-  // Documents section items
-  // const documentsItems = [
-
-  //    { path: '/documents/employee', icon: <FaFileAlt />, label: 'Employee Documents' },
-  //    { path: '/documents/company', icon: <FaFileAlt />, label: 'Company Documents' },
-  // ];
-
-  const toggleMaster = () => {
-    setMasterOpen(!masterOpen);
+  // Helper function to check if user has access to an item
+  const hasAccess = (itemRoles) => {
+    if (!userRole) return false;
+    return itemRoles.includes(userRole);
   };
 
-  const toggleEmployee = () => {
-    setEmployeeOpen(!employeeOpen);
+  // Helper function to check if a section has any visible items
+  const hasAnyVisibleItems = (items) => {
+    return items.some(item => hasAccess(item.roles));
   };
 
-  const toggleLeave = () => {
-    setLeaveOpen(!leaveOpen);
-  };
-
-  const togglePayroll = () => {
-    setPayrollOpen(!payrollOpen);
-  };
-
-  const toggleDocuments = () => {
-    setDocumentsOpen(!documentsOpen);
-  };
-
-  const toggleTasks = () => {
-    setTasksOpen(!tasksOpen);
-  };
+  const toggleMaster = () => setMasterOpen(!masterOpen);
+  const toggleEmployee = () => setEmployeeOpen(!employeeOpen);
+  const toggleLeave = () => setLeaveOpen(!leaveOpen);
+  const togglePayroll = () => setPayrollOpen(!payrollOpen);
+  const toggleDocuments = () => setDocumentsOpen(!documentsOpen);
+  const toggleTasks = () => setTasksOpen(!tasksOpen);
 
   const sidebarWidth = isMobile ? '260px' : (sidebarCollapsed ? '72px' : '260px');
+
+  // If role is not loaded yet, show loading or return null
+  if (!userRole) {
+    return null; // Or a loading spinner
+  }
 
   return (
     <div
@@ -165,38 +158,40 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
           }
         }}
       >
-        {/* Dashboard Menu Item */}
+        {/* Dashboard Menu Items */}
         {menuItems.map((item, index) => (
-          <li key={index} style={{ margin: '3px 10px' }}>
-            <NavLink
-              to={item.path}
-              title={sidebarCollapsed ? item.label : ''}
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: sidebarCollapsed ? '0' : '12px',
-                justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                padding: sidebarCollapsed ? '11px' : '11px 14px',
-                color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
-                textDecoration: 'none',
-                borderRadius: '10px',
-                transition: 'all 0.2s ease',
-                background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
-                borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
-                fontSize: '14px',
-                fontWeight: isActive ? 600 : 400,
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-              })}
-            >
-              <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
-              {!sidebarCollapsed && <span>{item.label}</span>}
-            </NavLink>
-          </li>
+          hasAccess(item.roles) && (
+            <li key={index} style={{ margin: '3px 10px' }}>
+              <NavLink
+                to={item.path}
+                title={sidebarCollapsed ? item.label : ''}
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: sidebarCollapsed ? '0' : '12px',
+                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  padding: sidebarCollapsed ? '11px' : '11px 14px',
+                  color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                  textDecoration: 'none',
+                  borderRadius: '10px',
+                  transition: 'all 0.2s ease',
+                  background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                  borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                  fontSize: '14px',
+                  fontWeight: isActive ? 600 : 400,
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                })}
+              >
+                <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+                {!sidebarCollapsed && <span>{item.label}</span>}
+              </NavLink>
+            </li>
+          )
         ))}
 
-        {/* Employee Section Header */}
-        {!sidebarCollapsed && (
+        {/* Employee Section */}
+        {hasAnyVisibleItems(employeeItems) && !sidebarCollapsed && (
           <li style={{ margin: '16px 10px 8px 10px' }}>
             <div
               onClick={toggleEmployee}
@@ -236,39 +231,41 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
         {(employeeOpen || sidebarCollapsed) && (
           <>
             {employeeItems.map((item, index) => (
-              <li key={`employee-${index}`} style={{ margin: '3px 10px' }}>
-                <NavLink
-                  to={item.path}
-                  title={sidebarCollapsed ? item.label : ''}
-                  style={({ isActive }) => ({
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: sidebarCollapsed ? '0' : '12px',
-                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                    padding: sidebarCollapsed ? '11px' : '11px 14px',
-                    paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
-                    textDecoration: 'none',
-                    borderRadius: '10px',
-                    transition: 'all 0.2s ease',
-                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
-                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
-                    fontSize: '14px',
-                    fontWeight: isActive ? 600 : 400,
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                  })}
-                >
-                  <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
-                  {!sidebarCollapsed && <span>{item.label}</span>}
-                </NavLink>
-              </li>
+              hasAccess(item.roles) && (
+                <li key={`employee-${index}`} style={{ margin: '3px 10px' }}>
+                  <NavLink
+                    to={item.path}
+                    title={sidebarCollapsed ? item.label : ''}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: sidebarCollapsed ? '0' : '12px',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      padding: sidebarCollapsed ? '11px' : '11px 14px',
+                      paddingLeft: sidebarCollapsed ? '11px' : '38px',
+                      color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                      textDecoration: 'none',
+                      borderRadius: '10px',
+                      transition: 'all 0.2s ease',
+                      background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                      borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                      fontSize: '14px',
+                      fontWeight: isActive ? 600 : 400,
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                    })}
+                  >
+                    <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  </NavLink>
+                </li>
+              )
             ))}
           </>
         )}
 
-        {/* Task Management Section Header */}
-        {!sidebarCollapsed && (
+        {/* Task Management Section */}
+        {hasAnyVisibleItems(tasksItems) && !sidebarCollapsed && (
           <li style={{ margin: '16px 10px 8px 10px' }}>
             <div
               onClick={toggleTasks}
@@ -308,39 +305,41 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
         {(tasksOpen || sidebarCollapsed) && (
           <>
             {tasksItems.map((item, index) => (
-              <li key={`tasks-${index}`} style={{ margin: '3px 10px' }}>
-                <NavLink
-                  to={item.path}
-                  title={sidebarCollapsed ? item.label : ''}
-                  style={({ isActive }) => ({
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: sidebarCollapsed ? '0' : '12px',
-                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                    padding: sidebarCollapsed ? '11px' : '11px 14px',
-                    paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
-                    textDecoration: 'none',
-                    borderRadius: '10px',
-                    transition: 'all 0.2s ease',
-                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
-                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
-                    fontSize: '14px',
-                    fontWeight: isActive ? 600 : 400,
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                  })}
-                >
-                  <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
-                  {!sidebarCollapsed && <span>{item.label}</span>}
-                </NavLink>
-              </li>
+              hasAccess(item.roles) && (
+                <li key={`tasks-${index}`} style={{ margin: '3px 10px' }}>
+                  <NavLink
+                    to={item.path}
+                    title={sidebarCollapsed ? item.label : ''}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: sidebarCollapsed ? '0' : '12px',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      padding: sidebarCollapsed ? '11px' : '11px 14px',
+                      paddingLeft: sidebarCollapsed ? '11px' : '38px',
+                      color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                      textDecoration: 'none',
+                      borderRadius: '10px',
+                      transition: 'all 0.2s ease',
+                      background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                      borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                      fontSize: '14px',
+                      fontWeight: isActive ? 600 : 400,
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                    })}
+                  >
+                    <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  </NavLink>
+                </li>
+              )
             ))}
           </>
         )}
 
-        {/* Leave Section Header */}
-        {!sidebarCollapsed && (
+        {/* Leave Section */}
+        {hasAnyVisibleItems(leaveItems) && !sidebarCollapsed && (
           <li style={{ margin: '16px 10px 8px 10px' }}>
             <div
               onClick={toggleLeave}
@@ -380,39 +379,41 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
         {(leaveOpen || sidebarCollapsed) && (
           <>
             {leaveItems.map((item, index) => (
-              <li key={`leave-${index}`} style={{ margin: '3px 10px' }}>
-                <NavLink
-                  to={item.path}
-                  title={sidebarCollapsed ? item.label : ''}
-                  style={({ isActive }) => ({
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: sidebarCollapsed ? '0' : '12px',
-                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                    padding: sidebarCollapsed ? '11px' : '11px 14px',
-                    paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
-                    textDecoration: 'none',
-                    borderRadius: '10px',
-                    transition: 'all 0.2s ease',
-                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
-                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
-                    fontSize: '14px',
-                    fontWeight: isActive ? 600 : 400,
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                  })}
-                >
-                  <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
-                  {!sidebarCollapsed && <span>{item.label}</span>}
-                </NavLink>
-              </li>
+              hasAccess(item.roles) && (
+                <li key={`leave-${index}`} style={{ margin: '3px 10px' }}>
+                  <NavLink
+                    to={item.path}
+                    title={sidebarCollapsed ? item.label : ''}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: sidebarCollapsed ? '0' : '12px',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      padding: sidebarCollapsed ? '11px' : '11px 14px',
+                      paddingLeft: sidebarCollapsed ? '11px' : '38px',
+                      color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                      textDecoration: 'none',
+                      borderRadius: '10px',
+                      transition: 'all 0.2s ease',
+                      background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                      borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                      fontSize: '14px',
+                      fontWeight: isActive ? 600 : 400,
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                    })}
+                  >
+                    <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  </NavLink>
+                </li>
+              )
             ))}
           </>
         )}
 
-        {/* Master Section Header */}
-        {!sidebarCollapsed && (
+        {/* Master Section - Only for Admin */}
+        {hasAnyVisibleItems(masterItems) && !sidebarCollapsed && (
           <li style={{ margin: '16px 10px 8px 10px' }}>
             <div
               onClick={toggleMaster}
@@ -452,39 +453,41 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
         {(masterOpen || sidebarCollapsed) && (
           <>
             {masterItems.map((item, index) => (
-              <li key={`master-${index}`} style={{ margin: '3px 10px' }}>
-                <NavLink
-                  to={item.path}
-                  title={sidebarCollapsed ? item.label : ''}
-                  style={({ isActive }) => ({
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: sidebarCollapsed ? '0' : '12px',
-                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                    padding: sidebarCollapsed ? '11px' : '11px 14px',
-                    paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
-                    textDecoration: 'none',
-                    borderRadius: '10px',
-                    transition: 'all 0.2s ease',
-                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
-                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
-                    fontSize: '14px',
-                    fontWeight: isActive ? 600 : 400,
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                  })}
-                >
-                  <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
-                  {!sidebarCollapsed && <span>{item.label}</span>}
-                </NavLink>
-              </li>
+              hasAccess(item.roles) && (
+                <li key={`master-${index}`} style={{ margin: '3px 10px' }}>
+                  <NavLink
+                    to={item.path}
+                    title={sidebarCollapsed ? item.label : ''}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: sidebarCollapsed ? '0' : '12px',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      padding: sidebarCollapsed ? '11px' : '11px 14px',
+                      paddingLeft: sidebarCollapsed ? '11px' : '38px',
+                      color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                      textDecoration: 'none',
+                      borderRadius: '10px',
+                      transition: 'all 0.2s ease',
+                      background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                      borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                      fontSize: '14px',
+                      fontWeight: isActive ? 600 : 400,
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                    })}
+                  >
+                    <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  </NavLink>
+                </li>
+              )
             ))}
           </>
         )}
 
-        {/* Payroll Section Header */}
-        {!sidebarCollapsed && (
+        {/* Payroll Section - Only Admin and HR */}
+        {hasAnyVisibleItems(payrollItems) && !sidebarCollapsed && (
           <li style={{ margin: '16px 10px 8px 10px' }}>
             <div
               onClick={togglePayroll}
@@ -524,110 +527,40 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
         {(payrollOpen || sidebarCollapsed) && (
           <>
             {payrollItems.map((item, index) => (
-              <li key={`payroll-${index}`} style={{ margin: '3px 10px' }}>
-                <NavLink
-                  to={item.path}
-                  title={sidebarCollapsed ? item.label : ''}
-                  style={({ isActive }) => ({
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: sidebarCollapsed ? '0' : '12px',
-                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                    padding: sidebarCollapsed ? '11px' : '11px 14px',
-                    paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
-                    textDecoration: 'none',
-                    borderRadius: '10px',
-                    transition: 'all 0.2s ease',
-                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
-                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
-                    fontSize: '14px',
-                    fontWeight: isActive ? 600 : 400,
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                  })}
-                >
-                  <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
-                  {!sidebarCollapsed && <span>{item.label}</span>}
-                </NavLink>
-              </li>
+              hasAccess(item.roles) && (
+                <li key={`payroll-${index}`} style={{ margin: '3px 10px' }}>
+                  <NavLink
+                    to={item.path}
+                    title={sidebarCollapsed ? item.label : ''}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: sidebarCollapsed ? '0' : '12px',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      padding: sidebarCollapsed ? '11px' : '11px 14px',
+                      paddingLeft: sidebarCollapsed ? '11px' : '38px',
+                      color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                      textDecoration: 'none',
+                      borderRadius: '10px',
+                      transition: 'all 0.2s ease',
+                      background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                      borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                      fontSize: '14px',
+                      fontWeight: isActive ? 600 : 400,
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                    })}
+                  >
+                    <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  </NavLink>
+                </li>
+              )
             ))}
           </>
         )}
 
-        {/* Documents Section Header */}
-        {!sidebarCollapsed && (
-          <li style={{ margin: '16px 10px 8px 10px' }}>
-            <div
-              onClick={toggleDocuments}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '8px 10px',
-                color: 'var(--sidebar-heading)',
-                fontSize: '11px',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                cursor: 'pointer',
-                borderRadius: '8px',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.color = 'var(--sidebar-text-active)';
-                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.color = 'var(--sidebar-heading)';
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FaFileAlt size={12} />
-                <span>DOCUMENTS</span>
-              </span>
-              {documentsOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
-            </div>
-          </li>
-        )}
-
-        {/* Documents Items */}
-        {(documentsOpen || sidebarCollapsed) && (
-          <>
-            {/* {documentsItems.map((item, index) => (
-              <li key={`documents-${index}`} style={{ margin: '3px 10px' }}>
-                <NavLink
-                  to={item.path}
-                  title={sidebarCollapsed ? item.label : ''}
-                  style={({ isActive }) => ({
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: sidebarCollapsed ? '0' : '12px',
-                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                    padding: sidebarCollapsed ? '11px' : '11px 14px',
-                    paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                    color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
-                    textDecoration: 'none',
-                    borderRadius: '10px',
-                    transition: 'all 0.2s ease',
-                    background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
-                    borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
-                    fontSize: '14px',
-                    fontWeight: isActive ? 600 : 400,
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                  })}
-                >
-                  <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
-                  {!sidebarCollapsed && <span>{item.label}</span>}
-                </NavLink>
-              </li>
-            ))} */}
-          </>
-        )}
-
-        {/* Logout */}
+        {/* Logout Button */}
         <li style={{ margin: '3px 10px', marginTop: '12px' }}>
           <div
             onClick={() => {
@@ -658,6 +591,10 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
               e.currentTarget.style.borderLeft = 'none';
             }}
           >
+            <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>
+              <FaSignOutAlt />
+            </span>
+            {!sidebarCollapsed && <span>Logout</span>}
           </div>
         </li>
       </ul>
