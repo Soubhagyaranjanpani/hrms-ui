@@ -41,7 +41,6 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   const employeeItems = [
     { path: '/employees', icon: <FaUsers />, label: 'Employee List', roles: ['Admin', 'Hr', 'Manager'] },
     { path: '/EmployeeGrade', icon: <FaUserTag />, label: 'Employee Grade', roles: ['Admin', 'Hr'] },
-    { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy', roles: ['Admin', 'Hr'] },
   ];
 
   // Attendance section items - separate from Employee
@@ -49,6 +48,8 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/attendance-dashboard', icon: <FaChartLine />, label: 'Attendance Dashboard', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/attendance-summary', icon: <FaChartPie />, label: 'Attendance Summary', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/attendance', icon: <FaCalendarCheck />, label: 'Mark Attendance', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy', roles: ['Admin', 'Hr'] },
+
   ];
 
   // Leave section items with role restrictions
@@ -226,7 +227,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FaUserFriends size={12} />
-                <span>EMPLOYEE MANAGEMENT</span>
+                <span>EMPLOYEE</span>
               </span>
               {employeeOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
@@ -374,7 +375,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FaTasks size={12} />
-                <span>TASK MANAGEMENT</span>
+                <span>TASK</span>
               </span>
               {tasksOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
@@ -448,7 +449,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FaPlane size={12} />
-                <span>LEAVE MANAGEMENT</span>
+                <span>LEAVE</span>
               </span>
               {leaveOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
@@ -522,7 +523,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FaDatabase size={12} />
-                <span>MASTER SETTINGS</span>
+                <span>MASTER</span>
               </span>
               {masterOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
