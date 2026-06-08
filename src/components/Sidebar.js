@@ -5,7 +5,7 @@ import {
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog,
   FaBuilding, FaSitemap,
-  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks, FaRupeeSign, FaSignOutAlt
+  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks, FaRupeeSign, FaSignOutAlt, FaClock, FaUserFriends
 } from 'react-icons/fa';
 import { BsChevronDown, BsChevronRight } from 'react-icons/bs';
 import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
@@ -13,6 +13,7 @@ import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
 const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogout }) => {
   const [masterOpen, setMasterOpen] = useState(true);
   const [employeeOpen, setEmployeeOpen] = useState(true);
+  const [attendanceOpen, setAttendanceOpen] = useState(true);
   const [leaveOpen, setLeaveOpen] = useState(true);
   const [payrollOpen, setPayrollOpen] = useState(true);
   const [documentsOpen, setDocumentsOpen] = useState(true);
@@ -36,14 +37,18 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/reports', icon: <FaChartBar />, label: 'Reports', roles: ['Admin', 'Hr', 'Manager'] },
   ];
 
-  // Employee section items with role restrictions
+  // Employee section items - Employee Management
   const employeeItems = [
-    { path: '/employees', icon: <FaUsers />, label: 'Employee', roles: ['Admin', 'Hr', 'Manager'] },
+    { path: '/employees', icon: <FaUsers />, label: 'Employee List', roles: ['Admin', 'Hr', 'Manager'] },
+    { path: '/EmployeeGrade', icon: <FaUserTag />, label: 'Employee Grade', roles: ['Admin', 'Hr'] },
+    { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy', roles: ['Admin', 'Hr'] },
+  ];
+
+  // Attendance section items - separate from Employee
+  const attendanceItems = [
     { path: '/attendance-dashboard', icon: <FaChartLine />, label: 'Attendance Dashboard', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/attendance-summary', icon: <FaChartPie />, label: 'Attendance Summary', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
-    { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy', roles: ['Admin', 'Hr'] },
-    { path: '/attendance', icon: <FaCalendarCheck />, label: 'Attendance', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
-    { path: '/EmployeeGrade', icon: <FaUserTag />, label: 'Employee Grade', roles: ['Admin', 'Hr'] },
+    { path: '/attendance', icon: <FaCalendarCheck />, label: 'Mark Attendance', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
   ];
 
   // Leave section items with role restrictions
@@ -94,6 +99,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
 
   const toggleMaster = () => setMasterOpen(!masterOpen);
   const toggleEmployee = () => setEmployeeOpen(!employeeOpen);
+  const toggleAttendance = () => setAttendanceOpen(!attendanceOpen);
   const toggleLeave = () => setLeaveOpen(!leaveOpen);
   const togglePayroll = () => setPayrollOpen(!payrollOpen);
   const toggleDocuments = () => setDocumentsOpen(!documentsOpen);
@@ -190,7 +196,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
           )
         ))}
 
-        {/* Employee Section */}
+        {/* Employee Section - Employee Management */}
         {hasAnyVisibleItems(employeeItems) && !sidebarCollapsed && (
           <li style={{ margin: '16px 10px 8px 10px' }}>
             <div
@@ -219,8 +225,8 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
               }}
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FaUserCircle size={12} />
-                <span>EMPLOYEE</span>
+                <FaUserFriends size={12} />
+                <span>EMPLOYEE MANAGEMENT</span>
               </span>
               {employeeOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
@@ -233,6 +239,80 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
             {employeeItems.map((item, index) => (
               hasAccess(item.roles) && (
                 <li key={`employee-${index}`} style={{ margin: '3px 10px' }}>
+                  <NavLink
+                    to={item.path}
+                    title={sidebarCollapsed ? item.label : ''}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: sidebarCollapsed ? '0' : '12px',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      padding: sidebarCollapsed ? '11px' : '11px 14px',
+                      paddingLeft: sidebarCollapsed ? '11px' : '38px',
+                      color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                      textDecoration: 'none',
+                      borderRadius: '10px',
+                      transition: 'all 0.2s ease',
+                      background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                      borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                      fontSize: '14px',
+                      fontWeight: isActive ? 600 : 400,
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                    })}
+                  >
+                    <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  </NavLink>
+                </li>
+              )
+            ))}
+          </>
+        )}
+
+        {/* Attendance Section - Separate from Employee */}
+        {hasAnyVisibleItems(attendanceItems) && !sidebarCollapsed && (
+          <li style={{ margin: '16px 10px 8px 10px' }}>
+            <div
+              onClick={toggleAttendance}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 10px',
+                color: 'var(--sidebar-heading)',
+                fontSize: '11px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                cursor: 'pointer',
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = 'var(--sidebar-text-active)';
+                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = 'var(--sidebar-heading)';
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FaClock size={12} />
+                <span>ATTENDANCE</span>
+              </span>
+              {attendanceOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
+            </div>
+          </li>
+        )}
+
+        {/* Attendance Items */}
+        {(attendanceOpen || sidebarCollapsed) && (
+          <>
+            {attendanceItems.map((item, index) => (
+              hasAccess(item.roles) && (
+                <li key={`attendance-${index}`} style={{ margin: '3px 10px' }}>
                   <NavLink
                     to={item.path}
                     title={sidebarCollapsed ? item.label : ''}
@@ -368,7 +448,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FaPlane size={12} />
-                <span>LEAVE</span>
+                <span>LEAVE MANAGEMENT</span>
               </span>
               {leaveOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
@@ -442,7 +522,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FaDatabase size={12} />
-                <span>MASTER</span>
+                <span>MASTER SETTINGS</span>
               </span>
               {masterOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
