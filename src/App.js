@@ -33,6 +33,7 @@ import TaskDetail from './Task/TaskDetail';
 import ChatBot from './components/ChatBot';
 import SalaryConfig from './pages/SalaryConfigPage';
 import EmployeeGrade from './pages/EmployeeGradePage';
+import Certification from './pages/Certification';
 
 
 
@@ -151,6 +152,7 @@ function App() {
           <Route path="PerformanceReview" element={<StartPerformanceReview user={currentUser} />} />
           <Route path="skills" element={<Skills user={currentUser} />} />
           <Route path="leave" element={<LeaveTypes user={currentUser} />} />
+          <Route path="certification" element={<Certification user={currentUser} />} />
 
           <Route path="SalaryConfig" element={<SalaryConfig user={currentUser} />} />
           <Route path="EmployeeGrade" element={<EmployeeGrade user={currentUser} />} />

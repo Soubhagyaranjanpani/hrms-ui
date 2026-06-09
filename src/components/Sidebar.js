@@ -41,6 +41,8 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   const employeeItems = [
     { path: '/employees', icon: <FaUsers />, label: 'Employee List', roles: ['Admin', 'Hr', 'Manager'] },
     { path: '/EmployeeGrade', icon: <FaUserTag />, label: 'Employee Grade', roles: ['Admin', 'Hr'] },
+        {path: '/Certification', icon: <FaChalkboardTeacher />, label: 'Certification', roles: ['Admin', 'Hr']},
+
   ];
 
   // Attendance section items - separate from Employee
