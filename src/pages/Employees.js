@@ -16,7 +16,8 @@ const RULES = {
     maxLen: 50,
     pattern: /^[a-zA-Z\s'-]+$/,
     patternMsg: 'Only letters, spaces, hyphens and apostrophes allowed'
-  },
+  }, 
+  
   email: {
     required: true,
     maxLen: 100,
