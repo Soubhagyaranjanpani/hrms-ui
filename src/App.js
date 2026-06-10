@@ -34,7 +34,13 @@ import ChatBot from './components/ChatBot';
 import SalaryConfig from './pages/SalaryConfigPage';
 import EmployeeGrade from './pages/EmployeeGradePage';
 import Certification from './pages/Certification';
-
+import CreateServiceBook from './pages/CreateServiceBook';
+import AppointmentDetail from './pages/AppointmentDetail';
+import ConfirmationDetails from './pages/ConfirmationDetails';
+import PromotionHistory from './pages/PromotionHistory';
+import TransferHistory from './pages/TransferHistory';
+import DeputationManagement from './pages/DeputationManagement';
+import PayRevisionHistory from './pages/PayRevisionHistory';
 
 
 
@@ -153,6 +159,14 @@ function App() {
           <Route path="skills" element={<Skills user={currentUser} />} />
           <Route path="leave" element={<LeaveTypes user={currentUser} />} />
           <Route path="certification" element={<Certification user={currentUser} />} />
+          <Route path="CreateServiceBook" element={<CreateServiceBook user={currentUser} />} />
+          <Route path ="AppointmentDetail" element={<AppointmentDetail user={currentUser} />} />
+          <Route path="ConfirmationDetails" element={<ConfirmationDetails user={currentUser} />} />
+          <Route path="PromotionHistory" element={<PromotionHistory user={currentUser} />} />
+          <Route path="TransferHistory" element={<TransferHistory user={currentUser} />} />
+          <Route path="DeputationManagement" element={<DeputationManagement user={currentUser} />} />
+          <Route path="PayRevisionHistory" element={<PayRevisionHistory user={currentUser} />} />
+
 
           <Route path="SalaryConfig" element={<SalaryConfig user={currentUser} />} />
           <Route path="EmployeeGrade" element={<EmployeeGrade user={currentUser} />} />

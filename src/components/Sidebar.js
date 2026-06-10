@@ -4,7 +4,7 @@ import {
   FaTachometerAlt, FaUsers, FaCalendarCheck, FaMoneyBillWave,
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog,
-  FaBuilding, FaSitemap,
+  FaBuilding, FaSitemap,FaPlus,FaBriefcase ,
   FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks, FaRupeeSign, FaSignOutAlt, FaClock, FaUserFriends
 } from 'react-icons/fa';
 import { BsChevronDown, BsChevronRight } from 'react-icons/bs';
@@ -13,6 +13,7 @@ import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
 const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogout }) => {
   const [masterOpen, setMasterOpen] = useState(true);
   const [employeeOpen, setEmployeeOpen] = useState(true);
+  const [serviceBookOpen, setServiceBookOpen] = useState(true);
   const [attendanceOpen, setAttendanceOpen] = useState(true);
   const [leaveOpen, setLeaveOpen] = useState(true);
   const [payrollOpen, setPayrollOpen] = useState(true);
@@ -42,7 +43,18 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/employees', icon: <FaUsers />, label: 'Employee List', roles: ['Admin', 'Hr', 'Manager'] },
     { path: '/EmployeeGrade', icon: <FaUserTag />, label: 'Employee Grade', roles: ['Admin', 'Hr'] },
         {path: '/Certification', icon: <FaChalkboardTeacher />, label: 'Certification', roles: ['Admin', 'Hr']},
+    { path: '/designation', icon: <FaCheck />, label: 'Designation', roles: ['Admin'] },
+  ];
 
+  // serive book 
+  const serviceBookItems = [
+    {path: '/CreateServiceBook', icon: <FaPlus />, label: 'Create Service Book', roles: ['Admin', 'Hr']},
+    {path : '/AppointmentDetail', icon: <FaBriefcase />, label: 'Appointment Detail', roles: ['Admin', 'Hr']},
+    {path : '/ConfirmationDetails', icon: <FaUserCircle />, label: 'Confirmation Details', roles: ['Admin', 'Hr']},
+    {path : '/PromotionHistory', icon: <FaDatabase />, label: 'Promotion History', roles: ['Admin', 'Hr']},
+    {path : '/TransferHistory', icon: <FaSitemap />, label: 'Transfer History', roles: ['Admin', 'Hr']},
+    {path : '/DeputationManagement', icon: <FaSitemap />, label: 'Deputation Management', roles: ['Admin', 'Hr']},
+    {path : '/PayRevisionHistory', icon: <FaSitemap />, label: 'Pay Revision History', roles: ['Admin', 'Hr']},
   ];
 
   // Attendance section items - separate from Employee
@@ -68,7 +80,6 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/branch', icon: <FaBuilding />, label: 'Branches', roles: ['Admin'] },
     { path: '/department', icon: <FaSitemap />, label: 'Departments', roles: ['Admin'] },
     { path: '/role', icon: <FaUserTag />, label: 'Roles', roles: ['Admin'] },
-    { path: '/designation', icon: <FaCheck />, label: 'Designation', roles: ['Admin'] },
     { path: '/leave', icon: <FaCalendarCheck />, label: 'Leave', roles: ['Admin'] },
   ];
 
@@ -102,6 +113,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
 
   const toggleMaster = () => setMasterOpen(!masterOpen);
   const toggleEmployee = () => setEmployeeOpen(!employeeOpen);
+ const toggleServiceBook = () => setServiceBookOpen(!serviceBookOpen);
   const toggleAttendance = () => setAttendanceOpen(!attendanceOpen);
   const toggleLeave = () => setLeaveOpen(!leaveOpen);
   const togglePayroll = () => setPayrollOpen(!payrollOpen);
@@ -242,6 +254,79 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
             {employeeItems.map((item, index) => (
               hasAccess(item.roles) && (
                 <li key={`employee-${index}`} style={{ margin: '3px 10px' }}>
+                  <NavLink
+                    to={item.path}
+                    title={sidebarCollapsed ? item.label : ''}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: sidebarCollapsed ? '0' : '12px',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      padding: sidebarCollapsed ? '11px' : '11px 14px',
+                      paddingLeft: sidebarCollapsed ? '11px' : '38px',
+                      color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                      textDecoration: 'none',
+                      borderRadius: '10px',
+                      transition: 'all 0.2s ease',
+                      background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                      borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                      fontSize: '14px',
+                      fontWeight: isActive ? 600 : 400,
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                    })}
+                  >
+                    <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  </NavLink>
+                </li>
+              )
+            ))}
+          </>
+        )}
+
+        {/* Service Book Section */}
+        {hasAnyVisibleItems(serviceBookItems) && !sidebarCollapsed && (
+          <li style={{ margin: '16px 10px 8px 10px' }}>
+            <div
+              onClick={toggleServiceBook}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 10px',
+                color: 'var(--sidebar-heading)',
+                fontSize: '11px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                cursor: 'pointer',
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = 'var(--sidebar-text-active)';
+                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = 'var(--sidebar-heading)';
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FaChartLine size={12} />
+                <span> Employee SERVICE BOOK</span>
+              </span>
+              {serviceBookOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
+            </div>
+          </li>
+        )}
+        {/* Service Book Items */}
+        {(serviceBookOpen || sidebarCollapsed) && (
+          <>
+            {serviceBookItems.map((item, index) => (
+              hasAccess(item.roles) && (
+                <li key={`servicebook-${index}`} style={{ margin: '3px 10px' }}>
                   <NavLink
                     to={item.path}
                     title={sidebarCollapsed ? item.label : ''}
