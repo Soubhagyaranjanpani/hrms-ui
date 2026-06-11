@@ -1,14 +1,16 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FaSearch, FaEdit, FaTrash, FaUserPlus, FaTimes,
-  FaArrowLeft, FaSave, FaExclamationCircle, FaUpload, FaDownload
+  FaArrowLeft, FaSave, FaExclamationCircle, FaUpload, FaDownload,
+  FaUserFriends, FaPlus, FaChild, FaVenusMars, FaGraduationCap, FaBriefcase
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
 import axios from 'axios';
 
-/* ─── Validation Rules (unchanged) ─── */
+/* ─── Validation Rules ─── */
 const RULES = {
   name: {
     required: true,
@@ -83,6 +85,19 @@ const FieldError = ({ msg }) =>
     </span>
   ) : null;
 
+const RELATION_OPTIONS = [
+  { value: 'SPOUSE', label: 'Spouse (Husband/Wife)' },
+  { value: 'FATHER', label: 'Father' },
+  { value: 'MOTHER', label: 'Mother' },
+  { value: 'SON', label: 'Son' },
+  { value: 'DAUGHTER', label: 'Daughter' },
+  { value: 'BROTHER', label: 'Brother' },
+  { value: 'SISTER', label: 'Sister' },
+  { value: 'FATHER_IN_LAW', label: 'Father-in-Law' },
+  { value: 'MOTHER_IN_LAW', label: 'Mother-in-Law' },
+  { value: 'OTHER', label: 'Other' }
+];
+
 const Employees = ({ user }) => {
   const [view, setView] = useState('list');
   const [editMode, setEditMode] = useState(false);
@@ -108,6 +123,26 @@ const Employees = ({ user }) => {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
+  // New Family States (without add family member button)
+  const [marriedStatus, setMarriedStatus] = useState('');
+  const [childrenCount, setChildrenCount] = useState(0);
+  const [child1, setChild1] = useState('');
+const [child2, setChild2] = useState('');
+  const [fatherName, setFatherName] = useState('');
+  const [motherName, setMotherName] = useState('');
+  
+  // Nominee list with serial numbers
+  const [nomineeList, setNomineeList] = useState([]);
+  const [nomineeFormData, setNomineeFormData] = useState({
+    serialNo: '',
+    name: '',
+    relation: '',
+    phone: ''
+  });
+  const [showNomineeForm, setShowNomineeForm] = useState(false);
+  const [editingNomineeIndex, setEditingNomineeIndex] = useState(null);
+  
+
   const [formData, setFormData] = useState({
     name: '', email: '', password: '', phone: '',
     joiningDate: '', roleId: '', departmentId: '',
@@ -126,6 +161,35 @@ const Employees = ({ user }) => {
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [loadingGrades, setLoadingGrades] = useState(false);
+
+  // Qualification States
+const [qualifications, setQualifications] = useState({
+  tenth: {
+    board: '',
+    percentage: '',
+    year: ''
+  },
+  twelfth: {
+    board: '',
+    percentage: '',
+    year: ''
+  },
+  graduation: {
+    university: '',
+    degree: '',
+    cgpa: '',
+    percentage: '',
+    year: ''
+  }
+});
+
+// Experience State
+const [experience, setExperience] = useState({
+  company: '',
+  position: '',
+  years: '',
+  months: ''
+});
 
   const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
   const axiosConfig = {
@@ -242,12 +306,76 @@ const Employees = ({ user }) => {
     setDepartments(allDepartments.filter(d => d.branchId === parseInt(branchId)));
   };
 
-  // ──────────────── BULK UPLOAD HANDLERS (FIXED) ────────────────
+  // Nominee functions
+  const addOrUpdateNominee = () => {
+    if (!nomineeFormData.name.trim()) {
+      toast.warning('Validation', 'Please enter nominee name');
+      return;
+    }
+    if (!nomineeFormData.relation) {
+      toast.warning('Validation', 'Please select relation');
+      return;
+    }
+    
+    if (editingNomineeIndex !== null) {
+      const updated = [...nomineeList];
+      updated[editingNomineeIndex] = { ...nomineeFormData };
+      setNomineeList(updated);
+      toast.success('Success', 'Nominee updated successfully');
+    } else {
+      const newSerialNo = nomineeList.length + 1;
+      setNomineeList([...nomineeList, { ...nomineeFormData, serialNo: newSerialNo }]);
+      toast.success('Success', 'Nominee added successfully');
+    }
+    resetNomineeForm();
+  };
+
+  // Handle Qualification Change
+const handleQualificationChange = (level, field, value) => {
+  setQualifications(prev => ({
+    ...prev,
+    [level]: {
+      ...prev[level],
+      [field]: value
+    }
+  }));
+};
+
+// Handle Experience Change
+const handleExperienceChange = (field, value) => {
+  setExperience(prev => ({
+    ...prev,
+    [field]: value
+  }));
+};
+
+  const editNominee = (index) => {
+    setEditingNomineeIndex(index);
+    setNomineeFormData({ ...nomineeList[index] });
+    setShowNomineeForm(true);
+  };
+
+  const removeNominee = (index) => {
+    setNomineeList(nomineeList.filter((_, i) => i !== index));
+    const reordered = nomineeList.filter((_, i) => i !== index).map((item, idx) => ({
+      ...item,
+      serialNo: idx + 1
+    }));
+    setNomineeList(reordered);
+    toast.success('Success', 'Nominee removed successfully');
+  };
+
+  const resetNomineeForm = () => {
+    setNomineeFormData({ serialNo: '', name: '', relation: '', phone: '' });
+    setEditingNomineeIndex(null);
+    setShowNomineeForm(false);
+  };
+
+  // ──────────────── BULK UPLOAD HANDLERS ────────────────
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
-    // Validate file type
     const allowedExtensions = ['.xlsx', '.xls', '.csv'];
     const fileName = file.name.toLowerCase();
     const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
@@ -259,7 +387,6 @@ const Employees = ({ user }) => {
       return;
     }
     
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('File Too Large', 'File size should not exceed 5MB');
       setSelectedFile(null);
@@ -282,12 +409,9 @@ const Employees = ({ user }) => {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      // IMPORTANT: For multipart/form-data, do NOT set Content-Type header
-      // Let the browser set it automatically with the correct boundary parameter
       const uploadConfig = {
         headers: {
           Authorization: `Bearer ${getAuthToken()}`
-          // Content-Type is automatically set by browser for FormData
         }
       };
 
@@ -302,7 +426,7 @@ const Employees = ({ user }) => {
         setShowBulkUploadModal(false);
         setSelectedFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
-        fetchEmployees(); // Refresh the list
+        fetchEmployees();
       } else {
         toast.error('Error', res.data?.message || 'Failed to upload employees');
       }
@@ -316,7 +440,6 @@ const Employees = ({ user }) => {
   };
 
   const downloadSampleTemplate = () => {
-    // Create a sample CSV template
     const headers = [
       'Name', 'Email', 'Password', 'Phone', 'Branch ID', 
       'Department ID', 'Role ID', 'Grade ID', 'Joining Date',
@@ -347,7 +470,7 @@ const Employees = ({ user }) => {
     toast.success('Template Downloaded', 'Fill in the template and upload it back');
   };
 
-  // ──────────────── All form handlers (unchanged) ────────────────
+  // ──────────────── All form handlers ────────────────
   const handleChange = (field, value) => {
     if (field === 'phone') value = value.replace(/\D/g, '').slice(0, 10);
     if (field === 'name' && /\d/.test(value)) return;
@@ -396,24 +519,40 @@ const Employees = ({ user }) => {
     setSubmitting(true);
 
     try {
+      const employeeData = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone,
+        joiningDate: formData.joiningDate,
+        roleId: parseInt(formData.roleId),
+        departmentId: parseInt(formData.departmentId),
+        branchId: parseInt(formData.branchId),
+        gradeId: formData.gradeId ? parseInt(formData.gradeId) : null,
+        address: formData.address.trim(),
+        profilePicture: formData.profilePicture,
+        bankAccount: formData.bankAccount,
+        uan: formData.uan,
+        pan: formData.pan,
+        marriedStatus: marriedStatus,
+        childrenCount: parseInt(childrenCount) || 0,
+        child1: child1,
+  child2: child2,
+   qualifications: qualifications,
+  experience: experience,
+        fatherName: fatherName,
+        motherName: motherName,
+        nomineeList: nomineeList.map(n => ({
+          serialNo: n.serialNo,
+          name: n.name,
+          relation: n.relation,
+          phone: n.phone
+        }))
+      };
+
       if (editMode) {
         const res = await axios.put(
           `${BASE_URL}/api/employees/${selectedEmployee.id}`,
-          {
-            name: formData.name.trim(),
-            email: formData.email.trim(),
-            phone: formData.phone,
-            joiningDate: formData.joiningDate,
-            roleId: parseInt(formData.roleId),
-            departmentId: parseInt(formData.departmentId),
-            branchId: parseInt(formData.branchId),
-            gradeId: formData.gradeId ? parseInt(formData.gradeId) : null,
-            address: formData.address.trim(),
-            profilePicture: formData.profilePicture,
-            bankAccount: formData.bankAccount,
-            uan: formData.uan,
-            pan: formData.pan
-          },
+          employeeData,
           axiosConfig
         );
 
@@ -426,24 +565,10 @@ const Employees = ({ user }) => {
           toast.error('Error', res.data?.message || 'Failed to update');
         }
       } else {
+        employeeData.password = formData.password;
         const res = await axios.post(
           `${BASE_URL}/api/employees/create`,
-          {
-            email: formData.email.trim(),
-            password: formData.password,
-            name: formData.name.trim(),
-            phone: formData.phone,
-            joiningDate: formData.joiningDate,
-            roleId: parseInt(formData.roleId),
-            departmentId: parseInt(formData.departmentId),
-            branchId: parseInt(formData.branchId),
-            gradeId: formData.gradeId ? parseInt(formData.gradeId) : null,
-            address: formData.address.trim(),
-            profilePicture: formData.profilePicture,
-            bankAccount: formData.bankAccount,
-            uan: formData.uan,
-            pan: formData.pan
-          },
+          employeeData,
           axiosConfig
         );
 
@@ -464,6 +589,7 @@ const Employees = ({ user }) => {
   };
 
   const confirmDelete = (emp) => { setEmployeeToDelete(emp); setShowDeleteModal(true); };
+  
   const handleDelete = async () => {
     if (!employeeToDelete) return;
     try {
@@ -501,6 +627,21 @@ const Employees = ({ user }) => {
     }
     setFormData(fd); setErrors({}); setTouched({});
     setEditMode(true); setView('form');
+    
+    // Load family data
+    setMarriedStatus(emp.marriedStatus || '');
+    setChildrenCount(emp.childrenCount || 0);
+    setChild1(emp.child1 || '');
+setChild2(emp.child2 || '');
+if (emp.qualifications) {
+  setQualifications(emp.qualifications);
+}
+if (emp.experience) {
+  setExperience(emp.experience);
+}
+    setFatherName(emp.fatherName || '');
+    setMotherName(emp.motherName || '');
+    setNomineeList(emp.nomineeList || []);
   };
 
   const resetForm = () => {
@@ -512,6 +653,20 @@ const Employees = ({ user }) => {
     });
     setErrors({}); setTouched({});
     setEditMode(false); setSelectedEmployee(null);
+    setMarriedStatus('');
+    setChildrenCount(0);
+    setChild1('');
+setChild2('');
+setQualifications({
+  tenth: { board: '', percentage: '', year: '' },
+  twelfth: { board: '', percentage: '', year: '' },
+  graduation: { university: '', degree: '', cgpa: '', percentage: '', year: '' }
+});
+setExperience({ company: '', position: '', years: '', months: '' });
+    setFatherName('');
+    setMotherName('');
+    setNomineeList([]);
+    resetNomineeForm();
   };
 
   const formatDate = (d) => {
@@ -896,6 +1051,386 @@ const Employees = ({ user }) => {
                 />
                 <FieldError msg={errors.address} />
               </div>
+            </div>
+{/* Qualification Section */}
+<div className="emp-divider" />
+<div className="emp-form-section-compact">
+  <div className="emp-section-label">
+    <FaGraduationCap style={{ marginRight: '8px' }} /> Educational Qualifications
+  </div>
+
+  {/* 10th Standard */}
+  <div className="emp-form-section-compact" style={{ marginBottom: '20px' }}>
+    <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>10th Standard</div>
+    <div className="emp-form-grid-3col">
+      <div className="emp-field-compact">
+        <label>Board</label>
+        <input
+          type="text"
+          placeholder="e.g., CBSE, ICSE, State Board"
+          value={qualifications.tenth.board}
+          onChange={(e) => handleQualificationChange('tenth', 'board', e.target.value)}
+        />
+      </div>
+      <div className="emp-field-compact">
+        <label>Percentage (%)</label>
+        <input
+          type="number"
+          placeholder="Enter percentage"
+          min="0"
+          max="100"
+          step="0.01"
+          value={qualifications.tenth.percentage}
+          onChange={(e) => handleQualificationChange('tenth', 'percentage', e.target.value)}
+        />
+      </div>
+      <div className="emp-field-compact">
+        <label>Passing Year</label>
+        <input
+          type="number"
+          placeholder="YYYY"
+          min="1950"
+          max="2026"
+          value={qualifications.tenth.year}
+          onChange={(e) => handleQualificationChange('tenth', 'year', e.target.value)}
+        />
+      </div>
+    </div>
+  </div>
+
+  {/* 12th Standard */}
+  <div className="emp-form-section-compact" style={{ marginBottom: '20px' }}>
+    <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>12th Standard</div>
+    <div className="emp-form-grid-3col">
+      <div className="emp-field-compact">
+        <label>Board</label>
+        <input
+          type="text"
+          placeholder="e.g., CBSE, ICSE, State Board"
+          value={qualifications.twelfth.board}
+          onChange={(e) => handleQualificationChange('twelfth', 'board', e.target.value)}
+        />
+      </div>
+      <div className="emp-field-compact">
+        <label>Percentage (%)</label>
+        <input
+          type="number"
+          placeholder="Enter percentage"
+          min="0"
+          max="100"
+          step="0.01"
+          value={qualifications.twelfth.percentage}
+          onChange={(e) => handleQualificationChange('twelfth', 'percentage', e.target.value)}
+        />
+      </div>
+      <div className="emp-field-compact">
+        <label>Passing Year</label>
+        <input
+          type="number"
+          placeholder="YYYY"
+          min="1950"
+          max="2026"
+          value={qualifications.twelfth.year}
+          onChange={(e) => handleQualificationChange('twelfth', 'year', e.target.value)}
+        />
+      </div>
+    </div>
+  </div>
+
+  {/* Graduation */}
+  <div className="emp-form-section-compact">
+    <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>Graduation</div>
+    <div className="emp-form-grid-3col">
+      <div className="emp-field-compact">
+        <label>University</label>
+        <input
+          type="text"
+          placeholder="University name"
+          value={qualifications.graduation.university}
+          onChange={(e) => handleQualificationChange('graduation', 'university', e.target.value)}
+        />
+      </div>
+      <div className="emp-field-compact">
+        <label>Degree</label>
+        <input
+          type="text"
+          placeholder="e.g., B.Tech, B.Sc, B.Com, BA"
+          value={qualifications.graduation.degree}
+          onChange={(e) => handleQualificationChange('graduation', 'degree', e.target.value)}
+        />
+      </div>
+      <div className="emp-field-compact">
+        <label>CGPA</label>
+        <input
+          type="number"
+          placeholder="CGPA (0-10)"
+          min="0"
+          max="10"
+          step="0.01"
+          value={qualifications.graduation.cgpa}
+          onChange={(e) => handleQualificationChange('graduation', 'cgpa', e.target.value)}
+        />
+      </div>
+      <div className="emp-field-compact">
+        <label>Passing Year</label>
+        <input
+          type="number"
+          placeholder="YYYY"
+          min="1950"
+          max="2026"
+          value={qualifications.graduation.year}
+          onChange={(e) => handleQualificationChange('graduation', 'year', e.target.value)}
+        />
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* Experience Section */}
+<div className="emp-divider" />
+<div className="emp-form-section-compact">
+  <div className="emp-section-label">
+    <FaBriefcase style={{ marginRight: '8px' }} /> Work Experience
+  </div>
+  
+  <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+    <div className="emp-field-compact">
+      <label>Company Name</label>
+      <input
+        type="text"
+        placeholder="Last/Current company"
+        value={experience.company}
+        onChange={(e) => handleExperienceChange('company', e.target.value)}
+      />
+    </div>
+    
+    <div className="emp-field-compact">
+      <label>Position / Designation</label>
+      <input
+        type="text"
+        placeholder="e.g., Software Engineer, Manager"
+        value={experience.position}
+        onChange={(e) => handleExperienceChange('position', e.target.value)}
+      />
+    </div>
+    
+    <div className="emp-field-compact">
+      <label>Years of Experience</label>
+      <input
+        type="number"
+        placeholder="Years"
+        min="0"
+        max="50"
+        value={experience.years}
+        onChange={(e) => handleExperienceChange('years', e.target.value)}
+      />
+    </div>
+    
+    <div className="emp-field-compact">
+      <label>Months of Experience</label>
+      <input
+        type="number"
+        placeholder="Months (0-11)"
+        min="0"
+        max="11"
+        value={experience.months}
+        onChange={(e) => handleExperienceChange('months', e.target.value)}
+      />
+    </div>
+  </div>
+  
+</div>
+            {/* Family Information */}
+            <div className="emp-divider" />
+            <div className="emp-form-section-compact">
+              <div className="emp-section-label">
+                <FaUserFriends style={{ marginRight: '8px' }} /> Family Information
+              </div>
+              
+              {/* Married Status Dropdown */}
+               <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="emp-field-compact">
+                  <label>Father's Name</label>
+                  <input
+                    type="text"
+                    placeholder="Enter father's full name"
+                    value={fatherName}
+                    onChange={(e) => setFatherName(e.target.value)}
+                  />
+                </div>
+                <div className="emp-field-compact">
+                  <label>Mother's Name</label>
+                  <input
+                    type="text"
+                    placeholder="Enter mother's full name"
+                    value={motherName}
+                    onChange={(e) => setMotherName(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+              <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="emp-field-compact">
+                  <label>Married Status</label>
+                  <select
+                    value={marriedStatus}
+                    onChange={(e) => setMarriedStatus(e.target.value)}
+                  >
+                    <option value="">Select status</option>
+                    <option value="YES">Yes</option>
+                    <option value="NO">No</option>
+                  </select>
+                </div>
+                
+                <div className="emp-field-compact">
+                  <label>Number of Children</label>
+                  <input
+                    type="number"
+                    placeholder="Count"
+                    min="0"
+                    max="20"
+                    value={childrenCount}
+                    onChange={(e) => setChildrenCount(parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                {/* Children Details - Only Child 1 and Child 2 */}
+<div className="emp-divider" />
+<div className="emp-form-section-compact">
+ 
+  
+  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+    {/* Child 1 Input */}
+    <div className="emp-field-compact">
+      <label>Child 1 Name</label>
+      <input
+        type="text"
+        placeholder="Enter first child's name"
+        value={child1}
+        onChange={(e) => setChild1(e.target.value)}
+      />
+    </div>
+    
+    {/* Child 2 Input */}
+    <div className="emp-field-compact">
+      <label>Child 2 Name</label>
+      <input
+        type="text"
+        placeholder="Enter second child's name"
+        value={child2}
+        onChange={(e) => setChild2(e.target.value)}
+      />
+    </div>
+  </div>
+</div>
+              </div>
+
+             
+
+            {/* Nominee List Section */}
+            <div className="emp-divider" />
+            <div className="emp-form-section-compact">
+              <div className="emp-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span><FaChild style={{ marginRight: '8px' }} /> Nominee List</span>
+                {!showNomineeForm && (
+                  <button type="button" className="emp-add-family-btn" onClick={() => setShowNomineeForm(true)}>
+                    <FaPlus size={12} /> Add Nominee
+                  </button>
+                )}
+              </div>
+
+              {/* Nominee List Table */}
+              {nomineeList.length > 0 && (
+                <div className="emp-table-wrap" style={{ marginTop: '16px' }}>
+                  <table className="emp-table" style={{ minWidth: '100%' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '60px' }}>S.No.</th>
+                        <th>Nominee Name</th>
+                        <th>Relation</th>
+                        <th>Phone No.</th>
+                        <th style={{ width: '80px' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {nomineeList.map((nominee, idx) => (
+                        <tr key={idx}>
+                          <td style={{ textAlign: 'center' }}>{nominee.serialNo}</td>
+                          <td><strong>{nominee.name}</strong></td>
+                          <td>{nominee.relation}</td>
+                          <td>{nominee.phone || '—'}</td>
+                          <td>
+                            <div className="emp-actions" style={{ gap: '6px' }}>
+                              <button type="button" onClick={() => editNominee(idx)} className="emp-act emp-act--edit" title="Edit">
+                                <FaEdit size={12} />
+                              </button>
+                              <button type="button" onClick={() => removeNominee(idx)} className="emp-act emp-act--del" title="Delete">
+                                <FaTrash size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Add/Edit Nominee Form */}
+              {showNomineeForm && (
+                <div className="emp-family-form" style={{ marginTop: '16px' }}>
+                  <div className="emp-family-form-header">
+                    <h4>{editingNomineeIndex !== null ? 'Edit Nominee' : 'Add Nominee'}</h4>
+                    <button type="button" onClick={resetNomineeForm} className="emp-close-form-btn">
+                      <FaTimes />
+                    </button>
+                  </div>
+                  
+                  <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="emp-field-compact">
+                      <label className="required">Nominee Full Name</label>
+                      <input
+                        type="text"
+                        placeholder="Enter nominee name"
+                        value={nomineeFormData.name}
+                        onChange={(e) => setNomineeFormData({ ...nomineeFormData, name: e.target.value })}
+                      />
+                    </div>
+                    
+                    <div className="emp-field-compact">
+                      <label className="required">Relation</label>
+                      <select
+                        value={nomineeFormData.relation}
+                        onChange={(e) => setNomineeFormData({ ...nomineeFormData, relation: e.target.value })}
+                      >
+                        <option value="">Select relation</option>
+                        {RELATION_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div className="emp-field-compact">
+                      <label>Phone Number</label>
+                      <input
+                        type="tel"
+                        placeholder="10-digit mobile number"
+                        maxLength="10"
+                        value={nomineeFormData.phone}
+                        onChange={(e) => setNomineeFormData({ ...nomineeFormData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="emp-family-form-actions" style={{ marginTop: '16px' }}>
+                    <button type="button" onClick={resetNomineeForm} className="emp-cancel-family-btn">
+                      Cancel
+                    </button>
+                    <button type="button" onClick={addOrUpdateNominee} className="emp-save-family-btn">
+                      <FaSave size={12} /> {editingNomineeIndex !== null ? 'Update' : 'Add'} Nominee
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="emp-form-actions">

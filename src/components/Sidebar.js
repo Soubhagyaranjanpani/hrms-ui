@@ -5,10 +5,15 @@ import {
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog,
   FaBuilding, FaSitemap,FaPlus,FaBriefcase ,
-  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks, FaRupeeSign, FaSignOutAlt, FaClock, FaUserFriends
+  FaUserTag, FaDatabase, FaUserCircle, FaLeaf, FaChartPie, FaCheck, FaTasks, FaRupeeSign, FaSignOutAlt, FaClock, FaUserFriends,
+  FaAward,
+  FaDochub,
+  FaBook,
+  FaTrailer
 } from 'react-icons/fa';
 import { BsChevronDown, BsChevronRight } from 'react-icons/bs';
 import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
+import { FaTimeline } from 'react-icons/fa6';
 
 const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogout }) => {
   const [masterOpen, setMasterOpen] = useState(true);
@@ -48,13 +53,21 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
 
   // serive book 
   const serviceBookItems = [
-    {path: '/CreateServiceBook', icon: <FaPlus />, label: 'Create Service Book', roles: ['Admin', 'Hr']},
-    {path : '/AppointmentDetail', icon: <FaBriefcase />, label: 'Appointment Detail', roles: ['Admin', 'Hr']},
-    {path : '/ConfirmationDetails', icon: <FaUserCircle />, label: 'Confirmation Details', roles: ['Admin', 'Hr']},
-    {path : '/PromotionHistory', icon: <FaDatabase />, label: 'Promotion History', roles: ['Admin', 'Hr']},
-    {path : '/TransferHistory', icon: <FaSitemap />, label: 'Transfer History', roles: ['Admin', 'Hr']},
-    {path : '/DeputationManagement', icon: <FaSitemap />, label: 'Deputation Management', roles: ['Admin', 'Hr']},
-    {path : '/PayRevisionHistory', icon: <FaSitemap />, label: 'Pay Revision History', roles: ['Admin', 'Hr']},
+    {path: '/CreateServiceBook', icon: <FaPlus />, label: 'Create', roles: ['Admin', 'Hr']},
+    {path : '/AppointmentDetail', icon: <FaBriefcase />, label: 'Appointment', roles: ['Admin', 'Hr']},
+    {path : '/ConfirmationDetails', icon: <FaUserCircle />, label: 'Confirmation', roles: ['Admin', 'Hr']},
+    {path : '/PromotionHistory', icon: <FaDatabase />, label: 'Promotion ', roles: ['Admin', 'Hr']},
+    {path : '/TransferHistory', icon: <FaSitemap />, label: 'Transfer', roles: ['Admin', 'Hr']},
+    {path : '/DeputationManagement', icon: <FaSitemap />, label: 'Deputation ', roles: ['Admin', 'Hr']},
+    {path : '/PayRevisionHistory', icon: <FaSitemap />, label: 'Pay Revision', roles: ['Admin', 'Hr']},
+    {path : '/DisciplinaryRecords', icon: <FaChartBar />, label: 'Disciplinary', roles: ['Admin','Hr']},
+    {path : '/AwardsHistory', icon:<FaAward />,label: 'Awards',roles:['Admin','Hr']},
+    {path : '/TrainingHistory',icon:<FaPlane />,label: 'Training History',roles:['Admin','Hr']},
+    {path : '/Retirement', icon:<FaBuilding />,label:'Retirement',roles:['Admin','Hr']},
+    {path: '/Timeline', icon:<FaTimeline />,label:'Timeline',roles:['Admin','Hr']},
+    {path: '/DocumentsRepository',icon:<FaDochub />,label:'Documents',roles:['Admin','Hr']},
+    {path: '/SearchBook',icon:<FaBook />,label:'Search Book',roles:['Admin','Hr']},
+    {path: '/AuditTrail',icon:<FaTrailer />,label:'Audit Trail',roles:['Admin','Hr']},
   ];
 
   // Attendance section items - separate from Employee

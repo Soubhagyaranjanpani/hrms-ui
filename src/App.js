@@ -41,6 +41,14 @@ import PromotionHistory from './pages/PromotionHistory';
 import TransferHistory from './pages/TransferHistory';
 import DeputationManagement from './pages/DeputationManagement';
 import PayRevisionHistory from './pages/PayRevisionHistory';
+import DisciplinaryRecords from './pages/DisciplinaryRecords';
+import AwardsHistory from './pages/AwardsHistory';
+import TrainingHistory from './pages/TrainingHistory';
+import Retirement from './pages/Retirement';
+import Timeline from './pages/Timeline';
+import DocumentsRepository from './pages/DocumentsRepository';
+import SearchBook from './pages/SearchBook';
+import AuditTrail from './pages/AuditTrail';
 
 
 
@@ -56,6 +64,7 @@ import HolidayManagement from './Leave/HolidayManagement';
 import StartPerformanceReview from './Task/StartPerformanceReview';
 import Skills from './Masters/Skills';
 import LeaveTypes from './Masters/Leave';
+import { BiCurrentLocation } from 'react-icons/bi';
 
 
 
@@ -166,7 +175,14 @@ function App() {
           <Route path="TransferHistory" element={<TransferHistory user={currentUser} />} />
           <Route path="DeputationManagement" element={<DeputationManagement user={currentUser} />} />
           <Route path="PayRevisionHistory" element={<PayRevisionHistory user={currentUser} />} />
-
+          <Route path="DisciplinaryRecords" element={<DisciplinaryRecords user={currentUser}/>}/>
+          <Route path="AwardsHistory" element={<AwardsHistory user={currentUser}/>}/>
+          <Route path="TrainingHistory" element={<TrainingHistory user={currentUser}/>}/>
+          <Route path="Retirement" element={<Retirement user={currentUser}/>}/>
+          <Route path="Timeline" element={<Timeline user={currentUser}/>}/>
+          <Route path="DocumentsRepository" element={<DocumentsRepository user={currentUser}/>}/>
+          <Route path="SearchBook" element={<SearchBook user={currentUser}/>}/>
+          <Route path="AuditTrail" element={<AuditTrail user={BiCurrentLocation}/>}/>
 
           <Route path="SalaryConfig" element={<SalaryConfig user={currentUser} />} />
           <Route path="EmployeeGrade" element={<EmployeeGrade user={currentUser} />} />

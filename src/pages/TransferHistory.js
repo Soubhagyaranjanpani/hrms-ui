@@ -228,7 +228,7 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
           <FaExchangeAlt className="text-primary" size={24} />
         </div>
         <div>
-          <h3 className="mb-0">Transfer History</h3>
+          <h5 className="mb-0">Transfer History</h5>
           <p className="text-muted mb-0 small">Manage employee transfer records</p>
         </div>
       </div>

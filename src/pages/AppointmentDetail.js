@@ -304,7 +304,7 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
           <FaFileAlt className="text-primary" size={24} />
         </div>
         <div>
-          <h3 className="mb-0">Appointment Details</h3>
+          <h5 className="mb-0">Appointment Details</h5>
           <p className="text-muted mb-0 small">Manage employee appointment information</p>
         </div>
       </div>

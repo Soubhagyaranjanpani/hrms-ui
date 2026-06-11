@@ -251,7 +251,7 @@ const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) =>
           <FaMoneyBillWave className="text-primary" size={24} />
         </div>
         <div>
-          <h3 className="mb-0">Pay Revision History</h3>
+          <h5 className="mb-0">Pay Revision History</h5>
           <p className="text-muted mb-0 small">Manage employee salary revision records</p>
         </div>
       </div>

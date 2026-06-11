@@ -570,7 +570,7 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
           <FaBook className="text-primary" size={24} />
         </div>
         <div>
-          <h3 className="mb-0">Create Service Book</h3>
+          <h5 className="mb-0">Create Service Book</h5>
           <p className="text-muted mb-0 small">Create new employee service book record</p>
         </div>
       </div>
