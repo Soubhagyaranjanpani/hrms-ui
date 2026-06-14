@@ -1,421 +1,6 @@
-// import React, { useState } from 'react';
-// import { FaSave, FaTimes, FaUser, FaIdCard, FaBuilding, FaBriefcase, FaBook, FaCheckCircle, FaSearch } from 'react-icons/fa';
-// import { toast } from '../components/Toast';
 
-// const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) => {
-//   const [formData, setFormData] = useState({
-//     employeeId: '',
-//     employeeName: '',
-//     employeeCode: '',
-//     department: '',
-//     designation: '',
-//     serviceBookNumber: '',
-//     serviceBookStatus: 'Active'
-//   });
-
-//   const [errors, setErrors] = useState({});
-//   const [touched, setTouched] = useState({});
-//   const [showEmployeeSearch, setShowEmployeeSearch] = useState(false);
-//   const [searchTerm, setSearchTerm] = useState('');
-
-//   // Dummy employees data for lookup
-//   const DUMMY_EMPLOYEES = [
-//     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
-//     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
-//     { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
-//     { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
-//     { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
-//   ];
-
-//   // Filtered employees for search
-//   const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-//     const search = searchTerm.toLowerCase();
-//     return emp.name.toLowerCase().includes(search) || 
-//            emp.code.toLowerCase().includes(search);
-//   });
-
-//   // Auto generate service book number
-//   const generateServiceBookNumber = () => {
-//     const year = new Date().getFullYear();
-//     const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-//     return `SB/${year}/${random}`;
-//   };
-
-//   // Handle employee selection
-//   const handleEmployeeSelect = (employee) => {
-//     setFormData({
-//       ...formData,
-//       employeeId: employee.id,
-//       employeeName: employee.name,
-//       employeeCode: employee.code,
-//       department: employee.department,
-//       designation: employee.designation,
-//       serviceBookNumber: generateServiceBookNumber()
-//     });
-//     setShowEmployeeSearch(false);
-//     setSearchTerm('');
-    
-//     if (errors.employeeName) {
-//       setErrors({ ...errors, employeeName: '' });
-//     }
-//   };
-
-//   // Handle form field change
-//   const handleChange = (field, value) => {
-//     setFormData({ ...formData, [field]: value });
-//     if (touched[field]) {
-//       validateField(field, value);
-//     }
-//   };
-
-//   // Validate single field
-//   const validateField = (field, value) => {
-//     let error = '';
-//     if (field === 'employeeName' && !value) {
-//       error = 'Employee Name is required';
-//     } else if (field === 'serviceBookStatus' && !value) {
-//       error = 'Status is required';
-//     }
-//     setErrors(prev => ({ ...prev, [field]: error }));
-//     return error === '';
-//   };
-
-//   // Handle blur
-//   const handleBlur = (field) => {
-//     setTouched(prev => ({ ...prev, [field]: true }));
-//     validateField(field, formData[field]);
-//   };
-
-//   // Validate entire form
-//   const validateForm = () => {
-//     const newErrors = {};
-//     if (!formData.employeeName) newErrors.employeeName = 'Employee Name is required';
-//     if (!formData.serviceBookStatus) newErrors.serviceBookStatus = 'Status is required';
-    
-//     setErrors(newErrors);
-//     return Object.keys(newErrors).length === 0;
-//   };
-
-//   // Handle form submit
-//   const handleSubmit = (e) => {
-//     e.preventDefault();
-    
-//     if (!validateForm()) {
-//       toast.warning('Validation Error', 'Please fill all required fields');
-//       return;
-//     }
-
-//     const serviceBookData = {
-//       ...formData,
-//       createdAt: new Date().toISOString(),
-//       createdBy: 'Current User'
-//     };
-
-//     console.log('Service Book Data:', serviceBookData);
-//     toast.success('Success', 'Service Book created successfully');
-    
-//     if (onSuccess) {
-//       onSuccess(serviceBookData);
-//     }
-//   };
-
-//   // Status options
-//   const statusOptions = [
-//     { value: 'Active', label: 'Active', color: '#10b981', bg: '#d1fae5' },
-//     { value: 'Closed', label: 'Closed', color: '#6b7280', bg: '#f3f4f6' },
-//     { value: 'Retired', label: 'Retired', color: '#f59e0b', bg: '#fed7aa' },
-//     { value: 'Terminated', label: 'Terminated', color: '#ef4444', bg: '#fee2e2' }
-//   ];
-
-//   const getStatusStyle = (status) => {
-//     const option = statusOptions.find(opt => opt.value === status);
-//     return option || statusOptions[0];
-//   };
-
-//   return (
-//     <div className="container-fluid p-4">
-//       {/* Header */}
-//       <div className="d-flex align-items-center gap-3 mb-4 pb-2 border-bottom">
-//         <div className="bg-primary bg-opacity-10 p-3 rounded-circle">
-//           <FaBook className="text-primary" size={24} />
-//         </div>
-//         <div>
-//           <h3 className="mb-0">Create Service Book</h3>
-//           <p className="text-muted mb-0 small">Create new employee service book record</p>
-//         </div>
-//       </div>
-
-//       {/* Form Card */}
-//       <div className="card border-0 shadow-sm">
-//         <div className="card-header bg-light border-0 py-3">
-//           <h6 className="mb-0 fw-bold">📋 Employee Information</h6>
-//         </div>
-//         <div className="card-body">
-//           <form onSubmit={handleSubmit}>
-//             <div className="row g-4">
-              
-//               {/* Employee Name - Lookup */}
-//               <div className="col-md-6">
-//                 <label className="form-label fw-bold">
-//                   Employee Name <span className="text-danger">*</span>
-//                 </label>
-//                 <div className="position-relative">
-//                   <div className="input-group">
-//                     <span className="input-group-text bg-light">
-//                       <FaUser size={14} className="text-muted" />
-//                     </span>
-//                     <input
-//                       type="text"
-//                       className={`form-control ${touched.employeeName && errors.employeeName ? 'is-invalid' : ''}`}
-//                       placeholder="Search employee by name or code..."
-//                       value={formData.employeeName}
-//                       onFocus={() => setShowEmployeeSearch(true)}
-//                       onChange={(e) => {
-//                         setFormData({ ...formData, employeeName: e.target.value });
-//                         setSearchTerm(e.target.value);
-//                       }}
-//                       readOnly={!!formData.employeeId}
-//                     />
-//                     {formData.employeeId && (
-//                       <button
-//                         type="button"
-//                         className="btn btn-outline-secondary"
-//                         onClick={() => {
-//                           setFormData({
-//                             employeeId: '',
-//                             employeeName: '',
-//                             employeeCode: '',
-//                             department: '',
-//                             designation: '',
-//                             serviceBookNumber: '',
-//                             serviceBookStatus: 'Active'
-//                           });
-//                         }}
-//                       >
-//                         <FaTimes size={12} />
-//                       </button>
-//                     )}
-//                     <button
-//                       type="button"
-//                       className="btn btn-outline-secondary"
-//                       onClick={() => setShowEmployeeSearch(true)}
-//                     >
-//                       <FaSearch size={12} />
-//                     </button>
-//                   </div>
-                  
-//                   {/* Employee Search Dropdown */}
-//                   {showEmployeeSearch && (
-//                     <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '300px', overflow: 'auto' }}>
-//                       <div className="card-body p-2">
-//                         <div className="mb-2">
-//                           <input
-//                             type="text"
-//                             className="form-control form-control-sm"
-//                             placeholder="Search by name or code..."
-//                             value={searchTerm}
-//                             onChange={(e) => setSearchTerm(e.target.value)}
-//                             autoFocus
-//                           />
-//                         </div>
-//                         {filteredEmployees.length > 0 ? (
-//                           filteredEmployees.map(emp => (
-//                             <div
-//                               key={emp.id}
-//                               className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
-//                               style={{ cursor: 'pointer' }}
-//                               onClick={() => handleEmployeeSelect(emp)}
-//                               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-//                               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-//                             >
-//                               <div>
-//                                 <div className="fw-bold">{emp.name}</div>
-//                                 <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-//                               </div>
-//                               <div>
-//                                 <span className="badge bg-light text-dark">{emp.designation}</span>
-//                               </div>
-//                             </div>
-//                           ))
-//                         ) : (
-//                           <div className="text-center py-3 text-muted">
-//                             <small>No employees found</small>
-//                           </div>
-//                         )}
-//                       </div>
-//                       <div className="card-footer bg-light py-1">
-//                         <button
-//                           type="button"
-//                           className="btn btn-sm btn-link text-danger w-100"
-//                           onClick={() => setShowEmployeeSearch(false)}
-//                         >
-//                           Close
-//                         </button>
-//                       </div>
-//                     </div>
-//                   )}
-//                 </div>
-//                 {touched.employeeName && errors.employeeName && (
-//                   <small className="text-danger">{errors.employeeName}</small>
-//                 )}
-//                 <small className="text-muted">Search by employee name or code</small>
-//               </div>
-
-//               {/* Employee Code - Auto Populate */}
-//               <div className="col-md-6">
-//                 <label className="form-label fw-bold">Employee Code</label>
-//                 <div className="input-group">
-//                   <span className="input-group-text bg-light">
-//                     <FaIdCard size={14} className="text-muted" />
-//                   </span>
-//                   <input
-//                     type="text"
-//                     className="form-control bg-light"
-//                     value={formData.employeeCode}
-//                     readOnly
-//                     placeholder="Auto-populated after selection"
-//                   />
-//                 </div>
-//               </div>
-
-//               {/* Department - Auto Populate */}
-//               <div className="col-md-6">
-//                 <label className="form-label fw-bold">Department</label>
-//                 <div className="input-group">
-//                   <span className="input-group-text bg-light">
-//                     <FaBuilding size={14} className="text-muted" />
-//                   </span>
-//                   <input
-//                     type="text"
-//                     className="form-control bg-light"
-//                     value={formData.department}
-//                     readOnly
-//                     placeholder="Auto-populated after selection"
-//                   />
-//                 </div>
-//               </div>
-
-//               {/* Designation - Auto Populate */}
-//               <div className="col-md-6">
-//                 <label className="form-label fw-bold">Designation</label>
-//                 <div className="input-group">
-//                   <span className="input-group-text bg-light">
-//                     <FaBriefcase size={14} className="text-muted" />
-//                   </span>
-//                   <input
-//                     type="text"
-//                     className="form-control bg-light"
-//                     value={formData.designation}
-//                     readOnly
-//                     placeholder="Auto-populated after selection"
-//                   />
-//                 </div>
-//               </div>
-
-//               {/* Service Book Number - Auto Generated */}
-//               <div className="col-md-6">
-//                 <label className="form-label fw-bold">Service Book Number</label>
-//                 <div className="input-group">
-//                   <span className="input-group-text bg-light">
-//                     <FaBook size={14} className="text-muted" />
-//                   </span>
-//                   <input
-//                     type="text"
-//                     className="form-control bg-light"
-//                     value={formData.serviceBookNumber}
-//                     readOnly
-//                     placeholder="Auto-generated after selection"
-//                   />
-//                 </div>
-//                 <small className="text-muted">Auto-generated on employee selection</small>
-//               </div>
-
-//               {/* Service Book Status - Dropdown */}
-//               <div className="col-md-6">
-//                 <label className="form-label fw-bold">
-//                   Service Book Status <span className="text-danger">*</span>
-//                 </label>
-//                 <select
-//                   className={`form-select ${touched.serviceBookStatus && errors.serviceBookStatus ? 'is-invalid' : ''}`}
-//                   value={formData.serviceBookStatus}
-//                   onChange={(e) => handleChange('serviceBookStatus', e.target.value)}
-//                   onBlur={() => handleBlur('serviceBookStatus')}
-//                 >
-//                   {statusOptions.map(option => (
-//                     <option key={option.value} value={option.value}>
-//                       {option.label}
-//                     </option>
-//                   ))}
-//                 </select>
-//                 {touched.serviceBookStatus && errors.serviceBookStatus && (
-//                   <small className="text-danger">{errors.serviceBookStatus}</small>
-//                 )}
-//               </div>
-
-//               {/* Preview Section */}
-//               {formData.employeeId && (
-//                 <div className="col-12 mt-3">
-//                   <div className="alert alert-success bg-opacity-10 border-0">
-//                     <div className="d-flex align-items-center gap-2">
-//                       <FaCheckCircle className="text-success" size={18} />
-//                       <strong>Service Book Ready to Create</strong>
-//                     </div>
-//                     <hr className="my-2" />
-//                     <div className="row">
-//                       <div className="col-md-3">
-//                         <small className="text-muted d-block">Service Book No:</small>
-//                         <span className="fw-bold">{formData.serviceBookNumber}</span>
-//                       </div>
-//                       <div className="col-md-3">
-//                         <small className="text-muted d-block">Status:</small>
-//                         <span className={`badge`} style={{
-//                           background: getStatusStyle(formData.serviceBookStatus).bg,
-//                           color: getStatusStyle(formData.serviceBookStatus).color
-//                         }}>
-//                           {formData.serviceBookStatus}
-//                         </span>
-//                       </div>
-//                       <div className="col-md-3">
-//                         <small className="text-muted d-block">Employee:</small>
-//                         <span>{formData.employeeName}</span>
-//                       </div>
-//                       <div className="col-md-3">
-//                         <small className="text-muted d-block">Department:</small>
-//                         <span>{formData.department}</span>
-//                       </div>
-//                     </div>
-//                   </div>
-//                 </div>
-//               )}
-//             </div>
-
-//             {/* Form Actions */}
-//             <div className="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-//               <button
-//                 type="button"
-//                 className="btn btn-outline-secondary px-4"
-//                 onClick={onCancel}
-//               >
-//                 Cancel
-//               </button>
-//               <button
-//                 type="submit"
-//                 className="btn btn-primary px-4"
-//                 disabled={!formData.employeeId}
-//               >
-//                 <FaSave className="me-1" size={12} /> Create Service Book
-//               </button>
-//             </div>
-//           </form>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default CreateServiceBook;
 import React, { useState } from 'react';
-import { FaSave, FaTimes, FaUser, FaIdCard, FaBuilding, FaBriefcase, FaBook, FaCheckCircle, FaSearch } from 'react-icons/fa';
+import { FaSave, FaTimes, FaUser, FaIdCard, FaBuilding, FaBriefcase, FaBook, FaCheckCircle, FaSearch, FaEdit, FaTrash, FaPlus, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) => {
@@ -429,10 +14,27 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
     serviceBookStatus: 'Active'
   });
 
+  // Dummy Service Books Data
+  const DUMMY_SERVICE_BOOKS = [
+    { id: 1, employeeId: 1, employeeName: 'John Doe', employeeCode: 'EMP001', department: 'IT', designation: 'Software Engineer', serviceBookNumber: 'SB/2024/0001', serviceBookStatus: 'Active', createdAt: '2024-01-15T10:30:00Z' },
+    { id: 2, employeeId: 2, employeeName: 'Jane Smith', employeeCode: 'EMP002', department: 'HR', designation: 'HR Manager', serviceBookNumber: 'SB/2024/0002', serviceBookStatus: 'Active', createdAt: '2024-02-20T11:45:00Z' },
+    { id: 3, employeeId: 3, employeeName: 'Mike Johnson', employeeCode: 'EMP003', department: 'IT', designation: 'Senior Developer', serviceBookNumber: 'SB/2024/0003', serviceBookStatus: 'Active', createdAt: '2024-03-10T09:15:00Z' },
+    { id: 4, employeeId: 4, employeeName: 'Sarah Williams', employeeCode: 'EMP004', department: 'Sales', designation: 'Sales Manager', serviceBookNumber: 'SB/2023/0015', serviceBookStatus: 'Closed', createdAt: '2023-11-05T14:20:00Z' },
+    { id: 5, employeeId: 5, employeeName: 'David Brown', employeeCode: 'EMP005', department: 'Finance', designation: 'Accountant', serviceBookNumber: 'SB/2024/0008', serviceBookStatus: 'Active', createdAt: '2024-04-18T08:00:00Z' },
+    { id: 6, employeeId: 1, employeeName: 'John Doe', employeeCode: 'EMP001', department: 'IT', designation: 'Tech Lead', serviceBookNumber: 'SB/2024/0012', serviceBookStatus: 'Active', createdAt: '2024-05-01T10:00:00Z' },
+    { id: 7, employeeId: 2, employeeName: 'Jane Smith', employeeCode: 'EMP002', department: 'HR', designation: 'Sr. HR Manager', serviceBookNumber: 'SB/2024/0015', serviceBookStatus: 'Active', createdAt: '2024-05-15T09:30:00Z' },
+    { id: 8, employeeId: 3, employeeName: 'Mike Johnson', employeeCode: 'EMP003', department: 'IT', designation: 'Tech Lead', serviceBookNumber: 'SB/2024/0020', serviceBookStatus: 'Active', createdAt: '2024-06-01T11:00:00Z' }
+  ];
+
+  const [serviceBooks, setServiceBooks] = useState(DUMMY_SERVICE_BOOKS);
+  const [editingId, setEditingId] = useState(null);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(5);
 
   // Dummy employees data for lookup
   const DUMMY_EMPLOYEES = [
@@ -443,12 +45,37 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
     { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
   ];
 
-  // Filtered employees for search
+  // Filter employees for dropdown
   const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
     const search = searchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || 
-           emp.code.toLowerCase().includes(search);
+    return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
   });
+
+  // Filter service books by search term
+  const filteredServiceBooks = serviceBooks.filter(book => {
+    const search = searchTerm.toLowerCase();
+    return book.employeeName.toLowerCase().includes(search) || 
+           book.employeeCode.toLowerCase().includes(search) ||
+           book.department.toLowerCase().includes(search) ||
+           book.serviceBookNumber.toLowerCase().includes(search);
+  });
+
+  // Pagination
+  const totalItems = filteredServiceBooks.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentBooks = filteredServiceBooks.slice(startIndex, startIndex + rowsPerPage);
+
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    return range;
+  };
 
   // Auto generate service book number
   const generateServiceBookNumber = () => {
@@ -470,13 +97,11 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
     });
     setSearchTerm('');
     setShowDropdown(false);
-    
     if (errors.employeeName) {
       setErrors({ ...errors, employeeName: '' });
     }
   };
 
-  // Handle form field change
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
     if (touched[field]) {
@@ -484,7 +109,6 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
     }
   };
 
-  // Validate single field
   const validateField = (field, value) => {
     let error = '';
     if (field === 'employeeName' && !value) {
@@ -496,46 +120,69 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
     return error === '';
   };
 
-  // Handle blur
   const handleBlur = (field) => {
     setTouched(prev => ({ ...prev, [field]: true }));
     validateField(field, formData[field]);
   };
 
-  // Validate entire form
   const validateForm = () => {
     const newErrors = {};
     if (!formData.employeeName) newErrors.employeeName = 'Employee Name is required';
     if (!formData.serviceBookStatus) newErrors.serviceBookStatus = 'Status is required';
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle form submit
   const handleSubmit = (e) => {
     e.preventDefault();
-    
     if (!validateForm()) {
       toast.warning('Validation Error', 'Please fill all required fields');
       return;
     }
 
-    const serviceBookData = {
-      ...formData,
-      createdAt: new Date().toISOString(),
-      createdBy: 'Current User'
-    };
-
-    console.log('Service Book Data:', serviceBookData);
-    toast.success('Success', 'Service Book created successfully');
-    
-    if (onSuccess) {
-      onSuccess(serviceBookData);
+    if (editingId) {
+      const updated = serviceBooks.map(sb => 
+        sb.id === editingId ? { ...formData, id: editingId, createdAt: new Date().toISOString() } : sb
+      );
+      setServiceBooks(updated);
+      toast.success('Success', 'Service Book updated successfully');
+      setEditingId(null);
+    } else {
+      const serviceBookData = {
+        ...formData,
+        id: Date.now(),
+        createdAt: new Date().toISOString(),
+        createdBy: 'Current User'
+      };
+      setServiceBooks([serviceBookData, ...serviceBooks]);
+      toast.success('Success', 'Service Book created successfully');
     }
+    resetForm();
+    setShowForm(false);
+    setPage(0);
+    if (onSuccess) onSuccess(formData);
   };
 
-  // Clear selected employee
+  const handleEdit = (book) => {
+    setEditingId(book.id);
+    setFormData({
+      employeeId: book.employeeId,
+      employeeName: book.employeeName,
+      employeeCode: book.employeeCode,
+      department: book.department,
+      designation: book.designation,
+      serviceBookNumber: book.serviceBookNumber,
+      serviceBookStatus: book.serviceBookStatus
+    });
+    setSearchTerm(book.employeeName);
+    setShowForm(true);
+  };
+
+  const handleDelete = (id) => {
+    setServiceBooks(serviceBooks.filter(sb => sb.id !== id));
+    toast.success('Deleted', 'Service Book deleted successfully');
+  };
+
   const clearEmployee = () => {
     setFormData({
       employeeId: '',
@@ -547,9 +194,30 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
       serviceBookStatus: 'Active'
     });
     setSearchTerm('');
+    setEditingId(null);
   };
 
-  // Status options
+  const resetForm = () => {
+    setFormData({
+      employeeId: '',
+      employeeName: '',
+      employeeCode: '',
+      department: '',
+      designation: '',
+      serviceBookNumber: '',
+      serviceBookStatus: 'Active'
+    });
+    setSearchTerm('');
+    setEditingId(null);
+    setErrors({});
+    setTouched({});
+  };
+
+  const handleCancelForm = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
   const statusOptions = [
     { value: 'Active', label: 'Active', color: '#10b981', bg: '#d1fae5' },
     { value: 'Closed', label: 'Closed', color: '#6b7280', bg: '#f3f4f6' },
@@ -562,274 +230,226 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
     return option || statusOptions[0];
   };
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  const handleBackToList = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
   return (
-    <div className="container-fluid p-4">
+    <div className="cert-root">
       {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4 pb-2 border-bottom">
-        <div className="bg-primary bg-opacity-10 p-3 rounded-circle">
-          <FaBook className="text-primary" size={24} />
-        </div>
+      <div className="cert-header">
         <div>
-          <h5 className="mb-0">Create Service Book</h5>
-          <p className="text-muted mb-0 small">Create new employee service book record</p>
+          <h1 className="cert-title">Service Book Management</h1>
+          <p className="cert-subtitle">Manage employee service book records</p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!showForm && (
+            <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
+              <FaPlus size={13} /> Add Service Book
+            </button>
+            
+          )}
+          {showForm && (
+              <button 
+                type="button" 
+                className="cert-back-btn" 
+                onClick={handleBackToList}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
+              >
+                <FaArrowLeft size={12} /> Back
+              </button>
+            )}
         </div>
       </div>
 
-      {/* Search Section - Separate */}
-      <div className="card border-0 shadow-sm mb-4">
-        <div className="card-header bg-light border-0 py-3">
-          <h6 className="mb-0 fw-bold">🔍 Search Employee</h6>
-        </div>
-        <div className="card-body">
-          <div className="row">
-            <div className="col-md-12">
-              <div className="position-relative">
-                <div className="input-group">
-                  <span className="input-group-text bg-light">
-                    <FaSearch size={14} className="text-muted" />
-                  </span>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Search by employee name or code..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setShowDropdown(true);
-                    }}
-                    onFocus={() => setShowDropdown(true)}
-                  />
-                  {formData.employeeId && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger"
-                      onClick={clearEmployee}
-                    >
-                      <FaTimes size={12} /> Clear
-                    </button>
-                  )}
+      {showForm ? (
+        // Form View
+        <div className="cert-form-wrap">
+          <form onSubmit={handleSubmit} className="cert-form-compact">
+            
+           
+
+            <div className="cert-form-section-compact">
+              <div className="cert-section-label">Employee Information</div>
+              <div className="cert-form-grid-3col">
+                <div className={`cert-field-compact ${touched.employeeName && errors.employeeName ? 'has-error' : ''}`}>
+                  <label className="required">Employee Name</label>
+                  <input type="text" className="bg-light" value={formData.employeeName} readOnly placeholder="Select from search" />
+                  <FieldError msg={errors.employeeName} />
                 </div>
                 
-                {/* Search Results Dropdown */}
-                {showDropdown && searchTerm && (
-                  <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '300px', overflow: 'auto' }}>
-                    <div className="card-body p-2">
-                      {filteredEmployees.length > 0 ? (
-                        filteredEmployees.map(emp => (
-                          <div
-                            key={emp.id}
-                            className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => handleEmployeeSelect(emp)}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            <div>
-                              <div className="fw-bold">{emp.name}</div>
-                              <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                            </div>
-                            <div>
-                              <span className="badge bg-light text-dark">{emp.designation}</span>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-3 text-muted">
-                          <small>No employees found</small>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <small className="text-muted">Type employee name or code to search</small>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Form Card */}
-      <div className="card border-0 shadow-sm">
-        <div className="card-header bg-light border-0 py-3">
-          <h6 className="mb-0 fw-bold">📋 Employee Information</h6>
-        </div>
-        <div className="card-body">
-          <form onSubmit={handleSubmit}>
-            <div className="row g-4">
-              
-              {/* Employee Name - Auto Populate */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">
-                  Employee Name <span className="text-danger">*</span>
-                </label>
-                <div className="input-group">
-                  <span className="input-group-text bg-light">
-                    <FaUser size={14} className="text-muted" />
-                  </span>
-                  <input
-                    type="text"
-                    className={`form-control bg-light ${touched.employeeName && errors.employeeName ? 'is-invalid' : ''}`}
-                    value={formData.employeeName}
-                    readOnly
-                    placeholder="Select from search above"
-                  />
+                <div className="cert-field-compact">
+                  <label>Employee Code</label>
+                  <input type="text" className="bg-light" value={formData.employeeCode} readOnly />
                 </div>
-                {touched.employeeName && errors.employeeName && (
-                  <small className="text-danger">{errors.employeeName}</small>
-                )}
-                <small className="text-muted">Auto-populated from search selection</small>
-              </div>
-
-              {/* Employee Code - Auto Populate */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">Employee Code</label>
-                <div className="input-group">
-                  <span className="input-group-text bg-light">
-                    <FaIdCard size={14} className="text-muted" />
-                  </span>
-                  <input
-                    type="text"
-                    className="form-control bg-light"
-                    value={formData.employeeCode}
-                    readOnly
-                    placeholder="Auto-populated"
-                  />
+                
+                <div className="cert-field-compact">
+                  <label>Department</label>
+                  <input type="text" className="bg-light" value={formData.department} readOnly />
+                </div>
+                
+                <div className="cert-field-compact">
+                  <label>Designation</label>
+                  <input type="text" className="bg-light" value={formData.designation} readOnly />
+                </div>
+                
+                <div className="cert-field-compact">
+                  <label>Service Book Number</label>
+                  <input type="text" className="bg-light" value={formData.serviceBookNumber} readOnly />
+                  <small>Auto-generated on employee selection</small>
+                </div>
+                
+                <div className={`cert-field-compact ${touched.serviceBookStatus && errors.serviceBookStatus ? 'has-error' : ''}`}>
+                  <label className="required">Service Book Status</label>
+                  <select value={formData.serviceBookStatus} onChange={(e) => handleChange('serviceBookStatus', e.target.value)} onBlur={() => handleBlur('serviceBookStatus')}>
+                    {statusOptions.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <FieldError msg={errors.serviceBookStatus} />
                 </div>
               </div>
-
-              {/* Department - Auto Populate */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">Department</label>
-                <div className="input-group">
-                  <span className="input-group-text bg-light">
-                    <FaBuilding size={14} className="text-muted" />
-                  </span>
-                  <input
-                    type="text"
-                    className="form-control bg-light"
-                    value={formData.department}
-                    readOnly
-                    placeholder="Auto-populated"
-                  />
-                </div>
-              </div>
-
-              {/* Designation - Auto Populate */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">Designation</label>
-                <div className="input-group">
-                  <span className="input-group-text bg-light">
-                    <FaBriefcase size={14} className="text-muted" />
-                  </span>
-                  <input
-                    type="text"
-                    className="form-control bg-light"
-                    value={formData.designation}
-                    readOnly
-                    placeholder="Auto-populated"
-                  />
-                </div>
-              </div>
-
-              {/* Service Book Number - Auto Generated */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">Service Book Number</label>
-                <div className="input-group">
-                  <span className="input-group-text bg-light">
-                    <FaBook size={14} className="text-muted" />
-                  </span>
-                  <input
-                    type="text"
-                    className="form-control bg-light"
-                    value={formData.serviceBookNumber}
-                    readOnly
-                    placeholder="Auto-generated after selection"
-                  />
-                </div>
-                <small className="text-muted">Auto-generated on employee selection</small>
-              </div>
-
-              {/* Service Book Status - Dropdown */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">
-                  Service Book Status <span className="text-danger">*</span>
-                </label>
-                <select
-                  className={`form-select ${touched.serviceBookStatus && errors.serviceBookStatus ? 'is-invalid' : ''}`}
-                  value={formData.serviceBookStatus}
-                  onChange={(e) => handleChange('serviceBookStatus', e.target.value)}
-                  onBlur={() => handleBlur('serviceBookStatus')}
-                >
-                  {statusOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                {touched.serviceBookStatus && errors.serviceBookStatus && (
-                  <small className="text-danger">{errors.serviceBookStatus}</small>
-                )}
-              </div>
-
-              {/* Preview Section */}
-              {formData.employeeId && (
-                <div className="col-12 mt-3">
-                  <div className="alert alert-success bg-opacity-10 border-0">
-                    <div className="d-flex align-items-center gap-2">
-                      <FaCheckCircle className="text-success" size={18} />
-                      <strong>Service Book Ready to Create</strong>
-                    </div>
-                    <hr className="my-2" />
-                    <div className="row">
-                      <div className="col-md-3">
-                        <small className="text-muted d-block">Service Book No:</small>
-                        <span className="fw-bold">{formData.serviceBookNumber}</span>
-                      </div>
-                      <div className="col-md-3">
-                        <small className="text-muted d-block">Status:</small>
-                        <span className={`badge`} style={{
-                          background: getStatusStyle(formData.serviceBookStatus).bg,
-                          color: getStatusStyle(formData.serviceBookStatus).color
-                        }}>
-                          {formData.serviceBookStatus}
-                        </span>
-                      </div>
-                      <div className="col-md-3">
-                        <small className="text-muted d-block">Employee:</small>
-                        <span>{formData.employeeName}</span>
-                      </div>
-                      <div className="col-md-3">
-                        <small className="text-muted d-block">Department:</small>
-                        <span>{formData.department}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Form Actions */}
-            <div className="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-              <button
-                type="button"
-                className="btn btn-outline-secondary px-4"
-                onClick={onCancel}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-    
-              >
-                <FaSave className="me-1" size={12} /> Create Service Book
+            {formData.employeeId && (
+              <div className="alert alert-success mt-3">
+                <FaCheckCircle className="me-2" />
+                <strong>Service Book Ready to Create</strong>
+                <hr />
+                <div className="row">
+                  <div className="col-md-3"><small>Service Book No:</small><br /><strong>{formData.serviceBookNumber}</strong></div>
+                  <div className="col-md-3"><small>Status:</small><br /><span className="badge" style={{ background: getStatusStyle(formData.serviceBookStatus).bg, color: getStatusStyle(formData.serviceBookStatus).color }}>{formData.serviceBookStatus}</span></div>
+                  <div className="col-md-3"><small>Employee:</small><br /><strong>{formData.employeeName}</strong></div>
+                  <div className="col-md-3"><small>Department:</small><br /><strong>{formData.department}</strong></div>
+                </div>
+              </div>
+            )}
+            
+            <div className="cert-form-actions">
+              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FaSave size={12} /> {editingId ? 'Update Service Book' : 'Create Service Book'}
               </button>
             </div>
           </form>
         </div>
-      </div>
+      ) : (
+        // List View
+        <>
+          {/* Search Bar */}
+          <div className="emp-search-bar">
+            <div className="emp-search-wrap">
+              <FaSearch className="emp-search-icon" size={12} />
+              <input
+                className="emp-search-input"
+                type="text"
+                placeholder="Search by employee name, code, department or service book number..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+              />
+              {searchTerm && (
+                <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setPage(0); }}>
+                  <FaTimes size={11} />
+                </button>
+              )}
+            </div>
+          </div>
+
+         
+          {/* Service Books Table */}
+          <div className="cert-table-card">
+            <div className="cert-table-wrap">
+              <table className="cert-table">
+                <thead>
+                  <tr>
+                    <th>Employee Name</th>
+                    <th>Employee Code</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Service Book No.</th>
+                    <th>Status</th>
+                    <th>Created Date</th>
+                    <th style={{ width: 100 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentBooks.length > 0 ? (
+                    currentBooks.map((book) => (
+                      <tr key={book.id}>
+                        <td><div className="cert-name">{book.employeeName}</div></td>
+                        <td>{book.employeeCode}</td>
+                        <td>{book.department}</td>
+                        <td>{book.designation}</td>
+                        <td>{book.serviceBookNumber}</td>
+                        <td>
+                          <span className="cert-status-badge" style={{ background: getStatusStyle(book.serviceBookStatus).bg, color: getStatusStyle(book.serviceBookStatus).color }}>
+                            {book.serviceBookStatus}
+                          </span>
+                        </td>
+                        <td>{formatDate(book.createdAt)}</td>
+                        <td>
+                          <div className="cert-actions">
+                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(book)} title="Edit">
+                              <FaEdit size={12} />
+                            </button>
+                            <button className="cert-act cert-act--del" onClick={() => handleDelete(book.id)} title="Delete">
+                              <FaTrash size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="8" className="text-center py-5">
+                        <FaBook size={48} className="text-muted mb-3" />
+                        <p>No service books found</p>
+                        <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
+                          <FaPlus size={13} /> Add First Service Book
+                        </button>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+           {totalPages > 1 && (
+              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="emp-page-info">
+                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+                  </span>
+                </div>
+                <div className="emp-page-controls">
+                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                    ) : (
+                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
+                        {pg + 1}
+                      </button>
+                    )
+                  )}
+                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                </div>
+              </div>
+            )}  
+          </div>
+        </>
+      )}
     </div>
   );
 };
+
+const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default CreateServiceBook;

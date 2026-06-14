@@ -1,13 +1,21 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaRupeeSign, FaCalendarAlt, FaUpload, 
   FaFilePdf, FaFileImage, FaTrash, FaEdit, FaPlus, FaChartLine,
-  FaFileAlt, FaSearch, FaArrowUp, FaMoneyBillWave, FaUserTie
+  FaFileAlt, FaSearch, FaArrowUp, FaMoneyBillWave, FaUserTie, FaArrowLeft,
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
-  const [revisions, setRevisions] = useState(initialData?.revisions || []);
+  const [revisions, setRevisions] = useState(initialData?.revisions || [
+    { id: 1, revisionOrderNo: 'PAY/2024/001', effectiveDate: '2024-01-01', previousPayScale: '₹50,000 - ₹80,000', revisedPayScale: '₹55,000 - ₹88,000', incrementAmount: '₹5,000 (10%)', revisionReason: 'Annual Increment', createdAt: '2024-01-01T10:30:00Z' },
+    { id: 2, revisionOrderNo: 'PAY/2024/002', effectiveDate: '2024-03-15', previousPayScale: '₹55,000 - ₹88,000', revisedPayScale: '₹65,000 - ₹1,00,000', incrementAmount: '₹10,000 (18%)', revisionReason: 'Promotion', createdAt: '2024-03-15T11:45:00Z' },
+    { id: 3, revisionOrderNo: 'PAY/2024/003', effectiveDate: '2024-06-01', previousPayScale: '₹60,000 - ₹90,000', revisedPayScale: '₹65,000 - ₹95,000', incrementAmount: '₹5,000 (8%)', revisionReason: 'Performance Based', createdAt: '2024-06-01T09:15:00Z' },
+    { id: 4, revisionOrderNo: 'PAY/2024/004', effectiveDate: '2024-08-20', previousPayScale: '₹45,000 - ₹70,000', revisedPayScale: '₹50,000 - ₹78,000', incrementAmount: '₹5,000 (11%)', revisionReason: 'Market Correction', createdAt: '2024-08-20T14:20:00Z' },
+    { id: 5, revisionOrderNo: 'PAY/2024/005', effectiveDate: '2024-10-01', previousPayScale: '₹70,000 - ₹1,00,000', revisedPayScale: '₹80,000 - ₹1,20,000', incrementAmount: '₹10,000 (14%)', revisionReason: 'Grade Revision', createdAt: '2024-10-01T10:00:00Z' }
+  ]);
+  
   const [editingRevision, setEditingRevision] = useState(null);
   const [formData, setFormData] = useState({
     revisionOrderNo: '',
@@ -23,25 +31,10 @@ const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) =>
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [existingOrderNos, setExistingOrderNos] = useState([]);
-  const [showEmployeeSearch, setShowEmployeeSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
-
-  // Dummy employees data for lookup
-  const DUMMY_EMPLOYEES = [
-    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer', currentPayScale: '₹50,000 - ₹80,000' },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager', currentPayScale: '₹60,000 - ₹90,000' },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer', currentPayScale: '₹70,000 - ₹1,00,000' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager', currentPayScale: '₹55,000 - ₹85,000' },
-    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant', currentPayScale: '₹45,000 - ₹70,000' }
-  ];
-
-  // Filtered employees for search
-  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-    const search = searchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || 
-           emp.code.toLowerCase().includes(search);
-  });
+  const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(4);
 
   // Revision Reasons
   const revisionReasons = [
@@ -55,24 +48,74 @@ const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) =>
     { value: 'Retention Bonus', label: 'Retention Bonus' }
   ];
 
+  // Filter revisions by search
+  const filteredRevisions = revisions.filter(rev => {
+    const search = searchTerm.toLowerCase();
+    return rev.revisionOrderNo.toLowerCase().includes(search) ||
+           rev.revisionReason.toLowerCase().includes(search) ||
+           rev.previousPayScale.toLowerCase().includes(search) ||
+           rev.revisedPayScale.toLowerCase().includes(search);
+  });
+
+  // Pagination
+  const totalItems = filteredRevisions.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentRevisions = filteredRevisions.slice(startIndex, startIndex + rowsPerPage);
+
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    return range;
+  };
+
   // Update existing order numbers
   useEffect(() => {
     setExistingOrderNos(revisions.map(rev => rev.revisionOrderNo));
   }, [revisions]);
 
-  // Auto calculate increment amount
+  // Auto-calculate increment amount
   useEffect(() => {
     if (formData.previousPayScale && formData.revisedPayScale) {
-      const prev = parseFloat(formData.previousPayScale.replace(/[^0-9.-]/g, ''));
-      const rev = parseFloat(formData.revisedPayScale.replace(/[^0-9.-]/g, ''));
-      if (!isNaN(prev) && !isNaN(rev)) {
-        const increment = rev - prev;
-        const incrementPercent = ((increment / prev) * 100).toFixed(2);
-        setFormData(prev => ({
-          ...prev,
-          incrementAmount: `₹${increment.toLocaleString()} (${incrementPercent}%)`
-        }));
+      const prevMatch = formData.previousPayScale.match(/\d{1,3}(?:,\d{3})*(?:\.\d+)?/g);
+      const revMatch = formData.revisedPayScale.match(/\d{1,3}(?:,\d{3})*(?:\.\d+)?/g);
+      
+      if (prevMatch && revMatch && prevMatch.length > 0 && revMatch.length > 0) {
+        const prevValue = parseInt(prevMatch[0].replace(/,/g, ''));
+        const revValue = parseInt(revMatch[0].replace(/,/g, ''));
+        
+        if (!isNaN(prevValue) && !isNaN(revValue)) {
+          const difference = revValue - prevValue;
+          const percentage = ((difference / prevValue) * 100).toFixed(0);
+          
+          if (difference > 0) {
+            setFormData(prev => ({
+              ...prev,
+              incrementAmount: `₹${difference.toLocaleString()} (${percentage}%)`
+            }));
+          } else if (difference < 0) {
+            setFormData(prev => ({
+              ...prev,
+              incrementAmount: `-₹${Math.abs(difference).toLocaleString()} (${Math.abs(percentage)}%)`
+            }));
+          } else {
+            setFormData(prev => ({
+              ...prev,
+              incrementAmount: '₹0 (0%)'
+            }));
+          }
+        }
       }
+    } else if (formData.previousPayScale && !formData.revisedPayScale) {
+      setFormData(prev => ({
+        ...prev,
+        incrementAmount: ''
+      }));
     }
   }, [formData.previousPayScale, formData.revisedPayScale]);
 
@@ -151,7 +194,6 @@ const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) =>
     if (!formData.revisedPayScale) newErrors.revisedPayScale = 'Revised Pay Scale is required';
     if (!formData.revisionReason) newErrors.revisionReason = 'Revision Reason is required';
     
-    // Validate revised pay scale > previous pay scale
     if (formData.previousPayScale && formData.revisedPayScale) {
       const prev = parseFloat(formData.previousPayScale.replace(/[^0-9.-]/g, ''));
       const rev = parseFloat(formData.revisedPayScale.replace(/[^0-9.-]/g, ''));
@@ -164,7 +206,8 @@ const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) =>
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  // Fixed handleSubmit function
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (!validateForm()) {
       toast.warning('Validation Error', 'Please fix the highlighted fields');
@@ -174,28 +217,29 @@ const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) =>
     if (editingRevision) {
       const updated = revisions.map(rev =>
         rev.id === editingRevision.id
-          ? { ...formData, id: rev.id, employeeId: selectedEmployee?.id || employeeId, employeeName: selectedEmployee?.name }
+          ? { ...formData, id: rev.id, createdAt: rev.createdAt, employeeId: employeeId }
           : rev
       );
       setRevisions(updated);
       toast.success('Success', 'Pay revision updated successfully');
+      setEditingRevision(null);
     } else {
       const newRevision = {
         id: Date.now(),
         ...formData,
-        employeeId: selectedEmployee?.id || employeeId,
-        employeeName: selectedEmployee?.name,
+        employeeId: employeeId,
         createdAt: new Date().toISOString()
       };
       setRevisions([newRevision, ...revisions]);
       toast.success('Success', 'Pay revision added successfully');
     }
     resetForm();
+    setShowForm(false);
+    setPage(0);
   };
 
   const handleEdit = (revision) => {
     setEditingRevision(revision);
-    setSelectedEmployee({ id: revision.employeeId, name: revision.employeeName });
     setFormData({
       revisionOrderNo: revision.revisionOrderNo,
       effectiveDate: revision.effectiveDate,
@@ -207,17 +251,12 @@ const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) =>
       revisionDocumentData: revision.revisionDocumentData,
       revisionDocumentName: revision.revisionDocumentName
     });
+    setShowForm(true);
   };
 
   const handleDelete = (id) => {
     setRevisions(revisions.filter(rev => rev.id !== id));
     toast.success('Success', 'Pay revision deleted successfully');
-  };
-
-  const handleEmployeeSelect = (employee) => {
-    setSelectedEmployee(employee);
-    setShowEmployeeSearch(false);
-    setSearchTerm('');
   };
 
   const resetForm = () => {
@@ -237,329 +276,146 @@ const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) =>
     setEditingRevision(null);
   };
 
+  const handleCancelForm = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
   // Calculate total increment for stats
   const totalIncrement = revisions.reduce((sum, rev) => {
     const inc = parseFloat(rev.incrementAmount?.replace(/[^0-9.-]/g, '') || 0);
     return sum + (isNaN(inc) ? 0 : inc);
   }, 0);
 
+  const handleBackToList = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
   return (
-    <div className="container-fluid p-4">
+    <div className="cert-root">
       {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4 pb-2 border-bottom">
-        <div className="bg-primary bg-opacity-10 p-3 rounded-circle">
-          <FaMoneyBillWave className="text-primary" size={24} />
-        </div>
+      <div className="cert-header">
         <div>
-          <h5 className="mb-0">Pay Revision History</h5>
-          <p className="text-muted mb-0 small">Manage employee salary revision records</p>
+          <h1 className="cert-title">Pay Revision History</h1>
+          <p className="cert-subtitle">Manage employee salary revision records</p>
         </div>
-      </div>
-
-      {/* Stats Cards */}
-      {selectedEmployee && revisions.length > 0 && (
-        <div className="row g-3 mb-4">
-          <div className="col-md-4">
-            <div className="card border-0 shadow-sm bg-primary bg-opacity-10">
-              <div className="card-body d-flex align-items-center gap-3">
-                <div className="bg-primary text-white p-3 rounded-circle">
-                  <FaChartLine size={20} />
-                </div>
-                <div>
-                  <h4 className="mb-0">{revisions.length}</h4>
-                  <small className="text-muted">Total Revisions</small>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-4">
-            <div className="card border-0 shadow-sm bg-success bg-opacity-10">
-              <div className="card-body d-flex align-items-center gap-3">
-                <div className="bg-success text-white p-3 rounded-circle">
-                  <FaArrowUp size={20} />
-                </div>
-                <div>
-                  <h4 className="mb-0">₹{totalIncrement.toLocaleString()}</h4>
-                  <small className="text-muted">Total Increment</small>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-4">
-            <div className="card border-0 shadow-sm bg-warning bg-opacity-10">
-              <div className="card-body d-flex align-items-center gap-3">
-                <div className="bg-warning text-white p-3 rounded-circle">
-                  <FaCalendarAlt size={20} />
-                </div>
-                <div>
-                  <h4 className="mb-0">{revisions[0]?.effectiveDate ? formatDate(revisions[0].effectiveDate) : '—'}</h4>
-                  <small className="text-muted">Last Revision</small>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Employee Search Section */}
-      <div className="card border-0 shadow-sm mb-4">
-        <div className="card-header bg-light border-0 py-3">
-          <h6 className="mb-0 fw-bold">🔍 Select Employee</h6>
-        </div>
-        <div className="card-body">
-          <div className="row">
-            <div className="col-md-12">
-              <div className="position-relative">
-                <div className="input-group">
-                  <span className="input-group-text bg-light">
-                    <FaSearch size={14} className="text-muted" />
-                  </span>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Search employee by name or code..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setShowEmployeeSearch(true);
-                    }}
-                    onFocus={() => setShowEmployeeSearch(true)}
-                  />
-                  {selectedEmployee && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger"
-                      onClick={() => {
-                        setSelectedEmployee(null);
-                        setSearchTerm('');
-                        resetForm();
-                      }}
-                    >
-                      <FaTimes size={12} /> Clear
-                    </button>
-                  )}
-                </div>
-                
-                {/* Search Results Dropdown */}
-                {showEmployeeSearch && searchTerm && (
-                  <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '300px', overflow: 'auto' }}>
-                    <div className="card-body p-2">
-                      {filteredEmployees.length > 0 ? (
-                        filteredEmployees.map(emp => (
-                          <div
-                            key={emp.id}
-                            className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => handleEmployeeSelect(emp)}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            <div>
-                              <div className="fw-bold">{emp.name}</div>
-                              <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                            </div>
-                            <div>
-                              <span className="badge bg-light text-dark">{emp.designation}</span>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-3 text-muted">
-                          <small>No employees found</small>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <small className="text-muted">Select an employee to manage pay revision records</small>
-            </div>
-          </div>
-          {selectedEmployee && (
-            <div className="alert alert-success mt-3 mb-0 py-2">
-              <FaUserTie className="me-2" /> <strong>Selected Employee:</strong> {selectedEmployee.name} ({selectedEmployee.code})
-              {selectedEmployee.currentPayScale && (
-                <span className="ms-3 text-muted">Current Pay Scale: {selectedEmployee.currentPayScale}</span>
-              )}
-            </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!showForm && (
+            <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
+              <FaPlus size={13} /> Add Pay Revision
+            </button>
+          )}
+          {showForm && (
+            <button 
+              type="button" 
+              className="cert-back-btn" 
+              onClick={handleBackToList}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
+            >
+              <FaArrowLeft size={12} /> Back
+            </button>
+          )}
+          {!showForm && onCancel && (
+            <button className="cert-cancel-btn" onClick={onCancel}>
+              <FaTimes size={13} /> Cancel
+            </button>
           )}
         </div>
       </div>
 
-      {/* Pay Revision Form - Show only if employee selected */}
-      {selectedEmployee && (
-        <div className="card border-0 shadow-sm mb-4">
-          <div className="card-header bg-light border-0 py-3">
-            <h6 className="mb-0 fw-bold">
-              {editingRevision ? '✏️ Edit Pay Revision' : '💰 New Pay Revision'}
-            </h6>
-          </div>
-          <div className="card-body">
-            <form onSubmit={handleSubmit}>
-              <div className="row g-3">
-                {/* Revision Order Number */}
-                <div className="col-md-4">
-                  <label className="form-label fw-bold">
-                    Revision Order Number <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className={`form-control ${touched.revisionOrderNo && errors.revisionOrderNo ? 'is-invalid' : ''}`}
-                    placeholder="e.g., ARI/PAY/2024/001"
-                    value={formData.revisionOrderNo}
-                    onChange={(e) => handleChange('revisionOrderNo', e.target.value)}
-                    onBlur={() => handleBlur('revisionOrderNo')}
-                  />
-                  {errors.revisionOrderNo && <small className="text-danger">{errors.revisionOrderNo}</small>}
-                  <small className="text-muted">Unique order number for pay revision</small>
-                </div>
+     
 
-                {/* Effective Date */}
-                <div className="col-md-4">
-                  <label className="form-label fw-bold">
-                    Effective Date <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    className={`form-control ${touched.effectiveDate && errors.effectiveDate ? 'is-invalid' : ''}`}
-                    value={formData.effectiveDate}
-                    onChange={(e) => handleChange('effectiveDate', e.target.value)}
-                    onBlur={() => handleBlur('effectiveDate')}
-                  />
-                  {errors.effectiveDate && <small className="text-danger">{errors.effectiveDate}</small>}
-                  <small className="text-muted">Date when new salary takes effect</small>
+      {/* Pay Revision Form */}
+      {showForm ? (
+        <div className="cert-form-wrap mb-4">
+          <form onSubmit={handleSubmit} className="cert-form-compact">
+            <div className="cert-form-section-compact">
+              <div className="cert-section-label">Pay Revision Details</div>
+              <div className="cert-form-grid-3col">
+                <div className={`cert-field-compact ${touched.revisionOrderNo && errors.revisionOrderNo ? 'has-error' : ''}`}>
+                  <label className="required">Revision Order Number</label>
+                  <input type="text" placeholder="e.g., ARI/PAY/2024/001" value={formData.revisionOrderNo} onChange={(e) => handleChange('revisionOrderNo', e.target.value)} onBlur={() => handleBlur('revisionOrderNo')} />
+                  <FieldError msg={errors.revisionOrderNo} />
                 </div>
-
-                {/* Revision Reason */}
-                <div className="col-md-4">
-                  <label className="form-label fw-bold">
-                    Revision Reason <span className="text-danger">*</span>
-                  </label>
-                  <select
-                    className={`form-select ${touched.revisionReason && errors.revisionReason ? 'is-invalid' : ''}`}
-                    value={formData.revisionReason}
-                    onChange={(e) => handleChange('revisionReason', e.target.value)}
-                    onBlur={() => handleBlur('revisionReason')}
-                  >
+                
+                <div className={`cert-field-compact ${touched.effectiveDate && errors.effectiveDate ? 'has-error' : ''}`}>
+                  <label className="required">Effective Date</label>
+                  <input type="date" value={formData.effectiveDate} onChange={(e) => handleChange('effectiveDate', e.target.value)} onBlur={() => handleBlur('effectiveDate')} />
+                  <FieldError msg={errors.effectiveDate} />
+                </div>
+                
+                <div className={`cert-field-compact ${touched.revisionReason && errors.revisionReason ? 'has-error' : ''}`}>
+                  <label className="required">Revision Reason</label>
+                  <select value={formData.revisionReason} onChange={(e) => handleChange('revisionReason', e.target.value)} onBlur={() => handleBlur('revisionReason')}>
                     <option value="">Select Reason</option>
-                    {revisionReasons.map(reason => (
-                      <option key={reason.value} value={reason.value}>{reason.label}</option>
-                    ))}
+                    {revisionReasons.map(reason => <option key={reason.value} value={reason.value}>{reason.label}</option>)}
                   </select>
-                  {errors.revisionReason && <small className="text-danger">{errors.revisionReason}</small>}
+                  <FieldError msg={errors.revisionReason} />
                 </div>
-
-                {/* Previous Pay Scale */}
-                <div className="col-md-6">
-                  <label className="form-label fw-bold">
-                    Previous Pay Scale <span className="text-danger">*</span>
-                  </label>
+                
+                <div className={`cert-field-compact ${touched.previousPayScale && errors.previousPayScale ? 'has-error' : ''}`}>
+                  <label className="required">Previous Pay Scale</label>
                   <div className="input-group">
-                    <span className="input-group-text bg-light">
-                      <FaRupeeSign size={14} className="text-muted" />
-                    </span>
-                    <input
-                      type="text"
-                      className={`form-control ${touched.previousPayScale && errors.previousPayScale ? 'is-invalid' : ''}`}
-                      placeholder="e.g., ₹50,000 - ₹80,000"
-                      value={formData.previousPayScale}
-                      onChange={(e) => handleChange('previousPayScale', e.target.value)}
-                      onBlur={() => handleBlur('previousPayScale')}
+                    <input type="text" placeholder="e.g., ₹50,000 - ₹80,000" value={formData.previousPayScale} onChange={(e) => handleChange('previousPayScale', e.target.value)} onBlur={() => handleBlur('previousPayScale')} />
+                  </div>
+                  <FieldError msg={errors.previousPayScale} />
+                </div>
+                
+                <div className={`cert-field-compact ${touched.revisedPayScale && errors.revisedPayScale ? 'has-error' : ''}`}>
+                  <label className="required">Revised Pay Scale</label>
+                  <div className="input-group">
+                    <input type="text" placeholder="e.g., ₹60,000 - ₹95,000" value={formData.revisedPayScale} onChange={(e) => handleChange('revisedPayScale', e.target.value)} onBlur={() => handleBlur('revisedPayScale')} />
+                  </div>
+                  <FieldError msg={errors.revisedPayScale} />
+                </div>
+                
+                <div className="cert-field-compact">
+                  <label>Increment Amount</label>
+                  <div className="input-group">
+                    <input 
+                      type="text" 
+                      className="bg-light" 
+                      value={formData.incrementAmount} 
+                      readOnly 
+                      placeholder="Auto-calculated" 
                     />
                   </div>
-                  {errors.previousPayScale && <small className="text-danger">{errors.previousPayScale}</small>}
-                  <small className="text-muted">Previous salary range or fixed amount</small>
                 </div>
-
-                {/* Revised Pay Scale */}
-                <div className="col-md-6">
-                  <label className="form-label fw-bold">
-                    Revised Pay Scale <span className="text-danger">*</span>
-                  </label>
-                  <div className="input-group">
-                    <span className="input-group-text bg-light">
-                      <FaRupeeSign size={14} className="text-muted" />
-                    </span>
-                    <input
-                      type="text"
-                      className={`form-control ${touched.revisedPayScale && errors.revisedPayScale ? 'is-invalid' : ''}`}
-                      placeholder="e.g., ₹60,000 - ₹95,000"
-                      value={formData.revisedPayScale}
-                      onChange={(e) => handleChange('revisedPayScale', e.target.value)}
-                      onBlur={() => handleBlur('revisedPayScale')}
-                    />
-                  </div>
-                  {errors.revisedPayScale && <small className="text-danger">{errors.revisedPayScale}</small>}
-                  <small className="text-muted">New salary range or fixed amount</small>
-                </div>
-
-                {/* Increment Amount (Auto-calculated) */}
-                <div className="col-md-6">
-                  <label className="form-label fw-bold">Increment Amount</label>
-                  <div className="input-group">
-                    <span className="input-group-text bg-light">
-                      <FaRupeeSign size={14} className="text-muted" />
-                    </span>
-                    <input
-                      type="text"
-                      className="form-control bg-light"
-                      value={formData.incrementAmount}
-                      readOnly
-                      placeholder="Auto-calculated"
-                    />
-                  </div>
-                  <small className="text-muted">Auto-calculated based on pay scale difference</small>
-                </div>
-
-                {/* Revision Document Upload */}
-                <div className="col-12">
-                  <label className="form-label fw-bold">Revision Document</label>
+                
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label>Revision Document</label>
                   <div className="border rounded p-3 text-center bg-light">
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={handleFileChange}
-                      style={{ display: 'none' }}
-                      id="revision-doc-upload"
-                    />
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="revision-doc-upload" />
                     <label htmlFor="revision-doc-upload" className="btn btn-outline-primary btn-sm">
-                      <FaUpload className="me-1" size={12} /> Choose File
+                      <FaUpload size={12} /> Choose File
                     </label>
                     {formData.revisionDocumentName && (
                       <div className="mt-2 text-primary">
-                        {formData.revisionDocumentName.endsWith('.pdf') ? 
-                          <FaFilePdf className="me-1" /> : <FaFileImage className="me-1" />}
-                        {formData.revisionDocumentName}
+                        {formData.revisionDocumentName.endsWith('.pdf') ? <FaFilePdf /> : <FaFileImage />} {formData.revisionDocumentName}
                       </div>
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
                 </div>
               </div>
-
-              <div className="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                <button type="button" className="btn btn-outline-secondary" onClick={resetForm}>
-                  Cancel 
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <FaSave className="me-1" size={12} /> {editingRevision ? 'Update Revision' : 'Save Revision'}
-                </button>
-              </div>
-            </form>
-          </div>
+            </div>
+            
+            <div className="cert-form-actions">
+              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FaSave size={12} /> {editingRevision ? 'Update Revision' : 'Save Revision'}
+              </button>
+            </div>
+          </form>
         </div>
-      )}
-
-      {/* Pay Revision List Table - Show only if employee selected */}
-      {selectedEmployee && revisions.length > 0 && (
-        <div className="card border-0 shadow-sm">
-          <div className="card-header bg-light border-0 py-3">
-            <h6 className="mb-0 fw-bold">📋 Pay Revision History - {selectedEmployee.name}</h6>
-          </div>
-          <div className="card-body p-0">
-            <div className="table-responsive">
-              <table className="table table-bordered table-hover align-middle mb-0">
-                <thead className="table-light">
+      ) : (
+        <>
+          {/* Pay Revision Table */}
+          <div className="cert-table-card">
+            <div className="cert-table-wrap">
+              <table className="cert-table">
+                <thead>
                   <tr>
                     <th>Order No.</th>
                     <th>Effective Date</th>
@@ -572,60 +428,83 @@ const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) =>
                   </tr>
                 </thead>
                 <tbody>
-                  {revisions.map((rev) => (
-                    <tr key={rev.id}>
-                      <td><strong>{rev.revisionOrderNo}</strong></td>
-                      <td>{formatDate(rev.effectiveDate)}</td>
-                      <td>{formatCurrency(rev.previousPayScale)}</td>
-                      <td>
-                        <span className="fw-bold text-success">
-                          {formatCurrency(rev.revisedPayScale)}
-                        </span>
-                       </td>
-                      <td>
-                        <span className="badge bg-success bg-opacity-10 text-success">
-                          <FaArrowUp className="me-1" size={10} /> {rev.incrementAmount || '—'}
-                        </span>
-                       </td>
-                      <td>
-                        <span className="badge bg-primary bg-opacity-10 text-primary">
-                          {rev.revisionReason}
-                        </span>
-                       </td>
-                      <td className="text-center">
-                        {rev.revisionDocumentName ? (
-                          <a 
-                            href={rev.revisionDocumentData} 
-                            download={rev.revisionDocumentName}
-                            className="btn btn-sm btn-outline-primary"
-                            title="Download Document"
-                          >
-                            <FaFileAlt size={12} className="me-1" /> View
-                          </a>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                      <td>
-                        <button className="btn btn-sm btn-outline-primary me-1" onClick={() => handleEdit(rev)}>
-                          <FaEdit size={12} />
-                        </button>
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(rev.id)}>
-                          <FaTrash size={12} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {currentRevisions.length > 0 ? (
+                    currentRevisions.map((rev) => (
+                      <tr key={rev.id}>
+                        <td><strong>{rev.revisionOrderNo}</strong></td>
+                        <td>{formatDate(rev.effectiveDate)}</td>
+                        <td>{formatCurrency(rev.previousPayScale)}</td>
+                        <td>
+                          <span className="fw-bold text-success">
+                            {formatCurrency(rev.revisedPayScale)}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="cert-status-badge" style={{ background: '#d1fae5', color: '#065f46' }}>
+                            <FaArrowUp className="me-1" size={10} /> {rev.incrementAmount || '—'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="cert-status-badge" style={{ background: '#e0e7ff', color: '#4f46e5' }}>
+                            {rev.revisionReason}
+                          </span>
+                        </td>
+                        <td className="text-center">
+                          {rev.revisionDocumentName ? (
+                            <a href={rev.revisionDocumentData} download={rev.revisionDocumentName} className="btn btn-sm btn-outline-primary">
+                              <FaFileAlt size={12} /> View
+                            </a>
+                          ) : <span className="text-muted">—</span>}
+                        </td>
+                        <td className="text-center">
+                          <div className="cert-actions">
+                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(rev)} title="Edit">
+                              <FaEdit size={12} />
+                            </button>
+                            <button className="cert-act cert-act--del" onClick={() => handleDelete(rev.id)} title="Delete">
+                              <FaTrash size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="8" className="text-center py-5">No pay revision records found</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      )}
 
-     
+            {/* Pagination */}
+             {totalPages > 1 && (
+              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="emp-page-info">
+                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+                  </span>
+                </div>
+                <div className="emp-page-controls">
+                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                    ) : (
+                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
+                        {pg + 1}
+                      </button>
+                    )
+                  )}
+                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                </div>
+              </div>
+            )}     
+          </div>
+        </>
+      )}
     </div>
   );
 };
+
+const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default PayRevisionHistory;

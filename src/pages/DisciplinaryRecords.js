@@ -1,13 +1,21 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaGavel, FaCalendarAlt, FaUserShield, 
   FaUpload, FaFilePdf, FaFileImage, FaEdit, FaPlus, FaExclamationTriangle,
-  FaFileAlt, FaSearch, FaCheckCircle, FaClock, FaUserTie, FaEye, FaDownload
+  FaFileAlt, FaSearch, FaCheckCircle, FaClock, FaUserTie, FaEye, FaDownload, FaArrowLeft,FaTrash
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) => {
-  const [disciplinaries, setDisciplinaries] = useState(initialData?.disciplinaries || []);
+  const [disciplinaries, setDisciplinaries] = useState(initialData?.disciplinaries || [
+    { id: 1, caseNumber: 'DISC/2024/001', incidentDate: '2024-01-15', actionType: 'Warning', investigationOfficer: 'Mr. Ramesh Sharma', penalty: 'Warning Letter', resolutionDate: '2024-01-20', supportingDocumentsName: null, createdAt: '2024-01-15T10:30:00Z', employeeName: 'John Doe', employeeId: 1 },
+    { id: 2, caseNumber: 'DISC/2024/002', incidentDate: '2024-03-10', actionType: 'Suspension', investigationOfficer: 'Ms. Priya Singh', penalty: 'Leave Without Pay', resolutionDate: '2024-03-25', supportingDocumentsName: null, createdAt: '2024-03-10T11:45:00Z', employeeName: 'Jane Smith', employeeId: 2 },
+    { id: 3, caseNumber: 'DISC/2024/003', incidentDate: '2024-05-20', actionType: 'Fine', investigationOfficer: 'Mr. Amit Patel', penalty: 'Salary Deduction', resolutionDate: '', supportingDocumentsName: null, createdAt: '2024-05-20T09:15:00Z', employeeName: 'Mike Johnson', employeeId: 3 },
+    { id: 4, caseNumber: 'DISC/2024/004', incidentDate: '2024-07-05', actionType: 'Show Cause', investigationOfficer: 'Ms. Neha Gupta', penalty: 'None', resolutionDate: '', supportingDocumentsName: null, createdAt: '2024-07-05T14:20:00Z', employeeName: 'Sarah Williams', employeeId: 4 },
+    { id: 5, caseNumber: 'DISC/2024/005', incidentDate: '2024-09-12', actionType: 'Termination', investigationOfficer: 'Mr. Vikram Mehta', penalty: 'Termination', resolutionDate: '2024-09-30', supportingDocumentsName: null, createdAt: '2024-09-12T10:00:00Z', employeeName: 'David Brown', employeeId: 5 }
+  ]);
+  
   const [editingRecord, setEditingRecord] = useState(null);
   const [formData, setFormData] = useState({
     caseNumber: '',
@@ -19,17 +27,20 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
     supportingDocuments: null,
     supportingDocumentsData: null,
     supportingDocumentsName: null,
-    remarks: '',
-    status: 'Open'
+    employeeId: '',
+    employeeName: ''
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [existingCaseNumbers, setExistingCaseNumbers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [viewingRecord, setViewingRecord] = useState(null);
+ 
+  const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(4);
 
   // Dummy employees data for lookup
   const DUMMY_EMPLOYEES = [
@@ -40,11 +51,9 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
     { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
   ];
 
-  // Filtered employees for search
   const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-    const search = searchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || 
-           emp.code.toLowerCase().includes(search);
+    const search = employeeSearchTerm.toLowerCase();
+    return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
   });
 
   // Action Types
@@ -61,20 +70,14 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
   // Penalty Options
   const penaltyOptions = [
     { value: 'None', label: 'None' },
+    { value: 'Warning Letter', label: 'Warning Letter' },
     { value: 'Salary Deduction', label: 'Salary Deduction' },
     { value: 'Leave Without Pay', label: 'Leave Without Pay' },
     { value: 'Bonus Cancellation', label: 'Bonus Cancellation' },
     { value: 'Increment Hold', label: 'Increment Hold' },
     { value: 'Promotion Hold', label: 'Promotion Hold' },
+    { value: 'Termination', label: 'Termination' },
     { value: 'Training Cost Recovery', label: 'Training Cost Recovery' }
-  ];
-
-  // Status Options
-  const statusOptions = [
-    { value: 'Open', label: 'Open' },
-    { value: 'Under Investigation', label: 'Under Investigation' },
-    { value: 'Resolved', label: 'Resolved' },
-    { value: 'Closed', label: 'Closed' }
   ];
 
   // Investigation Officers
@@ -85,6 +88,31 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
     { value: 'Ms. Neha Gupta', label: 'Ms. Neha Gupta - Compliance Officer' },
     { value: 'Mr. Vikram Mehta', label: 'Mr. Vikram Mehta - HR Director' }
   ];
+
+  // Filter records by search
+  const filteredRecords = disciplinaries.filter(rec => {
+    const search = searchTerm.toLowerCase();
+    return rec.caseNumber.toLowerCase().includes(search) ||
+           rec.actionType.toLowerCase().includes(search) ||
+           rec.employeeName.toLowerCase().includes(search);
+  });
+
+  // Pagination
+  const totalItems = filteredRecords.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentRecords = filteredRecords.slice(startIndex, startIndex + rowsPerPage);
+
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    return range;
+  };
 
   // Update existing case numbers
   useEffect(() => {
@@ -136,6 +164,7 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
     else if (field === 'actionType' && !value) error = 'Action Type is required';
     else if (field === 'investigationOfficer' && !value) error = 'Investigation Officer is required';
     else if (field === 'penalty' && !value) error = 'Penalty is required';
+    else if (field === 'employeeId' && !value) error = 'Employee is required';
     
     if (field === 'resolutionDate' && value && formData.incidentDate) {
       if (new Date(value) < new Date(formData.incidentDate)) {
@@ -166,6 +195,7 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
     if (!formData.actionType) newErrors.actionType = 'Action Type is required';
     if (!formData.investigationOfficer) newErrors.investigationOfficer = 'Investigation Officer is required';
     if (!formData.penalty) newErrors.penalty = 'Penalty is required';
+    if (!formData.employeeId) newErrors.employeeId = 'Employee is required';
     
     if (formData.resolutionDate && formData.incidentDate) {
       if (new Date(formData.resolutionDate) < new Date(formData.incidentDate)) {
@@ -177,6 +207,17 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleEmployeeSelect = (employee) => {
+    setSelectedEmployee(employee);
+    setFormData(prev => ({
+      ...prev,
+      employeeId: employee.id,
+      employeeName: employee.name
+    }));
+    setEmployeeSearchTerm('');
+    setShowDropdown(false);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validateForm()) {
@@ -185,32 +226,38 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
     }
     
     const recordData = {
-      ...formData,
-      employeeId: selectedEmployee?.id || employeeId,
-      employeeName: selectedEmployee?.name,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      id: editingRecord ? editingRecord.id : Date.now(),
+      caseNumber: formData.caseNumber,
+      incidentDate: formData.incidentDate,
+      actionType: formData.actionType,
+      investigationOfficer: formData.investigationOfficer,
+      penalty: formData.penalty,
+      resolutionDate: formData.resolutionDate || '',
+      supportingDocumentsData: formData.supportingDocumentsData,
+      supportingDocumentsName: formData.supportingDocumentsName,
+      employeeId: formData.employeeId,
+      employeeName: formData.employeeName,
+      createdAt: editingRecord ? editingRecord.createdAt : new Date().toISOString()
     };
     
     if (editingRecord) {
       const updated = disciplinaries.map(rec =>
-        rec.id === editingRecord.id
-          ? { ...recordData, id: rec.id }
-          : rec
+        rec.id === editingRecord.id ? recordData : rec
       );
       setDisciplinaries(updated);
       toast.success('Success', 'Disciplinary record updated successfully');
+      setEditingRecord(null);
     } else {
-      const newRecord = { id: Date.now(), ...recordData };
-      setDisciplinaries([newRecord, ...disciplinaries]);
+      setDisciplinaries([recordData, ...disciplinaries]);
       toast.success('Success', 'Disciplinary record added successfully');
     }
     resetForm();
+    setShowForm(false);
+    setPage(0);
   };
 
   const handleEdit = (record) => {
     setEditingRecord(record);
-    setSelectedEmployee({ id: record.employeeId, name: record.employeeName });
     setFormData({
       caseNumber: record.caseNumber,
       incidentDate: record.incidentDate,
@@ -221,22 +268,14 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
       supportingDocuments: null,
       supportingDocumentsData: record.supportingDocumentsData,
       supportingDocumentsName: record.supportingDocumentsName,
-      remarks: record.remarks || '',
-      status: record.status || 'Open'
+      employeeId: record.employeeId,
+      employeeName: record.employeeName
     });
+    setSelectedEmployee({ id: record.employeeId, name: record.employeeName });
+    setShowForm(true);
   };
 
-  const handleView = (record) => {
-    setViewingRecord(record);
-    setShowViewModal(true);
-  };
-
-  const handleEmployeeSelect = (employee) => {
-    setSelectedEmployee(employee);
-    setSearchTerm('');
-    setShowDropdown(false);
-  };
-
+ 
   const resetForm = () => {
     setFormData({
       caseNumber: '',
@@ -248,463 +287,255 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
       supportingDocuments: null,
       supportingDocumentsData: null,
       supportingDocumentsName: null,
-      remarks: '',
-      status: 'Open'
+      employeeId: '',
+      employeeName: ''
     });
     setErrors({});
     setTouched({});
     setEditingRecord(null);
+    setSelectedEmployee(null);
+    setEmployeeSearchTerm('');
   };
 
-  // Calculate stats
-  const openCases = disciplinaries.filter(d => d.status === 'Open' || d.status === 'Under Investigation').length;
-  const resolvedCases = disciplinaries.filter(d => d.status === 'Resolved' || d.status === 'Closed').length;
+  const handleCancelForm = () => {
+    resetForm();
+    setShowForm(false);
+  };
 
+  const handleBackToList = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  const handleDelete = (id) => {
+  setDisciplinaries(disciplinaries.filter(rec => rec.id !== id));
+  toast.success('Success', 'Disciplinary record deleted successfully');
+};
+  
   return (
-    <div className="container-fluid p-4">
+    <div className="cert-root">
       {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4 pb-2 border-bottom">
-        <div className="bg-primary bg-opacity-10 p-3 rounded-circle">
-          <FaGavel className="text-primary" size={24} />
-        </div>
+      <div className="cert-header">
         <div>
-          <h5 className="mb-0">Disciplinary Action Records</h5>
-          <p className="text-muted mb-0 small">Manage employee disciplinary records and conduct history</p>
+          <h1 className="cert-title">Disciplinary Action Records</h1>
+          <p className="cert-subtitle">Manage employee disciplinary records and conduct history</p>
         </div>
-      </div>
-
-      {/* Stats Cards */}
-      {selectedEmployee && disciplinaries.length > 0 && (
-        <div className="row g-3 mb-4">
-          <div className="col-md-4">
-            <div className="card border-0 shadow-sm bg-warning bg-opacity-10">
-              <div className="card-body d-flex align-items-center gap-3">
-                <div className="bg-warning text-white p-3 rounded-circle">
-                  <FaExclamationTriangle size={20} />
-                </div>
-                <div>
-                  <h4 className="mb-0">{openCases}</h4>
-                  <small className="text-muted">Open Cases</small>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-4">
-            <div className="card border-0 shadow-sm bg-success bg-opacity-10">
-              <div className="card-body d-flex align-items-center gap-3">
-                <div className="bg-success text-white p-3 rounded-circle">
-                  <FaCheckCircle size={20} />
-                </div>
-                <div>
-                  <h4 className="mb-0">{resolvedCases}</h4>
-                  <small className="text-muted">Resolved/Closed</small>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-4">
-            <div className="card border-0 shadow-sm bg-danger bg-opacity-10">
-              <div className="card-body d-flex align-items-center gap-3">
-                <div className="bg-danger text-white p-3 rounded-circle">
-                  <FaFileAlt size={20} />
-                </div>
-                <div>
-                  <h4 className="mb-0">{disciplinaries.length}</h4>
-                  <small className="text-muted">Total Records</small>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Employee Search Section */}
-      <div className="card border-0 shadow-sm mb-4">
-        <div className="card-header bg-light">
-          <h6 className="mb-0 fw-bold">🔍 Select Employee</h6>
-        </div>
-        <div className="card-body">
-          <div className="position-relative">
-            <div className="input-group">
-              <span className="input-group-text bg-light">
-                <FaSearch size={14} className="text-muted" />
-              </span>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Search by employee name or code..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setShowDropdown(true);
-                }}
-                onFocus={() => setShowDropdown(true)}
-              />
-              {selectedEmployee && (
-                <button
-                  type="button"
-                  className="btn btn-outline-danger"
-                  onClick={() => {
-                    setSelectedEmployee(null);
-                    setSearchTerm('');
-                    resetForm();
-                  }}
-                >
-                   Cancel
-                </button>
-              )}
-            </div>
-            
-            {/* Search Results Dropdown */}
-            {showDropdown && searchTerm && (
-              <div className="dropdown-menu show w-100 mt-1" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {filteredEmployees.length > 0 ? (
-                  filteredEmployees.map(emp => (
-                    <button
-                      key={emp.id}
-                      type="button"
-                      className="dropdown-item d-flex justify-content-between align-items-center"
-                      onClick={() => handleEmployeeSelect(emp)}
-                    >
-                      <div>
-                        <div className="fw-bold">{emp.name}</div>
-                        <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                      </div>
-                      <span className="badge bg-secondary">{emp.designation}</span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="dropdown-item text-center text-muted">
-                    No employees found
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <small className="text-muted mt-2 d-block">Type employee name or code to search</small>
-          
-          {selectedEmployee && (
-            <div className="alert alert-info mt-3 mb-0 py-2">
-              <FaUserTie className="me-2" /> <strong>Selected Employee:</strong> {selectedEmployee.name} ({selectedEmployee.code}) - {selectedEmployee.designation}
-            </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!showForm && (
+            <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
+              <FaPlus size={13} /> Add Disciplinary Record
+            </button>
+          )}
+          {showForm && (
+            <button 
+              type="button" 
+              className="cert-back-btn" 
+              onClick={handleBackToList}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
+            >
+              <FaArrowLeft size={12} /> Back
+            </button>
+          )}
+          {!showForm && onCancel && (
+            <button className="cert-cancel-btn" onClick={onCancel}>
+              <FaTimes size={13} /> Cancel
+            </button>
           )}
         </div>
       </div>
 
-      {/* Disciplinary Form - Show only if employee selected */}
-      {selectedEmployee && (
-        <div className="card border-0 shadow-sm mb-4">
-          <div className="card-header bg-light">
-            <h6 className="mb-0 fw-bold">
-              {editingRecord ? '✏️ Edit Disciplinary Record' : '📝 New Disciplinary Record'}
-            </h6>
-          </div>
-          <div className="card-body">
-            <form onSubmit={handleSubmit}>
-              <div className="row g-3">
+      {showForm ? (
+        <div className="cert-form-wrap mb-4">
+          <form onSubmit={handleSubmit} className="cert-form-compact">
+            <div className="cert-form-section-compact">
+              <div className="cert-section-label">Disciplinary Details</div>
+              <div className="cert-form-grid-3col">
+              
                 {/* Case Number */}
-                <div className="col-md-3">
-                  <label className="form-label fw-bold">
-                    Case Number <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className={`form-control ${touched.caseNumber && errors.caseNumber ? 'is-invalid' : ''}`}
-                    placeholder="e.g., DISC/2024/001"
-                    value={formData.caseNumber}
-                    onChange={(e) => handleChange('caseNumber', e.target.value)}
-                    onBlur={() => handleBlur('caseNumber')}
-                  />
-                  {errors.caseNumber && <small className="text-danger">{errors.caseNumber}</small>}
+                <div className={`cert-field-compact ${touched.caseNumber && errors.caseNumber ? 'has-error' : ''}`}>
+                  <label className="required">Case Number</label>
+                  <input type="text" placeholder="e.g., DISC/2024/001" value={formData.caseNumber} onChange={(e) => handleChange('caseNumber', e.target.value)} onBlur={() => handleBlur('caseNumber')} />
+                  <FieldError msg={errors.caseNumber} />
+                  <small>Unique case number</small>
                 </div>
-
+                
                 {/* Incident Date */}
-                <div className="col-md-3">
-                  <label className="form-label fw-bold">
-                    Incident Date <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    className={`form-control ${touched.incidentDate && errors.incidentDate ? 'is-invalid' : ''}`}
-                    value={formData.incidentDate}
-                    onChange={(e) => handleChange('incidentDate', e.target.value)}
-                    onBlur={() => handleBlur('incidentDate')}
-                  />
-                  {errors.incidentDate && <small className="text-danger">{errors.incidentDate}</small>}
+                <div className={`cert-field-compact ${touched.incidentDate && errors.incidentDate ? 'has-error' : ''}`}>
+                  <label className="required">Incident Date</label>
+                  <input type="date" value={formData.incidentDate} onChange={(e) => handleChange('incidentDate', e.target.value)} onBlur={() => handleBlur('incidentDate')} />
+                  <FieldError msg={errors.incidentDate} />
                 </div>
-
+                
                 {/* Action Type */}
-               <div className="col-md-3">
-  <label className="form-label fw-bold">
-    Action Type <span className="text-danger">*</span>
-  </label>
-  <select
-    className={`form-control ${touched.actionType && errors.actionType ? 'is-invalid' : ''}`}
-    value={formData.actionType}
-    onChange={(e) => handleChange('actionType', e.target.value)}
-    onBlur={() => handleBlur('actionType')}
-  >
-    {actionTypes.map(type => (
-      <option key={type.value} value={type.value}>{type.label}</option>
-    ))}
-  </select>
-  {errors.actionType && <small className="text-danger">{errors.actionType}</small>}
-</div>
-
-                {/* Status */}
-                <div className="col-md-3">
-                  <label className="form-label fw-bold">Status</label>
-                  <select
-                    className="form-select"
-                    value={formData.status}
-                    onChange={(e) => handleChange('status', e.target.value)}
-                  >
-                    {statusOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
+                <div className={`cert-field-compact ${touched.actionType && errors.actionType ? 'has-error' : ''}`}>
+                  <label className="required">Action Type</label>
+                  <select value={formData.actionType} onChange={(e) => handleChange('actionType', e.target.value)} onBlur={() => handleBlur('actionType')}>
+                    {actionTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
                   </select>
+                  <FieldError msg={errors.actionType} />
                 </div>
-
+                
                 {/* Investigation Officer */}
-                <div className="col-md-6">
-                  <label className="form-label fw-bold">
-                    Investigation Officer <span className="text-danger">*</span>
-                  </label>
-                  <select
-                    className={`form-select ${touched.investigationOfficer && errors.investigationOfficer ? 'is-invalid' : ''}`}
-                    value={formData.investigationOfficer}
-                    onChange={(e) => handleChange('investigationOfficer', e.target.value)}
-                    onBlur={() => handleBlur('investigationOfficer')}
-                  >
-                    <option value="">Select Investigation Officer</option>
-                    {investigationOfficers.map(officer => (
-                      <option key={officer.value} value={officer.value}>{officer.label}</option>
-                    ))}
+                <div className={`cert-field-compact ${touched.investigationOfficer && errors.investigationOfficer ? 'has-error' : ''}`} >
+                  <label className="required">Investigation Officer</label>
+                  <select value={formData.investigationOfficer} onChange={(e) => handleChange('investigationOfficer', e.target.value)} onBlur={() => handleBlur('investigationOfficer')}>
+                    <option value="">Select Officer</option>
+                    {investigationOfficers.map(officer => <option key={officer.value} value={officer.value}>{officer.label}</option>)}
                   </select>
-                  {errors.investigationOfficer && <small className="text-danger">{errors.investigationOfficer}</small>}
+                  <FieldError msg={errors.investigationOfficer} />
                 </div>
-
+                
                 {/* Penalty */}
-                <div className="col-md-6">
-                  <label className="form-label fw-bold">
-                    Penalty <span className="text-danger">*</span>
-                  </label>
-                  <select
-                    className={`form-select ${touched.penalty && errors.penalty ? 'is-invalid' : ''}`}
-                    value={formData.penalty}
-                    onChange={(e) => handleChange('penalty', e.target.value)}
-                    onBlur={() => handleBlur('penalty')}
-                  >
-                    {penaltyOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
+                <div className={`cert-field-compact ${touched.penalty && errors.penalty ? 'has-error' : ''}`}>
+                  <label className="required">Penalty</label>
+                  <select value={formData.penalty} onChange={(e) => handleChange('penalty', e.target.value)} onBlur={() => handleBlur('penalty')}>
+                    <option value="">Select Penalty</option>
+                    {penaltyOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
-                  {errors.penalty && <small className="text-danger">{errors.penalty}</small>}
+                  <FieldError msg={errors.penalty} />
                 </div>
-
+                
                 {/* Resolution Date */}
-                <div className="col-md-6">
-                  <label className="form-label fw-bold">Resolution Date</label>
-                  <input
-                    type="date"
-                    className={`form-control ${touched.resolutionDate && errors.resolutionDate ? 'is-invalid' : ''}`}
-                    value={formData.resolutionDate}
-                    min={formData.incidentDate || undefined}
-                    onChange={(e) => handleChange('resolutionDate', e.target.value)}
-                    onBlur={() => handleBlur('resolutionDate')}
-                  />
-                  {errors.resolutionDate && <small className="text-danger">{errors.resolutionDate}</small>}
-                  <small className="text-muted">Date when the case was resolved</small>
+                <div className={`cert-field-compact ${touched.resolutionDate && errors.resolutionDate ? 'has-error' : ''}`}>
+                  <label>Resolution Date</label>
+                  <input type="date" value={formData.resolutionDate} min={formData.incidentDate} onChange={(e) => handleChange('resolutionDate', e.target.value)} onBlur={() => handleBlur('resolutionDate')} />
+                  <FieldError msg={errors.resolutionDate} />
                 </div>
-
-                {/* Remarks */}
-                <div className="col-md-6">
-                  <label className="form-label fw-bold">Remarks</label>
-                  <textarea
-                    rows="2"
-                    className="form-control"
-                    placeholder="Additional remarks or case summary..."
-                    value={formData.remarks}
-                    onChange={(e) => handleChange('remarks', e.target.value)}
-                  />
-                </div>
-
+                
                 {/* Supporting Documents */}
-                <div className="col-12">
-                  <label className="form-label fw-bold">Supporting Documents</label>
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label>Supporting Documents</label>
                   <div className="border rounded p-3 text-center bg-light">
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={handleFileChange}
-                      style={{ display: 'none' }}
-                      id="disciplinary-doc-upload"
-                    />
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="disciplinary-doc-upload" />
                     <label htmlFor="disciplinary-doc-upload" className="btn btn-outline-primary btn-sm">
-                      <FaUpload className="me-1" size={12} /> Choose File
+                      <FaUpload size={12} /> Choose File
                     </label>
                     {formData.supportingDocumentsName && (
                       <div className="mt-2 text-primary">
-                        {formData.supportingDocumentsName.endsWith('.pdf') ? 
-                          <FaFilePdf className="me-1" /> : <FaFileImage className="me-1" />}
-                        {formData.supportingDocumentsName}
+                        {formData.supportingDocumentsName.endsWith('.pdf') ? <FaFilePdf /> : <FaFileImage />} {formData.supportingDocumentsName}
                       </div>
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
                 </div>
               </div>
-
-              <div className="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                <button type="button" className="btn btn-outline-secondary" onClick={resetForm}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <FaSave className="me-1" size={12} /> {editingRecord ? 'Update Record' : 'Save Record'}
-                </button>
-              </div>
-            </form>
-          </div>
+            </div>
+            
+            <div className="cert-form-actions">
+              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FaSave size={12} /> {editingRecord ? 'Update Record' : 'Save Record'}
+              </button>
+            </div>
+          </form>
         </div>
-      )}
-
-      {/* Disciplinary Records List Table */}
-      {selectedEmployee && disciplinaries.length > 0 && (
-        <div className="card border-0 shadow-sm">
-          <div className="card-header bg-light">
-            <h6 className="mb-0 fw-bold">📋 Disciplinary Records - {selectedEmployee.name}</h6>
+      ) : (
+        <>
+          {/* Search Bar */}
+          <div className="emp-search-bar">
+            <div className="emp-search-wrap">
+              <FaSearch className="emp-search-icon" size={12} />
+              <input
+                className="emp-search-input"
+                type="text"
+                placeholder="Search by case number, employee name or action type..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+              />
+              {searchTerm && (
+                <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setPage(0); }}>
+                  <FaTimes size={11} />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="card-body p-0">
-            <div className="table-responsive">
-              <table className="table table-bordered table-hover align-middle mb-0">
-                <thead className="table-light">
+
+         
+          {/* Disciplinary Records Table */}
+          <div className="cert-table-card">
+            <div className="cert-table-wrap">
+              <table className="cert-table">
+                <thead>
                   <tr>
                     <th>Case No.</th>
+                    
                     <th>Incident Date</th>
                     <th>Action Type</th>
                     <th>Investigation Officer</th>
                     <th>Penalty</th>
-                    <th>Status</th>
                     <th>Resolution Date</th>
-                    <th>Documents</th>
-                    <th style={{ width: 100 }}>Actions</th>
+                    <th>Document</th>
+                    <th style={{ width: 80 }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {disciplinaries.map((record) => (
-                    <tr key={record.id}>
-                      <td><strong>{record.caseNumber}</strong></td>
-                      <td>{formatDate(record.incidentDate)}</td>
-                      <td>{record.actionType}</td>
-                      <td>{record.investigationOfficer.split(' - ')[0]}</td>
-                      <td>{record.penalty}</td>
-                      <td>
-                        <span className={`badge ${record.status === 'Open' || record.status === 'Under Investigation' ? 'bg-warning' : record.status === 'Resolved' ? 'bg-success' : 'bg-secondary'} bg-opacity-10 text-dark`}>
-                          {record.status}
-                        </span>
-                      </td>
-                      <td>{record.resolutionDate ? formatDate(record.resolutionDate) : '—'}</td>
-                      <td className="text-center">
-                        {record.supportingDocumentsName ? (
-                          <a 
-                            href={record.supportingDocumentsData} 
-                            download={record.supportingDocumentsName}
-                            className="btn btn-sm btn-outline-primary"
-                          >
-                            <FaFileAlt size={12} /> View
-                          </a>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                      <td>
-                        <button className="btn btn-sm btn-outline-info me-1" onClick={() => handleView(record)} title="View">
-                          <FaEye size={12} />
-                        </button>
-                        <button className="btn btn-sm btn-outline-primary" onClick={() => handleEdit(record)} title="Edit">
-                          <FaEdit size={12} />
-                        </button>
-                       </td>
-                    </tr>
-                  ))}
+                  {currentRecords.length > 0 ? (
+                    currentRecords.map((record) => (
+                      <tr key={record.id}>
+                        <td><strong>{record.caseNumber}</strong></td>
+                       
+                        <td>{formatDate(record.incidentDate)}</td>
+                        <td>{record.actionType}</td>
+                        <td>{record.investigationOfficer?.split(' - ')[0]}</td>
+                        <td>{record.penalty}</td>
+                        <td>{record.resolutionDate ? formatDate(record.resolutionDate) : '—'}</td>
+                        <td className="text-center">
+                          {record.supportingDocumentsName ? (
+                            <a href={record.supportingDocumentsData} download={record.supportingDocumentsName} className="btn btn-sm btn-outline-primary">
+                              <FaFileAlt size={12} /> View
+                            </a>
+                          ) : <span className="text-muted">—</span>}
+                        </td>
+                        <td>
+                          <div className="cert-actions">
+                          
+                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(record)} title="Edit">
+                              <FaEdit size={12} />
+                            </button>
+                            <button className="cert-act cert-act--del" onClick={() => handleDelete(record.id)} title="Delete"><FaTrash size={12} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="9" className="text-center py-5">No disciplinary records found</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      )}
 
-    
-      {/* View Record Modal */}
-      {showViewModal && viewingRecord && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
-              <div className="modal-header bg-primary text-white">
-                <h5 className="modal-title">
-                  <FaGavel className="me-2" /> Disciplinary Case Details
-                </h5>
-                <button type="button" className="btn-close btn-close-white" onClick={() => setShowViewModal(false)}></button>
-              </div>
-              <div className="modal-body">
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <label className="text-muted small">Case Number</label>
-                    <p className="fw-bold">{viewingRecord.caseNumber}</p>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="text-muted small">Employee</label>
-                    <p className="fw-bold">{viewingRecord.employeeName}</p>
-                  </div>
-                  <div className="col-md-4">
-                    <label className="text-muted small">Incident Date</label>
-                    <p>{formatDate(viewingRecord.incidentDate)}</p>
-                  </div>
-                  <div className="col-md-4">
-                    <label className="text-muted small">Action Type</label>
-                    <p>{viewingRecord.actionType}</p>
-                  </div>
-                  <div className="col-md-4">
-                    <label className="text-muted small">Status</label>
-                    <p>{viewingRecord.status}</p>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="text-muted small">Investigation Officer</label>
-                    <p>{viewingRecord.investigationOfficer}</p>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="text-muted small">Penalty</label>
-                    <p>{viewingRecord.penalty}</p>
-                  </div>
-                  <div className="col-12">
-                    <label className="text-muted small">Remarks</label>
-                    <p>{viewingRecord.remarks || '—'}</p>
-                  </div>
-                  {viewingRecord.supportingDocumentsName && (
-                    <div className="col-12">
-                      <label className="text-muted small">Supporting Documents</label>
-                      <div>
-                        <a 
-                          href={viewingRecord.supportingDocumentsData} 
-                          download={viewingRecord.supportingDocumentsName}
-                          className="btn btn-sm btn-outline-primary mt-1"
-                        >
-                          <FaDownload className="me-1" size={12} /> Download {viewingRecord.supportingDocumentsName}
-                        </a>
-                      </div>
-                    </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="emp-page-info">
+                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+                  </span>
+                </div>
+                <div className="emp-page-controls">
+                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                    ) : (
+                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
+                        {pg + 1}
+                      </button>
+                    )
                   )}
+                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
                 </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowViewModal(false)}>Close</button>
-              </div>
-            </div>
+            )}
           </div>
-        </div>
+
+          
+        </>
       )}
     </div>
   );
 };
+
+const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default DisciplinaryRecords;

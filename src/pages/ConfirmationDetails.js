@@ -1,12 +1,20 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaFileAlt, FaCalendarAlt, FaUserCheck, 
-  FaUpload, FaFilePdf, FaFileImage, FaTrash, FaEdit, FaPlus, FaCheckCircle
+  FaUpload, FaFilePdf, FaFileImage, FaTrash, FaEdit, FaPlus, FaCheckCircle, FaSearch, FaArrowLeft, FaArrowRight
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onSuccess, onCancel }) => {
-  const [confirmations, setConfirmations] = useState(initialData?.confirmations || []);
+  const [confirmations, setConfirmations] = useState(initialData?.confirmations || [
+    { id: 1, confirmationOrderNo: 'CONF/2024/001', confirmationDate: '2024-07-15', confirmedBy: 'HR Manager', remarks: 'Performance satisfactory', createdAt: '2024-07-15T10:30:00Z' },
+    { id: 2, confirmationOrderNo: 'CONF/2024/002', confirmationDate: '2024-08-20', confirmedBy: 'CEO', remarks: 'Excellent performance', createdAt: '2024-08-20T11:45:00Z' },
+    { id: 3, confirmationOrderNo: 'CONF/2024/003', confirmationDate: '2024-06-10', confirmedBy: 'HR Director', remarks: 'Probation completed', createdAt: '2024-06-10T09:15:00Z' },
+    { id: 4, confirmationOrderNo: 'CONF/2024/004', confirmationDate: '2024-09-05', confirmedBy: 'Department Head', remarks: '', createdAt: '2024-09-05T14:20:00Z' },
+    { id: 5, confirmationOrderNo: 'CONF/2024/005', confirmationDate: '2024-10-12', confirmedBy: 'Senior HR Officer', remarks: 'Confirmed after review', createdAt: '2024-10-12T10:00:00Z' }
+  ]);
+  
   const [editingConfirmation, setEditingConfirmation] = useState(null);
   const [formData, setFormData] = useState({
     confirmationOrderNo: '',
@@ -20,6 +28,10 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [existingOrderNos, setExistingOrderNos] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(3);
 
   // Dummy data for Confirmed By dropdown
   const confirmedByOptions = [
@@ -29,6 +41,31 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
     { value: 'Department Head', label: 'Department Head' },
     { value: 'Senior HR Officer', label: 'Senior HR Officer' }
   ];
+
+  // Filter confirmations by search
+  const filteredConfirmations = confirmations.filter(conf => {
+    const search = searchTerm.toLowerCase();
+    return conf.confirmationOrderNo.toLowerCase().includes(search) ||
+           conf.confirmedBy.toLowerCase().includes(search) ||
+           (conf.remarks && conf.remarks.toLowerCase().includes(search));
+  });
+
+  // Pagination
+  const totalItems = filteredConfirmations.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentConfirmations = filteredConfirmations.slice(startIndex, startIndex + rowsPerPage);
+
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    return range;
+  };
 
   // Update existing order numbers
   useEffect(() => {
@@ -140,6 +177,7 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
       );
       setConfirmations(updated);
       toast.success('Success', 'Confirmation details updated successfully');
+      setEditingConfirmation(null);
     } else {
       const newConfirmation = {
         id: Date.now(),
@@ -150,6 +188,8 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
       toast.success('Success', 'Confirmation details added successfully');
     }
     resetForm();
+    setShowForm(false);
+    setPage(0);
   };
 
   const handleEdit = (confirmation) => {
@@ -163,6 +203,7 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
       confirmationDocumentData: confirmation.confirmationDocumentData,
       confirmationDocumentName: confirmation.confirmationDocumentName
     });
+    setShowForm(true);
   };
 
   const handleDelete = (id) => {
@@ -185,156 +226,151 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
     setEditingConfirmation(null);
   };
 
+  const handleCancelForm = () => {
+    resetForm();
+    setShowForm(false);
+  };
+const handleBackToList = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
   return (
-    <div className="container-fluid p-4">
+    <div className="cert-root">
       {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4 pb-2 border-bottom">
-        <div className="bg-primary bg-opacity-10 p-3 rounded-circle">
-          <FaUserCheck className="text-primary" size={24} />
-        </div>
+      <div className="cert-header">
         <div>
-          <h5 className="mb-0">Confirmation Details</h5>
-          <p className="text-muted mb-0 small">Manage employee probation confirmation records</p>
+          <h1 className="cert-title">Confirmation Details</h1>
+          <p className="cert-subtitle">Manage employee probation confirmation records</p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!showForm && (
+            <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
+              <FaPlus size={13} /> Add Confirmation
+            </button>
+          )}
+           {showForm && (
+                        <button 
+                          type="button" 
+                          className="cert-back-btn" 
+                          onClick={handleBackToList}
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
+                        >
+                          <FaArrowLeft size={12} /> Back
+                        </button>
+                      )}
+          {!showForm && onCancel && (
+            <button className="cert-cancel-btn" onClick={onCancel}>
+              <FaTimes size={13} /> Cancel
+            </button>
+          )}
         </div>
       </div>
 
       {/* Joining Date Info Alert */}
-      {employeeJoiningDate && (
-        <div className="alert alert-info bg-opacity-10 border-0 mb-4">
+      {employeeJoiningDate && !showForm && (
+        <div className="alert alert-info bg-opacity-10 border-0 mb-4" style={{ padding: '12px 16px', borderRadius: '12px', background: '#e0e7ff', color: '#4f46e5' }}>
           <div className="d-flex align-items-center gap-2">
-            <FaCalendarAlt className="text-info" />
+            <FaCalendarAlt />
             <span>
               <strong>Employee Joining Date:</strong> {formatDate(employeeJoiningDate)}
-              <small className="text-muted ms-2">Confirmation Date must be after this date</small>
+              <span className="text-muted ms-2">Confirmation Date must be after this date</span>
             </span>
           </div>
         </div>
       )}
 
-      {/* Confirmation Form - Direct show, no Add button */}
-      <div className="card border-0 shadow-sm mb-4">
-        <div className="card-header bg-light border-0 py-3">
-          <h6 className="mb-0 fw-bold">
-            {editingConfirmation ? '✏️ Edit Confirmation' : '✅ New Confirmation Record'}
-          </h6>
-        </div>
-        <div className="card-body">
-          <form onSubmit={handleSubmit}>
-            <div className="row g-3">
-              {/* Confirmation Order Number */}
-              <div className="col-md-4">
-                <label className="form-label fw-bold">
-                  Confirmation Order Number <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className={`form-control ${touched.confirmationOrderNo && errors.confirmationOrderNo ? 'is-invalid' : ''}`}
-                  placeholder="e.g., ARI/CONF/2024/001"
-                  value={formData.confirmationOrderNo}
-                  onChange={(e) => handleChange('confirmationOrderNo', e.target.value)}
-                  onBlur={() => handleBlur('confirmationOrderNo')}
-                />
-                {errors.confirmationOrderNo && <small className="text-danger">{errors.confirmationOrderNo}</small>}
-                <small className="text-muted">Unique order number for confirmation</small>
-              </div>
-
-              {/* Confirmation Date */}
-              <div className="col-md-4">
-                <label className="form-label fw-bold">
-                  Confirmation Date <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="date"
-                  className={`form-control ${touched.confirmationDate && errors.confirmationDate ? 'is-invalid' : ''}`}
-                  value={formData.confirmationDate}
-                  min={employeeJoiningDate ? new Date(new Date(employeeJoiningDate).setDate(new Date(employeeJoiningDate).getDate() + 1)).toISOString().split('T')[0] : ''}
-                  onChange={(e) => handleChange('confirmationDate', e.target.value)}
-                  onBlur={() => handleBlur('confirmationDate')}
-                />
-                {errors.confirmationDate && <small className="text-danger">{errors.confirmationDate}</small>}
-                <small className="text-muted">Date when employee was confirmed</small>
-              </div>
-
-              {/* Confirmed By */}
-              <div className="col-md-4">
-                <label className="form-label fw-bold">
-                  Confirmed By <span className="text-danger">*</span>
-                </label>
-                <select
-                  className={`form-select ${touched.confirmedBy && errors.confirmedBy ? 'is-invalid' : ''}`}
-                  value={formData.confirmedBy}
-                  onChange={(e) => handleChange('confirmedBy', e.target.value)}
-                  onBlur={() => handleBlur('confirmedBy')}
-                >
-                  <option value="">Select Authority</option>
-                  {confirmedByOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                {errors.confirmedBy && <small className="text-danger">{errors.confirmedBy}</small>}
-              </div>
-
-              {/* Remarks */}
-              <div className="col-12">
-                <label className="form-label fw-bold">Remarks</label>
-                <textarea
-                  rows="3"
-                  className="form-control"
-                  placeholder="Additional remarks about confirmation..."
-                  value={formData.remarks}
-                  onChange={(e) => handleChange('remarks', e.target.value)}
-                />
-                <small className="text-muted">Optional: Any special notes or comments</small>
-              </div>
-
-              {/* Confirmation Document Upload */}
-              <div className="col-12">
-                <label className="form-label fw-bold">Confirmation Document</label>
-                <div className="border rounded p-3 text-center bg-light">
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={handleFileChange}
-                    style={{ display: 'none' }}
-                    id="confirmation-doc-upload"
-                  />
-                  <label htmlFor="confirmation-doc-upload" className="btn btn-outline-primary btn-sm">
-                    <FaUpload className="me-1" size={12} /> Choose File
-                  </label>
-                  {formData.confirmationDocumentName && (
-                    <div className="mt-2 text-primary">
-                      {formData.confirmationDocumentName.endsWith('.pdf') ? 
-                        <FaFilePdf className="me-1" /> : <FaFileImage className="me-1" />}
-                      {formData.confirmationDocumentName}
-                    </div>
-                  )}
-                  <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
+      {showForm ? (
+        // Form View
+        <div className="cert-form-wrap">
+          <form onSubmit={handleSubmit} className="cert-form-compact">
+            <div className="cert-form-section-compact">
+              <div className="cert-section-label">Confirmation Details</div>
+              <div className="cert-form-grid-3col">
+                <div className={`cert-field-compact ${touched.confirmationOrderNo && errors.confirmationOrderNo ? 'has-error' : ''}`}>
+                  <label className="required">Confirmation Order Number</label>
+                  <input type="text" placeholder="e.g., ARI/CONF/2024/001" value={formData.confirmationOrderNo} onChange={(e) => handleChange('confirmationOrderNo', e.target.value)} onBlur={() => handleBlur('confirmationOrderNo')} />
+                  <FieldError msg={errors.confirmationOrderNo} />
+                  <small>Unique order number for confirmation</small>
+                </div>
+                
+                <div className={`cert-field-compact ${touched.confirmationDate && errors.confirmationDate ? 'has-error' : ''}`}>
+                  <label className="required">Confirmation Date</label>
+                  <input type="date" value={formData.confirmationDate} onChange={(e) => handleChange('confirmationDate', e.target.value)} onBlur={() => handleBlur('confirmationDate')} />
+                  <FieldError msg={errors.confirmationDate} />
+                  <small>Date when employee was confirmed</small>
+                </div>
+                
+                <div className={`cert-field-compact ${touched.confirmedBy && errors.confirmedBy ? 'has-error' : ''}`}>
+                  <label className="required">Confirmed By</label>
+                  <select value={formData.confirmedBy} onChange={(e) => handleChange('confirmedBy', e.target.value)} onBlur={() => handleBlur('confirmedBy')}>
+                    <option value="">Select Authority</option>
+                    {confirmedByOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                  <FieldError msg={errors.confirmedBy} />
+                </div>
+                
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label>Remarks</label>
+                  <textarea rows="3" placeholder="Additional remarks about confirmation..." value={formData.remarks} onChange={(e) => handleChange('remarks', e.target.value)} />
+                  <small>Optional: Any special notes or comments</small>
+                </div>
+                
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label>Confirmation Document</label>
+                  <div className="border rounded p-3 text-center bg-light">
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="confirmation-doc-upload" />
+                    <label htmlFor="confirmation-doc-upload" className="btn btn-outline-primary btn-sm">
+                      <FaUpload size={12} /> Choose File
+                    </label>
+                    {formData.confirmationDocumentName && (
+                      <div className="mt-2 text-primary">
+                        {formData.confirmationDocumentName.endsWith('.pdf') ? <FaFilePdf /> : <FaFileImage />} {formData.confirmationDocumentName}
+                      </div>
+                    )}
+                    <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
+                  </div>
                 </div>
               </div>
             </div>
-
-            <div className="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-              <button type="button" className="btn btn-outline-secondary" onClick={resetForm}>
-                 Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">
-                <FaSave className="me-1" size={12} /> {editingConfirmation ? 'Update Confirmation' : 'Save Confirmation'}
+            
+            <div className="cert-form-actions">
+              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FaSave size={12} /> {editingConfirmation ? 'Update Confirmation' : 'Save Confirmation'}
               </button>
             </div>
           </form>
         </div>
-      </div>
-
-      {/* Confirmations List Table */}
-      {confirmations.length > 0 && (
-        <div className="card border-0 shadow-sm">
-          <div className="card-header bg-light border-0 py-3">
-            <h6 className="mb-0 fw-bold">📋 Confirmation History</h6>
+      ) : (
+        // List View
+        <>
+          {/* Search Bar */}
+          <div className="emp-search-bar">
+            <div className="emp-search-wrap">
+              <FaSearch className="emp-search-icon" size={12} />
+              <input
+                className="emp-search-input"
+                type="text"
+                placeholder="Search by order number, confirmed by or remarks..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+              />
+              {searchTerm && (
+                <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setPage(0); }}>
+                  <FaTimes size={11} />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="card-body p-0">
-            <div className="table-responsive">
-              <table className="table table-bordered table-hover align-middle mb-0">
-                <thead className="table-light">
+
+       
+
+          {/* Confirmations Table */}
+          <div className="cert-table-card">
+            <div className="cert-table-wrap">
+              <table className="cert-table">
+                <thead>
                   <tr>
                     <th>Order No.</th>
                     <th>Confirmation Date</th>
@@ -345,54 +381,75 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
                   </tr>
                 </thead>
                 <tbody>
-                  {confirmations.map((conf) => (
-                    <tr key={conf.id}>
-                      <td><strong>{conf.confirmationOrderNo}</strong></td>
-                      <td>
-                        <span className="badge bg-primary bg-opacity-10 text-primary">
-                          <FaCheckCircle className="me-1" size={10} /> {formatDate(conf.confirmationDate)}
-                        </span>
-                      </td>
-                      <td>{conf.confirmedBy}</td>
-                      <td>
-                        {conf.remarks ? (
-                          <span className="text-muted small">{conf.remarks}</span>
-                        ) : (
-                          <span className="text-muted fst-italic">—</span>
-                        )}
-                      </td>
-                      <td className="text-center">
-                        {conf.confirmationDocumentName ? (
-                          <a 
-                            href={conf.confirmationDocumentData} 
-                            download={conf.confirmationDocumentName}
-                            className="btn btn-sm btn-outline-primary"
-                            title="Download Document"
-                          >
-                            <FaFileAlt size={12} className="me-1" /> View
-                          </a>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                      <td>
-                        <button className="btn btn-sm btn-outline-primary me-1" onClick={() => handleEdit(conf)}>
-                          <FaEdit size={12} />
-                        </button>
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(conf.id)}>
-                          <FaTrash size={12} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {currentConfirmations.length > 0 ? (
+                    currentConfirmations.map((conf) => (
+                      <tr key={conf.id}>
+                        <td><strong>{conf.confirmationOrderNo}</strong></td>
+                        <td>
+                          <span className="cert-status-badge" style={{ background: '#d1fae5', color: '#065f46' }}>
+                            <FaCheckCircle className="me-1" size={10} /> {formatDate(conf.confirmationDate)}
+                          </span>
+                        </td>
+                        <td>{conf.confirmedBy}</td>
+                        <td>{conf.remarks ? <span className="text-muted small">{conf.remarks}</span> : <span className="text-muted">—</span>}</td>
+                        <td>
+                          {conf.confirmationDocumentName ? (
+                            <a href={conf.confirmationDocumentData} download={conf.confirmationDocumentName} className="btn btn-sm btn-outline-primary">
+                              <FaFileAlt size={12} /> View
+                            </a>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="cert-actions">
+                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(conf)} title="Edit">
+                              <FaEdit size={12} />
+                            </button>
+                            <button className="cert-act cert-act--del" onClick={() => handleDelete(conf.id)} title="Delete">
+                              <FaTrash size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="6" className="text-center py-5">No confirmation records found</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="emp-page-info">
+                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+                  </span>
+                </div>
+                <div className="emp-page-controls">
+                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                    ) : (
+                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
+                        {pg + 1}
+                      </button>
+                    )
+                  )}
+                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                </div>
+              </div>
+            )}  
           </div>
-        </div>
+        </>
       )}
     </div>
   );
 };
+
+const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default ConfirmationDetails;

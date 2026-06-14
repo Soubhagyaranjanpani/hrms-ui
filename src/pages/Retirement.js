@@ -2,12 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaCalendarAlt, FaBuilding, 
   FaUpload, FaFilePdf, FaFileImage, FaEdit, FaTrash, FaPlus,
-  FaFileAlt, FaSearch, FaUserTie, FaEye, FaDownload, FaRupeeSign, FaClock
+  FaFileAlt, FaSearch, FaUserTie, FaEye, FaDownload, FaRupeeSign, FaClock, FaArrowLeft
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => {
-  const [retirements, setRetirements] = useState(initialData?.retirements || []);
+  const [retirements, setRetirements] = useState(initialData?.retirements || [
+    { id: 1, retirementDate: '2045-12-31', retirementType: 'Superannuation', pensionEligibility: 'Yes', pensionNumber: 'PEN/2045/001', retirementOrder: 'ORD/RET/2045/001', retirementBenefits: 'Gratuity, Provident Fund, Leave Encashment', createdAt: '2024-01-15T10:30:00Z', employeeName: 'John Doe', employeeCode: 'EMP001', superannuationDate: '2045-12-31' },
+    { id: 2, retirementDate: '2040-06-15', retirementType: 'Superannuation', pensionEligibility: 'Yes', pensionNumber: 'PEN/2040/002', retirementOrder: 'ORD/RET/2040/002', retirementBenefits: 'Gratuity, Provident Fund', createdAt: '2024-02-20T11:45:00Z', employeeName: 'Jane Smith', employeeCode: 'EMP002', superannuationDate: '2040-06-15' },
+    { id: 3, retirementDate: '2042-03-20', retirementType: 'Voluntary', pensionEligibility: 'Pending', pensionNumber: '', retirementOrder: 'ORD/RET/2042/003', retirementBenefits: 'Pending approval', createdAt: '2024-03-10T09:15:00Z', employeeName: 'Mike Johnson', employeeCode: 'EMP003', superannuationDate: '2042-03-20' },
+    { id: 4, retirementDate: '2038-08-10', retirementType: 'Medical', pensionEligibility: 'Yes', pensionNumber: 'PEN/2038/004', retirementOrder: 'ORD/RET/2038/004', retirementBenefits: 'Medical benefits, Provident Fund', createdAt: '2024-04-05T14:20:00Z', employeeName: 'Sarah Williams', employeeCode: 'EMP004', superannuationDate: '2038-08-10' },
+    { id: 5, retirementDate: '2048-01-05', retirementType: 'Superannuation', pensionEligibility: 'No', pensionNumber: '', retirementOrder: 'ORD/RET/2048/005', retirementBenefits: 'Provident Fund only', createdAt: '2024-05-12T10:00:00Z', employeeName: 'David Brown', employeeCode: 'EMP005', superannuationDate: '2048-01-05' }
+  ]);
+  
   const [editingRecord, setEditingRecord] = useState(null);
   const [formData, setFormData] = useState({
     retirementDate: '',
@@ -18,15 +25,22 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
     retirementBenefits: '',
     retirementOrderFile: null,
     retirementOrderFileData: null,
-    retirementOrderFileName: null
+    retirementOrderFileName: null,
+    employeeId: '',
+    employeeName: '',
+    employeeCode: '',
+    superannuationDate: ''
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [showViewModal, setShowViewModal] = useState(false);
   const [viewingRecord, setViewingRecord] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(4);
 
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer', superannuationDate: '2045-12-31' },
@@ -37,9 +51,34 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
   ];
 
   const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-    const search = searchTerm.toLowerCase();
+    const search = employeeSearchTerm.toLowerCase();
     return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
   });
+
+  // Filter retirements by search
+  const filteredRetirements = retirements.filter(record => {
+    const search = searchTerm.toLowerCase();
+    return record.employeeName.toLowerCase().includes(search) ||
+           record.retirementType.toLowerCase().includes(search) ||
+           record.pensionNumber.toLowerCase().includes(search);
+  });
+
+  // Pagination
+  const totalItems = filteredRetirements.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentRetirements = filteredRetirements.slice(startIndex, startIndex + rowsPerPage);
+
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    return range;
+  };
 
   const retirementTypes = [
     { value: 'Superannuation', label: 'Superannuation' },
@@ -93,8 +132,8 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
     
     if (field === 'retirementDate') {
       if (!value) error = 'Retirement Date is required';
-      else if (selectedEmployee && selectedEmployee.superannuationDate) {
-        if (new Date(value) < new Date(selectedEmployee.superannuationDate)) {
+      else if (formData.superannuationDate) {
+        if (new Date(value) < new Date(formData.superannuationDate)) {
           error = 'Retirement Date must be on or after Superannuation Date';
         }
       }
@@ -106,6 +145,7 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
         error = 'Pension Number is required when pension is eligible';
       }
     }
+    else if (field === 'retirementOrder' && !value) error = 'Retirement Order is required';
     
     setErrors(prev => ({ ...prev, [field]: error }));
     return error === '';
@@ -121,8 +161,8 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
     
     if (!formData.retirementDate) {
       newErrors.retirementDate = 'Retirement Date is required';
-    } else if (selectedEmployee && selectedEmployee.superannuationDate) {
-      if (new Date(formData.retirementDate) < new Date(selectedEmployee.superannuationDate)) {
+    } else if (formData.superannuationDate) {
+      if (new Date(formData.retirementDate) < new Date(formData.superannuationDate)) {
         newErrors.retirementDate = 'Retirement Date must be on or after Superannuation Date';
       }
     }
@@ -140,6 +180,19 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleEmployeeSelect = (employee) => {
+    setSelectedEmployee(employee);
+    setFormData({
+      ...formData,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      employeeCode: employee.code,
+      superannuationDate: employee.superannuationDate
+    });
+    setEmployeeSearchTerm('');
+    setShowDropdown(false);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validateForm()) {
@@ -149,25 +202,24 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
     
     const recordData = {
       ...formData,
-      employeeId: selectedEmployee?.id || employeeId,
-      employeeName: selectedEmployee?.name,
-      employeeCode: selectedEmployee?.code,
-      superannuationDate: selectedEmployee?.superannuationDate,
-      createdAt: new Date().toISOString()
+      id: editingRecord ? editingRecord.id : Date.now(),
+      createdAt: editingRecord ? editingRecord.createdAt : new Date().toISOString()
     };
     
     if (editingRecord) {
       const updated = retirements.map(r =>
-        r.id === editingRecord.id ? { ...recordData, id: r.id } : r
+        r.id === editingRecord.id ? recordData : r
       );
       setRetirements(updated);
       toast.success('Success', 'Retirement record updated successfully');
+      setEditingRecord(null);
     } else {
-      const newRecord = { id: Date.now(), ...recordData };
-      setRetirements([newRecord, ...retirements]);
+      setRetirements([recordData, ...retirements]);
       toast.success('Success', 'Retirement record added successfully');
     }
     resetForm();
+    setShowForm(false);
+    setPage(0);
   };
 
   const handleEdit = (record) => {
@@ -187,24 +239,20 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
       retirementBenefits: record.retirementBenefits || '',
       retirementOrderFile: null,
       retirementOrderFileData: record.retirementOrderFileData,
-      retirementOrderFileName: record.retirementOrderFileName
+      retirementOrderFileName: record.retirementOrderFileName,
+      employeeId: record.employeeId,
+      employeeName: record.employeeName,
+      employeeCode: record.employeeCode,
+      superannuationDate: record.superannuationDate
     });
+    setShowForm(true);
   };
 
-  const handleView = (record) => {
-    setViewingRecord(record);
-    setShowViewModal(true);
-  };
+ 
 
   const handleDelete = (id) => {
     setRetirements(retirements.filter(r => r.id !== id));
     toast.success('Success', 'Retirement record deleted successfully');
-  };
-
-  const handleEmployeeSelect = (employee) => {
-    setSelectedEmployee(employee);
-    setSearchTerm('');
-    setShowDropdown(false);
   };
 
   const resetForm = () => {
@@ -217,11 +265,27 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
       retirementBenefits: '',
       retirementOrderFile: null,
       retirementOrderFileData: null,
-      retirementOrderFileName: null
+      retirementOrderFileName: null,
+      employeeId: '',
+      employeeName: '',
+      employeeCode: '',
+      superannuationDate: ''
     });
     setErrors({});
     setTouched({});
     setEditingRecord(null);
+    setSelectedEmployee(null);
+    setEmployeeSearchTerm('');
+  };
+
+  const handleCancelForm = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  const handleBackToList = () => {
+    resetForm();
+    setShowForm(false);
   };
 
   // Calculate stats
@@ -230,357 +294,289 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
   const upcomingRetirements = retirements.filter(r => new Date(r.retirementDate) > new Date()).length;
 
   return (
-    <div className="container-fluid p-4">
+    <div className="cert-root">
       {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4 pb-2 border-bottom">
-        <div className="bg-primary bg-opacity-10 p-3 rounded-circle">
-          <FaCalendarAlt className="text-primary" size={24} />
-        </div>
+      <div className="cert-header">
         <div>
-          <h5 className="mb-0">Retirement Records</h5>
-          <p className="text-muted mb-0 small">Manage employee retirement records</p>
+          <h1 className="cert-title">Retirement Records</h1>
+          <p className="cert-subtitle">Manage employee retirement records</p>
         </div>
-      </div>
-
-      {/* Stats */}
-      {selectedEmployee && retirements.length > 0 && (
-        <div className="row g-3 mb-4">
-          <div className="col-md-4">
-            <div className="card bg-primary bg-opacity-10">
-              <div className="card-body d-flex align-items-center gap-3">
-                <div className="bg-primary text-white p-3 rounded-circle">
-                  <FaCalendarAlt size={20} />
-                </div>
-                <div>
-                  <h4 className="mb-0">{totalRetirements}</h4>
-                  <small className="text-muted">Total Retirements</small>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-4">
-            <div className="card bg-success bg-opacity-10">
-              <div className="card-body d-flex align-items-center gap-3">
-                <div className="bg-success text-white p-3 rounded-circle">
-                  <FaRupeeSign size={20} />
-                </div>
-                <div>
-                  <h4 className="mb-0">{pensionEligible}</h4>
-                  <small className="text-muted">Pension Eligible</small>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-4">
-            <div className="card bg-warning bg-opacity-10">
-              <div className="card-body d-flex align-items-center gap-3">
-                <div className="bg-warning text-white p-3 rounded-circle">
-                  <FaClock size={20} />
-                </div>
-                <div>
-                  <h4 className="mb-0">{upcomingRetirements}</h4>
-                  <small className="text-muted">Upcoming</small>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Search Employee */}
-      <div className="card shadow-sm mb-4">
-        <div className="card-header bg-light">
-          <h6 className="mb-0">Search Employee</h6>
-        </div>
-        <div className="card-body">
-          <div className="position-relative">
-            <div className="input-group">
-        
-                <span className="input-group-text bg-light">
-                  <FaSearch size={14} />
-                </span>
-
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Search by name or code..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setShowDropdown(true);
-                }}
-                onFocus={() => setShowDropdown(true)}
-              />
-              {selectedEmployee && (
-    
-                  <button className="btn btn-outline-danger" onClick={() => { setSelectedEmployee(null); setSearchTerm(''); resetForm(); }}>
-                     Cancel
-                  </button>
-        
-              )}
-            </div>
-            
-            {showDropdown && searchTerm && (
-              <div className="dropdown-menu show w-100 mt-1" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {filteredEmployees.length > 0 ? (
-                  filteredEmployees.map(emp => (
-                    <button key={emp.id} className="dropdown-item" onClick={() => handleEmployeeSelect(emp)}>
-                      <div className="font-weight-bold">{emp.name}</div>
-                      <small className="text-muted">{emp.code} | {emp.department} | Superannuation: {formatDate(emp.superannuationDate)}</small>
-                    </button>
-                  ))
-                ) : (
-                  <div className="dropdown-item text-center text-muted">No employees found</div>
-                )}
-              </div>
-            )}
-          </div>
-                           <small className="text-muted mt-2 d-block">Type employee name or code to search</small>
-
-          {selectedEmployee && (
-            <div className="alert alert-info mt-3 mb-0 py-2">
-              <FaUserTie className="mr-2" /> 
-              <strong>Selected:</strong> {selectedEmployee.name} ({selectedEmployee.code}) | 
-              <strong> Superannuation Date:</strong> {formatDate(selectedEmployee.superannuationDate)}
-            </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!showForm && (
+            <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
+              <FaPlus size={13} /> Add Retirement Record
+            </button>
+          )}
+          {showForm && (
+            <button 
+              type="button" 
+              className="cert-back-btn" 
+              onClick={handleBackToList}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
+            >
+              <FaArrowLeft size={12} /> Back
+            </button>
+          )}
+          {!showForm && onCancel && (
+            <button className="cert-cancel-btn" onClick={onCancel}>
+              <FaTimes size={13} /> Cancel
+            </button>
           )}
         </div>
       </div>
 
-      {/* Form - 2 columns per row */}
-      {selectedEmployee && (
-        <div className="card shadow-sm mb-4">
-          <div className="card-header bg-light">
-            <h6 className="mb-0">{editingRecord ? 'Edit Retirement Record' : 'New Retirement Record'}</h6>
-          </div>
-          <div className="card-body">
-            <form onSubmit={handleSubmit}>
-              <div className="row">
-                {/* Retirement Date - col 6 */}
-                <div className="col-md-6 mb-3">
-                  <label className="form-label fw-bold">
-                    Retirement Date <span className="text-danger">*</span>
-                  </label>
-                  <input 
-                    type="date" 
-                    className={`form-control ${errors.retirementDate ? 'is-invalid' : ''}`} 
-                    value={formData.retirementDate} 
-                    min={selectedEmployee?.superannuationDate}
-                    onChange={(e) => handleChange('retirementDate', e.target.value)} 
-                    onBlur={() => handleBlur('retirementDate')}
-                  />
-                  {errors.retirementDate && <small className="text-danger">{errors.retirementDate}</small>}
-                  <small className="text-muted">Must be on or after superannuation date: {formatDate(selectedEmployee?.superannuationDate)}</small>
+      {showForm ? (
+        // Only Form - Table Hidden
+        <div className="cert-form-wrap mb-4">
+          <form onSubmit={handleSubmit} className="cert-form-compact">
+            <div className="cert-form-section-compact">
+              <div className="cert-section-label">Retirement Details</div>
+              <div className="cert-form-grid-3col">
+                {/* Employee Selection */}
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label className="required">Select Employee</label>
+                  <div className="position-relative">
+                    <div className="input-group">
+                      <span className="input-group-text bg-light">
+                        <FaSearch size={14} className="text-muted" />
+                      </span>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Search employee by name or code..."
+                        value={employeeSearchTerm}
+                        onChange={(e) => {
+                          setEmployeeSearchTerm(e.target.value);
+                          setShowDropdown(true);
+                        }}
+                        onFocus={() => setShowDropdown(true)}
+                      />
+                    </div>
+                    
+                    {showDropdown && employeeSearchTerm && (
+                      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '300px', overflow: 'auto' }}>
+                        <div className="card-body p-2">
+                          {filteredEmployees.length > 0 ? (
+                            filteredEmployees.map(emp => (
+                              <div
+                                key={emp.id}
+                                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => handleEmployeeSelect(emp)}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                              >
+                                <div>
+                                  <div className="fw-bold">{emp.name}</div>
+                                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
+                                </div>
+                                <div>
+                                  <span className="badge bg-light text-dark">{emp.designation}</span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-3 text-muted">
+                              <small>No employees found</small>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <FieldError msg={errors.employeeId} />
+                  {formData.employeeName && (
+                    <div className="alert alert-success mt-2 py-1">
+                      <FaUserTie className="me-1" /> Selected: {formData.employeeName} ({formData.employeeCode})
+                      <br /><small>Superannuation Date: {formatDate(formData.superannuationDate)}</small>
+                    </div>
+                  )}
                 </div>
-
-                {/* Retirement Type - col 6 */}
-                <div className="col-md-6 mb-3">
-                  <label className="form-label fw-bold">
-                    Retirement Type <span className="text-danger">*</span>
-                  </label>
-                  <select 
-                    className={`form-control ${errors.retirementType ? 'is-invalid' : ''}`} 
-                    value={formData.retirementType} 
-                    onChange={(e) => handleChange('retirementType', e.target.value)} 
-                    onBlur={() => handleBlur('retirementType')}
-                  >
-                    {retirementTypes.map(type => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
+                
+                <div className={`cert-field-compact ${touched.retirementDate && errors.retirementDate ? 'has-error' : ''}`}>
+                  <label className="required">Retirement Date</label>
+                  <input type="date" value={formData.retirementDate} min={formData.superannuationDate} onChange={(e) => handleChange('retirementDate', e.target.value)} onBlur={() => handleBlur('retirementDate')} />
+                  <FieldError msg={errors.retirementDate} />
+                  <small>Must be on or after superannuation date</small>
+                </div>
+                
+                <div className={`cert-field-compact ${touched.retirementType && errors.retirementType ? 'has-error' : ''}`}>
+                  <label className="required">Retirement Type</label>
+                  <select value={formData.retirementType} onChange={(e) => handleChange('retirementType', e.target.value)} onBlur={() => handleBlur('retirementType')}>
+                    {retirementTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
                   </select>
-                  {errors.retirementType && <small className="text-danger">{errors.retirementType}</small>}
+                  <FieldError msg={errors.retirementType} />
                 </div>
-
-                {/* Pension Eligibility - col 6 */}
-                <div className="col-md-6 mb-3">
-                  <label className="form-label fw-bold">
-                    Pension Eligibility <span className="text-danger">*</span>
-                  </label>
-                  <select 
-                    className={`form-control ${errors.pensionEligibility ? 'is-invalid' : ''}`} 
-                    value={formData.pensionEligibility} 
-                    onChange={(e) => handleChange('pensionEligibility', e.target.value)} 
-                    onBlur={() => handleBlur('pensionEligibility')}
-                  >
-                    {pensionEligibilityOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
+                
+                <div className={`cert-field-compact ${touched.pensionEligibility && errors.pensionEligibility ? 'has-error' : ''}`}>
+                  <label className="required">Pension Eligibility</label>
+                  <select value={formData.pensionEligibility} onChange={(e) => handleChange('pensionEligibility', e.target.value)} onBlur={() => handleBlur('pensionEligibility')}>
+                    {pensionEligibilityOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
-                  {errors.pensionEligibility && <small className="text-danger">{errors.pensionEligibility}</small>}
+                  <FieldError msg={errors.pensionEligibility} />
                 </div>
-
-                {/* Pension Number - col 6 (conditional) */}
-                <div className="col-md-6 mb-3">
-                  <label className="form-label fw-bold">
-                    Pension Number {formData.pensionEligibility === 'Yes' && <span className="text-danger">*</span>}
-                  </label>
-                  <input 
-                    type="text" 
-                    className={`form-control ${errors.pensionNumber ? 'is-invalid' : ''}`} 
-                    placeholder="e.g., PEN/2024/001"
-                    value={formData.pensionNumber} 
-                    onChange={(e) => handleChange('pensionNumber', e.target.value)} 
-                    onBlur={() => handleBlur('pensionNumber')}
-                  />
-                  {errors.pensionNumber && <small className="text-danger">{errors.pensionNumber}</small>}
+                
+                <div className={`cert-field-compact ${touched.pensionNumber && errors.pensionNumber ? 'has-error' : ''}`}>
+                  <label className="required">Pension Number {formData.pensionEligibility === 'Yes' && '*'}</label>
+                  <input type="text" placeholder="e.g., PEN/2024/001" value={formData.pensionNumber} onChange={(e) => handleChange('pensionNumber', e.target.value)} onBlur={() => handleBlur('pensionNumber')} />
+                  <FieldError msg={errors.pensionNumber} />
                 </div>
-
-                {/* Retirement Order - col 6 */}
-                <div className="col-md-6 mb-3">
-                  <label className="form-label fw-bold">
-                    Retirement Order <span className="text-danger">*</span>
-                  </label>
-                  <input 
-                    type="text" 
-                    className={`form-control ${errors.retirementOrder ? 'is-invalid' : ''}`} 
-                    placeholder="e.g., ORD/RET/2024/001"
-                    value={formData.retirementOrder} 
-                    onChange={(e) => handleChange('retirementOrder', e.target.value)} 
-                    onBlur={() => handleBlur('retirementOrder')}
-                  />
-                  {errors.retirementOrder && <small className="text-danger">{errors.retirementOrder}</small>}
+                
+                <div className={`cert-field-compact ${touched.retirementOrder && errors.retirementOrder ? 'has-error' : ''}`}>
+                  <label className="required">Retirement Order</label>
+                  <input type="text" placeholder="e.g., ORD/RET/2024/001" value={formData.retirementOrder} onChange={(e) => handleChange('retirementOrder', e.target.value)} onBlur={() => handleBlur('retirementOrder')} />
+                  <FieldError msg={errors.retirementOrder} />
                 </div>
-
-                {/* Retirement Benefits - col 6 */}
-                <div className="col-md-6 mb-3">
-                  <label className="form-label fw-bold">Retirement Benefits</label>
-                  <textarea 
-                    rows="2" 
-                    className="form-control" 
-                    placeholder="e.g., Gratuity, Leave Encashment, Provident Fund, etc."
-                    value={formData.retirementBenefits} 
-                    onChange={(e) => handleChange('retirementBenefits', e.target.value)}
-                  />
+                
+                <div className="cert-field-compact">
+                  <label>Retirement Benefits</label>
+                  <textarea rows="2" placeholder="e.g., Gratuity, Leave Encashment, Provident Fund" value={formData.retirementBenefits} onChange={(e) => handleChange('retirementBenefits', e.target.value)} />
                 </div>
-
-                {/* Retirement Order Upload - col 12 */}
-                <div className="col-12 mb-3">
-                  <label className="form-label fw-bold">Retirement Order Upload</label>
+                
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label>Retirement Order Upload</label>
                   <div className="border rounded p-3 text-center bg-light">
-                    <input 
-                      type="file" 
-                      accept=".pdf,.jpg,.jpeg,.png" 
-                      onChange={handleFileChange} 
-                      style={{ display: 'none' }} 
-                      id="retirement-order-upload" 
-                    />
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="retirement-order-upload" />
                     <label htmlFor="retirement-order-upload" className="btn btn-outline-primary btn-sm">
-                      <FaUpload className="mr-1" /> Choose File
+                      <FaUpload size={12} /> Choose File
                     </label>
                     {formData.retirementOrderFileName && (
                       <div className="mt-2 text-primary">
-                        {formData.retirementOrderFileName.endsWith('.pdf') ? 
-                          <FaFilePdf className="mr-1" /> : <FaFileImage className="mr-1" />}
-                        {formData.retirementOrderFileName}
+                        {formData.retirementOrderFileName.endsWith('.pdf') ? <FaFilePdf /> : <FaFileImage />} {formData.retirementOrderFileName}
                       </div>
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
                 </div>
               </div>
-
-              <div className="d-flex justify-content-end gap-2 mt-3 pt-3 border-top">
-                <button type="button" className="btn btn-outline-secondary" onClick={resetForm}>Clear</button>
-                <button type="submit" className="btn btn-primary"><FaSave className="mr-1" /> {editingRecord ? 'Update' : 'Save'}</button>
-              </div>
-            </form>
-          </div>
+            </div>
+            
+            <div className="cert-form-actions">
+              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FaSave size={12} /> {editingRecord ? 'Update Record' : 'Save Record'}
+              </button>
+            </div>
+          </form>
         </div>
-      )}
-
-      {/* Table */}
-      {selectedEmployee && retirements.length > 0 && (
-        <div className="card shadow-sm">
-          <div className="card-header bg-light">
-            <h6 className="mb-0">Retirement Records - {selectedEmployee.name}</h6>
-          </div>
-          <div className="table-responsive">
-            <table className="table table-bordered mb-0">
-              <thead className="thead-light">
-                <tr>
-                  <th>Retirement Date</th>
-                  <th>Retirement Type</th>
-                  <th>Pension Eligibility</th>
-                  <th>Pension Number</th>
-                  <th>Retirement Order</th>
-                  <th>Benefits</th>
-                  <th>Document</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {retirements.map((record) => (
-                  <tr key={record.id}>
-                    <td>{formatDate(record.retirementDate)}</td>
-                    <td>{record.retirementType}</td>
-                    <td className="text-center">
-                      {record.pensionEligibility === 'Yes' ? (
-                        <span className="badge badge-success">Yes</span>
-                      ) : record.pensionEligibility === 'Pending' ? (
-                        <span className="badge badge-warning">Pending</span>
-                      ) : (
-                        <span className="badge badge-secondary">No</span>
-                      )}
-                    </td>
-                    <td>{record.pensionNumber || '—'}</td>
-                    <td><strong>{record.retirementOrder}</strong></td>
-                    <td>{record.retirementBenefits ? (record.retirementBenefits.length > 30 ? record.retirementBenefits.substring(0, 30) + '...' : record.retirementBenefits) : '—'}</td>
-                    <td className="text-center">
-                      {record.retirementOrderFileName ? (
-                        <a href={record.retirementOrderFileData} download={record.retirementOrderFileName} className="btn btn-sm btn-outline-primary">
-                          <FaFileAlt size={12} /> View
-                        </a>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </td>
-                    <td className="text-center">
-                      <button className="btn btn-sm btn-outline-info mr-1" onClick={() => handleView(record)}><FaEye size={12} /></button>
-                      <button className="btn btn-sm btn-outline-primary mr-1" onClick={() => handleEdit(record)}><FaEdit size={12} /></button>
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(record.id)}><FaTrash size={12} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-
-      {/* View Modal */}
-      {showViewModal && viewingRecord && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header bg-primary text-white">
-                <h5 className="modal-title"><FaCalendarAlt className="mr-2" /> Retirement Details</h5>
-                <button type="button" className="close text-white" onClick={() => setShowViewModal(false)}>
-                  <span>&times;</span>
+      ) : (
+        <>
+          {/* Search Bar */}
+          <div className="emp-search-bar">
+            <div className="emp-search-wrap">
+              <FaSearch className="emp-search-icon" size={12} />
+              <input
+                className="emp-search-input"
+                type="text"
+                placeholder="Search by employee name, retirement type or pension number..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+              />
+              {searchTerm && (
+                <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setPage(0); }}>
+                  <FaTimes size={11} />
                 </button>
-              </div>
-              <div className="modal-body">
-                <p><strong>Employee:</strong> {viewingRecord.employeeName} ({viewingRecord.employeeCode})</p>
-                <p><strong>Retirement Date:</strong> {formatDate(viewingRecord.retirementDate)}</p>
-                <p><strong>Retirement Type:</strong> {viewingRecord.retirementType}</p>
-                <p><strong>Superannuation Date:</strong> {formatDate(viewingRecord.superannuationDate)}</p>
-                <p><strong>Pension Eligibility:</strong> {viewingRecord.pensionEligibility}</p>
-                <p><strong>Pension Number:</strong> {viewingRecord.pensionNumber || '—'}</p>
-                <p><strong>Retirement Order:</strong> {viewingRecord.retirementOrder}</p>
-                <p><strong>Retirement Benefits:</strong> {viewingRecord.retirementBenefits || '—'}</p>
-                {viewingRecord.retirementOrderFileName && (
-                  <a href={viewingRecord.retirementOrderFileData} download={viewingRecord.retirementOrderFileName} className="btn btn-sm btn-primary mt-2">Download Document</a>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowViewModal(false)}>Close</button>
-              </div>
+              )}
             </div>
           </div>
-        </div>
+
+        
+
+          {/* Retirement Records Table */}
+          <div className="cert-table-card">
+            <div className="cert-table-wrap">
+              <table className="cert-table">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Retirement Date</th>
+                    <th>Retirement Type</th>
+                    <th>Pension Eligibility</th>
+                    <th>Pension Number</th>
+                    <th>Retirement Order</th>
+                    <th>Benefits</th>
+                    <th>Document</th>
+                   
+                    <th style={{ width: 100 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentRetirements.length > 0 ? (
+                    currentRetirements.map((record) => (
+                      <tr key={record.id}>
+                        <td><strong>{record.employeeName}</strong><br /><small>{record.employeeCode}</small></td>
+                        <td>{formatDate(record.retirementDate)}</td>
+                        <td>{record.retirementType}</td>
+                        <td className="text-center">
+                          <span className="cert-status-badge" style={{ 
+                            background: record.pensionEligibility === 'Yes' ? '#d1fae5' : record.pensionEligibility === 'Pending' ? '#fed7aa' : '#f3f4f6',
+                            color: record.pensionEligibility === 'Yes' ? '#065f46' : record.pensionEligibility === 'Pending' ? '#9a3412' : '#6b7280'
+                          }}>
+                            {record.pensionEligibility}
+                          </span>
+                        </td>
+                        <td>{record.pensionNumber || '—'}</td>
+                        <td>{record.retirementOrder}</td>
+                        <td>{record.retirementBenefits ? (record.retirementBenefits.length > 25 ? record.retirementBenefits.substring(0, 25) + '...' : record.retirementBenefits) : '—'}</td>
+                        <td className="text-center">
+                          {record.retirementOrderFileName ? (
+                            <a href={record.retirementOrderFileData} download={record.retirementOrderFileName} className="btn btn-sm btn-outline-primary">
+                              <FaFileAlt size={12} /> View
+                            </a>
+                          ) : <span className="text-muted">—</span>}
+                        </td>
+                        <td>
+                          <div className="cert-actions">
+                            
+                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(record)} title="Edit">
+                              <FaEdit size={12} />
+                            </button>
+                            <button className="cert-act cert-act--del" onClick={() => handleDelete(record.id)} title="Delete">
+                              <FaTrash size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="9" className="text-center py-5">No retirement records found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="emp-page-info">
+                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+                  </span>
+                </div>
+                <div className="emp-page-controls">
+                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                    ) : (
+                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
+                        {pg + 1}
+                      </button>
+                    )
+                  )}
+                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+         
+        </>
       )}
     </div>
   );
 };
+
+const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default RetirementRecords;

@@ -1,80 +1,183 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, FaUserTie, FaBuilding, FaBriefcase, FaCalendarAlt, 
-  FaBook, FaEye, FaDownload, FaPrint, FaFilter, FaTimes,
+  FaBook, FaEye, FaDownload, FaPrint, FaTimes,
   FaCheckCircle, FaClock, FaUserCheck, FaFileAlt, FaChartLine,
-  FaExchangeAlt, FaTrophy, FaRupeeSign, FaChalkboardTeacher
+  FaExchangeAlt, FaTrophy, FaRupeeSign, FaChalkboardTeacher,
+  FaPlus, FaSave, FaEdit, FaTrash, FaArrowLeft
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
-const ServiceBookSearch = ({ user }) => {
+const ServiceBookSearch = ({ user, onCancel }) => {
+  const [employees, setEmployees] = useState([
+    { id: 1, name: 'John Doe', department: 'IT', designation: 'Software Engineer', status: 'Active', joiningDate: '2020-01-15', retirementDate: null },
+    { id: 2, name: 'Jane Smith', department: 'HR', designation: 'HR Manager', status: 'Active', joiningDate: '2019-06-10', retirementDate: null },
+    { id: 3, name: 'Mike Johnson', department: 'IT', designation: 'Senior Developer', status: 'Active', joiningDate: '2021-03-20', retirementDate: null },
+    { id: 4, name: 'Sarah Williams', department: 'Sales', designation: 'Sales Manager', status: 'Retired', joiningDate: '2010-08-01', retirementDate: '2024-03-31' },
+    { id: 5, name: 'David Brown', department: 'Finance', designation: 'Accountant', status: 'Terminated', joiningDate: '2022-01-10', retirementDate: null },
+    { id: 6, name: 'Emily Wilson', department: 'Marketing', designation: 'Marketing Manager', status: 'Active', joiningDate: '2018-09-15', retirementDate: null },
+    { id: 7, name: 'Robert Taylor', department: 'Operations', designation: 'Operations Manager', status: 'Active', joiningDate: '2017-03-10', retirementDate: null },
+    { id: 8, name: 'Lisa Anderson', department: 'IT', designation: 'Product Manager', status: 'Active', joiningDate: '2019-11-20', retirementDate: null }
+  ]);
+  
   const [searchTerm, setSearchTerm] = useState('');
-  const [showEmployeeSearch, setShowEmployeeSearch] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  // Dummy employee data for service book
-  const DUMMY_EMPLOYEES = [
-    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer', status: 'Active', joiningDate: '2020-01-15', retirementDate: null, serviceBookNumber: 'SB/2020/0001', totalYears: 4.5, promotions: 2, trainings: 3, awards: 1 },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager', status: 'Active', joiningDate: '2019-06-10', retirementDate: null, serviceBookNumber: 'SB/2019/0023', totalYears: 5.8, promotions: 1, trainings: 4, awards: 2 },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer', status: 'Active', joiningDate: '2021-03-20', retirementDate: null, serviceBookNumber: 'SB/2021/0045', totalYears: 3.2, promotions: 1, trainings: 5, awards: 0 },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager', status: 'Retired', joiningDate: '2010-08-01', retirementDate: '2024-03-31', serviceBookNumber: 'SB/2010/0089', totalYears: 13.7, promotions: 3, trainings: 6, awards: 3 },
-    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant', status: 'Terminated', joiningDate: '2022-01-10', retirementDate: null, serviceBookNumber: 'SB/2022/0123', totalYears: 1.5, promotions: 0, trainings: 2, awards: 0 },
-    { id: 6, name: 'Emily Wilson', code: 'EMP006', department: 'Marketing', designation: 'Marketing Manager', status: 'Active', joiningDate: '2018-09-15', retirementDate: null, serviceBookNumber: 'SB/2018/0156', totalYears: 5.8, promotions: 2, trainings: 4, awards: 2 },
-    { id: 7, name: 'Robert Taylor', code: 'EMP007', department: 'Operations', designation: 'Operations Manager', status: 'Active', joiningDate: '2017-03-10', retirementDate: null, serviceBookNumber: 'SB/2017/0234', totalYears: 7.3, promotions: 2, trainings: 5, awards: 1 },
-    { id: 8, name: 'Lisa Anderson', code: 'EMP008', department: 'IT', designation: 'Product Manager', status: 'Active', joiningDate: '2019-11-20', retirementDate: null, serviceBookNumber: 'SB/2019/0345', totalYears: 4.7, promotions: 1, trainings: 6, awards: 3 }
-  ];
-
-  // Dummy service book details
-  const getServiceBookDetails = (employee) => {
-    return {
-      appointments: [{ date: employee.joiningDate, type: 'Appointment' }],
-      promotions: employee.promotions > 0 ? [
-        { date: '2021-03-01', from: 'Software Engineer', to: 'Senior Software Engineer' },
-        { date: '2023-01-15', from: 'Senior Software Engineer', to: 'Tech Lead' }
-      ] : [],
-      transfers: [],
-      trainings: employee.trainings > 0 ? [
-        { date: '2021-08-10', name: 'Leadership Program' },
-        { date: '2023-02-15', name: 'Cloud Architecture' }
-      ] : [],
-      awards: employee.awards > 0 ? [
-        { date: '2022-01-20', name: 'Star Performer' }
-      ] : []
-    };
-  };
-
-  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-    const search = searchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || 
-           emp.code.toLowerCase().includes(search);
+  const [filteredEmployees, setFilteredEmployees] = useState(employees);
+  const [showForm, setShowForm] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    department: '',
+    designation: '',
+    status: 'Active',
+    joiningDate: '',
+    retirementDate: ''
   });
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(4);
 
-  const handleEmployeeSelect = (employee) => {
-    const serviceBookData = getServiceBookDetails(employee);
-    setSelectedEmployee({ ...employee, serviceBookData });
-    setSearchTerm('');
-    setShowEmployeeSearch(false);
-    toast.success('Employee Selected', `Showing service book for ${employee.name}`);
+  const departments = ['IT', 'HR', 'Finance', 'Sales', 'Marketing', 'Operations'];
+  const designations = ['Software Engineer', 'Senior Developer', 'Tech Lead', 'HR Manager', 'Sales Manager', 'Accountant', 'Marketing Manager', 'Operations Manager', 'Product Manager'];
+  const statuses = ['Active', 'Retired', 'Terminated'];
+
+  // Filter employees by search
+  useEffect(() => {
+    const search = searchTerm.toLowerCase();
+    const filtered = employees.filter(emp => 
+      emp.name.toLowerCase().includes(search) ||
+      emp.department.toLowerCase().includes(search) ||
+      emp.designation.toLowerCase().includes(search)
+    );
+    setFilteredEmployees(filtered);
+    setPage(0);
+  }, [searchTerm, employees]);
+
+  // Pagination
+  const totalItems = filteredEmployees.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
+
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    return range;
   };
 
-  const handleClear = () => {
-    setSelectedEmployee(null);
-    setSearchTerm('');
+ 
+
+  const handleEdit = (employee) => {
+    setEditingEmployee(employee);
+    setFormData({
+      name: employee.name,
+      department: employee.department,
+      designation: employee.designation,
+      status: employee.status,
+      joiningDate: employee.joiningDate,
+      retirementDate: employee.retirementDate || ''
+    });
+    setShowForm(true);
   };
 
-  const handleViewDetails = () => {
-    setShowDetailModal(true);
+  const handleDelete = (id) => {
+    setEmployees(employees.filter(emp => emp.id !== id));
+    toast.success('Deleted', 'Employee deleted successfully');
   };
 
-  const handleDownloadServiceBook = () => {
-    toast.success('Download Started', `Downloading service book for ${selectedEmployee?.name}`);
+  const handleChange = (field, value) => {
+    setFormData({ ...formData, [field]: value });
+    if (touched[field]) {
+      validateField(field, value);
+    }
   };
 
-  const handlePrintServiceBook = () => {
-    toast.info('Print', `Printing service book for ${selectedEmployee?.name}`);
+  const validateField = (field, value) => {
+    let error = '';
+    if (field === 'name' && !value) error = 'Employee Name is required';
+    else if (field === 'department' && !value) error = 'Department is required';
+    else if (field === 'designation' && !value) error = 'Designation is required';
+    else if (field === 'joiningDate' && !value) error = 'Joining Date is required';
+    setErrors(prev => ({ ...prev, [field]: error }));
+    return error === '';
+  };
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    validateField(field, formData[field]);
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.name) newErrors.name = 'Employee Name is required';
+    if (!formData.department) newErrors.department = 'Department is required';
+    if (!formData.designation) newErrors.designation = 'Designation is required';
+    if (!formData.joiningDate) newErrors.joiningDate = 'Joining Date is required';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!validateForm()) {
+      toast.warning('Validation Error', 'Please fill all required fields');
+      return;
+    }
+    
+    const employeeData = {
+      id: editingEmployee ? editingEmployee.id : Date.now(),
+      name: formData.name,
+      department: formData.department,
+      designation: formData.designation,
+      status: formData.status,
+      joiningDate: formData.joiningDate,
+      retirementDate: formData.retirementDate || null
+    };
+    
+    if (editingEmployee) {
+      setEmployees(employees.map(emp => emp.id === editingEmployee.id ? employeeData : emp));
+      toast.success('Success', 'Employee updated successfully');
+      setEditingEmployee(null);
+    } else {
+      setEmployees([employeeData, ...employees]);
+      toast.success('Success', 'Employee added successfully');
+    }
+    resetForm();
+    setShowForm(false);
+    setPage(0);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      department: '',
+      designation: '',
+      status: 'Active',
+      joiningDate: '',
+      retirementDate: ''
+    });
+    setErrors({});
+    setTouched({});
+    setEditingEmployee(null);
+  };
+
+  const handleCancelForm = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  const handleBackToList = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  const handleCancel = () => {
+    if (onCancel) onCancel();
   };
 
   const formatDate = (dateStr) => {
@@ -93,462 +196,195 @@ const ServiceBookSearch = ({ user }) => {
   };
 
   return (
-    <div className="container-fluid p-4">
+    <div className="cert-root">
       {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4 pb-2 border-bottom">
-        <div className="bg-primary bg-opacity-10 p-3 rounded-circle">
-          <FaBook className="text-primary" size={24} />
-        </div>
+      <div className="cert-header">
         <div>
-          <h5 className="mb-0">Service Book Search</h5>
-          <p className="text-muted mb-0 small">Search and retrieve employee service records</p>
+          <h1 className="cert-title">Service Book Search</h1>
+          <p className="cert-subtitle">Manage employee service records</p>
         </div>
-      </div>
-
-      {/* Search Employee Card */}
-      <div className="card border-0 shadow-sm mb-4">
-        <div className="card-header bg-light border-0 py-3">
-          <h6 className="mb-0 fw-bold"> Select Employee</h6>
-        </div>
-        <div className="card-body">
-          <div className="row">
-            <div className="col-md-12">
-              <div className="position-relative">
-                <div className="input-group">
-                  <span className="input-group-text bg-light">
-                    <FaSearch size={14} className="text-muted" />
-                  </span>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Search by name or code..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setShowEmployeeSearch(true);
-                    }}
-                    onFocus={() => setShowEmployeeSearch(true)}
-                  />
-                  {selectedEmployee && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger"
-                      onClick={handleClear}
-                    >
-                 Cancel
-                    </button>
-                  )}
-                </div>
-                
-                {/* Search Results Dropdown */}
-                {showEmployeeSearch && searchTerm && (
-                  <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '300px', overflow: 'auto' }}>
-                    <div className="card-body p-2">
-                      {filteredEmployees.length > 0 ? (
-                        filteredEmployees.map(emp => (
-                          <div
-                            key={emp.id}
-                            className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => handleEmployeeSelect(emp)}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            <div>
-                              <div className="fw-bold">{emp.name}</div>
-                              <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                            </div>
-                            <div>
-                              <span className="badge bg-light text-dark">{emp.designation}</span>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-3 text-muted">
-                          <small>No employees found</small>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <small className="text-muted">Select an employee to view service book records</small>
-            </div>
-          </div>
-          {selectedEmployee && (
-            <div className="alert alert-success mt-3 mb-0 py-2">
-              <FaUserTie className="me-2" /> <strong>Selected Employee:</strong> {selectedEmployee.name} ({selectedEmployee.code})
-            </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!showForm && (
+            <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
+              <FaPlus size={13} /> Add Employee
+            </button>
+          )}
+          {showForm && (
+            <button 
+              type="button" 
+              className="cert-back-btn" 
+              onClick={handleBackToList}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
+            >
+              <FaArrowLeft size={12} /> Back
+            </button>
+          )}
+          {!showForm && onCancel && (
+            <button className="cert-cancel-btn" onClick={handleCancel}>
+              <FaTimes size={13} /> Cancel
+            </button>
           )}
         </div>
       </div>
 
-      {/* Employee Service Book Details - Shows when employee is selected */}
-      {selectedEmployee && (
+      {showForm ? (
+        <div className="cert-form-wrap mb-4">
+          <form onSubmit={handleSubmit} className="cert-form-compact">
+            <div className="cert-form-section-compact">
+              <div className="cert-section-label">Employee Details</div>
+              <div className="cert-form-grid-3col">
+                <div className={`cert-field-compact ${touched.name && errors.name ? 'has-error' : ''}`} style={{ gridColumn: 'span 2' }}>
+                  <label className="required">Employee Name</label>
+                  <input type="text" placeholder="Full Name" value={formData.name} onChange={(e) => handleChange('name', e.target.value)} onBlur={() => handleBlur('name')} />
+                  <FieldError msg={errors.name} />
+                </div>
+                
+                <div className={`cert-field-compact ${touched.department && errors.department ? 'has-error' : ''}`}>
+                  <label className="required">Department</label>
+                  <select value={formData.department} onChange={(e) => handleChange('department', e.target.value)} onBlur={() => handleBlur('department')}>
+                    <option value="">Select Department</option>
+                    {departments.map(dept => <option key={dept} value={dept}>{dept}</option>)}
+                  </select>
+                  <FieldError msg={errors.department} />
+                </div>
+                
+                <div className={`cert-field-compact ${touched.designation && errors.designation ? 'has-error' : ''}`}>
+                  <label className="required">Designation</label>
+                  <select value={formData.designation} onChange={(e) => handleChange('designation', e.target.value)} onBlur={() => handleBlur('designation')}>
+                    <option value="">Select Designation</option>
+                    {designations.map(des => <option key={des} value={des}>{des}</option>)}
+                  </select>
+                  <FieldError msg={errors.designation} />
+                </div>
+                
+                <div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
+                  <label className="required">Joining Date</label>
+                  <input type="date" value={formData.joiningDate} onChange={(e) => handleChange('joiningDate', e.target.value)} onBlur={() => handleBlur('joiningDate')} />
+                  <FieldError msg={errors.joiningDate} />
+                </div>
+                
+                <div className="cert-field-compact">
+                  <label>Status</label>
+                  <select value={formData.status} onChange={(e) => handleChange('status', e.target.value)}>
+                    {statuses.map(st => <option key={st} value={st}>{st}</option>)}
+                  </select>
+                </div>
+                
+                <div className="cert-field-compact">
+                  <label>Retirement Date</label>
+                  <input type="date" value={formData.retirementDate} onChange={(e) => handleChange('retirementDate', e.target.value)} />
+                </div>
+              </div>
+            </div>
+            
+            <div className="cert-form-actions">
+              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FaSave size={12} /> {editingEmployee ? 'Update Employee' : 'Save Employee'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
         <>
-          {/* Quick Stats */}
-          <div className="row g-3 mb-4">
-            <div className="col-md-3">
-              <div className="card bg-primary bg-opacity-10 border-0">
-                <div className="card-body text-center">
-                  <FaChartLine size={24} className="text-primary mb-2" />
-                  <h5 className="mb-0">{selectedEmployee.promotions}</h5>
-                  <small className="text-muted">Promotions</small>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3">
-              <div className="card bg-success bg-opacity-10 border-0">
-                <div className="card-body text-center">
-                  <FaChalkboardTeacher size={24} className="text-success mb-2" />
-                  <h5 className="mb-0">{selectedEmployee.trainings}</h5>
-                  <small className="text-muted">Trainings</small>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3">
-              <div className="card bg-warning bg-opacity-10 border-0">
-                <div className="card-body text-center">
-                  <FaTrophy size={24} className="text-warning mb-2" />
-                  <h5 className="mb-0">{selectedEmployee.awards}</h5>
-                  <small className="text-muted">Awards</small>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3">
-              <div className="card bg-info bg-opacity-10 border-0">
-                <div className="card-body text-center">
-                  <FaClock size={24} className="text-info mb-2" />
-                  <h5 className="mb-0">{selectedEmployee.totalYears} yrs</h5>
-                  <small className="text-muted">Total Service</small>
-                </div>
-              </div>
+          {/* Search Bar */}
+          <div className="emp-search-bar">
+            <div className="emp-search-wrap">
+              <FaSearch className="emp-search-icon" size={12} />
+              <input
+                className="emp-search-input"
+                type="text"
+                placeholder="Search by Name, Department or Designation..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button className="cert-search-clear" onClick={() => setSearchTerm('')}>
+                  <FaTimes size={11} />
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Service Book Details Card */}
-          <div className="card border-0 shadow-sm">
-            <div className="card-header bg-light border-0 py-3 d-flex justify-content-between align-items-center">
-              <h6 className="mb-0 fw-bold">
-                <FaBook className="me-2 text-primary" /> Service Book Details - {selectedEmployee.name}
-              </h6>
-              <div>
-                <button 
-                  className="btn btn-sm btn-outline-success me-1" 
-                  onClick={handleDownloadServiceBook}
-                >
-                  <FaDownload className="me-1" size={12} /> Download
-                </button>
-                <button 
-                  className="btn btn-sm btn-outline-secondary" 
-                  onClick={handlePrintServiceBook}
-                >
-                  <FaPrint className="me-1" size={12} /> Print
-                </button>
-              </div>
-            </div>
-            <div className="card-body">
-              {/* Employee Information Table */}
-              <div className="table-responsive mb-4">
-                <table className="table table-bordered">
-                  <tbody>
+          {/* Employees Table - With Serial No */}
+          <div className="cert-table-card">
+            <div className="cert-table-wrap">
+              <table className="cert-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Employee Name</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Status</th>
+                    <th>Joining Date</th>
+                    <th>Retirement Date</th>
+                    <th style={{ width: 120 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentEmployees.length > 0 ? (
+                    currentEmployees.map((emp, idx) => (
+                      <tr key={emp.id}>
+                        <td className="text-center">{startIndex + idx + 1}</td>
+                        <td className="fw-bold">{emp.name}</td>
+                        <td>{emp.department}</td>
+                        <td>{emp.designation}</td>
+                        <td>{getStatusBadge(emp.status)}</td>
+                        <td>{formatDate(emp.joiningDate)}</td>
+                        <td>{emp.retirementDate ? formatDate(emp.retirementDate) : '—'}</td>
+                        <td className="text-center">
+                          <div className="cert-actions">
+                           
+                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(emp)} title="Edit">
+                              <FaEdit size={12} />
+                            </button>
+                            <button className="cert-act cert-act--del" onClick={() => handleDelete(emp.id)} title="Delete">
+                              <FaTrash size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
                     <tr>
-                      <td className="bg-light fw-bold" style={{ width: '30%' }}>Employee Name</td>
-                      <td>{selectedEmployee.name}</td>
-                      <td className="bg-light fw-bold" style={{ width: '30%' }}>Employee Code</td>
-                      <td>{selectedEmployee.code}</td>
+                      <td colSpan="8" className="text-center py-5">No employees found</td>
                     </tr>
-                    <tr>
-                      <td className="bg-light fw-bold">Department</td>
-                      <td>{selectedEmployee.department}</td>
-                      <td className="bg-light fw-bold">Designation</td>
-                      <td>{selectedEmployee.designation}</td>
-                    </tr>
-                    <tr>
-                      <td className="bg-light fw-bold">Service Book Number</td>
-                      <td>{selectedEmployee.serviceBookNumber}</td>
-                      <td className="bg-light fw-bold">Status</td>
-                      <td>{getStatusBadge(selectedEmployee.status)}</td>
-                    </tr>
-                    <tr>
-                      <td className="bg-light fw-bold">Joining Date</td>
-                      <td>{formatDate(selectedEmployee.joiningDate)}</td>
-                      <td className="bg-light fw-bold">Retirement Date</td>
-                      <td>{selectedEmployee.retirementDate ? formatDate(selectedEmployee.retirementDate) : '—'}</td>
-                    </tr>
-                    <tr>
-                      <td className="bg-light fw-bold">Total Service</td>
-                      <td colSpan="3">{selectedEmployee.totalYears} years</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Career Timeline */}
-              <h6 className="fw-bold mb-3"><FaClock className="me-2" /> Career Timeline</h6>
-              <div className="position-relative" style={{ paddingLeft: '30px' }}>
-                <div className="position-absolute" style={{ left: '15px', top: '0', bottom: '0', width: '2px', background: '#e5e7eb' }}></div>
-                
-                {/* Appointment */}
-                <div className="position-relative mb-3">
-                  <div className="position-absolute rounded-circle" style={{ left: '-22px', top: '5px', width: '12px', height: '12px', backgroundColor: '#4f46e5' }}></div>
-                  <div className="d-flex align-items-center gap-2">
-                    <FaUserCheck className="text-primary" />
-                    <strong>Appointment</strong>
-                    <span className="text-muted small">{formatDate(selectedEmployee.joiningDate)}</span>
-                  </div>
-                  <div className="text-muted small mt-1">Appointed as {selectedEmployee.designation} in {selectedEmployee.department}</div>
+                  )}
+                </tbody>
+              </table>
+            </div> 
+             {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="emp-page-info">
+                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+                  </span>
                 </div>
-                
-                {/* Promotions */}
-                {selectedEmployee.promotions > 0 && (
-                  <div className="position-relative mb-3">
-                    <div className="position-absolute rounded-circle" style={{ left: '-22px', top: '5px', width: '12px', height: '12px', backgroundColor: '#f59e0b' }}></div>
-                    <div className="d-flex align-items-center gap-2">
-                      <FaChartLine className="text-warning" />
-                      <strong>Promotion</strong>
-                      <span className="text-muted small">Mar 2021</span>
-                    </div>
-                    <div className="text-muted small mt-1">Promoted to Senior {selectedEmployee.designation}</div>
-                  </div>
-                )}
-                
-                {/* Trainings */}
-                {selectedEmployee.trainings > 0 && (
-                  <div className="position-relative mb-3">
-                    <div className="position-absolute rounded-circle" style={{ left: '-22px', top: '5px', width: '12px', height: '12px', backgroundColor: '#8b5cf6' }}></div>
-                    <div className="d-flex align-items-center gap-2">
-                      <FaChalkboardTeacher className="text-purple" />
-                      <strong>Training</strong>
-                      <span className="text-muted small">Aug 2021</span>
-                    </div>
-                    <div className="text-muted small mt-1">Completed Leadership Program</div>
-                  </div>
-                )}
-                
-                {/* Awards */}
-                {selectedEmployee.awards > 0 && (
-                  <div className="position-relative mb-3">
-                    <div className="position-absolute rounded-circle" style={{ left: '-22px', top: '5px', width: '12px', height: '12px', backgroundColor: '#ef4444' }}></div>
-                    <div className="d-flex align-items-center gap-2">
-                      <FaTrophy className="text-danger" />
-                      <strong>Award</strong>
-                      <span className="text-muted small">Jan 2022</span>
-                    </div>
-                    <div className="text-muted small mt-1">Received Star Performer Award</div>
-                  </div>
-                )}
-                
-                {/* Retirement */}
-                {selectedEmployee.retirementDate && (
-                  <div className="position-relative mb-3">
-                    <div className="position-absolute rounded-circle" style={{ left: '-22px', top: '5px', width: '12px', height: '12px', backgroundColor: '#64748b' }}></div>
-                    <div className="d-flex align-items-center gap-2">
-                      <FaClock className="text-secondary" />
-                      <strong>Retirement</strong>
-                      <span className="text-muted small">{formatDate(selectedEmployee.retirementDate)}</span>
-                    </div>
-                    <div className="text-muted small mt-1">Retired from service</div>
-                  </div>
-                )}
+                <div className="emp-page-controls">
+                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                    ) : (
+                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
+                        {pg + 1}
+                      </button>
+                    )
+                  )}
+                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                </div>
               </div>
-
-              <div className="mt-4 text-end">
-                <button 
-                  className="btn btn-primary btn-sm"
-                  onClick={handleViewDetails}
-                >
-                  <FaEye className="me-1" size={12} /> View Complete Service Book
-                </button>
-              </div>
-            </div>
-          </div>
+            )}           
+          </div>      
         </>
       )}
-
-    
-      {/* Service Book Detail Modal */}
-      {showDetailModal && selectedEmployee && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-          <div className="modal-dialog modal-dialog-centered modal-xl">
-            <div className="modal-content">
-              <div className="modal-header btn btn-primary text-white">
-                <h5 className="modal-title text-white">
-              <FaFileAlt className="mr-2" />    Complete Service Book - {selectedEmployee.name}
-                </h5>
-               
-              </div>
-              <div className="modal-body">
-                {/* Employee Summary Cards */}
-                <div className="row mb-4">
-                  <div className="col-md-3">
-                    <div className="text-center p-3 bg-light rounded">
-                      <FaUserTie size={28} className="text-#831843 mb-2" />
-                      <h6 className="mb-0">{selectedEmployee.name}</h6>
-                      <small className="text-muted">{selectedEmployee.code}</small>
-                    </div>
-                  </div>
-                  <div className="col-md-3">
-                    <div className="text-center p-3 bg-light rounded">
-                      <FaBuilding size={28} className="text-primary mb-2" />
-                      <h6 className="mb-0">{selectedEmployee.department}</h6>
-                      <small className="text-muted">Department</small>
-                    </div>
-                  </div>
-                  <div className="col-md-3">
-                    <div className="text-center p-3 bg-light rounded">
-                      <FaBriefcase size={28} className="text-primary mb-2" />
-                      <h6 className="mb-0">{selectedEmployee.designation}</h6>
-                      <small className="text-muted">Designation</small>
-                    </div>
-                  </div>
-                  <div className="col-md-3">
-                    <div className="text-center p-3 bg-light rounded">
-                      <FaCalendarAlt size={28} className="text-primary mb-2" />
-                      <h6 className="mb-0">{formatDate(selectedEmployee.joiningDate)}</h6>
-                      <small className="text-muted">Joining Date</small>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Statistics */}
-                <div className="row mb-4">
-                  <div className="col-md-3">
-                    <div className="text-center p-2 bg-success bg-opacity-10 rounded">
-                      <FaChartLine size={20} className="text-success" />
-                      <h5 className="mb-0 mt-1">{selectedEmployee.promotions}</h5>
-                      <small>Promotions</small>
-                    </div>
-                  </div>
-                  <div className="col-md-3">
-                    <div className="text-center p-2 bg-info bg-opacity-10 rounded">
-                      <FaChalkboardTeacher size={20} className="text-info" />
-                      <h5 className="mb-0 mt-1">{selectedEmployee.trainings}</h5>
-                      <small>Trainings</small>
-                    </div>
-                  </div>
-                  <div className="col-md-3">
-                    <div className="text-center p-2 bg-warning bg-opacity-10 rounded">
-                      <FaTrophy size={20} className="text-warning" />
-                      <h5 className="mb-0 mt-1">{selectedEmployee.awards}</h5>
-                      <small>Awards</small>
-                    </div>
-                  </div>
-                  <div className="col-md-3">
-                    <div className="text-center p-2 bg-secondary bg-opacity-10 rounded">
-                      <FaClock size={20} className="text-secondary" />
-                      <h5 className="mb-0 mt-1">{selectedEmployee.totalYears} yrs</h5>
-                      <small>Total Service</small>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Complete Details Table */}
-                <div className="card mb-4">
-                  <div className="card-header bg-light">
-                    <h6 className="mb-0">Employee Information</h6>
-                  </div>
-                  <div className="table-responsive">
-                    <table className="table table-bordered mb-0">
-                      <tbody>
-                        <tr>
-                          <td className="bg-light fw-bold" style={{ width: '30%' }}>Employee Name</td>
-                          <td>{selectedEmployee.name}</td>
-                          <td className="bg-light fw-bold" style={{ width: '30%' }}>Employee Code</td>
-                          <td>{selectedEmployee.code}</td>
-                        </tr>
-                        <tr>
-                          <td className="bg-light fw-bold">Department</td>
-                          <td>{selectedEmployee.department}</td>
-                          <td className="bg-light fw-bold">Designation</td>
-                          <td>{selectedEmployee.designation}</td>
-                        </tr>
-                        <tr>
-                          <td className="bg-light fw-bold">Service Book Number</td>
-                          <td>{selectedEmployee.serviceBookNumber}</td>
-                          <td className="bg-light fw-bold">Status</td>
-                          <td>{getStatusBadge(selectedEmployee.status)}</td>
-                        </tr>
-                        <tr>
-                          <td className="bg-light fw-bold">Joining Date</td>
-                          <td>{formatDate(selectedEmployee.joiningDate)}</td>
-                          <td className="bg-light fw-bold">Retirement Date</td>
-                          <td>{selectedEmployee.retirementDate ? formatDate(selectedEmployee.retirementDate) : '—'}</td>
-                        </tr>
-                        <tr>
-                          <td className="bg-light fw-bold">Total Service</td>
-                          <td colSpan="3">{selectedEmployee.totalYears} years</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Career Timeline */}
-                <div className="card">
-                  <div className="card-header bg-light">
-                    <h6 className="mb-0">Career Timeline</h6>
-                  </div>
-                  <div className="card-body">
-                    <div className="position-relative" style={{ paddingLeft: '30px' }}>
-                      <div className="position-absolute" style={{ left: '15px', top: '0', bottom: '0', width: '2px', background: '#e5e7eb' }}></div>
-                      
-                      <div className="position-relative mb-3">
-                        <div className="position-absolute rounded-circle" style={{ left: '-22px', top: '5px', width: '12px', height: '12px', backgroundColor: '#4f46e5' }}></div>
-                        <div><strong>Appointment</strong> <span className="text-muted small">({formatDate(selectedEmployee.joiningDate)})</span></div>
-                        <div className="text-muted small">Appointed as {selectedEmployee.designation} in {selectedEmployee.department}</div>
-                      </div>
-                      
-                      {selectedEmployee.promotions > 0 && (
-                        <div className="position-relative mb-3">
-                          <div className="position-absolute rounded-circle" style={{ left: '-22px', top: '5px', width: '12px', height: '12px', backgroundColor: '#f59e0b' }}></div>
-                          <div><strong>Promotion</strong> <span className="text-muted small">(Mar 2021)</span></div>
-                          <div className="text-muted small">Promoted to Senior {selectedEmployee.designation}</div>
-                        </div>
-                      )}
-                      
-                      {selectedEmployee.trainings > 0 && (
-                        <div className="position-relative mb-3">
-                          <div className="position-absolute rounded-circle" style={{ left: '-22px', top: '5px', width: '12px', height: '12px', backgroundColor: '#8b5cf6' }}></div>
-                          <div><strong>Training</strong> <span className="text-muted small">(Aug 2021)</span></div>
-                          <div className="text-muted small">Completed Leadership Program</div>
-                        </div>
-                      )}
-                      
-                      {selectedEmployee.awards > 0 && (
-                        <div className="position-relative mb-3">
-                          <div className="position-absolute rounded-circle" style={{ left: '-22px', top: '5px', width: '12px', height: '12px', backgroundColor: '#ef4444' }}></div>
-                          <div><strong>Award</strong> <span className="text-muted small">(Jan 2022)</span></div>
-                          <div className="text-muted small">Received Star Performer Award</div>
-                        </div>
-                      )}
-                      
-                      {selectedEmployee.retirementDate && (
-                        <div className="position-relative mb-3">
-                          <div className="position-absolute rounded-circle" style={{ left: '-22px', top: '5px', width: '12px', height: '12px', backgroundColor: '#64748b' }}></div>
-                          <div><strong>Retirement</strong> <span className="text-muted small">({formatDate(selectedEmployee.retirementDate)})</span></div>
-                          <div className="text-muted small">Retired from service</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowDetailModal(false)}>Close</button>
-                <button className="btn btn-success" onClick={handleDownloadServiceBook}>
-                  <FaDownload className="me-1" /> Download Service Book
-                </button>
-                <button className="btn btn-primary" onClick={handlePrintServiceBook}>
-                  <FaPrint className="me-1" /> Print
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 };
+
+const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default ServiceBookSearch;

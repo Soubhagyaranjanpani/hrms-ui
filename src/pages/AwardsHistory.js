@@ -1,13 +1,21 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaTrophy, FaCalendarAlt, FaBuilding, 
   FaUpload, FaFilePdf, FaFileImage, FaEdit, FaTrash, FaPlus,
-  FaFileAlt, FaSearch, FaAward, FaUserTie, FaEye, FaDownload, FaStar
+  FaFileAlt, FaSearch, FaAward, FaUserTie, FaEye, FaDownload, FaStar, FaArrowLeft
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
-  const [awards, setAwards] = useState(initialData?.awards || []);
+  const [awards, setAwards] = useState(initialData?.awards || [
+    { id: 1, awardName: 'Star Performer of the Year', awardDate: '2024-01-15', awardType: 'Star Performer', issuedBy: 'CEO Office', description: 'Exceptional performance throughout the year', createdAt: '2024-01-15T10:30:00Z', employeeName: 'John Doe', employeeId: 1 },
+    { id: 2, awardName: 'Innovation Award', awardDate: '2024-03-20', awardType: 'Innovation', issuedBy: 'HR Department', description: 'Outstanding innovation in process improvement', createdAt: '2024-03-20T11:45:00Z', employeeName: 'Jane Smith', employeeId: 2 },
+    { id: 3, awardName: 'Employee of the Month', awardDate: '2024-05-10', awardType: 'Employee of Month', issuedBy: 'Department Head', description: 'Consistent performance', createdAt: '2024-05-10T09:15:00Z', employeeName: 'Mike Johnson', employeeId: 3 },
+    { id: 4, awardName: 'Leadership Excellence', awardDate: '2024-07-05', awardType: 'Leadership', issuedBy: 'Managing Director', description: 'Excellent leadership skills', createdAt: '2024-07-05T14:20:00Z', employeeName: 'Sarah Williams', employeeId: 4 },
+    { id: 5, awardName: 'Customer Service Star', awardDate: '2024-09-12', awardType: 'Customer Service', issuedBy: 'CEO Office', description: 'Outstanding customer service', createdAt: '2024-09-12T10:00:00Z', employeeName: 'David Brown', employeeId: 5 }
+  ]);
+  
   const [editingAward, setEditingAward] = useState(null);
   const [formData, setFormData] = useState({
     awardName: '',
@@ -17,15 +25,20 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     description: '',
     certificateFile: null,
     certificateFileData: null,
-    certificateFileName: null
+    certificateFileName: null,
+    employeeId: '',
+    employeeName: ''
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [viewingAward, setViewingAward] = useState(null);
+ 
+  const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(4);
 
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
@@ -36,7 +49,7 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   ];
 
   const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-    const search = searchTerm.toLowerCase();
+    const search = employeeSearchTerm.toLowerCase();
     return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
   });
 
@@ -61,6 +74,32 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     { value: 'Client', label: 'Client' },
     { value: 'External Organization', label: 'External Organization' }
   ];
+
+  // Filter awards by search
+  const filteredAwards = awards.filter(award => {
+    const search = searchTerm.toLowerCase();
+    return award.awardName.toLowerCase().includes(search) ||
+           award.awardType.toLowerCase().includes(search) ||
+           award.issuedBy.toLowerCase().includes(search) ||
+           award.employeeName.toLowerCase().includes(search);
+  });
+
+  // Pagination
+  const totalItems = filteredAwards.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentAwards = filteredAwards.slice(startIndex, startIndex + rowsPerPage);
+
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    return range;
+  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
@@ -101,6 +140,7 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     else if (field === 'awardDate' && !value) error = 'Award Date is required';
     else if (field === 'awardType' && !value) error = 'Award Type is required';
     else if (field === 'issuedBy' && !value) error = 'Issued By is required';
+    else if (field === 'employeeId' && !value) error = 'Employee is required';
     
     setErrors(prev => ({ ...prev, [field]: error }));
     return error === '';
@@ -118,37 +158,50 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     if (!formData.awardDate) newErrors.awardDate = 'Award Date is required';
     if (!formData.awardType) newErrors.awardType = 'Award Type is required';
     if (!formData.issuedBy) newErrors.issuedBy = 'Issued By is required';
+    if (!formData.employeeId) newErrors.employeeId = 'Employee is required';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleEmployeeSelect = (employee) => {
+    setSelectedEmployee(employee);
+    setFormData(prev => ({
+      ...prev,
+      employeeId: employee.id,
+      employeeName: employee.name
+    }));
+    setEmployeeSearchTerm('');
+    setShowDropdown(false);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validateForm()) {
-      toast.warning('Validation Error', 'Please fill all required fields');
+      toast.warning('Validation Error', 'Please fix the highlighted fields');
       return;
     }
     
     const awardData = {
       ...formData,
-      employeeId: selectedEmployee?.id || employeeId,
-      employeeName: selectedEmployee?.name,
-      createdAt: new Date().toISOString()
+      id: editingAward ? editingAward.id : Date.now(),
+      createdAt: editingAward ? editingAward.createdAt : new Date().toISOString()
     };
     
     if (editingAward) {
       const updated = awards.map(a =>
-        a.id === editingAward.id ? { ...awardData, id: a.id } : a
+        a.id === editingAward.id ? awardData : a
       );
       setAwards(updated);
       toast.success('Success', 'Award updated successfully');
+      setEditingAward(null);
     } else {
-      const newAward = { id: Date.now(), ...awardData };
-      setAwards([newAward, ...awards]);
+      setAwards([awardData, ...awards]);
       toast.success('Success', 'Award added successfully');
     }
     resetForm();
+    setShowForm(false);
+    setPage(0);
   };
 
   const handleEdit = (award) => {
@@ -162,24 +215,18 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       description: award.description || '',
       certificateFile: null,
       certificateFileData: award.certificateFileData,
-      certificateFileName: award.certificateFileName
+      certificateFileName: award.certificateFileName,
+      employeeId: award.employeeId,
+      employeeName: award.employeeName
     });
+    setShowForm(true);
   };
 
-  const handleView = (award) => {
-    setViewingAward(award);
-    setShowViewModal(true);
-  };
+ 
 
   const handleDelete = (id) => {
     setAwards(awards.filter(a => a.id !== id));
     toast.success('Success', 'Award deleted successfully');
-  };
-
-  const handleEmployeeSelect = (employee) => {
-    setSelectedEmployee(employee);
-    setSearchTerm('');
-    setShowDropdown(false);
   };
 
   const resetForm = () => {
@@ -191,322 +238,237 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       description: '',
       certificateFile: null,
       certificateFileData: null,
-      certificateFileName: null
+      certificateFileName: null,
+      employeeId: '',
+      employeeName: ''
     });
     setErrors({});
     setTouched({});
     setEditingAward(null);
+    setSelectedEmployee(null);
+    setEmployeeSearchTerm('');
   };
 
+  const handleCancelForm = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  const handleBackToList = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  // Calculate stats
+  const totalAwards = awards.length;
+  const topAwards = awards.filter(a => a.awardType === 'Employee of Year' || a.awardType === 'Star Performer').length;
+
   return (
-    <div className="container-fluid p-4">
+    <div className="cert-root">
       {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4 pb-2 border-bottom">
-        <div className="bg-primary bg-opacity-10 p-3 rounded-circle">
-          <FaTrophy className="text-primary" size={24} />
-        </div>
+      <div className="cert-header">
         <div>
-          <h5 className="mb-0">Awards & Recognition History</h5>
-          <p className="text-muted mb-0 small">Manage employee awards and recognitions</p>
+          <h1 className="cert-title">Awards & Recognition History</h1>
+          <p className="cert-subtitle">Manage employee awards and recognitions</p>
         </div>
-      </div>
-
-      {/* Stats */}
-      {selectedEmployee && awards.length > 0 && (
-        <div className="row g-3 mb-4">
-          <div className="col-md-6">
-            <div className="card bg-warning bg-opacity-10">
-              <div className="card-body d-flex align-items-center gap-3">
-                <div className="bg-warning text-white p-3 rounded-circle">
-                  <FaTrophy size={20} />
-                </div>
-                <div>
-                  <h4 className="mb-0">{awards.length}</h4>
-                  <small className="text-muted">Total Awards</small>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-6">
-            <div className="card bg-success bg-opacity-10">
-              <div className="card-body d-flex align-items-center gap-3">
-                <div className="bg-success text-white p-3 rounded-circle">
-                  <FaStar size={20} />
-                </div>
-                <div>
-                  <h4 className="mb-0">{awards.filter(a => a.awardType === 'Employee of Year').length}</h4>
-                  <small className="text-muted">Top Awards</small>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Search Employee */}
-      <div className="card border-0 shadow-sm mb-4">
-        <div className="card-header bg-light">
-          <h6 className="mb-0 fw-bold">Search Employee</h6>
-        </div>
-        <div className="card-body">
-          <div className="position-relative">
-            <div className="input-group">
-                <span className="input-group-text bg-light">
-                               <FaSearch size={14} className="text-muted" />
-                             </span>
-              
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Search by name or code..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setShowDropdown(true);
-                }}
-                onFocus={() => setShowDropdown(true)}
-              />
-              
-              {selectedEmployee && (
-                  <button className="btn btn-outline-danger" onClick={() => { setSelectedEmployee(null); setSearchTerm(''); resetForm(); }}>
-                 Cancel
-                  </button>
-              )}
-            </div>
-            
-            {showDropdown && searchTerm && (
-              <div className="dropdown-menu show w-100 mt-1" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {filteredEmployees.length > 0 ? (
-                  filteredEmployees.map(emp => (
-                    <button key={emp.id} className="dropdown-item" onClick={() => handleEmployeeSelect(emp)}>
-                      <div className="font-weight-bold">{emp.name}</div>
-                      <small className="text-muted">{emp.code} | {emp.department}</small>
-                    </button>
-                  ))
-                ) : (
-                  <div className="dropdown-item text-center text-muted">No employees found</div>
-                )}
-                
-              </div>
-              
-            )}
-          </div>
-           <small className="text-muted mt-2 d-block">Type employee name or code to search</small>
-          
-          {selectedEmployee && (
-            <div className="alert alert-info mt-3 mb-0 py-2">
-              <FaUserTie className="mr-2" /> Selected: {selectedEmployee.name} ({selectedEmployee.code})
-            </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!showForm && (
+            <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
+              <FaPlus size={13} /> Add Award
+            </button>
           )}
-          
-          
+          {showForm && (
+            <button 
+              type="button" 
+              className="cert-back-btn" 
+              onClick={handleBackToList}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
+            >
+              <FaArrowLeft size={12} /> Back
+            </button>
+          )}
+          {!showForm && onCancel && (
+            <button className="cert-cancel-btn" onClick={onCancel}>
+              <FaTimes size={13} /> Cancel
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Form - 2 columns per row */}
-      {selectedEmployee && (
-        <div className="card shadow-sm mb-4">
-          <div className="card-header bg-light">
-            <h6 className="mb-0">{editingAward ? 'Edit Award' : 'New Award'}</h6>
-          </div>
-          <div className="card-body">
-            <form onSubmit={handleSubmit}>
-              <div className="row">
-                {/* Award Name - col 6 */}
-                <div className="col-md-6 mb-3">
-                  <label className="form-label fw-bold">
-                    Award Name <span className="text-danger">*</span>
-                  </label>
-                  <input 
-                    type="text" 
-                    className={`form-control ${errors.awardName ? 'is-invalid' : ''}`} 
-                    placeholder="e.g., Best Employee of the Year"
-                    value={formData.awardName} 
-                    onChange={(e) => handleChange('awardName', e.target.value)} 
-                    onBlur={() => handleBlur('awardName')}
-                  />
-                  {errors.awardName && <small className="text-danger">{errors.awardName}</small>}
+      {showForm ? (
+        <div className="cert-form-wrap mb-4">
+          <form onSubmit={handleSubmit} className="cert-form-compact">
+            <div className="cert-form-section-compact">
+              <div className="cert-section-label">Award Details</div>
+              <div className="cert-form-grid-3col">
+               
+                <div className={`cert-field-compact ${touched.awardName && errors.awardName ? 'has-error' : ''}`}>
+                  <label className="required">Award Name</label>
+                  <input type="text" placeholder="e.g., Best Employee of the Year" value={formData.awardName} onChange={(e) => handleChange('awardName', e.target.value)} onBlur={() => handleBlur('awardName')} />
+                  <FieldError msg={errors.awardName} />
                 </div>
-
-                {/* Award Date - col 6 */}
-                <div className="col-md-6 mb-3">
-                  <label className="form-label fw-bold">
-                    Award Date <span className="text-danger">*</span>
-                  </label>
-                  <input 
-                    type="date" 
-                    className={`form-control ${errors.awardDate ? 'is-invalid' : ''}`} 
-                    value={formData.awardDate} 
-                    onChange={(e) => handleChange('awardDate', e.target.value)} 
-                    onBlur={() => handleBlur('awardDate')}
-                  />
-                  {errors.awardDate && <small className="text-danger">{errors.awardDate}</small>}
+                
+                <div className={`cert-field-compact ${touched.awardDate && errors.awardDate ? 'has-error' : ''}`}>
+                  <label className="required">Award Date</label>
+                  <input type="date" value={formData.awardDate} onChange={(e) => handleChange('awardDate', e.target.value)} onBlur={() => handleBlur('awardDate')} />
+                  <FieldError msg={errors.awardDate} />
                 </div>
-
-                {/* Award Type - col 6 */}
-                <div className="col-md-6 mb-3">
-                  <label className="form-label fw-bold">
-                    Award Type <span className="text-danger">*</span>
-                  </label>
-                  <select 
-                    className={`form-control ${errors.awardType ? 'is-invalid' : ''}`} 
-                    value={formData.awardType} 
-                    onChange={(e) => handleChange('awardType', e.target.value)} 
-                    onBlur={() => handleBlur('awardType')}
-                  >
-                    {awardTypes.map(type => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
+                
+                <div className={`cert-field-compact ${touched.awardType && errors.awardType ? 'has-error' : ''}`}>
+                  <label className="required">Award Type</label>
+                  <select value={formData.awardType} onChange={(e) => handleChange('awardType', e.target.value)} onBlur={() => handleBlur('awardType')}>
+                    {awardTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
                   </select>
-                  {errors.awardType && <small className="text-danger">{errors.awardType}</small>}
+                  <FieldError msg={errors.awardType} />
                 </div>
-
-                {/* Issued By - col 6 */}
-                <div className="col-md-6 mb-3">
-                  <label className="form-label fw-bold">
-                    Issued By <span className="text-danger">*</span>
-                  </label>
-                  <select 
-                    className={`form-control ${errors.issuedBy ? 'is-invalid' : ''}`} 
-                    value={formData.issuedBy} 
-                    onChange={(e) => handleChange('issuedBy', e.target.value)} 
-                    onBlur={() => handleBlur('issuedBy')}
-                  >
+                
+                <div className={`cert-field-compact ${touched.issuedBy && errors.issuedBy ? 'has-error' : ''}`}>
+                  <label className="required">Issued By</label>
+                  <select value={formData.issuedBy} onChange={(e) => handleChange('issuedBy', e.target.value)} onBlur={() => handleBlur('issuedBy')}>
                     <option value="">Select Issued By</option>
-                    {issuedByOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
+                    {issuedByOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
-                  {errors.issuedBy && <small className="text-danger">{errors.issuedBy}</small>}
+                  <FieldError msg={errors.issuedBy} />
                 </div>
-
-                {/* Description - col 12 (full width) */}
-                <div className="col-12 mb-3">
-                  <label className="form-label fw-bold">Description</label>
-                  <textarea 
-                    rows="3" 
-                    className="form-control" 
-                    placeholder="Brief description of the award and achievement..."
-                    value={formData.description} 
-                    onChange={(e) => handleChange('description', e.target.value)}
-                  />
+                
+                <div className="cert-field-compact" style={{ gridColumn: 'span 2' }}>
+                  <label>Description</label>
+                  <textarea rows="3" placeholder="Brief description of the award and achievement..." value={formData.description} onChange={(e) => handleChange('description', e.target.value)} />
                 </div>
-
-                {/* Certificate Upload - col 12 */}
-                <div className="col-12 mb-3">
-                  <label className="form-label fw-bold">Award Certificate</label>
+                
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label>Award Certificate</label>
                   <div className="border rounded p-3 text-center bg-light">
-                    <input 
-                      type="file" 
-                      accept=".pdf,.jpg,.jpeg,.png" 
-                      onChange={handleFileChange} 
-                      style={{ display: 'none' }} 
-                      id="certificate-upload" 
-                    />
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="certificate-upload" />
                     <label htmlFor="certificate-upload" className="btn btn-outline-primary btn-sm">
-                      <FaUpload className="mr-1" /> Choose File
+                      <FaUpload size={12} /> Choose File
                     </label>
                     {formData.certificateFileName && (
                       <div className="mt-2 text-primary">
-                        {formData.certificateFileName.endsWith('.pdf') ? 
-                          <FaFilePdf className="mr-1" /> : <FaFileImage className="mr-1" />}
-                        {formData.certificateFileName}
+                        {formData.certificateFileName.endsWith('.pdf') ? <FaFilePdf /> : <FaFileImage />} {formData.certificateFileName}
                       </div>
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
                 </div>
               </div>
-
-              <div className="d-flex justify-content-end gap-2 mt-3 pt-3 border-top">
-                <button type="button" className="btn btn-outline-secondary" onClick={resetForm}>Clear</button>
-                <button type="submit" className="btn btn-primary"><FaSave className="mr-1" /> {editingAward ? 'Update' : 'Save'}</button>
-              </div>
-            </form>
-          </div>
+            </div>
+            
+            <div className="cert-form-actions">
+              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FaSave size={12} /> {editingAward ? 'Update Award' : 'Save Award'}
+              </button>
+            </div>
+          </form>
         </div>
-      )}
-
-      {/* Table */}
-      {selectedEmployee && awards.length > 0 && (
-        <div className="card shadow-sm">
-          <div className="card-header bg-light">
-            <h6 className="mb-0">Awards & Recognition - {selectedEmployee.name}</h6>
-          </div>
-          <div className="table-responsive">
-            <table className="table table-bordered mb-0">
-              <thead className="thead-light">
-                <tr>
-                  <th>Award Name</th>
-                  <th>Award Date</th>
-                  <th>Award Type</th>
-                  <th>Issued By</th>
-                  <th>Description</th>
-                  <th>Certificate</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {awards.map((award) => (
-                  <tr key={award.id}>
-                    <td><strong>{award.awardName}</strong></td>
-                    <td>{formatDate(award.awardDate)}</td>
-                    <td>{award.awardType}</td>
-                    <td>{award.issuedBy}</td>
-                    <td>{award.description || '—'}</td>
-                    <td className="text-center">
-                      {award.certificateFileName ? (
-                        <a href={award.certificateFileData} download={award.certificateFileName} className="btn btn-sm btn-outline-primary">
-                          <FaFileAlt size={12} /> View
-                        </a>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </td>
-                    <td>
-                      <button className="btn btn-sm btn-outline-info mr-1" onClick={() => handleView(award)}><FaEye size={12} /></button>
-                      <button className="btn btn-sm btn-outline-primary mr-1" onClick={() => handleEdit(award)}><FaEdit size={12} /></button>
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(award.id)}><FaTrash size={12} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-     
-      {/* View Modal */}
-      {showViewModal && viewingAward && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header bg-primary text-white">
-                <h5 className="modal-title"><FaTrophy className="mr-2" /> Award Details</h5>
-                <button type="button" className="close text-white" onClick={() => setShowViewModal(false)}>
-                  <span>&times;</span>
+      ) : (
+        <>
+          {/* Search Bar */}
+          <div className="emp-search-bar">
+            <div className="emp-search-wrap">
+              <FaSearch className="emp-search-icon" size={12} />
+              <input
+                className="emp-search-input"
+                type="text"
+                placeholder="Search by award name, type, issued by or employee..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+              />
+              {searchTerm && (
+                <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setPage(0); }}>
+                  <FaTimes size={11} />
                 </button>
-              </div>
-              <div className="modal-body">
-                <p><strong>Award Name:</strong> {viewingAward.awardName}</p>
-                <p><strong>Award Date:</strong> {formatDate(viewingAward.awardDate)}</p>
-                <p><strong>Award Type:</strong> {viewingAward.awardType}</p>
-                <p><strong>Issued By:</strong> {viewingAward.issuedBy}</p>
-                <p><strong>Description:</strong> {viewingAward.description || '—'}</p>
-                {viewingAward.certificateFileName && (
-                  <a href={viewingAward.certificateFileData} download={viewingAward.certificateFileName} className="btn btn-sm btn-primary mt-2">Download Certificate</a>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowViewModal(false)}>Close</button>
-              </div>
+              )}
             </div>
           </div>
-        </div>
+
+         
+          {/* Awards Table */}
+          <div className="cert-table-card">
+            <div className="cert-table-wrap">
+              <table className="cert-table">
+                <thead>
+                  <tr>
+                    <th>Award Name</th>
+                    
+                    <th>Award Date</th>
+                    <th>Award Type</th>
+                    <th>Issued By</th>
+                    <th>Description</th>
+                    <th>Certificate</th>
+                    <th style={{ width: 100 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentAwards.length > 0 ? (
+                    currentAwards.map((award) => (
+                      <tr key={award.id}>
+                        <td><strong>{award.awardName}</strong></td>
+                       
+                        <td>{formatDate(award.awardDate)}</td>
+                        <td>{award.awardType}</td>
+                        <td>{award.issuedBy}</td>
+                        <td>{award.description ? (award.description.length > 30 ? award.description.substring(0, 30) + '...' : award.description) : '—'}</td>
+                        <td className="text-center">
+                          {award.certificateFileName ? (
+                            <a href={award.certificateFileData} download={award.certificateFileName} className="btn btn-sm btn-outline-primary">
+                              <FaFileAlt size={12} /> View
+                            </a>
+                          ) : <span className="text-muted">—</span>}
+                        </td>
+                        <td>
+                          <div className="cert-actions">
+                            
+                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(award)} title="Edit">
+                              <FaEdit size={12} />
+                            </button>
+                            <button className="cert-act cert-act--del" onClick={() => handleDelete(award.id)} title="Delete">
+                              <FaTrash size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="8" className="text-center py-5">No award records found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="emp-page-info">
+                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+                  </span>
+                </div>
+                <div className="emp-page-controls">
+                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                    ) : (
+                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
+                        {pg + 1}
+                      </button>
+                    )
+                  )}
+                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+         
+        </>
       )}
     </div>
   );
 };
+
+const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default AwardsHistory;

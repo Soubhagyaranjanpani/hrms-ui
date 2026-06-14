@@ -1,232 +1,1028 @@
+// // import React, { useState, useEffect } from 'react';
+// // import { 
+// //   FaSearch, FaUserTie, FaBuilding, FaCalendarAlt, 
+// //   FaBook, FaEye, FaDownload, FaFilter, FaTimes,
+// //   FaPlus, FaEdit, FaCheckCircle, FaUpload, FaEye as FaView,
+// //   FaClock, FaFileAlt, FaUserCheck, FaChartLine,
+// //   FaExchangeAlt, FaTrophy, FaRupeeSign, FaChalkboardTeacher,
+// //   FaSave, FaTrash
+// // } from 'react-icons/fa';
+// // import { toast } from '../components/Toast';
+
+// // const AuditTrail = ({ user, onCancel }) => {
+// //   const [auditLogs, setAuditLogs] = useState([
+// //     { id: 1, eventType: 'Create', description: 'Service book created for John Doe', timestamp: '2024-01-15 09:30:00', ipAddress: '192.168.1.101', userName: 'HR Admin', employeeName: 'John Doe', employeeId: 1, details: { serviceBookNumber: 'SB/2024/0001', joiningDate: '2024-01-15' } },
+// //     { id: 2, eventType: 'Upload', description: 'Appointment order document uploaded', timestamp: '2024-01-15 10:15:22', ipAddress: '192.168.1.101', userName: 'HR Admin', employeeName: 'John Doe', employeeId: 1, details: { documentName: 'Appointment_Order.pdf', documentSize: '1.2 MB' } },
+// //     { id: 3, eventType: 'Update', description: 'Employee designation updated', timestamp: '2024-03-01 14:20:35', ipAddress: '192.168.1.105', userName: 'HR Manager', employeeName: 'John Doe', employeeId: 1, details: { fieldChanged: 'designation', oldValue: 'Software Engineer', newValue: 'Senior Software Engineer' } },
+// //     { id: 4, eventType: 'Approval', description: 'Promotion request approved', timestamp: '2024-03-05 11:45:00', ipAddress: '192.168.1.110', userName: 'HR Director', employeeName: 'Jane Smith', employeeId: 2, details: { approvalType: 'Promotion', approvedBy: 'HR Director' } },
+// //     { id: 5, eventType: 'View', description: 'Service book viewed by Manager', timestamp: '2024-03-10 09:15:30', ipAddress: '192.168.1.115', userName: 'Department Head', employeeName: 'Mike Johnson', employeeId: 3, details: { viewedFrom: 'Employee Management Module' } },
+// //     { id: 6, eventType: 'Download', description: 'Service book PDF downloaded', timestamp: '2024-03-12 16:30:45', ipAddress: '192.168.1.120', userName: 'HR Executive', employeeName: 'Sarah Williams', employeeId: 4, details: { downloadFormat: 'PDF', fileSize: '2.5 MB' } },
+// //     { id: 7, eventType: 'Upload', description: 'Promotion order document uploaded', timestamp: '2024-03-05 12:00:00', ipAddress: '192.168.1.105', userName: 'HR Manager', employeeName: 'David Brown', employeeId: 5, details: { documentName: 'Promotion_Order.pdf', documentSize: '856 KB' } },
+// //     { id: 8, eventType: 'Update', description: 'Salary revised', timestamp: '2024-04-01 10:00:00', ipAddress: '192.168.1.125', userName: 'Payroll Manager', employeeName: 'Emily Wilson', employeeId: 6, details: { fieldChanged: 'salary', oldValue: '₹50,000', newValue: '₹60,000' } }
+// //   ]);
+  
+// //   const [searchTerm, setSearchTerm] = useState('');
+// //   const [filteredLogs, setFilteredLogs] = useState(auditLogs);
+// //   const [eventFilter, setEventFilter] = useState('all');
+// //   const [dateFrom, setDateFrom] = useState('');
+// //   const [dateTo, setDateTo] = useState('');
+// //   const [showForm, setShowForm] = useState(false);
+// //   const [editingLog, setEditingLog] = useState(null);
+// //   const [formData, setFormData] = useState({
+// //     eventType: 'Create',
+// //     description: '',
+// //     userName: '',
+// //     employeeName: '',
+// //     ipAddress: '',
+// //     details: ''
+// //   });
+// //   const [errors, setErrors] = useState({});
+// //   const [touched, setTouched] = useState({});
+// //   const [page, setPage] = useState(0);
+// //   const [rowsPerPage] = useState(5);
+
+// //   const eventTypes = [
+// //     { value: 'all', label: 'All Events', icon: <FaClock /> },
+// //     { value: 'Create', label: 'Create', icon: <FaPlus />, color: '#10b981', bg: '#d1fae5' },
+// //     { value: 'Update', label: 'Update', icon: <FaEdit />, color: '#f59e0b', bg: '#fed7aa' },
+// //     { value: 'Approval', label: 'Approval', icon: <FaCheckCircle />, color: '#10b981', bg: '#d1fae5' },
+// //     { value: 'Upload', label: 'Upload', icon: <FaUpload />, color: '#8b5cf6', bg: '#ede9fe' },
+// //     { value: 'Download', label: 'Download', icon: <FaDownload />, color: '#ec489a', bg: '#fce7f3' },
+// //     { value: 'View', label: 'View', icon: <FaView />, color: '#06b6d4', bg: '#cffafe' }
+// //   ];
+
+// //   const DUMMY_EMPLOYEES = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Williams', 'David Brown', 'Emily Wilson'];
+
+// //   // Filter logs
+// //   useEffect(() => {
+// //     let filtered = auditLogs;
+    
+// //     // Search filter
+// //     if (searchTerm) {
+// //       const search = searchTerm.toLowerCase();
+// //       filtered = filtered.filter(log => 
+// //         log.employeeName.toLowerCase().includes(search) ||
+// //         log.eventType.toLowerCase().includes(search) ||
+// //         log.userName.toLowerCase().includes(search) ||
+// //         log.description.toLowerCase().includes(search)
+// //       );
+// //     }
+    
+// //     // Event type filter
+// //     if (eventFilter !== 'all') {
+// //       filtered = filtered.filter(log => log.eventType === eventFilter);
+// //     }
+    
+// //     // Date range filter
+// //     if (dateFrom) {
+// //       filtered = filtered.filter(log => log.timestamp.split(' ')[0] >= dateFrom);
+// //     }
+// //     if (dateTo) {
+// //       filtered = filtered.filter(log => log.timestamp.split(' ')[0] <= dateTo);
+// //     }
+    
+// //     setFilteredLogs(filtered);
+// //     setPage(0);
+// //   }, [searchTerm, eventFilter, dateFrom, dateTo, auditLogs]);
+
+// //   // Pagination
+// //   const totalItems = filteredLogs.length;
+// //   const totalPages = Math.ceil(totalItems / rowsPerPage);
+// //   const startIndex = page * rowsPerPage;
+// //   const currentLogs = filteredLogs.slice(startIndex, startIndex + rowsPerPage);
+
+// //   const getPaginationRange = () => {
+// //     const delta = 2;
+// //     const range = [];
+// //     const left = Math.max(0, page - delta);
+// //     const right = Math.min(totalPages - 1, page + delta);
+// //     if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+// //     for (let i = left; i <= right; i++) range.push(i);
+// //     if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+// //     return range;
+// //   };
+
+// //   const handleChange = (field, value) => {
+// //     setFormData({ ...formData, [field]: value });
+// //     if (touched[field]) {
+// //       validateField(field, value);
+// //     }
+// //   };
+
+// //   const validateField = (field, value) => {
+// //     let error = '';
+// //     if (field === 'eventType' && !value) error = 'Event Type is required';
+// //     else if (field === 'description' && !value) error = 'Description is required';
+// //     else if (field === 'userName' && !value) error = 'User Name is required';
+// //     else if (field === 'employeeName' && !value) error = 'Employee Name is required';
+// //     setErrors(prev => ({ ...prev, [field]: error }));
+// //     return error === '';
+// //   };
+
+// //   const handleBlur = (field) => {
+// //     setTouched(prev => ({ ...prev, [field]: true }));
+// //     validateField(field, formData[field]);
+// //   };
+
+// //   const validateForm = () => {
+// //     const newErrors = {};
+// //     if (!formData.eventType) newErrors.eventType = 'Event Type is required';
+// //     if (!formData.description) newErrors.description = 'Description is required';
+// //     if (!formData.userName) newErrors.userName = 'User Name is required';
+// //     if (!formData.employeeName) newErrors.employeeName = 'Employee Name is required';
+// //     setErrors(newErrors);
+// //     return Object.keys(newErrors).length === 0;
+// //   };
+
+// //   const handleSubmit = (e) => {
+// //     e.preventDefault();
+// //     if (!validateForm()) {
+// //       toast.warning('Validation Error', 'Please fill all required fields');
+// //       return;
+// //     }
+    
+// //     const newLog = {
+// //       id: editingLog ? editingLog.id : Date.now(),
+// //       eventType: formData.eventType,
+// //       description: formData.description,
+// //       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+// //       ipAddress: formData.ipAddress || '192.168.1.1',
+// //       userName: formData.userName,
+// //       employeeName: formData.employeeName,
+// //       employeeId: editingLog ? editingLog.employeeId : DUMMY_EMPLOYEES.indexOf(formData.employeeName) + 1,
+// //       details: { note: formData.details || 'No additional details' }
+// //     };
+    
+// //     if (editingLog) {
+// //       setAuditLogs(auditLogs.map(log => log.id === editingLog.id ? newLog : log));
+// //       toast.success('Success', 'Audit log updated successfully');
+// //       setEditingLog(null);
+// //     } else {
+// //       setAuditLogs([newLog, ...auditLogs]);
+// //       toast.success('Success', 'Audit log added successfully');
+// //     }
+// //     resetForm();
+// //     setShowForm(false);
+// //     setPage(0);
+// //   };
+
+// //   const handleEdit = (log) => {
+// //     setEditingLog(log);
+// //     setFormData({
+// //       eventType: log.eventType,
+// //       description: log.description,
+// //       userName: log.userName,
+// //       employeeName: log.employeeName,
+// //       ipAddress: log.ipAddress,
+// //       details: log.details?.note || ''
+// //     });
+// //     setShowForm(true);
+// //   };
+
+// //   const handleDelete = (id) => {
+// //     setAuditLogs(auditLogs.filter(log => log.id !== id));
+// //     toast.success('Deleted', 'Audit log deleted successfully');
+// //   };
+
+// //   const resetForm = () => {
+// //     setFormData({
+// //       eventType: 'Create',
+// //       description: '',
+// //       userName: '',
+// //       employeeName: '',
+// //       ipAddress: '',
+// //       details: ''
+// //     });
+// //     setErrors({});
+// //     setTouched({});
+// //     setEditingLog(null);
+// //   };
+
+// //   const handleCancelForm = () => {
+// //     resetForm();
+// //     setShowForm(false);
+// //   };
+
+// //   const handleCancel = () => {
+// //     if (onCancel) onCancel();
+// //   };
+
+// //   const formatDateTime = (timestamp) => {
+// //     const [date, time] = timestamp.split(' ');
+// //     const formattedDate = new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+// //     return { date: formattedDate, time };
+// //   };
+
+// //   const getEventBadge = (eventType) => {
+// //     const event = eventTypes.find(e => e.value === eventType);
+// //     const style = event || eventTypes[0];
+// //     return <span className="badge" style={{ backgroundColor: style.bg, color: style.color, padding: '6px 12px' }}>{eventType}</span>;
+// //   };
+
+// //   // Stats
+// //   const totalEvents = auditLogs.length;
+// //   const createCount = auditLogs.filter(l => l.eventType === 'Create').length;
+// //   const updateCount = auditLogs.filter(l => l.eventType === 'Update').length;
+
+// //   return (
+// //     <div className="cert-root">
+// //       {/* Header */}
+// //       <div className="cert-header">
+// //         <div>
+// //           <h1 className="cert-title">Service Book Audit Trail</h1>
+// //           <p className="cert-subtitle">Track all service book changes and activities</p>
+// //         </div>
+// //         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+// //           {!showForm && (
+// //             <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
+// //               <FaPlus size={13} /> Add Audit Log
+// //             </button>
+// //           )}
+// //           {onCancel && (
+// //             <button className="cert-cancel-btn" onClick={handleCancel}>
+// //               <FaTimes size={13} /> Cancel
+// //             </button>
+// //           )}
+// //         </div>
+// //       </div>
+
+// //       {/* Search Bar */}
+// //       <div className="cert-search-bar">
+// //         <div className="cert-search-wrap">
+// //           <FaSearch className="cert-search-icon" size={12} />
+// //           <input
+// //             className="cert-search-input"
+// //             type="text"
+// //             placeholder="Search by employee name, event type, user..."
+// //             value={searchTerm}
+// //             onChange={(e) => setSearchTerm(e.target.value)}
+// //           />
+// //           {searchTerm && (
+// //             <button className="cert-search-clear" onClick={() => setSearchTerm('')}>
+// //               <FaTimes size={11} />
+// //             </button>
+// //           )}
+// //         </div>
+// //       </div>
+
+// //       {/* Stats */}
+// //       <div className="cert-stats">
+// //         <div className="cert-stat-card">
+// //           <FaClock size={16} color="#4f46e5" />
+// //           <span>{totalEvents} Total Events</span>
+// //         </div>
+// //         <div className="cert-stat-card">
+// //           <FaPlus size={16} color="#10b981" />
+// //           <span>{createCount} Creates</span>
+// //         </div>
+// //         <div className="cert-stat-card">
+// //           <FaEdit size={16} color="#f59e0b" />
+// //           <span>{updateCount} Updates</span>
+// //         </div>
+// //       </div>
+
+// //       {/* Filter Section */}
+// //       <div className="card shadow-sm mb-4">
+// //         <div className="card-header bg-light">
+// //           <h6 className="mb-0"><FaFilter className="me-2" /> Filters</h6>
+// //         </div>
+// //         <div className="card-body">
+// //           <div className="row">
+// //             <div className="col-md-4 mb-3">
+// //               <label className="form-label fw-bold">Event Type</label>
+// //               <select className="form-select" value={eventFilter} onChange={(e) => setEventFilter(e.target.value)}>
+// //                 {eventTypes.map(event => (
+// //                   <option key={event.value} value={event.value}>{event.label}</option>
+// //                 ))}
+// //               </select>
+// //             </div>
+// //             <div className="col-md-4 mb-3">
+// //               <label className="form-label fw-bold">Date From</label>
+// //               <input type="date" className="form-control" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+// //             </div>
+// //             <div className="col-md-4 mb-3">
+// //               <label className="form-label fw-bold">Date To</label>
+// //               <input type="date" className="form-control" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+// //             </div>
+// //           </div>
+// //         </div>
+// //       </div>
+
+// //       {/* Audit Log Form */}
+// //       {showForm && (
+// //         <div className="cert-form-wrap mb-4">
+// //           <form onSubmit={handleSubmit} className="cert-form-compact">
+// //             <div className="cert-form-section-compact">
+// //               <div className="cert-section-label">Audit Log Details</div>
+// //               <div className="cert-form-grid-3col">
+// //                 <div className={`cert-field-compact ${touched.eventType && errors.eventType ? 'has-error' : ''}`}>
+// //                   <label className="required">Event Type</label>
+// //                   <select value={formData.eventType} onChange={(e) => handleChange('eventType', e.target.value)} onBlur={() => handleBlur('eventType')}>
+// //                     {eventTypes.filter(e => e.value !== 'all').map(type => (
+// //                       <option key={type.value} value={type.value}>{type.label}</option>
+// //                     ))}
+// //                   </select>
+// //                   <FieldError msg={errors.eventType} />
+// //                 </div>
+                
+// //                 <div className={`cert-field-compact ${touched.employeeName && errors.employeeName ? 'has-error' : ''}`}>
+// //                   <label className="required">Employee Name</label>
+// //                   <select value={formData.employeeName} onChange={(e) => handleChange('employeeName', e.target.value)} onBlur={() => handleBlur('employeeName')}>
+// //                     <option value="">Select Employee</option>
+// //                     {DUMMY_EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+// //                   </select>
+// //                   <FieldError msg={errors.employeeName} />
+// //                 </div>
+                
+// //                 <div className={`cert-field-compact ${touched.userName && errors.userName ? 'has-error' : ''}`}>
+// //                   <label className="required">User Name</label>
+// //                   <input type="text" placeholder="User who performed action" value={formData.userName} onChange={(e) => handleChange('userName', e.target.value)} onBlur={() => handleBlur('userName')} />
+// //                   <FieldError msg={errors.userName} />
+// //                 </div>
+                
+// //                 <div className={`cert-field-compact ${touched.description && errors.description ? 'has-error' : ''}`} style={{ gridColumn: 'span 2' }}>
+// //                   <label className="required">Description</label>
+// //                   <input type="text" placeholder="Description of the event" value={formData.description} onChange={(e) => handleChange('description', e.target.value)} onBlur={() => handleBlur('description')} />
+// //                   <FieldError msg={errors.description} />
+// //                 </div>
+                
+// //                 <div className="cert-field-compact">
+// //                   <label>IP Address</label>
+// //                   <input type="text" placeholder="e.g., 192.168.1.1" value={formData.ipAddress} onChange={(e) => handleChange('ipAddress', e.target.value)} />
+// //                 </div>
+                
+// //                 <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+// //                   <label>Additional Details</label>
+// //                   <textarea rows="2" placeholder="Any additional details..." value={formData.details} onChange={(e) => handleChange('details', e.target.value)} />
+// //                 </div>
+// //               </div>
+// //             </div>
+            
+// //             <div className="cert-form-actions">
+// //               <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+// //               <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+// //                 <FaSave size={12} /> {editingLog ? 'Update Log' : 'Save Log'}
+// //               </button>
+// //             </div>
+// //           </form>
+// //         </div>
+// //       )}
+
+// //       {/* Audit Logs Table */}
+// //       <div className="cert-table-card">
+// //         <div className="cert-table-wrap">
+// //           <table className="cert-table">
+// //             <thead>
+// //               <tr>
+// //                 <th>#</th>
+// //                 <th>Event Type</th>
+// //                 <th>Employee</th>
+// //                 <th>Description</th>
+// //                 <th>User</th>
+// //                 <th>Timestamp</th>
+// //                 <th>IP Address</th>
+// //                 <th style={{ width: 100 }}>Actions</th>
+// //               </tr>
+// //             </thead>
+// //             <tbody>
+// //               {currentLogs.length > 0 ? (
+// //                 currentLogs.map((log, idx) => {
+// //                   const { date, time } = formatDateTime(log.timestamp);
+// //                   return (
+// //                     <tr key={log.id}>
+// //                       <td className="text-center">{startIndex + idx + 1}</td>
+// //                       <td className="text-center">{getEventBadge(log.eventType)}</td>
+// //                       <td className="fw-bold">{log.employeeName}</td>
+// //                       <td>{log.description}</td>
+// //                       <td>{log.userName}</td>
+// //                       <td><div>{date}</div><small className="text-muted">{time}</small></td>
+// //                       <td><code>{log.ipAddress}</code></td>
+// //                       <td className="text-center">
+// //                         <div className="cert-actions">
+// //                           <button className="cert-act cert-act--edit" onClick={() => handleEdit(log)} title="Edit">
+// //                             <FaEdit size={12} />
+// //                           </button>
+// //                           <button className="cert-act cert-act--del" onClick={() => handleDelete(log.id)} title="Delete">
+// //                             <FaTrash size={12} />
+// //                           </button>
+// //                         </div>
+// //                        </td>
+// //                      </tr>
+// //                   );
+// //                 })
+// //               ) : (
+// //                 <tr><td colSpan="8" className="text-center py-5">No audit records found</td></tr>
+// //               )}
+// //             </tbody>
+// //           </table>
+// //         </div>
+
+// //         {/* Pagination */}
+// //         {totalPages > 1 && (
+// //           <div className="cert-pagination" style={{ justifyContent: 'center', display: 'flex', gap: '8px', marginTop: '20px', padding: '12px 0' }}>
+// //             <button className="cert-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+// //             {getPaginationRange().map((pg, i) =>
+// //               pg === '...' ? <span key={i} className="cert-page-dots">…</span> : <button key={pg} className={`cert-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>{pg + 1}</button>
+// //             )}
+// //             <button className="cert-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+// //           </div>
+// //         )}
+// //       </div>
+// //     </div>
+// //   );
+// // };
+
+// // const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
+
+// // export default AuditTrail;
+// import React, { useState, useEffect } from 'react';
+// import { 
+//   FaSearch, FaUserTie, FaBuilding, FaCalendarAlt, 
+//   FaBook, FaEye, FaDownload, FaFilter, FaTimes,
+//   FaPlus, FaEdit, FaCheckCircle, FaUpload, FaEye as FaView,
+//   FaClock, FaFileAlt, FaUserCheck, FaChartLine,
+//   FaExchangeAlt, FaTrophy, FaRupeeSign, FaChalkboardTeacher,
+//   FaSave, FaTrash, FaArrowLeft
+// } from 'react-icons/fa';
+// import { toast } from '../components/Toast';
+
+// const AuditTrail = ({ user, onCancel }) => {
+//   const [auditLogs, setAuditLogs] = useState([
+//     { id: 1, eventType: 'Create', description: 'Service book created for John Doe', timestamp: '2024-01-15 09:30:00', ipAddress: '192.168.1.101', userName: 'HR Admin', employeeName: 'John Doe', employeeId: 1, details: { serviceBookNumber: 'SB/2024/0001', joiningDate: '2024-01-15' } },
+//     { id: 2, eventType: 'Upload', description: 'Appointment order document uploaded', timestamp: '2024-01-15 10:15:22', ipAddress: '192.168.1.101', userName: 'HR Admin', employeeName: 'John Doe', employeeId: 1, details: { documentName: 'Appointment_Order.pdf', documentSize: '1.2 MB' } },
+//     { id: 3, eventType: 'Update', description: 'Employee designation updated', timestamp: '2024-03-01 14:20:35', ipAddress: '192.168.1.105', userName: 'HR Manager', employeeName: 'John Doe', employeeId: 1, details: { fieldChanged: 'designation', oldValue: 'Software Engineer', newValue: 'Senior Software Engineer' } },
+//     { id: 4, eventType: 'Approval', description: 'Promotion request approved', timestamp: '2024-03-05 11:45:00', ipAddress: '192.168.1.110', userName: 'HR Director', employeeName: 'Jane Smith', employeeId: 2, details: { approvalType: 'Promotion', approvedBy: 'HR Director' } },
+//     { id: 5, eventType: 'View', description: 'Service book viewed by Manager', timestamp: '2024-03-10 09:15:30', ipAddress: '192.168.1.115', userName: 'Department Head', employeeName: 'Mike Johnson', employeeId: 3, details: { viewedFrom: 'Employee Management Module' } },
+//     { id: 6, eventType: 'Download', description: 'Service book PDF downloaded', timestamp: '2024-03-12 16:30:45', ipAddress: '192.168.1.120', userName: 'HR Executive', employeeName: 'Sarah Williams', employeeId: 4, details: { downloadFormat: 'PDF', fileSize: '2.5 MB' } },
+//     { id: 7, eventType: 'Upload', description: 'Promotion order document uploaded', timestamp: '2024-03-05 12:00:00', ipAddress: '192.168.1.105', userName: 'HR Manager', employeeName: 'David Brown', employeeId: 5, details: { documentName: 'Promotion_Order.pdf', documentSize: '856 KB' } },
+//     { id: 8, eventType: 'Update', description: 'Salary revised', timestamp: '2024-04-01 10:00:00', ipAddress: '192.168.1.125', userName: 'Payroll Manager', employeeName: 'Emily Wilson', employeeId: 6, details: { fieldChanged: 'salary', oldValue: '₹50,000', newValue: '₹60,000' } }
+//   ]);
+  
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [filteredLogs, setFilteredLogs] = useState(auditLogs);
+//   const [showForm, setShowForm] = useState(false);
+//   const [editingLog, setEditingLog] = useState(null);
+//   const [formData, setFormData] = useState({
+//     eventType: 'Create',
+//     description: '',
+//     userName: '',
+//     employeeName: '',
+//     ipAddress: '',
+//     details: ''
+//   });
+//   const [errors, setErrors] = useState({});
+//   const [touched, setTouched] = useState({});
+//   const [page, setPage] = useState(0);
+//   const [rowsPerPage] = useState(5);
+
+//   const eventTypes = [
+//     { value: 'Create', label: 'Create', icon: <FaPlus />, color: '#10b981', bg: '#d1fae5' },
+//     { value: 'Update', label: 'Update', icon: <FaEdit />, color: '#f59e0b', bg: '#fed7aa' },
+//     { value: 'Approval', label: 'Approval', icon: <FaCheckCircle />, color: '#10b981', bg: '#d1fae5' },
+//     { value: 'Upload', label: 'Upload', icon: <FaUpload />, color: '#8b5cf6', bg: '#ede9fe' },
+//     { value: 'Download', label: 'Download', icon: <FaDownload />, color: '#ec489a', bg: '#fce7f3' },
+//     { value: 'View', label: 'View', icon: <FaView />, color: '#06b6d4', bg: '#cffafe' }
+//   ];
+
+//   const DUMMY_EMPLOYEES = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Williams', 'David Brown', 'Emily Wilson'];
+
+//   // Filter logs by search
+//   useEffect(() => {
+//     let filtered = auditLogs;
+    
+//     if (searchTerm) {
+//       const search = searchTerm.toLowerCase();
+//       filtered = filtered.filter(log => 
+//         log.employeeName.toLowerCase().includes(search) ||
+//         log.eventType.toLowerCase().includes(search) ||
+//         log.userName.toLowerCase().includes(search) ||
+//         log.description.toLowerCase().includes(search)
+//       );
+//     }
+    
+//     setFilteredLogs(filtered);
+//     setPage(0);
+//   }, [searchTerm, auditLogs]);
+
+//   // Pagination
+//   const totalItems = filteredLogs.length;
+//   const totalPages = Math.ceil(totalItems / rowsPerPage);
+//   const startIndex = page * rowsPerPage;
+//   const currentLogs = filteredLogs.slice(startIndex, startIndex + rowsPerPage);
+
+//   const getPaginationRange = () => {
+//     const delta = 2;
+//     const range = [];
+//     const left = Math.max(0, page - delta);
+//     const right = Math.min(totalPages - 1, page + delta);
+//     if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+//     for (let i = left; i <= right; i++) range.push(i);
+//     if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+//     return range;
+//   };
+
+//   const handleChange = (field, value) => {
+//     setFormData({ ...formData, [field]: value });
+//     if (touched[field]) {
+//       validateField(field, value);
+//     }
+//   };
+
+//   const validateField = (field, value) => {
+//     let error = '';
+//     if (field === 'eventType' && !value) error = 'Event Type is required';
+//     else if (field === 'description' && !value) error = 'Description is required';
+//     else if (field === 'userName' && !value) error = 'User Name is required';
+//     else if (field === 'employeeName' && !value) error = 'Employee Name is required';
+//     setErrors(prev => ({ ...prev, [field]: error }));
+//     return error === '';
+//   };
+
+//   const handleBlur = (field) => {
+//     setTouched(prev => ({ ...prev, [field]: true }));
+//     validateField(field, formData[field]);
+//   };
+
+//   const validateForm = () => {
+//     const newErrors = {};
+//     if (!formData.eventType) newErrors.eventType = 'Event Type is required';
+//     if (!formData.description) newErrors.description = 'Description is required';
+//     if (!formData.userName) newErrors.userName = 'User Name is required';
+//     if (!formData.employeeName) newErrors.employeeName = 'Employee Name is required';
+//     setErrors(newErrors);
+//     return Object.keys(newErrors).length === 0;
+//   };
+
+//   const handleSubmit = (e) => {
+//     e.preventDefault();
+//     if (!validateForm()) {
+//       toast.warning('Validation Error', 'Please fill all required fields');
+//       return;
+//     }
+    
+//     const newLog = {
+//       id: editingLog ? editingLog.id : Date.now(),
+//       eventType: formData.eventType,
+//       description: formData.description,
+//       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+//       ipAddress: formData.ipAddress || '192.168.1.1',
+//       userName: formData.userName,
+//       employeeName: formData.employeeName,
+//       employeeId: editingLog ? editingLog.employeeId : DUMMY_EMPLOYEES.indexOf(formData.employeeName) + 1,
+//       details: { note: formData.details || 'No additional details' }
+//     };
+    
+//     if (editingLog) {
+//       setAuditLogs(auditLogs.map(log => log.id === editingLog.id ? newLog : log));
+//       toast.success('Success', 'Audit log updated successfully');
+//       setEditingLog(null);
+//     } else {
+//       setAuditLogs([newLog, ...auditLogs]);
+//       toast.success('Success', 'Audit log added successfully');
+//     }
+//     resetForm();
+//     setShowForm(false);
+//     setPage(0);
+//   };
+
+//   const handleEdit = (log) => {
+//     setEditingLog(log);
+//     setFormData({
+//       eventType: log.eventType,
+//       description: log.description,
+//       userName: log.userName,
+//       employeeName: log.employeeName,
+//       ipAddress: log.ipAddress,
+//       details: log.details?.note || ''
+//     });
+//     setShowForm(true);
+//   };
+
+//   const handleDelete = (id) => {
+//     setAuditLogs(auditLogs.filter(log => log.id !== id));
+//     toast.success('Deleted', 'Audit log deleted successfully');
+//   };
+
+//   const resetForm = () => {
+//     setFormData({
+//       eventType: 'Create',
+//       description: '',
+//       userName: '',
+//       employeeName: '',
+//       ipAddress: '',
+//       details: ''
+//     });
+//     setErrors({});
+//     setTouched({});
+//     setEditingLog(null);
+//   };
+
+//   const handleCancelForm = () => {
+//     resetForm();
+//     setShowForm(false);
+//   };
+
+//   const handleBackToList = () => {
+//     resetForm();
+//     setShowForm(false);
+//   };
+
+//   const handleCancel = () => {
+//     if (onCancel) onCancel();
+//   };
+
+//   const formatDateTime = (timestamp) => {
+//     const [date, time] = timestamp.split(' ');
+//     const formattedDate = new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+//     return { date: formattedDate, time };
+//   };
+
+//   const getEventBadge = (eventType) => {
+//     const event = eventTypes.find(e => e.value === eventType);
+//     const style = event || eventTypes[0];
+//     return <span className="badge" style={{ backgroundColor: style.bg, color: style.color, padding: '6px 12px' }}>{eventType}</span>;
+//   };
+
+//   return (
+//     <div className="cert-root">
+//       {/* Header */}
+//       <div className="cert-header">
+//         <div>
+//           <h1 className="cert-title">Service Book Audit Trail</h1>
+//           <p className="cert-subtitle">Track all service book changes and activities</p>
+//         </div>
+//         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+//           {!showForm && (
+//             <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
+//               <FaPlus size={13} /> Add Audit Log
+//             </button>
+//           )}
+//           {showForm && (
+//             <button 
+//               type="button" 
+//               className="cert-back-btn" 
+//               onClick={handleBackToList}
+//               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
+//             >
+//               <FaArrowLeft size={12} /> Back
+//             </button>
+//           )}
+//           {!showForm && onCancel && (
+//             <button className="cert-cancel-btn" onClick={handleCancel}>
+//               <FaTimes size={13} /> Cancel
+//             </button>
+//           )}
+//         </div>
+//       </div>
+
+//       {showForm ? (
+//         // Only Form - Table Hidden
+//         <div className="cert-form-wrap mb-4">
+//           <form onSubmit={handleSubmit} className="cert-form-compact">
+//             <div className="cert-form-section-compact">
+//               <div className="cert-section-label">Audit Log Details</div>
+//               <div className="cert-form-grid-3col">
+//                 <div className={`cert-field-compact ${touched.eventType && errors.eventType ? 'has-error' : ''}`}>
+//                   <label className="required">Event Type</label>
+//                   <select value={formData.eventType} onChange={(e) => handleChange('eventType', e.target.value)} onBlur={() => handleBlur('eventType')}>
+//                     {eventTypes.map(type => (
+//                       <option key={type.value} value={type.value}>{type.label}</option>
+//                     ))}
+//                   </select>
+//                   <FieldError msg={errors.eventType} />
+//                 </div>
+                
+//                 <div className={`cert-field-compact ${touched.employeeName && errors.employeeName ? 'has-error' : ''}`}>
+//                   <label className="required">Employee Name</label>
+//                   <select value={formData.employeeName} onChange={(e) => handleChange('employeeName', e.target.value)} onBlur={() => handleBlur('employeeName')}>
+//                     <option value="">Select Employee</option>
+//                     {DUMMY_EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+//                   </select>
+//                   <FieldError msg={errors.employeeName} />
+//                 </div>
+                
+//                 <div className={`cert-field-compact ${touched.userName && errors.userName ? 'has-error' : ''}`}>
+//                   <label className="required">User Name</label>
+//                   <input type="text" placeholder="User who performed action" value={formData.userName} onChange={(e) => handleChange('userName', e.target.value)} onBlur={() => handleBlur('userName')} />
+//                   <FieldError msg={errors.userName} />
+//                 </div>
+                
+//                 <div className={`cert-field-compact ${touched.description && errors.description ? 'has-error' : ''}`} style={{ gridColumn: 'span 2' }}>
+//                   <label className="required">Description</label>
+//                   <input type="text" placeholder="Description of the event" value={formData.description} onChange={(e) => handleChange('description', e.target.value)} onBlur={() => handleBlur('description')} />
+//                   <FieldError msg={errors.description} />
+//                 </div>
+                
+//                 <div className="cert-field-compact">
+//                   <label>IP Address</label>
+//                   <input type="text" placeholder="e.g., 192.168.1.1" value={formData.ipAddress} onChange={(e) => handleChange('ipAddress', e.target.value)} />
+//                 </div>
+                
+//                 <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+//                   <label>Additional Details</label>
+//                   <textarea rows="2" placeholder="Any additional details..." value={formData.details} onChange={(e) => handleChange('details', e.target.value)} />
+//                 </div>
+//               </div>
+//             </div>
+            
+//             <div className="cert-form-actions">
+//               <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+//               <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+//                 <FaSave size={12} /> {editingLog ? 'Update Log' : 'Save Log'}
+//               </button>
+//             </div>
+//           </form>
+//         </div>
+//       ) : (
+//         // Only Table - Form Hidden
+//         <>
+//           {/* Search Bar */}
+//           <div className="cert-search-bar">
+//             <div className="cert-search-wrap">
+//               <FaSearch className="cert-search-icon" size={12} />
+//               <input
+//                 className="cert-search-input"
+//                 type="text"
+//                 placeholder="Search by employee name, event type, user..."
+//                 value={searchTerm}
+//                 onChange={(e) => setSearchTerm(e.target.value)}
+//               />
+//               {searchTerm && (
+//                 <button className="cert-search-clear" onClick={() => setSearchTerm('')}>
+//                   <FaTimes size={11} />
+//                 </button>
+//               )}
+//             </div>
+//           </div>
+
+//           {/* Audit Logs Table */}
+//           <div className="cert-table-card">
+//             <div className="cert-table-wrap">
+//               <table className="cert-table">
+//                 <thead>
+//                   <tr>
+//                     <th>#</th>
+//                     <th>Event Type</th>
+//                     <th>Employee</th>
+//                     <th>Description</th>
+//                     <th>User</th>
+//                     <th>Timestamp</th>
+//                     <th>IP Address</th>
+//                     <th style={{ width: 100 }}>Actions</th>
+//                   </tr>
+//                 </thead>
+//                 <tbody>
+//                   {currentLogs.length > 0 ? (
+//                     currentLogs.map((log, idx) => {
+//                       const { date, time } = formatDateTime(log.timestamp);
+//                       return (
+//                         <tr key={log.id}>
+//                           <td className="text-center">{startIndex + idx + 1}</td>
+//                           <td className="text-center">{getEventBadge(log.eventType)}</td>
+//                           <td className="fw-bold">{log.employeeName}</td>
+//                           <td>{log.description}</td>
+//                           <td>{log.userName}</td>
+//                           <td><div>{date}</div><small className="text-muted">{time}</small></td>
+//                           <td><code>{log.ipAddress}</code></td>
+//                           <td className="text-center">
+//                             <div className="cert-actions">
+//                               <button className="cert-act cert-act--edit" onClick={() => handleEdit(log)} title="Edit">
+//                                 <FaEdit size={12} />
+//                               </button>
+//                               <button className="cert-act cert-act--del" onClick={() => handleDelete(log.id)} title="Delete">
+//                                 <FaTrash size={12} />
+//                               </button>
+//                             </div>
+//                           </td>
+//                         </tr>
+//                       );
+//                     })
+//                   ) : (
+//                     <tr>
+//                       <td colSpan="8" className="text-center py-5">No audit records found</td>
+//                     </tr>
+//                   )}
+//                 </tbody>
+//               </table>
+//             </div>
+
+//             {/* Pagination */}
+//             {totalPages > 1 && (
+//               <div className="cert-pagination" style={{ justifyContent: 'center', display: 'flex', gap: '8px', marginTop: '20px', padding: '12px 0' }}>
+//                 <button className="cert-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+//                 {getPaginationRange().map((pg, i) =>
+//                   pg === '...' ? <span key={i} className="cert-page-dots">…</span> : <button key={pg} className={`cert-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>{pg + 1}</button>
+//                 )}
+//                 <button className="cert-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+//               </div>
+//             )}
+//           </div>
+//         </>
+//       )}
+//     </div>
+//   );
+// };
+
+// const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
+
+// export default AuditTrail;
 import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, FaUserTie, FaBuilding, FaCalendarAlt, 
   FaBook, FaEye, FaDownload, FaFilter, FaTimes,
   FaPlus, FaEdit, FaCheckCircle, FaUpload, FaEye as FaView,
   FaClock, FaFileAlt, FaUserCheck, FaChartLine,
-  FaExchangeAlt, FaTrophy, FaRupeeSign, FaChalkboardTeacher
+  FaExchangeAlt, FaTrophy, FaRupeeSign, FaChalkboardTeacher,
+  FaSave, FaTrash, FaArrowLeft
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
-const AuditTrail = ({ user }) => {
+const AuditTrail = ({ user, onCancel }) => {
+  const [auditLogs, setAuditLogs] = useState([
+    { id: 1, eventType: 'Create', description: 'Service book created for John Doe', timestamp: '2024-01-15 09:30:00', ipAddress: '192.168.1.101', userName: 'HR Admin', employeeName: 'John Doe', employeeId: 1, details: { serviceBookNumber: 'SB/2024/0001', joiningDate: '2024-01-15' } },
+    { id: 2, eventType: 'Document Upload', description: 'Appointment order document uploaded', timestamp: '2024-01-15 10:15:22', ipAddress: '192.168.1.101', userName: 'HR Admin', employeeName: 'John Doe', employeeId: 1, details: { documentName: 'Appointment_Order.pdf', documentSize: '1.2 MB' } },
+    { id: 3, eventType: 'Update', description: 'Employee designation updated', timestamp: '2024-03-01 14:20:35', ipAddress: '192.168.1.105', userName: 'HR Manager', employeeName: 'John Doe', employeeId: 1, details: { fieldChanged: 'designation', oldValue: 'Software Engineer', newValue: 'Senior Software Engineer' } },
+    { id: 4, eventType: 'Approval', description: 'Promotion request approved', timestamp: '2024-03-05 11:45:00', ipAddress: '192.168.1.110', userName: 'HR Director', employeeName: 'Jane Smith', employeeId: 2, details: { approvalType: 'Promotion', approvedBy: 'HR Director' } },
+    { id: 5, eventType: 'View', description: 'Service book viewed by Manager', timestamp: '2024-03-10 09:15:30', ipAddress: '192.168.1.115', userName: 'Department Head', employeeName: 'Mike Johnson', employeeId: 3, details: { viewedFrom: 'Employee Management Module' } },
+    { id: 6, eventType: 'Download', description: 'Service book PDF downloaded', timestamp: '2024-03-12 16:30:45', ipAddress: '192.168.1.120', userName: 'HR Executive', employeeName: 'Sarah Williams', employeeId: 4, details: { downloadFormat: 'PDF', fileSize: '2.5 MB' } },
+    { id: 7, eventType: 'Document Upload', description: 'Promotion order document uploaded', timestamp: '2024-03-05 12:00:00', ipAddress: '192.168.1.105', userName: 'HR Manager', employeeName: 'David Brown', employeeId: 5, details: { documentName: 'Promotion_Order.pdf', documentSize: '856 KB' } },
+    { id: 8, eventType: 'Update', description: 'Salary revised', timestamp: '2024-04-01 10:00:00', ipAddress: '192.168.1.125', userName: 'Payroll Manager', employeeName: 'Emily Wilson', employeeId: 6, details: { fieldChanged: 'salary', oldValue: '₹50,000', newValue: '₹60,000' } },
+    { id: 9, eventType: 'Approval', description: 'Leave request approved', timestamp: '2024-05-10 14:30:00', ipAddress: '192.168.1.130', userName: 'HR Manager', employeeName: 'John Doe', employeeId: 1, details: { approvalType: 'Leave', approvedBy: 'HR Manager' } }
+  ]);
+  
   const [searchTerm, setSearchTerm] = useState('');
-  const [showEmployeeSearch, setShowEmployeeSearch] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [filteredLogs, setFilteredLogs] = useState([]);
-  const [eventFilter, setEventFilter] = useState('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-
-  // Dummy employee data
-  const DUMMY_EMPLOYEES = [
-    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
-    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
-  ];
-
-  // Dummy audit log data
-  const getAuditLogs = (employee) => {
-    if (!employee) return [];
-    
-    return [
-      {
-        id: 1,
-        eventType: 'Create',
-        eventIcon: <FaPlus style={{ color: '#10b981' }} />,
-        eventColor: '#10b981',
-        eventBg: '#d1fae5',
-        description: `Service book created for ${employee.name}`,
-        timestamp: '2024-01-15 09:30:00',
-        ipAddress: '192.168.1.101',
-        userAgent: 'Chrome/120.0.0.0',
-        userName: 'HR Admin',
-        details: {
-          serviceBookNumber: 'SB/2024/0001',
-          joiningDate: '2024-01-15',
-          designation: employee.designation
-        }
-      },
-      {
-        id: 2,
-        eventType: 'Upload',
-        eventIcon: <FaUpload style={{ color: '#8b5cf6' }} />,
-        eventColor: '#8b5cf6',
-        eventBg: '#ede9fe',
-        description: `Appointment order document uploaded`,
-        timestamp: '2024-01-15 10:15:22',
-        ipAddress: '192.168.1.101',
-        userAgent: 'Chrome/120.0.0.0',
-        userName: 'HR Admin',
-        details: {
-          documentName: 'Appointment_Order.pdf',
-          documentSize: '1.2 MB',
-          category: 'Appointment Orders'
-        }
-      },
-      {
-        id: 3,
-        eventType: 'Update',
-        eventIcon: <FaEdit style={{ color: '#f59e0b' }} />,
-        eventColor: '#f59e0b',
-        eventBg: '#fed7aa',
-        description: `Employee designation updated from ${employee.designation} to Senior ${employee.designation}`,
-        timestamp: '2024-03-01 14:20:35',
-        ipAddress: '192.168.1.105',
-        userAgent: 'Chrome/120.0.0.0',
-        userName: 'HR Manager',
-        details: {
-          fieldChanged: 'designation',
-          oldValue: employee.designation,
-          newValue: `Senior ${employee.designation}`
-        }
-      },
-      {
-        id: 4,
-        eventType: 'Approval',
-        eventIcon: <FaCheckCircle style={{ color: '#10b981' }} />,
-        eventColor: '#10b981',
-        eventBg: '#d1fae5',
-        description: `Promotion request approved by HR Director`,
-        timestamp: '2024-03-05 11:45:00',
-        ipAddress: '192.168.1.110',
-        userAgent: 'Chrome/120.0.0.0',
-        userName: 'HR Director',
-        details: {
-          approvalType: 'Promotion',
-          approvedBy: 'HR Director',
-          remarks: 'Performance based promotion'
-        }
-      },
-      {
-        id: 5,
-        eventType: 'View',
-        eventIcon: <FaView style={{ color: '#06b6d4' }} />,
-        eventColor: '#06b6d4',
-        eventBg: '#cffafe',
-        description: `Service book viewed by Manager`,
-        timestamp: '2024-03-10 09:15:30',
-        ipAddress: '192.168.1.115',
-        userAgent: 'Chrome/120.0.0.0',
-        userName: 'Department Head',
-        details: {
-          viewedFrom: 'Employee Management Module',
-          viewDuration: '5 minutes'
-        }
-      },
-      {
-        id: 6,
-        eventType: 'Download',
-        eventIcon: <FaDownload style={{ color: '#ec489a' }} />,
-        eventColor: '#ec489a',
-        eventBg: '#fce7f3',
-        description: `Service book PDF downloaded`,
-        timestamp: '2024-03-12 16:30:45',
-        ipAddress: '192.168.1.120',
-        userAgent: 'Chrome/120.0.0.0',
-        userName: 'HR Executive',
-        details: {
-          downloadFormat: 'PDF',
-          fileSize: '2.5 MB'
-        }
-      },
-      {
-        id: 7,
-        eventType: 'Upload',
-        eventIcon: <FaUpload style={{ color: '#8b5cf6' }} />,
-        eventColor: '#8b5cf6',
-        eventBg: '#ede9fe',
-        description: `Promotion order document uploaded`,
-        timestamp: '2024-03-05 12:00:00',
-        ipAddress: '192.168.1.105',
-        userAgent: 'Chrome/120.0.0.0',
-        userName: 'HR Manager',
-        details: {
-          documentName: 'Promotion_Order.pdf',
-          documentSize: '856 KB',
-          category: 'Promotion Orders'
-        }
-      },
-      {
-        id: 8,
-        eventType: 'Update',
-        eventIcon: <FaEdit style={{ color: '#f59e0b' }} />,
-        eventColor: '#f59e0b',
-        eventBg: '#fed7aa',
-        description: `Salary revised from ₹50,000 to ₹60,000`,
-        timestamp: '2024-04-01 10:00:00',
-        ipAddress: '192.168.1.125',
-        userAgent: 'Chrome/120.0.0.0',
-        userName: 'Payroll Manager',
-        details: {
-          fieldChanged: 'salary',
-          oldValue: '₹50,000',
-          newValue: '₹60,000'
-        }
-      }
-    ];
-  };
-
-  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-    const search = searchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || 
-           emp.code.toLowerCase().includes(search);
+  const [filteredLogs, setFilteredLogs] = useState(auditLogs);
+  const [showForm, setShowForm] = useState(false);
+  const [editingLog, setEditingLog] = useState(null);
+  const [formData, setFormData] = useState({
+    eventType: 'Create',
+    description: '',
+    userName: '',
+    employeeName: '',
+    ipAddress: '',
+    details: ''
   });
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(5);
 
+  // Event Types as per requirements
   const eventTypes = [
-    { value: 'all', label: 'All Events', icon: <FaClock /> },
-    { value: 'Create', label: 'Create', icon: <FaPlus /> },
-    { value: 'Update', label: 'Update', icon: <FaEdit /> },
-    { value: 'Approval', label: 'Approval', icon: <FaCheckCircle /> },
-    { value: 'Upload', label: 'Document Upload', icon: <FaUpload /> },
-    { value: 'Download', label: 'Download', icon: <FaDownload /> },
-    { value: 'View', label: 'View', icon: <FaView /> }
+    { value: 'Create', label: 'Create', icon: <FaPlus />, color: '#10b981', bg: '#d1fae5' },
+    { value: 'Update', label: 'Update', icon: <FaEdit />, color: '#f59e0b', bg: '#fed7aa' },
+    { value: 'Approval', label: 'Approval', icon: <FaCheckCircle />, color: '#10b981', bg: '#d1fae5' },
+    { value: 'Document Upload', label: 'Document Upload', icon: <FaUpload />, color: '#8b5cf6', bg: '#ede9fe' },
+    { value: 'Download', label: 'Download', icon: <FaDownload />, color: '#ec489a', bg: '#fce7f3' },
+    { value: 'View', label: 'View', icon: <FaView />, color: '#06b6d4', bg: '#cffafe' }
   ];
 
-  const handleEmployeeSelect = (employee) => {
-    setSelectedEmployee(employee);
-    const logs = getAuditLogs(employee);
-    setAuditLogs(logs);
-    setFilteredLogs(logs);
-    setSearchTerm('');
-    setShowEmployeeSearch(false);
-    toast.success('Employee Selected', `Showing audit trail for ${employee.name}`);
-  };
+  const DUMMY_EMPLOYEES = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Williams', 'David Brown', 'Emily Wilson'];
 
-  const handleClear = () => {
-    setSelectedEmployee(null);
-    setAuditLogs([]);
-    setFilteredLogs([]);
-    setSearchTerm('');
-    setEventFilter('all');
-    setDateFrom('');
-    setDateTo('');
-  };
-
-  const applyFilters = () => {
-    let filtered = [...auditLogs];
+  // Filter logs by search
+  useEffect(() => {
+    let filtered = auditLogs;
     
-    // Filter by event type
-    if (eventFilter !== 'all') {
-      filtered = filtered.filter(log => log.eventType === eventFilter);
-    }
-    
-    // Filter by date range
-    if (dateFrom) {
-      filtered = filtered.filter(log => log.timestamp.split(' ')[0] >= dateFrom);
-    }
-    if (dateTo) {
-      filtered = filtered.filter(log => log.timestamp.split(' ')[0] <= dateTo);
+    if (searchTerm) {
+      const search = searchTerm.toLowerCase();
+      filtered = filtered.filter(log => 
+        log.employeeName.toLowerCase().includes(search) ||
+        log.eventType.toLowerCase().includes(search) ||
+        log.userName.toLowerCase().includes(search) ||
+        log.description.toLowerCase().includes(search)
+      );
     }
     
     setFilteredLogs(filtered);
+    setPage(0);
+  }, [searchTerm, auditLogs]);
+
+  // Pagination
+  const totalItems = filteredLogs.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentLogs = filteredLogs.slice(startIndex, startIndex + rowsPerPage);
+
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    return range;
   };
 
-  useEffect(() => {
-    applyFilters();
-  }, [eventFilter, dateFrom, dateTo, auditLogs]);
+  const handleChange = (field, value) => {
+    setFormData({ ...formData, [field]: value });
+    if (touched[field]) {
+      validateField(field, value);
+    }
+  };
+
+  const validateField = (field, value) => {
+    let error = '';
+    if (field === 'eventType' && !value) error = 'Event Type is required';
+    else if (field === 'description' && !value) error = 'Description is required';
+    else if (field === 'userName' && !value) error = 'User Name is required';
+    else if (field === 'employeeName' && !value) error = 'Employee Name is required';
+    setErrors(prev => ({ ...prev, [field]: error }));
+    return error === '';
+  };
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    validateField(field, formData[field]);
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.eventType) newErrors.eventType = 'Event Type is required';
+    if (!formData.description) newErrors.description = 'Description is required';
+    if (!formData.userName) newErrors.userName = 'User Name is required';
+    if (!formData.employeeName) newErrors.employeeName = 'Employee Name is required';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!validateForm()) {
+      toast.warning('Validation Error', 'Please fill all required fields');
+      return;
+    }
+    
+    const newLog = {
+      id: editingLog ? editingLog.id : Date.now(),
+      eventType: formData.eventType,
+      description: formData.description,
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      ipAddress: formData.ipAddress || '192.168.1.1',
+      userName: formData.userName,
+      employeeName: formData.employeeName,
+      employeeId: editingLog ? editingLog.employeeId : DUMMY_EMPLOYEES.indexOf(formData.employeeName) + 1,
+      details: { note: formData.details || 'No additional details' }
+    };
+    
+    if (editingLog) {
+      setAuditLogs(auditLogs.map(log => log.id === editingLog.id ? newLog : log));
+      toast.success('Success', 'Audit log updated successfully');
+      setEditingLog(null);
+    } else {
+      setAuditLogs([newLog, ...auditLogs]);
+      toast.success('Success', 'Audit log added successfully');
+    }
+    resetForm();
+    setShowForm(false);
+    setPage(0);
+  };
+
+  const handleEdit = (log) => {
+    setEditingLog(log);
+    setFormData({
+      eventType: log.eventType,
+      description: log.description,
+      userName: log.userName,
+      employeeName: log.employeeName,
+      ipAddress: log.ipAddress,
+      details: log.details?.note || ''
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = (id) => {
+    setAuditLogs(auditLogs.filter(log => log.id !== id));
+    toast.success('Deleted', 'Audit log deleted successfully');
+  };
+
+  const resetForm = () => {
+    setFormData({
+      eventType: 'Create',
+      description: '',
+      userName: '',
+      employeeName: '',
+      ipAddress: '',
+      details: ''
+    });
+    setErrors({});
+    setTouched({});
+    setEditingLog(null);
+  };
+
+  const handleCancelForm = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  const handleBackToList = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  const handleCancel = () => {
+    if (onCancel) onCancel();
+  };
 
   const formatDateTime = (timestamp) => {
     const [date, time] = timestamp.split(' ');
@@ -235,260 +1031,178 @@ const AuditTrail = ({ user }) => {
   };
 
   const getEventBadge = (eventType) => {
-    const styles = {
-      Create: { bg: '#d1fae5', color: '#065f46' },
-      Update: { bg: '#fed7aa', color: '#9a3412' },
-      Approval: { bg: '#d1fae5', color: '#065f46' },
-      Upload: { bg: '#ede9fe', color: '#6d28d9' },
-      Download: { bg: '#fce7f3', color: '#be185d' },
-      View: { bg: '#cffafe', color: '#0e7490' }
-    };
-    const style = styles[eventType] || styles.View;
+    const event = eventTypes.find(e => e.value === eventType);
+    const style = event || eventTypes[0];
     return <span className="badge" style={{ backgroundColor: style.bg, color: style.color, padding: '6px 12px' }}>{eventType}</span>;
   };
 
   return (
-    <div className="container-fluid p-4">
+    <div className="cert-root">
       {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4 pb-2 border-bottom">
-        <div className="bg-primary bg-opacity-10 p-3 rounded-circle">
-          <FaBook className="text-primary" size={24} />
-        </div>
+      <div className="cert-header">
         <div>
-          <h5 className="mb-0">Service Book Audit Trail</h5>
-          <p className="text-muted mb-0 small">Track all service book changes and activities for compliance</p>
+          <h1 className="cert-title">Service Book Audit Trail</h1>
+          <p className="cert-subtitle">Track service book changes for compliance management</p>
         </div>
-      </div>
-
-      {/* Select Employee Card */}
-      <div className="card border-0 shadow-sm mb-4">
-        <div className="card-header bg-light border-0 py-3">
-          <h6 className="mb-0 fw-bold">Select Employee</h6>
-        </div>
-        <div className="card-body">
-          <div className="row">
-            <div className="col-md-12">
-              <div className="position-relative">
-                <div className="input-group">
-                  <span className="input-group-text bg-light">
-                    <FaSearch size={14} className="text-muted" />
-                  </span>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Search by name or code..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setShowEmployeeSearch(true);
-                    }}
-                    onFocus={() => setShowEmployeeSearch(true)}
-                  />
-                  {selectedEmployee && (
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger"
-                      onClick={handleClear}
-                    >
-                      Cancel
-                    </button>
-                  )}
-                </div>
-                
-                {/* Search Results Dropdown */}
-                {showEmployeeSearch && searchTerm && (
-                  <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '300px', overflow: 'auto' }}>
-                    <div className="card-body p-2">
-                      {filteredEmployees.length > 0 ? (
-                        filteredEmployees.map(emp => (
-                          <div
-                            key={emp.id}
-                            className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => handleEmployeeSelect(emp)}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            <div>
-                              <div className="fw-bold">{emp.name}</div>
-                              <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                            </div>
-                            <div>
-                              <span className="badge bg-light text-dark">{emp.designation}</span>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-3 text-muted">
-                          <small>No employees found</small>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <small className="text-muted">Select an employee to view service book audit trail</small>
-            </div>
-          </div>
-          {selectedEmployee && (
-            <div className="alert alert-info mt-3 mb-0 py-2">
-              <FaUserTie className="me-2" /> <strong>Selected Employee:</strong> {selectedEmployee.name} ({selectedEmployee.code}) | {selectedEmployee.department} | {selectedEmployee.designation}
-            </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!showForm && (
+            <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
+              <FaPlus size={13} /> Add Audit Log
+            </button>
+          )}
+          {showForm && (
+            <button 
+              type="button" 
+              className="cert-back-btn" 
+              onClick={handleBackToList}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
+            >
+              <FaArrowLeft size={12} /> Back
+            </button>
+          )}
+          {!showForm && onCancel && (
+            <button className="cert-cancel-btn" onClick={handleCancel}>
+              <FaTimes size={13} /> Cancel
+            </button>
           )}
         </div>
       </div>
 
-      {/* Audit Trail Section */}
-      {selectedEmployee && (
-        <>
-          {/* Filter Section */}
-          <div className="card border-0 shadow-sm mb-4">
-            <div className="card-header bg-light border-0 py-3">
-              <h6 className="mb-0 fw-bold"><FaFilter className="me-2" /> Filter Audit Logs</h6>
-            </div>
-            <div className="card-body">
-              <div className="row">
-                <div className="col-md-4 mb-3">
-                  <label className="form-label fw-bold">Event Type</label>
-                  <select
-                    className="form-select"
-                    value={eventFilter}
-                    onChange={(e) => setEventFilter(e.target.value)}
-                  >
-                    {eventTypes.map(event => (
-                      <option key={event.value} value={event.value}>
-                        {event.label}
-                      </option>
+      {showForm ? (
+        // Only Form - Table Hidden
+        <div className="cert-form-wrap mb-4">
+          <form onSubmit={handleSubmit} className="cert-form-compact">
+            <div className="cert-form-section-compact">
+              <div className="cert-section-label">Audit Log Details</div>
+              <div className="cert-form-grid-3col">
+                <div className={`cert-field-compact ${touched.eventType && errors.eventType ? 'has-error' : ''}`}>
+                  <label className="required">Event Type</label>
+                  <select value={formData.eventType} onChange={(e) => handleChange('eventType', e.target.value)} onBlur={() => handleBlur('eventType')}>
+                    {eventTypes.map(type => (
+                      <option key={type.value} value={type.value}>{type.label}</option>
                     ))}
                   </select>
+                  <FieldError msg={errors.eventType} />
                 </div>
-                <div className="col-md-4 mb-3">
-                  <label className="form-label fw-bold">Date From</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                  />
+                
+                <div className={`cert-field-compact ${touched.employeeName && errors.employeeName ? 'has-error' : ''}`}>
+                  <label className="required">Employee Name</label>
+                  <select value={formData.employeeName} onChange={(e) => handleChange('employeeName', e.target.value)} onBlur={() => handleBlur('employeeName')}>
+                    <option value="">Select Employee</option>
+                    {DUMMY_EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                  </select>
+                  <FieldError msg={errors.employeeName} />
                 </div>
-                <div className="col-md-4 mb-3">
-                  <label className="form-label fw-bold">Date To</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                  />
+                
+                <div className={`cert-field-compact ${touched.userName && errors.userName ? 'has-error' : ''}`}>
+                  <label className="required">User Name</label>
+                  <input type="text" placeholder="User who performed action" value={formData.userName} onChange={(e) => handleChange('userName', e.target.value)} onBlur={() => handleBlur('userName')} />
+                  <FieldError msg={errors.userName} />
+                </div>
+                
+                <div className={`cert-field-compact ${touched.description && errors.description ? 'has-error' : ''}`} style={{ gridColumn: 'span 2' }}>
+                  <label className="required">Description</label>
+                  <input type="text" placeholder="Description of the event" value={formData.description} onChange={(e) => handleChange('description', e.target.value)} onBlur={() => handleBlur('description')} />
+                  <FieldError msg={errors.description} />
+                </div>
+                
+                <div className="cert-field-compact">
+                  <label>IP Address</label>
+                  <input type="text" placeholder="e.g., 192.168.1.1" value={formData.ipAddress} onChange={(e) => handleChange('ipAddress', e.target.value)} />
+                </div>
+                
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label>Additional Details</label>
+                  <textarea rows="2" placeholder="Any additional details..." value={formData.details} onChange={(e) => handleChange('details', e.target.value)} />
                 </div>
               </div>
+            </div>
+            
+            <div className="cert-form-actions">
+              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FaSave size={12} /> {editingLog ? 'Update Log' : 'Save Log'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        // Only Table - Form Hidden
+        <>
+          {/* Search Bar */}
+          <div className="cert-search-bar">
+            <div className="cert-search-wrap">
+              <FaSearch className="cert-search-icon" size={12} />
+              <input
+                className="cert-search-input"
+                type="text"
+                placeholder="Search by employee name, event type, user..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button className="cert-search-clear" onClick={() => setSearchTerm('')}>
+                  <FaTimes size={11} />
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Audit Logs Summary */}
-          <div className="row g-3 mb-4">
-            <div className="col-md-3">
-              <div className="card bg-primary bg-opacity-10 border-0">
-                <div className="card-body text-center">
-                  <FaClock size={24} className="text-primary mb-2" />
-                  <h5 className="mb-0">{auditLogs.length}</h5>
-                  <small className="text-muted">Total Events</small>
-                </div>
-              </div>
+          {/* Event Types Legend */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-header bg-light">
+              <h6 className="mb-0"><FaClock className="me-2" /> Track Events</h6>
             </div>
-            <div className="col-md-3">
-              <div className="card bg-success bg-opacity-10 border-0">
-                <div className="card-body text-center">
-                  <FaPlus size={24} className="text-success mb-2" />
-                  <h5 className="mb-0">{auditLogs.filter(l => l.eventType === 'Create').length}</h5>
-                  <small className="text-muted">Creates</small>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3">
-              <div className="card bg-warning bg-opacity-10 border-0">
-                <div className="card-body text-center">
-                  <FaEdit size={24} className="text-warning mb-2" />
-                  <h5 className="mb-0">{auditLogs.filter(l => l.eventType === 'Update').length}</h5>
-                  <small className="text-muted">Updates</small>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3">
-              <div className="card bg-info bg-opacity-10 border-0">
-                <div className="card-body text-center">
-                  <FaUpload size={24} className="text-info mb-2" />
-                  <h5 className="mb-0">{auditLogs.filter(l => l.eventType === 'Upload').length}</h5>
-                  <small className="text-muted">Documents</small>
-                </div>
+            <div className="card-body">
+              <div className="d-flex flex-wrap gap-3">
+                {eventTypes.map(event => (
+                  <div key={event.value} className="d-flex align-items-center gap-2">
+                    <span className="badge" style={{ backgroundColor: event.bg, color: event.color, padding: '6px 12px' }}>
+                      {event.icon} {event.label}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
           {/* Audit Logs Table */}
-          <div className="card border-0 shadow-sm">
-            <div className="card-header bg-light border-0 py-3 d-flex justify-content-between align-items-center">
-              <h6 className="mb-0 fw-bold">
-                <FaBook className="me-2 text-primary" /> Audit Trail - {selectedEmployee.name}
-              </h6>
-              <span className="badge bg-primary">{filteredLogs.length} Records Found</span>
-            </div>
-            <div className="table-responsive">
-              <table className="table table-bordered table-hover mb-0">
-                <thead className="table-light">
+          <div className="cert-table-card">
+            <div className="cert-table-wrap">
+              <table className="cert-table">
+                <thead>
                   <tr>
-                    <th style={{ width: '5%' }}>#</th>
-                    <th style={{ width: '10%' }}>Event</th>
-                    <th style={{ width: '20%' }}>Description</th>
-                    <th style={{ width: '15%' }}>User</th>
-                    <th style={{ width: '15%' }}>Timestamp</th>
-                    <th style={{ width: '15%' }}>IP Address</th>
-                    <th style={{ width: '20%' }}>Details</th>
+                    <th>#</th>
+                    <th>Event Type</th>
+                    <th>Employee</th>
+                    <th>Description</th>
+                    <th>User</th>
+                    <th>Timestamp</th>
+                    <th>IP Address</th>
+                    <th style={{ width: 100 }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLogs.length > 0 ? (
-                    filteredLogs.map((log, index) => {
+                  {currentLogs.length > 0 ? (
+                    currentLogs.map((log, idx) => {
                       const { date, time } = formatDateTime(log.timestamp);
                       return (
                         <tr key={log.id}>
-                          <td className="text-center">{index + 1}</td>
+                          <td className="text-center">{startIndex + idx + 1}</td>
+                          <td className="text-center">{getEventBadge(log.eventType)}</td>
+                          <td className="fw-bold">{log.employeeName}</td>
+                          <td>{log.description}</td>
+                          <td>{log.userName}</td>
+                          <td><div>{date}</div><small className="text-muted">{time}</small></td>
+                          <td><code>{log.ipAddress}</code></td>
                           <td className="text-center">
-                            {getEventBadge(log.eventType)}
-                          </td>
-                          <td>
-                            <div className="d-flex align-items-center gap-2">
-                              {log.eventIcon}
-                              <span>{log.description}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <strong>{log.userName}</strong>
-                            <br />
-                            <small className="text-muted">{log.userAgent}</small>
-                          </td>
-                          <td>
-                            <div>{date}</div>
-                            <small className="text-muted">{time}</small>
-                          </td>
-                          <td>
-                            <code className="small">{log.ipAddress}</code>
-                          </td>
-                          <td>
-                            <button 
-                              className="btn btn-sm btn-outline-info"
-                              data-toggle="collapse"
-                              data-target={`#details-${log.id}`}
-                            >
-                              <FaEye size={10} className="me-1" /> View Details
-                            </button>
-                            <div className="collapse mt-2" id={`details-${log.id}`}>
-                              <div className="card card-body bg-light p-2 small">
-                                {Object.entries(log.details).map(([key, value]) => (
-                                  <div key={key}>
-                                    <strong>{key.replace(/([A-Z])/g, ' $1').trim()}:</strong> {value}
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="cert-actions">
+                              <button className="cert-act cert-act--edit" onClick={() => handleEdit(log)} title="Edit">
+                                <FaEdit size={12} />
+                              </button>
+                              <button className="cert-act cert-act--del" onClick={() => handleDelete(log.id)} title="Delete">
+                                <FaTrash size={12} />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -496,23 +1210,30 @@ const AuditTrail = ({ user }) => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan="7" className="text-center py-5">
-                        <FaBook size={48} className="text-muted mb-3" />
-                        <p className="mb-0">No audit records found</p>
-                        <small className="text-muted">Try changing your filter criteria</small>
-                      </td>
+                      <td colSpan="8" className="text-center py-5">No audit records found</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="cert-pagination" style={{ justifyContent: 'center', display: 'flex', gap: '8px', marginTop: '20px', padding: '12px 0' }}>
+                <button className="cert-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                {getPaginationRange().map((pg, i) =>
+                  pg === '...' ? <span key={i} className="cert-page-dots">…</span> : <button key={pg} className={`cert-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>{pg + 1}</button>
+                )}
+                <button className="cert-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+              </div>
+            )}
           </div>
         </>
       )}
-
-    
     </div>
   );
 };
+
+const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default AuditTrail;
