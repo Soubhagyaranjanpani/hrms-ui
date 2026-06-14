@@ -49,7 +49,9 @@ import Timeline from './pages/Timeline';
 import DocumentsRepository from './pages/DocumentsRepository';
 import SearchBook from './pages/SearchBook';
 import AuditTrail from './pages/AuditTrail';
-
+import ServicebookReport from './pages/ServicebookReport';
+import EmployeeDesignation from './pages/EmployeeDesignation';
+import EmployeeskillMaster from './pages/EmployeeSkillMaster';
 
 
 
@@ -183,6 +185,9 @@ function App() {
           <Route path="DocumentsRepository" element={<DocumentsRepository user={currentUser}/>}/>
           <Route path="SearchBook" element={<SearchBook user={currentUser}/>}/>
           <Route path="AuditTrail" element={<AuditTrail user={BiCurrentLocation}/>}/>
+          <Route path="ServicebookReport" element={<ServicebookReport user={currentUser}/>}/>
+          <Route path="EmployeeDesignation" element={<EmployeeDesignation user={currentUser}/>}/>
+          <Route path="EmployeeSkillMaster" element={<EmployeeskillMaster user={currentUser}/>}/>
 
           <Route path="SalaryConfig" element={<SalaryConfig user={currentUser} />} />
           <Route path="EmployeeGrade" element={<EmployeeGrade user={currentUser} />} />

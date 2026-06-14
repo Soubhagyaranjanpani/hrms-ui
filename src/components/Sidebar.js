@@ -49,11 +49,13 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/EmployeeGrade', icon: <FaUserTag />, label: 'Employee Grade', roles: ['Admin', 'Hr'] },
         {path: '/Certification', icon: <FaChalkboardTeacher />, label: 'Certification', roles: ['Admin', 'Hr']},
     { path: '/designation', icon: <FaCheck />, label: 'Designation', roles: ['Admin'] },
+    {path: '/EmployeeDesignation', icon:<FaCheck />,label: 'Employee Designation',roles:['Admin','Hr']},
+    {path: '/EmployeeSkillMaster', icon:< FaBook/>,label:'Employee Skill Master',roles:['Admin','Hr']},
   ];
 
   // serive book 
   const serviceBookItems = [
-    {path: '/CreateServiceBook', icon: <FaPlus />, label: 'Create', roles: ['Admin', 'Hr']},
+    {path: '/CreateServiceBook', icon: <FaPlus />, label: 'Create Service Book ', roles: ['Admin', 'Hr']},
     {path : '/AppointmentDetail', icon: <FaBriefcase />, label: 'Appointment', roles: ['Admin', 'Hr']},
     {path : '/ConfirmationDetails', icon: <FaUserCircle />, label: 'Confirmation', roles: ['Admin', 'Hr']},
     {path : '/PromotionHistory', icon: <FaDatabase />, label: 'Promotion ', roles: ['Admin', 'Hr']},
@@ -68,6 +70,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     {path: '/DocumentsRepository',icon:<FaDochub />,label:'Documents',roles:['Admin','Hr']},
     {path: '/SearchBook',icon:<FaBook />,label:'Search Book',roles:['Admin','Hr']},
     {path: '/AuditTrail',icon:<FaTrailer />,label:'Audit Trail',roles:['Admin','Hr']},
+    {path: '/ServicebookReport',icon:<FaBook />,label:'Report',roles:['Admin','Hr']},
   ];
 
   // Attendance section items - separate from Employee
