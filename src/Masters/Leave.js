@@ -10,6 +10,7 @@ import { BASE_URL, STORAGE_KEYS } from "../config/api.config";
 
 /* ─── Validation Rules (unchanged) ─── */
 const RULES = {
+  
   name: {
     required: true,
     minLen: 2,
@@ -111,12 +112,11 @@ const LeaveTypes = () => {
   }, [searchName]);
 
   const normaliseLeaveTypes = (data) => {
-    if (!Array.isArray(data)) return [];
     return data.map((item) => ({
       id: item.id || item._id,
       name: item.name,
       maxDaysPerYear: item.maxDaysPerYear || 0,
-      isActive: item.isActive === true || item.isActive === "true" || item.isActive === 1,
+      isActive: item.isActive === true,
     }));
   };
 
@@ -146,7 +146,6 @@ const LeaveTypes = () => {
     fetchLeaveTypes();
   }, [fetchLeaveTypes]);
 
-  // 🔁 FILTER + SORT: active (isActive === true) first, then inactive
   const filteredItems = leaveTypes
     .filter((item) =>
       item.name?.toLowerCase().includes(debouncedSearch.toLowerCase())
@@ -201,29 +200,29 @@ const LeaveTypes = () => {
       const payload = {
         name: formData.name.trim(),
         maxDaysPerYear: Number(formData.maxDaysPerYear),
-        isActive: true, // New items are active by default
+        isActive: true,
       };
 
-      let res;
       if (editMode) {
         const existing = leaveTypes.find(lt => lt.id === selectedItem.id);
         payload.isActive = existing ? existing.isActive : true;
-        res = await axios.put(`${BASE_URL}/api/leave-type/${selectedItem.id}`, payload, getAuthConfig());
+
+        await axios.put(`${BASE_URL}/api/leave-type/${selectedItem.id}`, payload, getAuthConfig());
+        toast.success("Leave type updated");
       } else {
-        res = await axios.post(`${BASE_URL}/api/leave-type`, payload, getAuthConfig());
+        await axios.post(`${BASE_URL}/api/leave-type`, payload, getAuthConfig());
+        toast.success("Leave type created");
       }
 
-      if (res.status >= 200 && res.status < 300) {
-        toast.success(editMode ? "Leave type updated" : "Leave type created");
-        resetForm();
-        setView("list");
-        await fetchLeaveTypes();
-      } else {
-        throw new Error(res.data?.message || "Operation failed");
-      }
+      resetForm();
+      setView("list");
+      // ✅ Always refetch after successful mutation to sync with server
+      await fetchLeaveTypes();
     } catch (err) {
       console.error("Submit error:", err);
-      toast.error("Error", err.response?.data?.message || err.message || "Something went wrong");
+      toast.error("Error", err.response?.data?.message || err.message);
+      // Refetch to revert any optimistic changes (though we no longer use optimistic updates)
+      await fetchLeaveTypes();
     } finally {
       setSubmitting(false);
     }
@@ -266,19 +265,12 @@ const LeaveTypes = () => {
         isActive: newStatus,
       };
 
-      const res = await axios.put(`${BASE_URL}/api/leave-type/${id}`, updatePayload, getAuthConfig());
+      await axios.put(`${BASE_URL}/api/leave-type/${id}`, updatePayload, getAuthConfig());
+      toast.success(`Leave type ${newStatus ? "activated" : "deactivated"}`);
 
-      if (res.status >= 200 && res.status < 300) {
-        toast.success(`Leave type ${newStatus ? "activated" : "deactivated"}`);
-
-        // Instant UI update (no full refetch needed, but fetchLeaveTypes is also fine)
-        setLeaveTypes((prev) =>
-          prev.map((item) =>
-            item.id === id ? { ...item, isActive: newStatus } : item
-          )
-        );
-        setShowStatusModal(false);
-      }
+      setShowStatusModal(false);
+      // ✅ Refetch entire list to ensure consistency after status change
+      await fetchLeaveTypes();
     } catch (err) {
       console.error("Status update error:", err);
       if (err.response?.status === 401) {
@@ -428,7 +420,7 @@ const LeaveTypes = () => {
                                 {item.isActive ? "Active" : "Inactive"}
                               </span>
                             </div>
-                          </td>
+                           </td>
                           <td>
                             <div className="emp-actions">
                               <button
@@ -441,7 +433,7 @@ const LeaveTypes = () => {
                                 <FaEdit size={12} />
                               </button>
                             </div>
-                          </td>
+                           </td>
                         </tr>
                       ))
                     ) : (
