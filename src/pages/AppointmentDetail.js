@@ -1,4 +1,4 @@
-// export default AppointmentDetails;
+
 import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaFileAlt, FaCalendarAlt, FaBuilding,FaCheckCircle,
@@ -8,12 +8,12 @@ import { toast } from '../components/Toast';
 
 const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [appointments, setAppointments] = useState(initialData?.appointments || [
-    { id: 1, appointmentOrderNo: 'APP/2024/001', appointmentDate: '2024-01-15', appointmentAuthority: 'Managing Director', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'Software Engineer', initialDepartment: 'IT', initialBranch: 'Mumbai', joiningDate: '2024-01-15', probationPeriod: '6', confirmationDueDate: '2024-07-15', createdAt: '2024-01-15T10:30:00Z' },
-    { id: 2, appointmentOrderNo: 'APP/2024/002', appointmentDate: '2024-02-20', appointmentAuthority: 'CEO', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'HR Manager', initialDepartment: 'HR', initialBranch: 'Delhi', joiningDate: '2024-02-20', probationPeriod: '6', confirmationDueDate: '2024-08-20', createdAt: '2024-02-20T11:45:00Z' },
-    { id: 3, appointmentOrderNo: 'APP/2024/003', appointmentDate: '2024-03-10', appointmentAuthority: 'HR Director', appointmentType: 'Contract', employmentType: 'Contractual', initialDesignation: 'Senior Developer', initialDepartment: 'IT', initialBranch: 'Bangalore', joiningDate: '2024-03-10', probationPeriod: '3', confirmationDueDate: '2024-06-10', createdAt: '2024-03-10T09:15:00Z' },
-    { id: 4, appointmentOrderNo: 'APP/2024/004', appointmentDate: '2024-04-05', appointmentAuthority: 'Managing Director', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'Tech Lead', initialDepartment: 'IT', initialBranch: 'Mumbai', joiningDate: '2024-04-05', probationPeriod: '6', confirmationDueDate: '2024-10-05', createdAt: '2024-04-05T14:20:00Z' },
-    { id: 5, appointmentOrderNo: 'APP/2024/005', appointmentDate: '2024-05-12', appointmentAuthority: 'HR Director', appointmentType: 'Temporary', employmentType: 'Part-Time', initialDesignation: 'HR Executive', initialDepartment: 'HR', initialBranch: 'Delhi', joiningDate: '2024-05-12', probationPeriod: '3', confirmationDueDate: '2024-08-12', createdAt: '2024-05-12T10:00:00Z' },
-    { id: 6, appointmentOrderNo: 'APP/2024/006', appointmentDate: '2024-06-01', appointmentAuthority: 'CEO', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'Sales Manager', initialDepartment: 'Sales', initialBranch: 'Bangalore', joiningDate: '2024-06-01', probationPeriod: '6', confirmationDueDate: '2024-12-01', createdAt: '2024-06-01T09:30:00Z' }
+    { id: 1, employeeId:1, appointmentOrderNo: 'APP/2024/001', appointmentDate: '2024-01-15', appointmentAuthority: 'Managing Director', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'Software Engineer', initialDepartment: 'IT', initialBranch: 'Mumbai', joiningDate: '2024-01-15', probationPeriod: '6', confirmationDueDate: '2024-07-15', createdAt: '2024-01-15T10:30:00Z' },
+    { id: 2, employeeId:2, appointmentOrderNo: 'APP/2024/002', appointmentDate: '2024-02-20', appointmentAuthority: 'CEO', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'HR Manager', initialDepartment: 'HR', initialBranch: 'Delhi', joiningDate: '2024-02-20', probationPeriod: '6', confirmationDueDate: '2024-08-20', createdAt: '2024-02-20T11:45:00Z' },
+    { id: 3, employeeId:3, appointmentOrderNo: 'APP/2024/003', appointmentDate: '2024-03-10', appointmentAuthority: 'HR Director', appointmentType: 'Contract', employmentType: 'Contractual', initialDesignation: 'Senior Developer', initialDepartment: 'IT', initialBranch: 'Bangalore', joiningDate: '2024-03-10', probationPeriod: '3', confirmationDueDate: '2024-06-10', createdAt: '2024-03-10T09:15:00Z' },
+    { id: 4, employeeId:4, appointmentOrderNo: 'APP/2024/004', appointmentDate: '2024-04-05', appointmentAuthority: 'Managing Director', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'Tech Lead', initialDepartment: 'IT', initialBranch: 'Mumbai', joiningDate: '2024-04-05', probationPeriod: '6', confirmationDueDate: '2024-10-05', createdAt: '2024-04-05T14:20:00Z' },
+    { id: 5, employeeId:5, appointmentOrderNo: 'APP/2024/005', appointmentDate: '2024-05-12', appointmentAuthority: 'HR Director', appointmentType: 'Temporary', employmentType: 'Part-Time', initialDesignation: 'HR Executive', initialDepartment: 'HR', initialBranch: 'Delhi', joiningDate: '2024-05-12', probationPeriod: '3', confirmationDueDate: '2024-08-12', createdAt: '2024-05-12T10:00:00Z' },
+    { id: 6, employeeId:6, appointmentOrderNo: 'APP/2024/006', appointmentDate: '2024-06-01', appointmentAuthority: 'CEO', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'Sales Manager', initialDepartment: 'Sales', initialBranch: 'Bangalore', joiningDate: '2024-06-01', probationPeriod: '6', confirmationDueDate: '2024-12-01', createdAt: '2024-06-01T09:30:00Z' }
   ]);
   
   const [editingAppointment, setEditingAppointment] = useState(null);
@@ -40,7 +40,18 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
   const [showForm, setShowForm] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
+  // Employee Search State
+const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+const [selectedEmployee, setSelectedEmployee] = useState(null);
 
+const DUMMY_EMPLOYEES = [
+  { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
+  { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
+  { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
+  { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
+  { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
+];
   // Dummy data for dropdowns
   const appointmentTypes = [
     { value: 'Permanent', label: 'Permanent' },
@@ -102,6 +113,17 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
   const currentAppointments = filteredAppointments.slice(startIndex, startIndex + rowsPerPage);
+
+  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
+  const search = employeeSearchTerm.toLowerCase();
+  return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
+});
+
+const handleEmployeeSelect = (employee) => {
+  setSelectedEmployee(employee);
+  setEmployeeSearchTerm(employee.name);
+  setShowEmployeeDropdown(false);
+};
 
   const getPaginationRange = () => {
     const delta = 2;
@@ -263,7 +285,12 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
       toast.warning('Validation Error', 'Please fix the highlighted fields');
       return;
     }
-    
+     const appointmentData = {
+    ...formData,
+    employeeId: selectedEmployee?.id || null,  
+    id: editingAppointment ? editingAppointment.id : Date.now(),
+    createdAt: editingAppointment ? editingAppointment.createdAt : new Date().toISOString()
+  };
     if (editingAppointment) {
       const updated = appointments.map(apt =>
         apt.id === editingAppointment.id
@@ -288,6 +315,8 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
   };
 
   const handleEdit = (appointment) => {
+    const emp = DUMMY_EMPLOYEES.find(e => e.id === appointment.employeeId);
+  setSelectedEmployee(emp || null);  
     setEditingAppointment(appointment);
     setFormData({
       appointmentOrderNo: appointment.appointmentOrderNo,
@@ -305,6 +334,7 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
       appointmentOrderFileData: appointment.appointmentOrderFileData,
       appointmentOrderFileName: appointment.appointmentOrderFileName
     });
+    setEmployeeSearchTerm(emp?.name || '');
     setShowForm(true);
   };
 
@@ -313,28 +343,29 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
     toast.success('Success', 'Appointment deleted successfully');
   };
 
-  const resetForm = () => {
-    setFormData({
-      appointmentOrderNo: '',
-      appointmentDate: '',
-      appointmentAuthority: '',
-      appointmentType: 'Permanent',
-      employmentType: 'Full-Time',
-      initialDesignation: '',
-      initialDepartment: '',
-      initialBranch: '',
-      joiningDate: '',
-      probationPeriod: '6',
-      confirmationDueDate: '',
-      appointmentOrderFile: null,
-      appointmentOrderFileData: null,
-      appointmentOrderFileName: null
-    });
-    setErrors({});
-    setTouched({});
-    setEditingAppointment(null);
-  };
-
+ const resetForm = () => {
+  setFormData({
+    appointmentOrderNo: '',
+    appointmentDate: '',
+    appointmentAuthority: '',
+    appointmentType: 'Permanent',
+    employmentType: 'Full-Time',
+    initialDesignation: '',
+    initialDepartment: '',
+    initialBranch: '',
+    joiningDate: '',
+    probationPeriod: '6',
+    confirmationDueDate: '',
+    appointmentOrderFile: null,
+    appointmentOrderFileData: null,
+    appointmentOrderFileName: null
+  });
+  setErrors({});
+  setTouched({});
+  setEditingAppointment(null);
+  setSelectedEmployee(null);      
+  setEmployeeSearchTerm('');   
+};
   const handleCancelForm = () => {
     resetForm();
     setShowForm(false);
@@ -395,6 +426,76 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Appointment Details</div>
               <div className="cert-form-grid-3col">
+<div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+  <label className="required">Employee Name</label>
+  <div className="position-relative">
+    <div className="input-group">
+      <span className="input-group-text bg-light">
+        <FaSearch size={14} className="text-muted" />
+      </span>
+      <input
+        type="text"
+        className="form-control"
+        placeholder="Type employee name to search..."
+        value={employeeSearchTerm}
+        onChange={(e) => {
+          setEmployeeSearchTerm(e.target.value);
+          setShowEmployeeDropdown(true);
+        }}
+        onFocus={() => setShowEmployeeDropdown(true)}
+      />
+    </div>
+    
+    {showEmployeeDropdown && employeeSearchTerm && (
+      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
+        <div className="card-body p-2">
+          {filteredEmployees.length > 0 ? (
+            filteredEmployees.map(emp => (
+              <div
+                key={emp.id}
+                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
+                style={{ cursor: 'pointer' }}
+                onClick={() => handleEmployeeSelect(emp)}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <div>
+                  <div className="fw-bold">{emp.name}</div>
+                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
+                </div>
+                <div>
+                  <span className="badge bg-light text-dark">{emp.designation}</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-3 text-muted">
+              <small>No employees found</small>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
+</div>
+
+{/* Employee Code - Auto Populate */}
+<div className="cert-field-compact">
+  <label>Employee Code</label>
+  <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
+</div>
+
+{/* Department - Auto Populate */}
+<div className="cert-field-compact">
+  <label>Department</label>
+  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
+</div>
+
+{/* Designation - Auto Populate */}
+<div className="cert-field-compact">
+  <label>Designation</label>
+  <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
+</div>
                 <div className={`cert-field-compact ${touched.appointmentOrderNo && errors.appointmentOrderNo ? 'has-error' : ''}`}>
                   <label className="required">Appointment Order Number</label>
                   <input type="text" placeholder="e.g., ARI/APP/2024/001" value={formData.appointmentOrderNo} onChange={(e) => handleChange('appointmentOrderNo', e.target.value)} onBlur={() => handleBlur('appointmentOrderNo')} />
@@ -504,7 +605,6 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
           </form>
         </div>
       ) : (
-        // List View
         <>
           {/* Search Bar */}
           <div className="emp-search-bar">
@@ -532,6 +632,8 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
     <table className="cert-table">
       <thead>
         <tr>
+          <th>#</th>
+          <th>Employee</th>  
           <th>Order No.</th>
           <th>Appointment Date</th>
           <th>Appointment Authority</th>
@@ -549,8 +651,14 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
       </thead>
       <tbody>
         {currentAppointments.length > 0 ? (
-          currentAppointments.map((apt) => (
+          currentAppointments.map((apt,idx) => (
             <tr key={apt.id}>
+             <td className="text-center">{startIndex + idx + 1}</td>
+
+              <td>                        
+
+    {DUMMY_EMPLOYEES.find(e => e.id === apt.employeeId)?.name || 'Unknown'}
+</td>
               <td><strong>{apt.appointmentOrderNo}</strong></td>
               <td>{formatDate(apt.appointmentDate)}</td>
               <td>{apt.appointmentAuthority}</td>
@@ -607,28 +715,45 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
   </div>
 
   {/* Pagination */}
-  {totalPages > 1 && (
-              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span className="emp-page-info">
-                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
-                  </span>
-                </div>
-                <div className="emp-page-controls">
-                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === '...' ? (
-                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
-                    ) : (
-                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
-                </div>
-              </div>
-            )}  
+ {/* Pagination */}
+{totalItems > 0 && (
+  <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <span className="emp-page-info">
+        Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} events
+      </span>
+    </div>
+    <div className="emp-page-controls">
+      <button 
+        className="emp-page-btn" 
+        disabled={page === 0} 
+        onClick={() => setPage(page - 1)}
+      >
+        ← Prev
+      </button>
+      {getPaginationRange().map((pg, i) =>
+        pg === '...' ? (
+          <span key={`dots-${i}`} className="emp-page-dots">…</span>
+        ) : (
+          <button 
+            key={pg} 
+            className={`emp-page-num ${pg === page ? 'active' : ''}`} 
+            onClick={() => setPage(pg)}
+          >
+            {pg + 1}
+          </button>
+        )
+      )}
+      <button 
+        className="emp-page-btn" 
+        disabled={page + 1 >= totalPages} 
+        onClick={() => setPage(page + 1)}
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+)}
 </div>
         </>
       )}

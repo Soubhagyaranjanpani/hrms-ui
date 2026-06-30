@@ -37,12 +37,11 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
- 
   const [showForm, setShowForm] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(4);
-
-  // Dummy employees data for lookup
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
@@ -51,9 +50,10 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
     { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
   ];
 
-  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
+  // ✅ FIXED: 'employee' use karo 'emp' ki jagah
+  const filteredEmployees = DUMMY_EMPLOYEES.filter(employee => {
     const search = employeeSearchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
+    return employee.name.toLowerCase().includes(search) || employee.code.toLowerCase().includes(search);
   });
 
   // Action Types
@@ -114,7 +114,7 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
     return range;
   };
 
-  // Update existing case numbers
+  // ✅ useEffect ko TOP-LEVEL par rakho - condition ke andar nahi
   useEffect(() => {
     setExistingCaseNumbers(disciplinaries.map(rec => rec.caseNumber));
   }, [disciplinaries]);
@@ -214,8 +214,8 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
       employeeId: employee.id,
       employeeName: employee.name
     }));
-    setEmployeeSearchTerm('');
-    setShowDropdown(false);
+    setEmployeeSearchTerm(employee.name);
+    setShowEmployeeDropdown(false);
   };
 
   const handleSubmit = (e) => {
@@ -257,6 +257,8 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
   };
 
   const handleEdit = (record) => {
+    const emp = DUMMY_EMPLOYEES.find(e => e.id === record.employeeId);
+    setSelectedEmployee(emp || null);  
     setEditingRecord(record);
     setFormData({
       caseNumber: record.caseNumber,
@@ -271,11 +273,10 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
       employeeId: record.employeeId,
       employeeName: record.employeeName
     });
-    setSelectedEmployee({ id: record.employeeId, name: record.employeeName });
+    setEmployeeSearchTerm(emp?.name || '');
     setShowForm(true);
   };
 
- 
   const resetForm = () => {
     setFormData({
       caseNumber: '',
@@ -308,9 +309,9 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
   };
 
   const handleDelete = (id) => {
-  setDisciplinaries(disciplinaries.filter(rec => rec.id !== id));
-  toast.success('Success', 'Disciplinary record deleted successfully');
-};
+    setDisciplinaries(disciplinaries.filter(rec => rec.id !== id));
+    toast.success('Success', 'Disciplinary record deleted successfully');
+  };
   
   return (
     <div className="cert-root">
@@ -350,7 +351,77 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Disciplinary Details</div>
               <div className="cert-form-grid-3col">
-              
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label className="required">Employee Name</label>
+                  <div className="position-relative">
+                    <div className="input-group">
+                      <span className="input-group-text bg-light">
+                        <FaSearch size={14} className="text-muted" />
+                      </span>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Type employee name to search..."
+                        value={employeeSearchTerm}
+                        onChange={(e) => {
+                          setEmployeeSearchTerm(e.target.value);
+                          setShowEmployeeDropdown(true);
+                        }}
+                        onFocus={() => setShowEmployeeDropdown(true)}
+                      />
+                    </div>
+                    
+                    {showEmployeeDropdown && employeeSearchTerm && (
+                      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
+                        <div className="card-body p-2">
+                          {filteredEmployees.length > 0 ? (
+                            filteredEmployees.map(emp => (
+                              <div
+                                key={emp.id}
+                                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => handleEmployeeSelect(emp)}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                              >
+                                <div>
+                                  <div className="fw-bold">{emp.name}</div>
+                                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
+                                </div>
+                                <div>
+                                  <span className="badge bg-light text-dark">{emp.designation}</span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-3 text-muted">
+                              <small>No employees found</small>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Employee Code - Auto Populate */}
+                <div className="cert-field-compact">
+                  <label>Employee Code</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
+                </div>
+                
+                {/* Department - Auto Populate */}
+                <div className="cert-field-compact">
+                  <label>Department</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
+                </div>
+                
+                {/* Designation - Auto Populate */}
+                <div className="cert-field-compact">
+                  <label>Designation</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
+                </div>
+                         
                 {/* Case Number */}
                 <div className={`cert-field-compact ${touched.caseNumber && errors.caseNumber ? 'has-error' : ''}`}>
                   <label className="required">Case Number</label>
@@ -457,8 +528,9 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
               <table className="cert-table">
                 <thead>
                   <tr>
-                    <th>Case No.</th>
-                    
+                    <th>#</th>
+                    <th>Employee</th>
+                    <th>Case No.</th>                   
                     <th>Incident Date</th>
                     <th>Action Type</th>
                     <th>Investigation Officer</th>
@@ -470,10 +542,13 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
                 </thead>
                 <tbody>
                   {currentRecords.length > 0 ? (
-                    currentRecords.map((record) => (
+                    currentRecords.map((record,idx) => (
                       <tr key={record.id}>
+                     <td className="text-center">{startIndex + idx + 1}</td>
+                        <td>                        
+                          {DUMMY_EMPLOYEES.find(e => e.id === record.employeeId)?.name || 'Unknown'}
+                        </td>
                         <td><strong>{record.caseNumber}</strong></td>
-                       
                         <td>{formatDate(record.incidentDate)}</td>
                         <td>{record.actionType}</td>
                         <td>{record.investigationOfficer?.split(' - ')[0]}</td>
@@ -488,11 +563,12 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
                         </td>
                         <td>
                           <div className="cert-actions">
-                          
                             <button className="cert-act cert-act--edit" onClick={() => handleEdit(record)} title="Edit">
                               <FaEdit size={12} />
                             </button>
-                            <button className="cert-act cert-act--del" onClick={() => handleDelete(record.id)} title="Delete"><FaTrash size={12} /></button>
+                            <button className="cert-act cert-act--del" onClick={() => handleDelete(record.id)} title="Delete">
+                              <FaTrash size={12} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -505,31 +581,46 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span className="emp-page-info">
-                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
-                  </span>
-                </div>
-                <div className="emp-page-controls">
-                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === '...' ? (
-                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
-                    ) : (
-                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
-                </div>
-              </div>
-            )}
+          {/* Pagination */}
+{totalItems > 0 && (
+  <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <span className="emp-page-info">
+        Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} events
+      </span>
+    </div>
+    <div className="emp-page-controls">
+      <button 
+        className="emp-page-btn" 
+        disabled={page === 0} 
+        onClick={() => setPage(page - 1)}
+      >
+        ← Prev
+      </button>
+      {getPaginationRange().map((pg, i) =>
+        pg === '...' ? (
+          <span key={`dots-${i}`} className="emp-page-dots">…</span>
+        ) : (
+          <button 
+            key={pg} 
+            className={`emp-page-num ${pg === page ? 'active' : ''}`} 
+            onClick={() => setPage(pg)}
+          >
+            {pg + 1}
+          </button>
+        )
+      )}
+      <button 
+        className="emp-page-btn" 
+        disabled={page + 1 >= totalPages} 
+        onClick={() => setPage(page + 1)}
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+)}
           </div>
-
-          
         </>
       )}
     </div>

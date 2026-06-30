@@ -41,7 +41,9 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
   const [showForm, setShowForm] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(4);
-
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  
+ 
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer', superannuationDate: '2045-12-31' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager', superannuationDate: '2040-06-15' },
@@ -326,7 +328,6 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
       </div>
 
       {showForm ? (
-        // Only Form - Table Hidden
         <div className="cert-form-wrap mb-4">
           <form onSubmit={handleSubmit} className="cert-form-compact">
             <div className="cert-form-section-compact">
@@ -334,7 +335,7 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
               <div className="cert-form-grid-3col">
                 {/* Employee Selection */}
                 <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
-                  <label className="required">Select Employee</label>
+                  <label className="required">Employee Name</label>
                   <div className="position-relative">
                     <div className="input-group">
                       <span className="input-group-text bg-light">
@@ -343,18 +344,18 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
                       <input
                         type="text"
                         className="form-control"
-                        placeholder="Search employee by name or code..."
+                        placeholder="Type employee name to search..."
                         value={employeeSearchTerm}
                         onChange={(e) => {
                           setEmployeeSearchTerm(e.target.value);
-                          setShowDropdown(true);
+                          setShowEmployeeDropdown(true);
                         }}
-                        onFocus={() => setShowDropdown(true)}
+                        onFocus={() => setShowEmployeeDropdown(true)}
                       />
                     </div>
                     
-                    {showDropdown && employeeSearchTerm && (
-                      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '300px', overflow: 'auto' }}>
+                    {showEmployeeDropdown && employeeSearchTerm && (
+                      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
                         <div className="card-body p-2">
                           {filteredEmployees.length > 0 ? (
                             filteredEmployees.map(emp => (
@@ -384,15 +385,26 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
                       </div>
                     )}
                   </div>
-                  <FieldError msg={errors.employeeId} />
-                  {formData.employeeName && (
-                    <div className="alert alert-success mt-2 py-1">
-                      <FaUserTie className="me-1" /> Selected: {formData.employeeName} ({formData.employeeCode})
-                      <br /><small>Superannuation Date: {formatDate(formData.superannuationDate)}</small>
-                    </div>
-                  )}
                 </div>
                 
+                {/* Employee Code - Auto Populate */}
+                <div className="cert-field-compact">
+                  <label>Employee Code</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
+                </div>
+                
+                {/* Department - Auto Populate */}
+                <div className="cert-field-compact">
+                  <label>Department</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
+                </div>
+                
+                {/* Designation - Auto Populate */}
+                <div className="cert-field-compact">
+                  <label>Designation</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
+                </div>
+                     
                 <div className={`cert-field-compact ${touched.retirementDate && errors.retirementDate ? 'has-error' : ''}`}>
                   <label className="required">Retirement Date</label>
                   <input type="date" value={formData.retirementDate} min={formData.superannuationDate} onChange={(e) => handleChange('retirementDate', e.target.value)} onBlur={() => handleBlur('retirementDate')} />
@@ -488,6 +500,7 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
               <table className="cert-table">
                 <thead>
                   <tr>
+                    <th>#</th>
                     <th>Employee</th>
                     <th>Retirement Date</th>
                     <th>Retirement Type</th>
@@ -502,8 +515,9 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
                 </thead>
                 <tbody>
                   {currentRetirements.length > 0 ? (
-                    currentRetirements.map((record) => (
+                    currentRetirements.map((record,idx) => (
                       <tr key={record.id}>
+                     <td className="text-center">{startIndex + idx + 1}</td>
                         <td><strong>{record.employeeName}</strong><br /><small>{record.employeeCode}</small></td>
                         <td>{formatDate(record.retirementDate)}</td>
                         <td>{record.retirementType}</td>
@@ -546,28 +560,45 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span className="emp-page-info">
-                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
-                  </span>
-                </div>
-                <div className="emp-page-controls">
-                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === '...' ? (
-                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
-                    ) : (
-                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
-                </div>
-              </div>
-            )}
+          {/* Pagination */}
+{totalItems > 0 && (
+  <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <span className="emp-page-info">
+        Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} events
+      </span>
+    </div>
+    <div className="emp-page-controls">
+      <button 
+        className="emp-page-btn" 
+        disabled={page === 0} 
+        onClick={() => setPage(page - 1)}
+      >
+        ← Prev
+      </button>
+      {getPaginationRange().map((pg, i) =>
+        pg === '...' ? (
+          <span key={`dots-${i}`} className="emp-page-dots">…</span>
+        ) : (
+          <button 
+            key={pg} 
+            className={`emp-page-num ${pg === page ? 'active' : ''}`} 
+            onClick={() => setPage(pg)}
+          >
+            {pg + 1}
+          </button>
+        )
+      )}
+      <button 
+        className="emp-page-btn" 
+        disabled={page + 1 >= totalPages} 
+        onClick={() => setPage(page + 1)}
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+)}
           </div>
 
          

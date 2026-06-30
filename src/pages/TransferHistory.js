@@ -8,11 +8,11 @@ import { toast } from '../components/Toast';
 
 const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [transfers, setTransfers] = useState(initialData?.transfers || [
-    { id: 1, transferOrderNo: 'TRF/2024/001', transferDate: '2024-06-01', transferType: 'Permanent', fromDepartment: 'IT', toDepartment: 'IT', fromBranch: 'Mumbai - Head Office', toBranch: 'Bangalore - South Region', effectiveDate: '2024-06-15', transferReason: 'Project requirement', createdAt: '2024-06-01T10:30:00Z' },
-    { id: 2, transferOrderNo: 'TRF/2024/002', transferDate: '2024-08-20', transferType: 'Temporary', fromDepartment: 'HR', toDepartment: 'Operations', fromBranch: 'Delhi - North Region', toBranch: 'Mumbai - Head Office', effectiveDate: '2024-09-01', transferReason: 'Department restructuring', createdAt: '2024-08-20T11:45:00Z' },
-    { id: 3, transferOrderNo: 'TRF/2024/003', transferDate: '2024-10-15', transferType: 'On Deputation', fromDepartment: 'Finance', toDepartment: 'Legal', fromBranch: 'Chennai - East Region', toBranch: 'Hyderabad - Central Region', effectiveDate: '2024-11-01', transferReason: 'Special assignment', createdAt: '2024-10-15T09:15:00Z' },
-    { id: 4, transferOrderNo: 'TRF/2024/004', transferDate: '2024-12-01', transferType: 'Permanent', fromDepartment: 'Sales', toDepartment: 'Marketing', fromBranch: 'Kolkata - East Region', toBranch: 'Delhi - North Region', effectiveDate: '2024-12-15', transferReason: 'Promotion transfer', createdAt: '2024-12-01T14:20:00Z' },
-    { id: 5, transferOrderNo: 'TRF/2024/005', transferDate: '2024-12-10', transferType: 'Contractual', fromDepartment: 'IT', toDepartment: 'Operations', fromBranch: 'Bangalore - South Region', toBranch: 'Pune - West Region', effectiveDate: '2025-01-01', transferReason: 'Contract completion', createdAt: '2024-12-10T10:00:00Z' }
+    { id: 1,employeeId:1, transferOrderNo: 'TRF/2024/001', transferDate: '2024-06-01', transferType: 'Permanent', fromDepartment: 'IT', toDepartment: 'IT', fromBranch: 'Mumbai - Head Office', toBranch: 'Bangalore - South Region', effectiveDate: '2024-06-15', transferReason: 'Project requirement', createdAt: '2024-06-01T10:30:00Z' },
+    { id: 2, employeeId:2,transferOrderNo: 'TRF/2024/002', transferDate: '2024-08-20', transferType: 'Temporary', fromDepartment: 'HR', toDepartment: 'Operations', fromBranch: 'Delhi - North Region', toBranch: 'Mumbai - Head Office', effectiveDate: '2024-09-01', transferReason: 'Department restructuring', createdAt: '2024-08-20T11:45:00Z' },
+    { id: 3, employeeId:3,transferOrderNo: 'TRF/2024/003', transferDate: '2024-10-15', transferType: 'On Deputation', fromDepartment: 'Finance', toDepartment: 'Legal', fromBranch: 'Chennai - East Region', toBranch: 'Hyderabad - Central Region', effectiveDate: '2024-11-01', transferReason: 'Special assignment', createdAt: '2024-10-15T09:15:00Z' },
+    { id: 4,employeeId:4, transferOrderNo: 'TRF/2024/004', transferDate: '2024-12-01', transferType: 'Permanent', fromDepartment: 'Sales', toDepartment: 'Marketing', fromBranch: 'Kolkata - East Region', toBranch: 'Delhi - North Region', effectiveDate: '2024-12-15', transferReason: 'Promotion transfer', createdAt: '2024-12-01T14:20:00Z' },
+    { id: 5, employeeId:5,transferOrderNo: 'TRF/2024/005', transferDate: '2024-12-10', transferType: 'Contractual', fromDepartment: 'IT', toDepartment: 'Operations', fromBranch: 'Bangalore - South Region', toBranch: 'Pune - West Region', effectiveDate: '2025-01-01', transferReason: 'Contract completion', createdAt: '2024-12-10T10:00:00Z' }
   ]);
   
   const [editingTransfer, setEditingTransfer] = useState(null);
@@ -37,6 +37,17 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [showForm, setShowForm] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(4);
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  
+  const DUMMY_EMPLOYEES = [
+    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
+    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
+    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
+    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
+    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
+  ];
 
   // Dummy data for dropdowns
   const transferTypes = [
@@ -83,6 +94,16 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
   const currentTransfers = filteredTransfers.slice(startIndex, startIndex + rowsPerPage);
+ const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
+  const search = employeeSearchTerm.toLowerCase();
+  return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
+});
+
+const handleEmployeeSelect = (employee) => {
+  setSelectedEmployee(employee);
+  setEmployeeSearchTerm(employee.name);
+  setShowEmployeeDropdown(false);
+};
 
   const getPaginationRange = () => {
     const delta = 2;
@@ -219,6 +240,8 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   };
 
   const handleEdit = (transfer) => {
+     const emp = DUMMY_EMPLOYEES.find(e => e.id === transfer.employeeId);
+  setSelectedEmployee(emp || null);  
     setEditingTransfer(transfer);
     setFormData({
       transferOrderNo: transfer.transferOrderNo,
@@ -234,6 +257,7 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       transferOrderFileData: transfer.transferOrderFileData,
       transferOrderFileName: transfer.transferOrderFileName
     });
+     setEmployeeSearchTerm(emp?.name || '');
     setShowForm(true);
   };
 
@@ -260,6 +284,8 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     setErrors({});
     setTouched({});
     setEditingTransfer(null);
+     setSelectedEmployee(null);      
+  setEmployeeSearchTerm('');   
   };
 
   const handleCancelForm = () => {
@@ -311,6 +337,77 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Transfer Details</div>
               <div className="cert-form-grid-3col">
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label className="required">Employee Name</label>
+                  <div className="position-relative">
+                    <div className="input-group">
+                      <span className="input-group-text bg-light">
+                        <FaSearch size={14} className="text-muted" />
+                      </span>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Type employee name to search..."
+                        value={employeeSearchTerm}
+                        onChange={(e) => {
+                          setEmployeeSearchTerm(e.target.value);
+                          setShowEmployeeDropdown(true);
+                        }}
+                        onFocus={() => setShowEmployeeDropdown(true)}
+                      />
+                    </div>
+                    
+                    {showEmployeeDropdown && employeeSearchTerm && (
+                      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
+                        <div className="card-body p-2">
+                          {filteredEmployees.length > 0 ? (
+                            filteredEmployees.map(emp => (
+                              <div
+                                key={emp.id}
+                                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => handleEmployeeSelect(emp)}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                              >
+                                <div>
+                                  <div className="fw-bold">{emp.name}</div>
+                                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
+                                </div>
+                                <div>
+                                  <span className="badge bg-light text-dark">{emp.designation}</span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-3 text-muted">
+                              <small>No employees found</small>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                 
+                {/* Employee Code - Auto Populate */}
+                <div className="cert-field-compact">
+                  <label>Employee Code</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
+                </div>
+                
+                {/* Department - Auto Populate */}
+                <div className="cert-field-compact">
+                  <label>Department</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
+                </div>
+                
+                {/* Designation - Auto Populate */}
+                <div className="cert-field-compact">
+                  <label>Designation</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
+                </div>
+                         
                 <div className={`cert-field-compact ${touched.transferOrderNo && errors.transferOrderNo ? 'has-error' : ''}`}>
                   <label className="required">Transfer Order Number</label>
                   <input type="text" placeholder="e.g., ARI/TRF/2024/001" value={formData.transferOrderNo} onChange={(e) => handleChange('transferOrderNo', e.target.value)} onBlur={() => handleBlur('transferOrderNo')} />
@@ -433,6 +530,8 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
               <table className="cert-table">
                 <thead>
                   <tr>
+                    <th>#</th>
+                    <th>Employee</th>
                     <th>Order No.</th>
                     <th>Transfer Date</th>
                     <th>From → To (Branch)</th>
@@ -446,8 +545,14 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                 </thead>
                 <tbody>
                   {currentTransfers.length > 0 ? (
-                    currentTransfers.map((transfer) => (
+                    currentTransfers.map((transfer,idx) => (
                       <tr key={transfer.id}>
+                      <td className="text-center">{startIndex + idx + 1}</td>
+
+                         <td>                        
+
+    {DUMMY_EMPLOYEES.find(e => e.id === transfer.employeeId)?.name || 'Unknown'}
+</td>
                         <td><strong>{transfer.transferOrderNo}</strong></td>
                         <td>{formatDate(transfer.transferDate)}</td>
                         <td>
@@ -501,29 +606,46 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
               </table>
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span className="emp-page-info">
-                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} transfers
-                  </span>
-                </div>
-                <div className="emp-page-controls">
-                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === '...' ? (
-                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
-                    ) : (
-                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
-                </div>
-              </div>
-            )}
+         
+          {/* Pagination */}
+{totalItems > 0 && (
+  <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <span className="emp-page-info">
+        Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} events
+      </span>
+    </div>
+    <div className="emp-page-controls">
+      <button 
+        className="emp-page-btn" 
+        disabled={page === 0} 
+        onClick={() => setPage(page - 1)}
+      >
+        ← Prev
+      </button>
+      {getPaginationRange().map((pg, i) =>
+        pg === '...' ? (
+          <span key={`dots-${i}`} className="emp-page-dots">…</span>
+        ) : (
+          <button 
+            key={pg} 
+            className={`emp-page-num ${pg === page ? 'active' : ''}`} 
+            onClick={() => setPage(pg)}
+          >
+            {pg + 1}
+          </button>
+        )
+      )}
+      <button 
+        className="emp-page-btn" 
+        disabled={page + 1 >= totalPages} 
+        onClick={() => setPage(page + 1)}
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+)}
           </div>
         </>
       )}

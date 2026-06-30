@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { FaSave, FaTimes, FaUser, FaIdCard, FaBuilding, FaBriefcase, FaBook, FaCheckCircle, FaSearch, FaEdit, FaTrash, FaPlus, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
+import React, { useState, useRef, useEffect } from 'react';
+import { FaSave, FaTimes, FaUser, FaIdCard, FaBuilding, FaBriefcase, FaBook, FaCheckCircle, FaSearch, FaEdit, FaTrash, FaPlus, FaArrowLeft, FaArrowRight, FaChevronDown } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) => {
@@ -35,6 +35,20 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
   const [showForm, setShowForm] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
+  const dropdownRef = useRef(null);
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+
+// Click outside dropdown
+useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      setShowDropdown(false);
+    }
+  };
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, []);
 
   // Dummy employees data for lookup
   const DUMMY_EMPLOYEES = [
@@ -46,10 +60,19 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
   ];
 
   // Filter employees for dropdown
-  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-    const search = searchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
-  });
+// const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
+//   const search = searchTerm.toLowerCase();
+//   return emp.name.toLowerCase().includes(search) || 
+//          emp.code.toLowerCase().includes(search) ||
+//          emp.department.toLowerCase().includes(search);
+// });
+// Filter employees for dropdown
+const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
+  const search = employeeSearchTerm.toLowerCase();
+  return emp.name.toLowerCase().includes(search) || 
+         emp.code.toLowerCase().includes(search) ||
+         emp.department.toLowerCase().includes(search);
+});
 
   // Filter service books by search term
   const filteredServiceBooks = serviceBooks.filter(book => {
@@ -84,23 +107,22 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
     return `SB/${year}/${random}`;
   };
 
-  // Handle employee selection
-  const handleEmployeeSelect = (employee) => {
-    setFormData({
-      ...formData,
-      employeeId: employee.id,
-      employeeName: employee.name,
-      employeeCode: employee.code,
-      department: employee.department,
-      designation: employee.designation,
-      serviceBookNumber: generateServiceBookNumber()
-    });
-    setSearchTerm('');
-    setShowDropdown(false);
-    if (errors.employeeName) {
-      setErrors({ ...errors, employeeName: '' });
-    }
-  };
+const handleEmployeeSelect = (employee) => {
+  setFormData({
+    ...formData,
+    employeeId: employee.id,
+    employeeName: employee.name,
+    employeeCode: employee.code,
+    department: employee.department,
+    designation: employee.designation,
+    serviceBookNumber: generateServiceBookNumber()
+  });
+  setEmployeeSearchTerm(employee.name);
+  setShowEmployeeDropdown(false); // Close dropdown after selection
+  if (errors.employeeName) {
+    setErrors({ ...errors, employeeName: '' });
+  }
+};
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -278,11 +300,64 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Employee Information</div>
               <div className="cert-form-grid-3col">
-                <div className={`cert-field-compact ${touched.employeeName && errors.employeeName ? 'has-error' : ''}`}>
-                  <label className="required">Employee Name</label>
-                  <input type="text" className="bg-light" value={formData.employeeName} readOnly placeholder="Select from search" />
-                  <FieldError msg={errors.employeeName} />
+            <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+  <label className="required">Employee Name</label>
+  <div className="position-relative">
+    <div className="input-group">
+      <span className="input-group-text bg-light">
+        <FaSearch size={14} className="text-muted" />
+      </span>
+      <input
+        type="text"
+        className="form-control"
+        placeholder="Type employee name to search..."
+        value={employeeSearchTerm}
+        onChange={(e) => {
+          setEmployeeSearchTerm(e.target.value);
+          setShowEmployeeDropdown(true);
+        }}
+        onFocus={() => {
+          // Only show dropdown if there's text
+          if (employeeSearchTerm.length > 0) {
+            setShowEmployeeDropdown(true);
+          }
+        }}
+      />
+    </div>
+    
+    {/* Show dropdown only when there's search text AND dropdown is visible */}
+    {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
+      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
+        <div className="card-body p-2">
+          {filteredEmployees.length > 0 ? (
+            filteredEmployees.map(emp => (
+              <div
+                key={emp.id}
+                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
+                style={{ cursor: 'pointer' }}
+                onClick={() => handleEmployeeSelect(emp)}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <div>
+                  <div className="fw-bold">{emp.name}</div>
+                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
                 </div>
+                <div>
+                  <span className="badge bg-light text-dark">{emp.designation}</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-3 text-muted">
+              <small>No employees found</small>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
+</div>
                 
                 <div className="cert-field-compact">
                   <label>Employee Code</label>
@@ -317,7 +392,7 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
               </div>
             </div>
 
-            {formData.employeeId && (
+            {/* {formData.employeeId && (
               <div className="alert alert-success mt-3">
                 <FaCheckCircle className="me-2" />
                 <strong>Service Book Ready to Create</strong>
@@ -330,7 +405,7 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
                 </div>
               </div>
             )}
-            
+             */}
             <div className="cert-form-actions">
               <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
               <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -368,6 +443,7 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
               <table className="cert-table">
                 <thead>
                   <tr>
+                    <th>#</th>
                     <th>Employee Name</th>
                     <th>Employee Code</th>
                     <th>Department</th>
@@ -380,8 +456,9 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
                 </thead>
                 <tbody>
                   {currentBooks.length > 0 ? (
-                    currentBooks.map((book) => (
+                    currentBooks.map((book,idx) => (
                       <tr key={book.id}>
+                     <td className="text-center">{startIndex + idx + 1}</td>
                         <td><div className="cert-name">{book.employeeName}</div></td>
                         <td>{book.employeeCode}</td>
                         <td>{book.department}</td>
@@ -420,29 +497,46 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
               </table>
             </div>
 
-            {/* Pagination */}
-           {totalPages > 1 && (
-              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span className="emp-page-info">
-                    Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
-                  </span>
-                </div>
-                <div className="emp-page-controls">
-                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === '...' ? (
-                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
-                    ) : (
-                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
-                </div>
-              </div>
-            )}  
+            
+          {/* Pagination */}
+{totalItems > 0 && (
+  <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <span className="emp-page-info">
+        Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} events
+      </span>
+    </div>
+    <div className="emp-page-controls">
+      <button 
+        className="emp-page-btn" 
+        disabled={page === 0} 
+        onClick={() => setPage(page - 1)}
+      >
+        ← Prev
+      </button>
+      {getPaginationRange().map((pg, i) =>
+        pg === '...' ? (
+          <span key={`dots-${i}`} className="emp-page-dots">…</span>
+        ) : (
+          <button 
+            key={pg} 
+            className={`emp-page-num ${pg === page ? 'active' : ''}`} 
+            onClick={() => setPage(pg)}
+          >
+            {pg + 1}
+          </button>
+        )
+      )}
+      <button 
+        className="emp-page-btn" 
+        disabled={page + 1 >= totalPages} 
+        onClick={() => setPage(page + 1)}
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+)} 
           </div>
         </>
       )}

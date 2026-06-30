@@ -27,8 +27,8 @@ const DUMMY_CERTIFICATIONS = [
     expiryDate: '2026-01-14',
     reminderDays: 30,
     notes: 'Professional certification',
-     certificateFileData: 'https://images.credly.com/images/0e284c3f-5164-4b21-8660-0d84737941bc/aws-certified-solutions-architect-associate.png',
-  certificateFileName: 'AWS_Certificate.png'
+    certificateFileData: 'https://images.credly.com/images/0e284c3f-5164-4b21-8660-0d84737941bc/aws-certified-solutions-architect-associate.png',
+    certificateFileName: 'AWS_Certificate.png'
   },
   {
     id: 2,
@@ -115,7 +115,6 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
   const [selectedCertification, setSelectedCertification] = useState(null);
   const [allCertifications, setAllCertifications] = useState(DUMMY_CERTIFICATIONS);
   const [nextId, setNextId] = useState(7);
-  const [expandedEmployees, setExpandedEmployees] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [employeeFilter, setEmployeeFilter] = useState(propEmployeeId || '');
   const [page, setPage] = useState(0);
@@ -126,6 +125,11 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
   const [renewalData, setRenewalData] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [certToView, setCertToView] = useState(null);
+  
+  // Employee Certificate Page State
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  
   const [formData, setFormData] = useState({
     employeeId: '',
     certificationName: '',
@@ -156,42 +160,21 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
     return allCertifications.filter(cert => cert.employeeId === employeeId);
   };
 
-  const toggleExpand = (employeeId) => {
-    setExpandedEmployees(prev => ({ ...prev, [employeeId]: !prev[employeeId] }));
+  // Open Employee Certificate Page
+  const openEmployeeCertPage = (employee) => {
+    setSelectedEmployee(employee);
+    setView('employeeCerts');
+    setShowAddForm(false);
+    resetForm();
   };
 
-  const addNewCertificate = (employeeId, employeeName) => {
-    const newCert = {
-      id: nextId,
-      employeeId: employeeId,
-      employeeName: employeeName,
-      certificationName: 'New Certification',
-      issuedBy: '',
-      certificateNumber: '',
-      issueDate: new Date().toISOString().split('T')[0],
-      expiryDate: '',
-      reminderDays: 30,
-      notes: '',
-      certificateFileData: null,
-      certificateFileName: null
-    };
-    setAllCertifications([...allCertifications, newCert]);
-    setNextId(nextId + 1);
-    toast.success('Success', 'New certification added. Click Edit to fill details.');
-    setExpandedEmployees(prev => ({ ...prev, [employeeId]: true }));
+  // Go back to list
+  const goBackToList = () => {
+    setView('list');
+    setSelectedEmployee(null);
+    setShowAddForm(false);
+    resetForm();
   };
-
-  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-    if (employeeFilter && emp.id !== parseInt(employeeFilter)) return false;
-    const search = searchTerm.toLowerCase();
-    if (search && !emp.name.toLowerCase().includes(search) && !emp.email.toLowerCase().includes(search)) return false;
-    return true;
-  });
-
-  const totalItems = filteredEmployees.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage);
-  const startIndex = page * rowsPerPage;
-  const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
 
   const handleChange = (field, value) => {
     const updated = { ...formData, [field]: value };
@@ -278,8 +261,8 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
     } else {
       const newCert = {
         id: nextId,
-        employeeId: propEmployeeId ? parseInt(propEmployeeId) : parseInt(formData.employeeId),
-        employeeName: propEmployeeId ? `Employee #${propEmployeeId}` : employeeName,
+        employeeId: parseInt(formData.employeeId),
+        employeeName: employeeName,
         certificationName: formData.certificationName,
         issuedBy: formData.issuedBy,
         certificateNumber: formData.certificateNumber || '',
@@ -295,7 +278,7 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
       toast.success('Success', 'Certification added successfully');
     }
     resetForm();
-    setView('list');
+    setShowAddForm(false);
   };
 
   const handleRenewal = () => {
@@ -342,7 +325,7 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
     setErrors({});
     setTouched({});
     setEditMode(true);
-    setView('form');
+    setShowAddForm(true);
   };
 
   const openRenewalModal = (cert) => {
@@ -356,18 +339,15 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
     setShowRenewalModal(true);
   };
 
-  const openViewModal = (cert) => {
-    setCertToView(cert);
-    setShowViewModal(true);
-  };
+  
 
   const resetForm = () => {
     setFormData({
-      employeeId: propEmployeeId || '',
+      employeeId: selectedEmployee?.id || propEmployeeId || '',
       certificationName: '',
       issuedBy: '',
       certificateNumber: '',
-      issueDate: '',
+      issueDate: new Date().toISOString().split('T')[0],
       expiryDate: '',
       reminderDays: '30',
       notes: '',
@@ -387,27 +367,280 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
   };
 
   const getPaginationRange = () => {
-  const delta = 2;
-  const range = [];
-  const left = Math.max(0, page - delta);
-  const right = Math.min(totalPages - 1, page + delta);
-  if (left > 0) { 
-    range.push(0); 
-    if (left > 1) range.push('...'); 
-  }
-  for (let i = left; i <= right; i++) range.push(i);
-  if (right < totalPages - 1) { 
-    if (right < totalPages - 2) range.push('...'); 
-    range.push(totalPages - 1); 
-  }
-  return range;
-};
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { 
+      range.push(0); 
+      if (left > 1) range.push('...'); 
+    }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) { 
+      if (right < totalPages - 2) range.push('...'); 
+      range.push(totalPages - 1); 
+    }
+    return range;
+  };
+
+  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
+    if (employeeFilter && emp.id !== parseInt(employeeFilter)) return false;
+    const search = searchTerm.toLowerCase();
+    if (search && !emp.name.toLowerCase().includes(search) && !emp.email.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  const totalItems = filteredEmployees.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
+
+  // Render Employee Certificates Page
+  const renderEmployeeCertPage = () => {
+    if (!selectedEmployee) return null;
+    const empCerts = getEmployeeCertificates(selectedEmployee.id);
+
+    return (
+      <div>
+        {/* Header with Back Button */}
+        <div className="cert-header" style={{ marginBottom: '24px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button 
+                onClick={goBackToList}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  fontSize: '16px', 
+                  color: '#6b7280',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  background: '#f3f4f6',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#e5e7eb'}
+                onMouseLeave={(e) => e.target.style.background = '#f3f4f6'}
+              >
+                <FaArrowLeft size={14} /> Back
+              </button>
+              <div>
+                <h1 className="cert-title" style={{ margin: 0 }}>{selectedEmployee.name}'s Certificates</h1>
+                <p className="cert-subtitle" style={{ margin: '4px 0 0 0' }}>
+                  {selectedEmployee.department} • {selectedEmployee.designation} • {empCerts.length} Certificates
+                </p>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {!showAddForm && (
+              <button 
+                className="cert-add-btn" 
+                onClick={() => { 
+                  resetForm(); 
+                  setFormData(prev => ({ ...prev, employeeId: selectedEmployee.id }));
+                  setEditMode(false);
+                  setShowAddForm(true); 
+                }}
+              >
+                <FaPlus size={13} /> Add Certificate
+              </button>
+            )}
+            {/* Close/Back Button - Alternative */}
+            <button 
+              onClick={goBackToList}
+              style={{ 
+                padding: '8px 16px',
+                background: 'transparent',
+                color: '#6b7280',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
+              onMouseLeave={(e) => e.target.style.background = 'transparent'}
+            >
+             Back
+            </button>
+          </div>
+        </div>
+
+        {/* Stats for this employee */}
+        <div className="cert-stats" style={{ marginBottom: '20px' }}>
+          <div className="cert-stat-card">
+            <FaCheckCircle size={16} color="#10b981" />
+            <span>{empCerts.filter(c => getCertStatus(c.expiryDate).type === 'active').length} Active</span>
+          </div>
+          <div className="cert-stat-card">
+            <FaClock size={16} color="#f59e0b" />
+            <span>{empCerts.filter(c => getCertStatus(c.expiryDate).type === 'expiring').length} Expiring Soon</span>
+          </div>
+          <div className="cert-stat-card">
+            <FaExclamationCircle size={16} color="#ef4444" />
+            <span>{empCerts.filter(c => getCertStatus(c.expiryDate).type === 'expired').length} Expired</span>
+          </div>
+        </div>
+
+        {/* Add Certificate Form */}
+        {showAddForm && (
+          <div style={{ background: '#f9fafb', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #e5e7eb' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>
+                {editMode ? 'Edit Certificate' : 'Add New Certificate'}
+              </h4>
+              <button 
+                onClick={() => { setShowAddForm(false); resetForm(); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '16px' }}
+              >
+                <FaTimes size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className={`cert-field-compact ${touched.certificationName && errors.certificationName ? 'has-error' : ''}`}>
+                  <label className="required" style={{ fontSize: '13px' }}>Certification Name</label>
+                  <input type="text" placeholder="e.g., AWS Certified Solutions Architect" value={formData.certificationName} onChange={(e) => handleChange('certificationName', e.target.value)} onBlur={() => handleBlur('certificationName')} />
+                  <FieldError msg={errors.certificationName} />
+                </div>
+                <div className={`cert-field-compact ${touched.issuedBy && errors.issuedBy ? 'has-error' : ''}`}>
+                  <label className="required" style={{ fontSize: '13px' }}>Issuing Authority</label>
+                  <input type="text" placeholder="e.g., Amazon Web Services" value={formData.issuedBy} onChange={(e) => handleChange('issuedBy', e.target.value)} onBlur={() => handleBlur('issuedBy')} />
+                  <FieldError msg={errors.issuedBy} />
+                </div>
+                <div className="cert-field-compact">
+                  <label style={{ fontSize: '13px' }}>Certificate Number</label>
+                  <input type="text" placeholder="e.g., AWS-12345" value={formData.certificateNumber} onChange={(e) => handleChange('certificateNumber', e.target.value)} />
+                </div>
+                <div className={`cert-field-compact ${touched.issueDate && errors.issueDate ? 'has-error' : ''}`}>
+                  <label className="required" style={{ fontSize: '13px' }}>Issue Date</label>
+                  <input type="date" value={formData.issueDate} onChange={(e) => handleChange('issueDate', e.target.value)} onBlur={() => handleBlur('issueDate')} />
+                  <FieldError msg={errors.issueDate} />
+                </div>
+                <div className="cert-field-compact">
+                  <label style={{ fontSize: '13px' }}>Expiry Date</label>
+                  <input type="date" value={formData.expiryDate} min={formData.issueDate || undefined} onChange={(e) => handleChange('expiryDate', e.target.value)} />
+                  <FieldError msg={errors.expiryDate} />
+                </div>
+                <div className="cert-field-compact">
+                  <label style={{ fontSize: '13px' }}>Reminder Days</label>
+                  <input type="number" placeholder="30" value={formData.reminderDays} min="0" max="365" onChange={(e) => handleChange('reminderDays', e.target.value)} />
+                </div>
+                <div className="cert-field-compact" style={{ gridColumn: 'span 2' }}>
+                  <label style={{ fontSize: '13px' }}>Upload Certificate (Optional)</label>
+                  <div style={{ border: '1px dashed #ccc', borderRadius: '6px', padding: '12px', textAlign: 'center', background: 'white' }}>
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="page-cert-upload" />
+                    <label htmlFor="page-cert-upload" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: '#4f46e5', color: 'white', borderRadius: '6px', fontSize: '13px' }}>
+                      <FaUpload size={12} /> Choose File
+                    </label>
+                    {formData.certificateFileName && (
+                      <span style={{ marginLeft: '8px', fontSize: '13px', color: '#10b981' }}>{formData.certificateFileName}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="cert-field-compact" style={{ gridColumn: 'span 2' }}>
+                  <label style={{ fontSize: '13px' }}>Notes</label>
+                  <textarea rows={2} placeholder="Additional information..." value={formData.notes} onChange={(e) => handleChange('notes', e.target.value)} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+                <button type="button" onClick={() => { setShowAddForm(false); resetForm(); }} style={{ padding: '8px 20px', border: '1px solid #d1d5db', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>
+                  Cancel
+                </button>
+                <button type="submit" style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <FaSave size={12} /> {editMode ? 'Update' : 'Add'} Certificate
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Certificates Table */}
+        <div className="cert-table-card">
+          <div className="cert-table-wrap">
+            <table className="cert-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 40 }}>#</th>
+                  <th>Certification Name</th>
+                  <th>Issued By</th>
+                  <th>Cert. No.</th>
+                  <th>Issue Date</th>
+                  <th>Expiry Date</th>
+                  <th>Status</th>
+                  <th style={{ width: 160 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {empCerts.length > 0 ? (
+                  empCerts.map((cert, idx) => {
+                    const status = getCertStatus(cert.expiryDate);
+                    const StatusIcon = status.icon;
+                    return (
+                      <tr key={cert.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                        <td>
+                          <strong>{cert.certificationName}</strong>
+                          {cert.notes && <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>{cert.notes}</div>}
+                        </td>
+                        <td>{cert.issuedBy}</td>
+                        <td>{cert.certificateNumber || '—'}</td>
+                        <td>{formatDate(cert.issueDate)}</td>
+                        <td>{formatDate(cert.expiryDate)}</td>
+                        <td>
+                          <span className={`cert-status-badge cert-status--${status.type}`}>
+                            <StatusIcon size={10} /> {status.label}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            
+                            {cert.expiryDate && new Date(cert.expiryDate) > new Date() && (
+                              <button onClick={() => openRenewalModal(cert)} title="Renew" style={{ background: '#f59e0b', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer' }}>
+                                <FaClock size={12} />
+                              </button>
+                            )}
+                            <button onClick={() => { handleEdit(cert); }} title="Edit" style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer' }}>
+                              <FaEdit size={12} />
+                            </button>
+                            <button onClick={() => { setCertToDelete(cert); setShowDeleteModal(true); }} title="Delete" style={{ background: '#ef4444', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer' }}>
+                              <FaTrash size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                      <FaFileAlt size={40} style={{ display: 'block', margin: '0 auto 12px', opacity: 0.5 }} />
+                      <p style={{ fontSize: '16px', fontWeight: '500', color: '#374151' }}>No certificates found</p>
+                      <p style={{ fontSize: '14px' }}>Click "Add Certificate" to add a new certification</p>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="cert-root">
-      <div className="cert-header">
-        {view !== 'list' ? (
-          <>
+      {view === 'employeeCerts' ? (
+        renderEmployeeCertPage()
+      ) : view !== 'list' ? (
+        <>
+          <div className="cert-header">
             <div>
               <h1 className="cert-title">{editMode ? 'Edit Certification' : 'Add Certification'}</h1>
               <p className="cert-subtitle">{editMode ? 'Update certification details' : 'Enter new certification information'}</p>
@@ -415,9 +648,102 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
             <button className="cert-back-btn" onClick={() => { setView('list'); resetForm(); }}>
               <FaArrowLeft size={12} /> Back to List
             </button>
-          </>
-        ) : (
-          <>
+          </div>
+          <div className="cert-form-wrap">
+            <form onSubmit={handleSubmit} className="cert-form-compact">
+              <div className="cert-form-section-compact">
+                <div className="cert-section-label">Certification Details</div>
+                <div className="cert-form-grid-3col">
+                  {!propEmployeeId && (
+                    <div className={`cert-field-compact ${touched.employeeId && errors.employeeId ? 'has-error' : ''}`}>
+                      <label className="required">Employee</label>
+                      <select value={formData.employeeId} onChange={(e) => handleChange('employeeId', e.target.value)} onBlur={() => handleBlur('employeeId')}>
+                        <option value="">Select employee</option>
+                        {DUMMY_EMPLOYEES.map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name} ({emp.department})</option>
+                        ))}
+                      </select>
+                      <FieldError msg={errors.employeeId} />
+                    </div>
+                  )}
+                  
+                  <div className={`cert-field-compact ${touched.certificationName && errors.certificationName ? 'has-error' : ''}`}>
+                    <label className="required">Certification Name</label>
+                    <input type="text" placeholder="e.g., AWS Certified Solutions Architect" value={formData.certificationName} onChange={(e) => handleChange('certificationName', e.target.value)} onBlur={() => handleBlur('certificationName')} />
+                    <FieldError msg={errors.certificationName} />
+                  </div>
+                  
+                  <div className={`cert-field-compact ${touched.issuedBy && errors.issuedBy ? 'has-error' : ''}`}>
+                    <label className="required">Issuing Authority</label>
+                    <input type="text" placeholder="e.g., Amazon Web Services" value={formData.issuedBy} onChange={(e) => handleChange('issuedBy', e.target.value)} onBlur={() => handleBlur('issuedBy')} />
+                    <FieldError msg={errors.issuedBy} />
+                  </div>
+                  
+                  <div className="cert-field-compact">
+                    <label>Certificate Number</label>
+                    <input type="text" placeholder="Optional reference number" value={formData.certificateNumber} onChange={(e) => handleChange('certificateNumber', e.target.value)} />
+                  </div>
+                  
+                  <div className={`cert-field-compact ${touched.issueDate && errors.issueDate ? 'has-error' : ''}`}>
+                    <label className="required">Issue Date</label>
+                    <input type="date" value={formData.issueDate} onChange={(e) => handleChange('issueDate', e.target.value)} onBlur={() => handleBlur('issueDate')} />
+                    <FieldError msg={errors.issueDate} />
+                  </div>
+                  
+                  <div className="cert-field-compact">
+                    <label>Expiry Date</label>
+                    <input type="date" value={formData.expiryDate} min={formData.issueDate || undefined} onChange={(e) => handleChange('expiryDate', e.target.value)} />
+                    <FieldError msg={errors.expiryDate} />
+                  </div>
+                  
+                  <div className="cert-field-compact">
+                    <label>Reminder (days before expiry)</label>
+                    <input type="number" placeholder="30" value={formData.reminderDays} min="0" max="365" onChange={(e) => handleChange('reminderDays', e.target.value)} />
+                    <small style={{ fontSize: '11px', color: '#666' }}>Email notifications sent before expiry</small>
+                  </div>
+                  
+                  <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                    <label>Upload Certificate (Optional)</label>
+                    <div style={{ border: '1px dashed #ccc', borderRadius: '6px', padding: '12px', textAlign: 'center', background: '#f9fafb' }}>
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="certificate-upload" />
+                      <label htmlFor="certificate-upload" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: '#4f46e5', color: 'white', borderRadius: '6px', fontSize: '13px' }}>
+                        <FaUpload size={12} /> Choose File
+                      </label>
+                      {formData.certificateFileName && (
+                        <div style={{ marginTop: '10px', fontSize: '13px', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          {formData.certificateFileName.endsWith('.pdf') ? <FaFilePdf size={14} /> : <FaFileImage size={14} />}
+                          {formData.certificateFileName}
+                        </div>
+                      )}
+                      <small style={{ fontSize: '11px', color: '#666', display: 'block', marginTop: '8px' }}>Supported: PDF, JPG, PNG (Max 5MB)</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="cert-divider" />
+              
+              <div className="cert-form-section-compact">
+                <div className="cert-section-label">Additional Information</div>
+                <div className={`cert-field-compact`} style={{ gridColumn: 'span 3' }}>
+                  <label>Notes</label>
+                  <textarea rows={3} placeholder="Any additional information about this certification..." value={formData.notes} onChange={(e) => handleChange('notes', e.target.value)} />
+                </div>
+              </div>
+              
+              <div className="cert-form-actions">
+                <button type="button" className="cert-cancel-btn" onClick={() => { setView('list'); resetForm(); }}>Cancel</button>
+                <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <FaSave size={12} /> {editMode ? 'Update Certification' : 'Add Certification'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      ) : (
+        // List View
+        <>
+          <div className="cert-header">
             <div>
               <h1 className="cert-title">Certification Management</h1>
               <p className="cert-subtitle">Manage employee certifications and track expiry</p>
@@ -427,12 +753,8 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
                 <FaPlus size={13} /> Add Certification
               </button>
             </div>
-          </>
-        )}
-      </div>
+          </div>
 
-      {view === 'list' ? (
-        <>
           <div className="cert-search-bar">
             <div className="cert-search-wrap">
               <FaSearch className="cert-search-icon" size={12} />
@@ -441,7 +763,6 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
                 type="text"
                 placeholder="Search by employee name or email..."
                 value={searchTerm}
-                // onChange={(e) => setSearchTerm(e.target.value)}
                 onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
               />
               {searchTerm && (
@@ -454,7 +775,6 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
               <select 
                 className="cert-filter-select" 
                 value={employeeFilter} 
-                // onChange={(e) => setEmployeeFilter(e.target.value)}
                 onChange={(e) => { setEmployeeFilter(e.target.value); setPage(0); }}
               >
                 <option value="">All Departments</option>
@@ -497,7 +817,6 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
                 <tbody>
                   {currentEmployees.length > 0 ? currentEmployees.map((emp) => {
                     const empCerts = getEmployeeCertificates(emp.id);
-                    const isExpanded = expandedEmployees[emp.id];
                     const activeCount = empCerts.filter(c => getCertStatus(c.expiryDate).type === 'active').length;
                     const expiringCount = empCerts.filter(c => getCertStatus(c.expiryDate).type === 'expiring').length;
                     const expiredCount = empCerts.filter(c => getCertStatus(c.expiryDate).type === 'expired').length;
@@ -519,118 +838,38 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
                     }
 
                     return (
-                      <React.Fragment key={emp.id}>
-                        <tr className="cert-row" style={{ cursor: 'pointer' }} onClick={() => empCerts.length > 0 && toggleExpand(emp.id)}>
-                          <td>
-                            <div>
-                              <strong>{emp.name}</strong>
-                              <div style={{ fontSize: '11px', color: '#666' }}>{emp.email}</div>
-                            </div>
-                          </td>
-                          <td>{emp.department}</td>
-                          <td>{emp.designation}</td>
-                          <td>{empCerts.length}</td>
-                          <td>
-                            {empCerts.length > 0 ? (
-                              <span style={{ padding: '4px 8px', borderRadius: '12px', fontSize: '11px', ...statusColor }}>
-                                {statusText}
-                              </span>
-                            ) : (
-                              <span style={{ padding: '4px 8px', borderRadius: '12px', fontSize: '11px', background: '#f3f4f6', color: '#6b7280' }}>
-                                No Certificates
-                              </span>
-                            )}
-                          </td>
-                          <td>
-                            <button 
-                              className="cert-act cert-act--add"
-                              onClick={(e) => { e.stopPropagation(); addNewCertificate(emp.id, emp.name); }}
-                              title="Add Certificate"
-                              style={{ background: '#10b981', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-                            >
-                              <FaPlus size={20} /> Add
-                            </button>
-                          </td>
-                        </tr>
-                        
-                        {isExpanded && empCerts.length > 0 && (
-                          <tr>
-                            <td colSpan="6" style={{ padding: '0 0 20px 40px', background: '#f9fafb' }}>
-                              <div style={{ marginTop: '10px' }}>
-                                <table className="cert-table" style={{ width: '100%', background: 'white', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
-                                  <thead>
-                                    <tr style={{ background: '#f3f4f6' }}>
-                                      <th style={{ width: 40 }}>#</th>
-                                      <th>Certification Name</th>
-                                      <th>Issued By</th>
-                                      <th>Cert. No.</th>
-                                      <th>Issue Date</th>
-                                      <th>Expiry Date</th>
-                                      <th>Status</th>
-                                      <th style={{ width: 100 }}>Actions</th>
-                                     </tr>
-                                  </thead>
-                                  <tbody>
-                                    {empCerts.map((cert, idx) => {
-                                      const status = getCertStatus(cert.expiryDate);
-                                      const StatusIcon = status.icon;
-                                      return (
-                                        <tr key={cert.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                                          <td style={{ textAlign: 'center' }}>{idx + 1}</td>
-                                          <td>
-                                            <strong>{cert.certificationName}</strong>
-                                            {cert.notes && <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>{cert.notes}</div>}
-                                          </td>
-                                          <td>{cert.issuedBy}</td>
-                                          <td>{cert.certificateNumber || '—'}</td>
-                                          <td>{formatDate(cert.issueDate)}</td>
-                                          <td>{formatDate(cert.expiryDate)}</td>
-                                          <td>
-                                            <span className={`cert-status-badge cert-status--${status.type}`}>
-                                              <StatusIcon size={10} /> {status.label}
-                                            </span>
-                                          </td>
-                                          <td>
-                                            {/* <div className="cert-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                              {cert.expiryDate && new Date(cert.expiryDate) > new Date() && (
-                                                <button className="cert-act cert-act--renew" onClick={() => openRenewalModal(cert)} title="Renew">
-                                                  <FaClock size={12} />
-                                                </button>
-                                              )}
-                                              <button className="cert-act cert-act--edit" onClick={() => handleEdit(cert)} title="Edit">
-                                                <FaEdit size={12} />
-                                              </button>
-                                             
-                                            </div> */}
-                                            <div className="cert-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-  {/* VIEW BUTTON - Certificate dekhne ke liye */}
-  <button 
-    onClick={() => openViewModal(cert)} 
-    title="View Certificate"
-    style={{ background: '#4f46e5', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer' }}
-  >
-    <FaEye size={12} />
-  </button>
-  {cert.expiryDate && new Date(cert.expiryDate) > new Date() && (
-    <button className="cert-act cert-act--renew" onClick={() => openRenewalModal(cert)} title="Renew">
-      <FaClock size={12} />
-    </button>
-  )}
-  <button className="cert-act cert-act--edit" onClick={() => handleEdit(cert)} title="Edit">
-    <FaEdit size={12} />
-  </button>
-</div>
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </td>
-                           </tr>
-                        )}
-                      </React.Fragment>
+                      <tr key={emp.id} className="cert-row" style={{ cursor: 'pointer' }} onClick={() => openEmployeeCertPage(emp)}>
+                        <td>
+                          <div>
+                            <strong>{emp.name}</strong>
+                            <div style={{ fontSize: '11px', color: '#666' }}>{emp.email}</div>
+                          </div>
+                        </td>
+                        <td>{emp.department}</td>
+                        <td>{emp.designation}</td>
+                        <td>{empCerts.length}</td>
+                        <td>
+                          {empCerts.length > 0 ? (
+                            <span style={{ padding: '4px 8px', borderRadius: '12px', fontSize: '11px', ...statusColor }}>
+                              {statusText}
+                            </span>
+                          ) : (
+                            <span style={{ padding: '4px 8px', borderRadius: '12px', fontSize: '11px', background: '#f3f4f6', color: '#6b7280' }}>
+                              No Certificates
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <button 
+                            className="cert-act cert-act--add"
+                            onClick={(e) => { e.stopPropagation(); openEmployeeCertPage(emp); }}
+                            title="View/Add Certificates"
+                            style={{ background: '#10b981', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                          >
+                            <FaPlus size={20} /> Add
+                          </button>
+                        </td>
+                      </tr>
                     );
                   }) : (
                     <tr>
@@ -647,152 +886,60 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
               </table>
             </div>
 
-<div className="cert-table-footer">
-  <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
-    Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
-  </div>
-  
-  {/* Right side - Pagination */}
-  {totalPages > 1 && (
-    <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-      <button 
-        className="cert-page-btn" 
-        disabled={page === 0} 
-        onClick={() => setPage(page - 1)}
-        style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-      >
-        ← Prev
-      </button>
-      {getPaginationRange().map((pg, i) =>
-        pg === '...' ? (
-          <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
-        ) : (
-          <button 
-            key={pg} 
-            className={`cert-page-num ${pg === page ? 'active' : ''}`} 
-            onClick={() => setPage(pg)}
-            style={{ 
-              padding: '6px 10px', 
-              border: '1px solid #e5e7eb', 
-              background: pg === page ? '#9d174d' : 'white', 
-              color: pg === page ? 'white' : '#374151',
-              borderRadius: '6px', 
-              cursor: 'pointer', 
-              fontSize: '12px',
-              minWidth: '34px'
-            }}
-          >
-            {pg + 1}
-          </button>
-        )
-      )}
-      <button 
-        className="cert-page-btn" 
-        disabled={page + 1 >= totalPages} 
-        onClick={() => setPage(page + 1)}
-        style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-      >
-        Next →
-      </button>
-    </div>
-  )}
-</div>
+            <div className="cert-table-footer">
+              <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
+                Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+              </div>
+              
+              {totalPages > 1 && (
+                <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <button 
+                    className="cert-page-btn" 
+                    disabled={page === 0} 
+                    onClick={() => setPage(page - 1)}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    ← Prev
+                  </button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
+                    ) : (
+                      <button 
+                        key={pg} 
+                        className={`cert-page-num ${pg === page ? 'active' : ''}`} 
+                        onClick={() => setPage(pg)}
+                        style={{ 
+                          padding: '6px 10px', 
+                          border: '1px solid #e5e7eb', 
+                          background: pg === page ? '#9d174d' : 'white', 
+                          color: pg === page ? 'white' : '#374151',
+                          borderRadius: '6px', 
+                          cursor: 'pointer', 
+                          fontSize: '12px',
+                          minWidth: '34px'
+                        }}
+                      >
+                        {pg + 1}
+                      </button>
+                    )
+                  )}
+                  <button 
+                    className="cert-page-btn" 
+                    disabled={page + 1 >= totalPages} 
+                    onClick={() => setPage(page + 1)}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </>
-      ) : (
-        <div className="cert-form-wrap">
-          <form onSubmit={handleSubmit} className="cert-form-compact">
-            <div className="cert-form-section-compact">
-              <div className="cert-section-label">Certification Details</div>
-              <div className="cert-form-grid-3col">
-                {!propEmployeeId && (
-                  <div className={`cert-field-compact ${touched.employeeId && errors.employeeId ? 'has-error' : ''}`}>
-                    <label className="required">Employee</label>
-                    <select value={formData.employeeId} onChange={(e) => handleChange('employeeId', e.target.value)} onBlur={() => handleBlur('employeeId')}>
-                      <option value="">Select employee</option>
-                      {DUMMY_EMPLOYEES.map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.name} ({emp.department})</option>
-                      ))}
-                    </select>
-                    <FieldError msg={errors.employeeId} />
-                  </div>
-                )}
-                
-                <div className={`cert-field-compact ${touched.certificationName && errors.certificationName ? 'has-error' : ''}`}>
-                  <label className="required">Certification Name</label>
-                  <input type="text" placeholder="e.g., AWS Certified Solutions Architect" value={formData.certificationName} onChange={(e) => handleChange('certificationName', e.target.value)} onBlur={() => handleBlur('certificationName')} />
-                  <FieldError msg={errors.certificationName} />
-                </div>
-                
-                <div className={`cert-field-compact ${touched.issuedBy && errors.issuedBy ? 'has-error' : ''}`}>
-                  <label className="required">Issuing Authority</label>
-                  <input type="text" placeholder="e.g., Amazon Web Services" value={formData.issuedBy} onChange={(e) => handleChange('issuedBy', e.target.value)} onBlur={() => handleBlur('issuedBy')} />
-                  <FieldError msg={errors.issuedBy} />
-                </div>
-                
-                <div className="cert-field-compact">
-                  <label>Certificate Number</label>
-                  <input type="text" placeholder="Optional reference number" value={formData.certificateNumber} onChange={(e) => handleChange('certificateNumber', e.target.value)} />
-                </div>
-                
-                <div className={`cert-field-compact ${touched.issueDate && errors.issueDate ? 'has-error' : ''}`}>
-                  <label className="required">Issue Date</label>
-                  <input type="date" value={formData.issueDate} onChange={(e) => handleChange('issueDate', e.target.value)} onBlur={() => handleBlur('issueDate')} />
-                  <FieldError msg={errors.issueDate} />
-                </div>
-                
-                <div className="cert-field-compact">
-                  <label>Expiry Date</label>
-                  <input type="date" value={formData.expiryDate} min={formData.issueDate || undefined} onChange={(e) => handleChange('expiryDate', e.target.value)} />
-                  <FieldError msg={errors.expiryDate} />
-                </div>
-                
-                <div className="cert-field-compact">
-                  <label>Reminder (days before expiry)</label>
-                  <input type="number" placeholder="30" value={formData.reminderDays} min="0" max="365" onChange={(e) => handleChange('reminderDays', e.target.value)} />
-                  <small style={{ fontSize: '11px', color: '#666' }}>Email notifications sent before expiry</small>
-                </div>
-                
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
-                  <label>Upload Certificate (Optional)</label>
-                  <div style={{ border: '1px dashed #ccc', borderRadius: '6px', padding: '12px', textAlign: 'center', background: '#f9fafb' }}>
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="certificate-upload" />
-                    <label htmlFor="certificate-upload" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: '#4f46e5', color: 'white', borderRadius: '6px', fontSize: '13px' }}>
-                      <FaUpload size={12} /> Choose File
-                    </label>
-                    {formData.certificateFileName && (
-                      <div style={{ marginTop: '10px', fontSize: '13px', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                        {formData.certificateFileName.endsWith('.pdf') ? <FaFilePdf size={14} /> : <FaFileImage size={14} />}
-                        {formData.certificateFileName}
-                      </div>
-                    )}
-                    <small style={{ fontSize: '11px', color: '#666', display: 'block', marginTop: '8px' }}>Supported: PDF, JPG, PNG (Max 5MB)</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="cert-divider" />
-            
-            <div className="cert-form-section-compact">
-              <div className="cert-section-label">Additional Information</div>
-              <div className={`cert-field-compact`} style={{ gridColumn: 'span 3' }}>
-                <label>Notes</label>
-                <textarea rows={3} placeholder="Any additional information about this certification..." value={formData.notes} onChange={(e) => handleChange('notes', e.target.value)} />
-              </div>
-            </div>
-            
-            <div className="cert-form-actions">
-              <button type="button" className="cert-cancel-btn" onClick={() => { setView('list'); resetForm(); }}>Cancel</button>
-              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <FaSave size={12} /> {editMode ? 'Update Certification' : 'Add Certification'}
-              </button>
-            </div>
-          </form>
-        </div>
       )}
 
-      {/* Delete Modal */} 
+      {/* Delete Modal */}
       {showDeleteModal && certToDelete && (
         <div className="cert-modal-overlay" onClick={() => setShowDeleteModal(false)}>
           <div className="cert-modal" onClick={(e) => e.stopPropagation()}>
@@ -828,89 +975,7 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
         </div>
       )}
 
-      {/* View Certificate Modal */}
-      {/* {showViewModal && certToView && (
-        <div className="cert-modal-overlay" onClick={() => setShowViewModal(false)}>
-          <div className="cert-modal cert-view-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '90%', width: '800px', maxHeight: '90vh', overflow: 'auto' }}>
-            <div className="cert-modal-icon" style={{ background: '#e0e7ff', color: '#4f46e5' }}><FaFileAlt size={18} /></div>
-            <h3 className="cert-modal-title">Certificate Document</h3>
-            <p className="cert-modal-body" style={{ textAlign: 'center' }}><strong>{certToView.certificationName}</strong><br />{certToView.employeeName}</p>
-            <div style={{ margin: '20px 0', padding: '20px', background: '#f9fafb', borderRadius: '8px', textAlign: 'center', minHeight: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              {certToView.certificateFileData ? (
-                certToView.certificateFileData.startsWith('data:image') ? (
-                  <div><img src={certToView.certificateFileData} alt="Certificate" style={{ maxWidth: '100%', maxHeight: '500px', borderRadius: '4px', objectFit: 'contain' }} /><p style={{ marginTop: '12px', fontSize: '12px', color: '#666' }}>File: {certToView.certificateFileName}</p></div>
-                ) : certToView.certificateFileData.startsWith('data:application/pdf') ? (
-                  <div style={{ textAlign: 'center', width: '100%' }}><FaFilePdf size={80} color="#ef4444" /><p style={{ marginTop: '16px', marginBottom: '16px' }}>{certToView.certificateFileName || 'Certificate.pdf'}</p><iframe src={certToView.certificateFileData} title="Certificate PDF" style={{ width: '100%', height: '500px', border: 'none', borderRadius: '4px' }} /></div>
-                ) : (
-                  <div><FaFileAlt size={80} color="#4f46e5" /><p style={{ marginTop: '16px' }}>{certToView.certificateFileName}</p><p style={{ color: '#666', fontSize: '13px', marginTop: '8px' }}>Certificate file is available</p></div>
-                )
-              ) : (
-                <div><FaFileAlt size={64} /><p style={{ marginTop: '16px' }}>No certificate uploaded</p><p style={{ fontSize: '12px', marginTop: '8px' }}>Click Edit to upload a certificate</p></div>
-              )}
-            </div>
-            <div className="cert-modal-actions">
-              <button className="cert-modal-cancel" onClick={() => setShowViewModal(false)}>Close</button>
-              {certToView.certificateFileData && <a href={certToView.certificateFileData} download={certToView.certificateFileName || 'certificate'} style={{ padding: '8px 16px', background: '#10b981', color: 'white', textDecoration: 'none', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><FaUpload size={12} /> Download</a>}
-            </div>
-          </div>
-        </div>
-      )} */}
-     {/* View Certificate Modal */}
-{showViewModal && certToView && (
-  <div className="cert-modal-overlay" onClick={() => setShowViewModal(false)}>
-    <div className="cert-modal cert-view-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '90%', width: '800px', maxHeight: '90vh', overflow: 'auto' }}>
-      <div className="cert-modal-icon" style={{ background: '#e0e7ff', color: '#4f46e5' }}><FaFileAlt size={18} /></div>
-      <h3 className="cert-modal-title">Certificate Document</h3>
-      <p className="cert-modal-body" style={{ textAlign: 'center' }}><strong>{certToView.certificationName}</strong><br />{certToView.employeeName}</p>
-      <div style={{ margin: '20px 0', padding: '20px', background: '#f9fafb', borderRadius: '8px', textAlign: 'center', minHeight: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        {/* SAFE CHECK - certToView aur uski property dono check karo */}
-        {certToView && certToView.certificateFileData ? (
-          (certToView.certificateFileData.startsWith('data:image') || 
-           certToView.certificateFileData.startsWith('https://')) ? (
-            <div>
-              <img 
-                src={certToView.certificateFileData} 
-                alt="Certificate" 
-                style={{ maxWidth: '100%', maxHeight: '500px', borderRadius: '4px', objectFit: 'contain' }} 
-              />
-              <p style={{ marginTop: '12px', fontSize: '12px', color: '#666' }}>File: {certToView.certificateFileName || 'Certificate'}</p>
-            </div>
-          ) : certToView.certificateFileData.startsWith('data:application/pdf') ? (
-            <div style={{ textAlign: 'center', width: '100%' }}>
-              <FaFilePdf size={80} color="#ef4444" />
-              <p style={{ marginTop: '16px', marginBottom: '16px' }}>{certToView.certificateFileName || 'Certificate.pdf'}</p>
-              <iframe src={certToView.certificateFileData} title="Certificate PDF" style={{ width: '100%', height: '500px', border: 'none', borderRadius: '4px' }} />
-            </div>
-          ) : (
-            <div>
-              <FaFileAlt size={80} color="#4f46e5" />
-              <p style={{ marginTop: '16px' }}>{certToView.certificateFileName || 'Certificate'}</p>
-              <p style={{ color: '#666', fontSize: '13px', marginTop: '8px' }}>Certificate file is available</p>
-            </div>
-          )
-        ) : (
-          <div>
-            <FaFileAlt size={64} />
-            <p style={{ marginTop: '16px' }}>No certificate uploaded</p>
-            <p style={{ fontSize: '12px', marginTop: '8px' }}>Click Edit to upload a certificate</p>
-          </div>
-        )}
-      </div>
-      <div className="cert-modal-actions">
-        <button className="cert-modal-cancel" onClick={() => setShowViewModal(false)}>Close</button>
-        {certToView && certToView.certificateFileData && (
-          <a 
-            href={certToView.certificateFileData} 
-            download={certToView.certificateFileName || 'certificate'} 
-            style={{ padding: '8px 16px', background: '#10b981', color: 'white', textDecoration: 'none', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-          >
-            <FaUpload size={12} /> Download
-          </a>
-        )}
-      </div>
-    </div>
-  </div>
-)}
+     
     </div>
   );
 };

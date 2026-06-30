@@ -1,31 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, FaUserTie, FaBuilding, FaBriefcase, FaCalendarAlt, 
-  FaTimes, FaFilter, FaChartLine, FaCheckCircle, FaClock, FaEdit, FaSave,FaEye
+  FaTimes, FaEdit, FaSave, FaPlus, FaTrash,
+  FaArrowLeft, FaEye
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
-const EmployeeDesignation = () => {
+const EmployeeDesignation = ({ user, onCancel }) => {
   const [employees, setEmployees] = useState([
     { id: 1, name: 'John Doe', code: 'EMP001', email: 'john@example.com', department: 'IT', currentDesignation: 'Software Engineer', joiningDate: '2020-01-15', status: 'Active' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', email: 'jane@example.com', department: 'HR', currentDesignation: 'HR Manager', joiningDate: '2019-06-10', status: 'Active' },
     { id: 3, name: 'Mike Johnson', code: 'EMP003', email: 'mike@example.com', department: 'IT', currentDesignation: 'Senior Developer', joiningDate: '2021-03-20', status: 'Active' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', email: 'sarah@example.com', department: 'Sales', currentDesignation: 'Sales Manager', joiningDate: '2010-08-01', status: 'Retired' },
-    { id: 5, name: 'David Brown', code: 'EMP005', email: 'david@example.com', department: 'Finance', currentDesignation: 'Accountant', joiningDate: '2022-01-10', status: 'Terminated' },
+    { id: 4, name: 'Sarah Williams', code: 'EMP004', email: 'sarah@example.com', department: 'Sales', currentDesignation: 'Sales Manager', joiningDate: '2010-08-01', status: 'Inactive' },
+    { id: 5, name: 'David Brown', code: 'EMP005', email: 'david@example.com', department: 'Finance', currentDesignation: 'Accountant', joiningDate: '2022-01-10', status: 'Inactive' },
     { id: 6, name: 'Emily Wilson', code: 'EMP006', email: 'emily@example.com', department: 'Marketing', currentDesignation: 'Marketing Manager', joiningDate: '2018-09-15', status: 'Active' },
     { id: 7, name: 'Robert Taylor', code: 'EMP007', email: 'robert@example.com', department: 'Operations', currentDesignation: 'Operations Manager', joiningDate: '2017-03-10', status: 'Active' },
     { id: 8, name: 'Lisa Anderson', code: 'EMP008', email: 'lisa@example.com', department: 'IT', currentDesignation: 'Product Manager', joiningDate: '2019-11-20', status: 'Active' },
-    { id: 9, name: 'Amit Kumar', code: 'EMP009', email: 'amit@example.com', department: 'IT', currentDesignation: 'Tech Lead', joiningDate: '2018-05-15', status: 'Active' },
+    { id: 9, name: 'Amit Kumar', code: 'EMP009', email: 'amit@example.com', department: 'IT', currentDesignation: 'Tech Lead', joiningDate: '2018-05-15', status: 'Inactive' },
     { id: 10, name: 'Priya Singh', code: 'EMP010', email: 'priya@example.com', department: 'HR', currentDesignation: 'HR Executive', joiningDate: '2021-08-20', status: 'Active' }
   ]);
 
-  const [selectedEmployee, setSelectedEmployee] = useState('');
-  const [selectedDesignation, setSelectedDesignation] = useState('');
-  const [filteredData, setFilteredData] = useState([]);
-  const [showDetails, setShowDetails] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredEmployees, setFilteredEmployees] = useState(employees);
   const [showForm, setShowForm] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus: '' });
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -36,6 +36,21 @@ const EmployeeDesignation = () => {
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(4);
+  
+  // Employee Search State
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+
+  const DUMMY_EMPLOYEES = [
+    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
+    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
+    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
+    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
+    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
+  ];
 
   const DESIGNATIONS = [
     'Software Engineer',
@@ -51,105 +66,74 @@ const EmployeeDesignation = () => {
   ];
 
   const departments = ['IT', 'HR', 'Finance', 'Sales', 'Marketing', 'Operations'];
-  const statuses = ['Active', 'Retired', 'Terminated'];
+  const statuses = ['Active', 'Inactive'];
 
-  // Designation-wise mapping (career path)
-  const getDesignationHistory = (employee, designation) => {
-    const designationHistory = {
-      'Software Engineer': [
-        { date: '2020-01-15', designation: 'Associate Engineer' },
-        { date: '2021-03-01', designation: 'Software Engineer' }
-      ],
-      'Senior Developer': [
-        { date: '2021-03-20', designation: 'Software Engineer' },
-        { date: '2023-05-01', designation: 'Senior Developer' }
-      ],
-      'Tech Lead': [
-        { date: '2018-05-15', designation: 'Software Engineer' },
-        { date: '2020-04-01', designation: 'Senior Developer' },
-        { date: '2022-01-15', designation: 'Tech Lead' }
-      ],
-      'Product Manager': [
-        { date: '2019-11-20', designation: 'Product Owner' },
-        { date: '2022-04-01', designation: 'Product Manager' }
-      ],
-      'HR Manager': [
-        { date: '2019-06-10', designation: 'HR Executive' },
-        { date: '2022-04-01', designation: 'HR Manager' }
-      ],
-      'HR Executive': [
-        { date: '2021-08-20', designation: 'HR Executive' }
-      ],
-      'Sales Manager': [
-        { date: '2010-08-01', designation: 'Sales Executive' },
-        { date: '2013-04-01', designation: 'Sr. Sales Executive' },
-        { date: '2017-01-15', designation: 'Assistant Sales Manager' },
-        { date: '2021-03-01', designation: 'Sales Manager' }
-      ],
-      'Marketing Manager': [
-        { date: '2018-09-15', designation: 'Marketing Executive' },
-        { date: '2020-04-01', designation: 'Sr. Marketing Executive' },
-        { date: '2022-01-15', designation: 'Marketing Manager' }
-      ],
-      'Operations Manager': [
-        { date: '2017-03-10', designation: 'Operations Executive' },
-        { date: '2019-06-01', designation: 'Sr. Operations Executive' },
-        { date: '2021-01-15', designation: 'Operations Manager' }
-      ],
-      'Accountant': [
-        { date: '2022-01-10', designation: 'Junior Accountant' },
-        { date: '2022-06-15', designation: 'Accountant' }
-      ]
-    };
-    
-    return designationHistory[designation] || [{ date: employee.joiningDate, designation: designation }];
+  // Filter employees by search
+  useEffect(() => {
+    const search = searchTerm.toLowerCase();
+    const filtered = employees.filter(emp => 
+      emp.name.toLowerCase().includes(search) ||
+      emp.code.toLowerCase().includes(search) ||
+      emp.department.toLowerCase().includes(search) ||
+      emp.currentDesignation.toLowerCase().includes(search)
+    );
+    setFilteredEmployees(filtered);
+    setPage(0);
+  }, [searchTerm, employees]);
+
+  // Pagination
+  const totalItems = filteredEmployees.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
+
+  const employeeSearchResults = DUMMY_EMPLOYEES.filter(emp => {
+    const search = employeeSearchTerm.toLowerCase();
+    return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
+  });
+
+  const handleEmployeeSelect = (employee) => {
+    setSelectedEmployee(employee);
+    setFormData(prev => ({
+      ...prev,
+      name: employee.name,
+      code: employee.code,
+      department: employee.department,
+      currentDesignation: employee.designation
+    }));
+    setEmployeeSearchTerm(employee.name);
+    setShowEmployeeDropdown(false);
   };
 
-  const handleSearch = () => {
-    if (!selectedEmployee && !selectedDesignation) {
-      toast.warning('Select Filter', 'Please select either Employee or Designation');
-      return;
-    }
-    
-    let results = [];
-    
-    if (selectedEmployee) {
-      const employee = employees.find(emp => emp.name === selectedEmployee);
-      if (employee) {
-        results = [{
-          ...employee,
-          designationHistory: getDesignationHistory(employee, employee.currentDesignation)
-        }];
-      }
-    } else if (selectedDesignation) {
-      results = employees.filter(emp => emp.currentDesignation === selectedDesignation)
-        .map(emp => ({
-          ...emp,
-          designationHistory: getDesignationHistory(emp, emp.currentDesignation)
-        }));
-    }
-    
-    setFilteredData(results);
-    setShowForm(false);
-    if (results.length === 0) {
-      toast.info('No Results', 'No employees found for selected criteria');
-    } else {
-      toast.success('Success', `${results.length} record(s) found`);
-    }
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    return range;
   };
 
-  const handleReset = () => {
-    setSelectedEmployee('');
-    setSelectedDesignation('');
-    setFilteredData([]);
-    setShowDetails(false);
-    setShowForm(false);
+  const handleAddNew = () => {
     setEditingEmployee(null);
+    setFormData({
+      name: '',
+      code: '',
+      department: '',
+      currentDesignation: '',
+      joiningDate: '',
+      status: 'Active'
+    });
+    setEmployeeSearchTerm('');
+    setSelectedEmployee(null);
+    setShowForm(true);
   };
-
- 
 
   const handleEdit = (employee) => {
+    const emp = DUMMY_EMPLOYEES.find(e => e.id === employee.id);
+    setSelectedEmployee(emp || null);
     setEditingEmployee(employee);
     setFormData({
       name: employee.name,
@@ -159,9 +143,27 @@ const EmployeeDesignation = () => {
       joiningDate: employee.joiningDate,
       status: employee.status
     });
+    setEmployeeSearchTerm(emp?.name || '');
     setShowForm(true);
-    setFilteredData([]);
   };
+
+  const handleDelete = (id) => {
+    if (window.confirm('Are you sure you want to delete this employee?')) {
+      const updatedEmployees = employees.filter(emp => emp.id !== id);
+      setEmployees(updatedEmployees);
+      toast.success('Deleted', 'Employee record deleted successfully');
+    }
+  };
+
+  const handleStatusToggle = (id, name, currentStatus) => {
+  const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+  setStatusAction({
+    id,
+    name,
+    newStatus
+  });
+  setShowStatusModal(true);
+};
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -204,15 +206,79 @@ const EmployeeDesignation = () => {
       return;
     }
     
-    const updatedEmployees = employees.map(emp => 
-      emp.id === editingEmployee.id ? { ...emp, ...formData } : emp
-    );
-    
-    setEmployees(updatedEmployees);
-    toast.success('Success', 'Employee updated successfully');
+    if (editingEmployee) {
+      const updatedEmployees = employees.map(emp => 
+        emp.id === editingEmployee.id ? { ...emp, ...formData } : emp
+      );
+      setEmployees(updatedEmployees);
+      toast.success('Success', 'Employee updated successfully');
+      setEditingEmployee(null);
+    } else {
+      const newEmployee = {
+        id: employees.length > 0 ? Math.max(...employees.map(e => e.id)) + 1 : 1,
+        ...formData,
+        email: formData.code.toLowerCase() + '@example.com'
+      };
+      setEmployees([newEmployee, ...employees]);
+      toast.success('Success', 'Employee added successfully');
+    }
+    resetForm();
     setShowForm(false);
+    setPage(0);
+  };
+
+  const confirmStatusChange = () => {
+  const { id, newStatus } = statusAction;
+  
+  const updatedEmployees = employees.map(emp => {
+    if (emp.id === id) {
+      return { ...emp, status: newStatus };
+    }
+    return emp;
+  });
+  setEmployees(updatedEmployees);
+  
+  if (filteredEmployees.length > 0) {
+    setFilteredEmployees(filteredEmployees.map(emp => {
+      if (emp.id === id) {
+        return { ...emp, status: newStatus };
+      }
+      return emp;
+    }));
+  }
+  
+  setShowStatusModal(false);
+  toast.success('Status Updated', `Employee ${statusAction.name} is now ${newStatus}`);
+};
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      code: '',
+      department: '',
+      currentDesignation: '',
+      joiningDate: '',
+      status: 'Active'
+    });
+    setErrors({});
+    setTouched({});
     setEditingEmployee(null);
-    handleReset();
+    setEmployeeSearchTerm('');
+    setSelectedEmployee(null);
+  };
+
+  const handleCancelForm = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  const handleBackToList = () => {
+    resetForm();
+    setShowForm(false);
+  };
+
+  const handleCancel = () => {
+    if (onCancel) onCancel();
   };
 
   const formatDate = (dateStr) => {
@@ -223,14 +289,11 @@ const EmployeeDesignation = () => {
   const getStatusBadge = (status) => {
     const styles = {
       Active: { bg: '#d1fae5', color: '#065f46' },
-      Retired: { bg: '#fed7aa', color: '#9a3412' },
-      Terminated: { bg: '#fee2e2', color: '#991b1b' }
+      Inactive: { bg: '#fee2e2', color: '#991b1b' }
     };
     const style = styles[status] || styles.Active;
-    return <span className="badge" style={{ backgroundColor: style.bg, color: style.color, padding: '4px 8px', borderRadius: '4px' }}>{status}</span>;
+    return <span className="badge" style={{ backgroundColor: style.bg, color: style.color, padding: '4px 8px' }}>{status}</span>;
   };
-
-  const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
   return (
     <div className="cert-root">
@@ -238,103 +301,104 @@ const EmployeeDesignation = () => {
       <div className="cert-header">
         <div>
           <h1 className="cert-title">Employee Designation</h1>
-          <p className="cert-subtitle">View employee designation details and career progression</p>
+          <p className="cert-subtitle">Manage employee designation details and career progression</p>
         </div>
-        {showForm && (
-          <button type="button" className="cert-back-btn" onClick={handleReset} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}>
-            <FaTimes size={12} /> Back
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!showForm && (
+            <button className="cert-add-btn" onClick={handleAddNew}>
+              <FaPlus size={13} /> Add Employee
+            </button>
+          )}
+          {showForm && (
+            <button 
+              type="button" 
+              className="cert-back-btn" 
+              onClick={handleBackToList}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
+            >
+              <FaArrowLeft size={12} /> Back
+            </button>
+          )}
+          {!showForm && onCancel && (
+            <button className="cert-cancel-btn" onClick={handleCancel}>
+              <FaTimes size={13} /> Cancel
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Search Section */}
-      {!showForm && (
-        <div className="card border-0 shadow-sm mb-4">
-          
-          <div className="card-body">
-            <div className="row g-3">
-              <div className="col-md-5">
-                <label className="form-label fw-bold">Select Employee</label>
-                <select 
-                  className="form-select" 
-                  value={selectedEmployee}
-                  onChange={(e) => {
-                    setSelectedEmployee(e.target.value);
-                    if (e.target.value) setSelectedDesignation('');
-                  }}
-                  style={{ width: '100%' }}
-                >
-                  <option value="">-- Select Employee --</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.name}>{emp.name} ({emp.code})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-md-5">
-                <label className="form-label fw-bold">Select Designation</label>
-                <select 
-                  className="form-select" 
-                  value={selectedDesignation}
-                  onChange={(e) => {
-                    setSelectedDesignation(e.target.value);
-                    if (e.target.value) setSelectedEmployee('');
-                  }}
-                  style={{ width: '100%' }}
-                >
-                  <option value="">-- Select Designation --</option>
-                  {DESIGNATIONS.map(des => (
-                    <option key={des} value={des}>{des}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-md-2 d-flex align-items-end gap-2">
-                <button className="btn btn-primary" onClick={handleSearch} style={{ flex: 1 }}>
-              Search
-                </button>
-                <button className="btn btn-outline-secondary" onClick={handleReset} style={{ flex: 1 }}>
-           Reset
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Form */}
-      {showForm && editingEmployee && (
+      {showForm ? (
         <div className="cert-form-wrap mb-4">
           <form onSubmit={handleSubmit} className="cert-form-compact">
             <div className="cert-form-section-compact">
-              <div className="cert-section-label">Edit Employee Details</div>
+              <div className="cert-section-label">Employee Details</div>
               <div className="cert-form-grid-3col">
-                <div className={`cert-field-compact ${touched.name && errors.name ? 'has-error' : ''}`}>
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label className="required">Employee Name</label>
-                  <input type="text" value={formData.name} onChange={(e) => handleChange('name', e.target.value)} onBlur={() => handleBlur('name')} />
-                  <FieldError msg={errors.name} />
+                  <div className="position-relative">
+                    <div className="input-group">
+                      <span className="input-group-text bg-light">
+                        <FaSearch size={14} className="text-muted" />
+                      </span>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Type employee name to search..."
+                        value={employeeSearchTerm}
+                        onChange={(e) => {
+                          setEmployeeSearchTerm(e.target.value);
+                          setShowEmployeeDropdown(true);
+                        }}
+                        onFocus={() => setShowEmployeeDropdown(true)}
+                      />
+                    </div>
+                    
+                    {showEmployeeDropdown && employeeSearchTerm && (
+                      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
+                        <div className="card-body p-2">
+                          {employeeSearchResults.length > 0 ? (
+                            employeeSearchResults.map(emp => (
+                              <div
+                                key={emp.id}
+                                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => handleEmployeeSelect(emp)}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                              >
+                                <div>
+                                  <div className="fw-bold">{emp.name}</div>
+                                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
+                                </div>
+                                <div>
+                                  <span className="badge bg-light text-dark">{emp.designation}</span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-3 text-muted">
+                              <small>No employees found</small>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
-                <div className={`cert-field-compact ${touched.code && errors.code ? 'has-error' : ''}`}>
-                  <label className="required">Employee Code</label>
-                  <input type="text" value={formData.code} onChange={(e) => handleChange('code', e.target.value)} onBlur={() => handleBlur('code')} />
-                  <FieldError msg={errors.code} />
+                <div className="cert-field-compact">
+                  <label>Employee Code</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
                 </div>
                 
-                <div className={`cert-field-compact ${touched.department && errors.department ? 'has-error' : ''}`}>
-                  <label className="required">Department</label>
-                  <select value={formData.department} onChange={(e) => handleChange('department', e.target.value)} onBlur={() => handleBlur('department')}>
-                    <option value="">Select Department</option>
-                    {departments.map(dept => <option key={dept} value={dept}>{dept}</option>)}
-                  </select>
-                  <FieldError msg={errors.department} />
+                <div className="cert-field-compact">
+                  <label>Department</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
                 </div>
                 
-                <div className={`cert-field-compact ${touched.currentDesignation && errors.currentDesignation ? 'has-error' : ''}`}>
-                  <label className="required">Designation</label>
-                  <select value={formData.currentDesignation} onChange={(e) => handleChange('currentDesignation', e.target.value)} onBlur={() => handleBlur('currentDesignation')}>
-                    <option value="">Select Designation</option>
-                    {DESIGNATIONS.map(des => <option key={des} value={des}>{des}</option>)}
-                  </select>
-                  <FieldError msg={errors.currentDesignation} />
+                <div className="cert-field-compact">
+                  <label>Designation</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
                 </div>
                 
                 <div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
@@ -342,176 +406,192 @@ const EmployeeDesignation = () => {
                   <input type="date" value={formData.joiningDate} onChange={(e) => handleChange('joiningDate', e.target.value)} onBlur={() => handleBlur('joiningDate')} />
                   <FieldError msg={errors.joiningDate} />
                 </div>
-                
-                <div className="cert-field-compact">
-                  <label>Status</label>
-                  <select value={formData.status} onChange={(e) => handleChange('status', e.target.value)}>
-                    {statuses.map(st => <option key={st} value={st}>{st}</option>)}
-                  </select>
-                </div>
+              
               </div>
             </div>
             
             <div className="cert-form-actions">
-              <button type="button" className="cert-cancel-btn" onClick={handleReset}>Cancel</button>
+              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
               <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <FaSave size={12} /> Update Employee
+                <FaSave size={12} /> {editingEmployee ? 'Update Employee' : 'Save Employee'}
               </button>
             </div>
           </form>
         </div>
-      )}
-
-      {/* Results Section */}
-      {!showForm && filteredData.length > 0 && (
+      ) : (
         <>
-         
-          {/* Results Table */}
+          {/* Search Bar */}
+          <div className="emp-search-bar">
+            <div className="emp-search-wrap">
+              <FaSearch className="emp-search-icon" size={12} />
+              <input
+                className="emp-search-input"
+                type="text"
+                placeholder="Search by Name, Code, Department or Designation..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button className="cert-search-clear" onClick={() => setSearchTerm('')}>
+                  <FaTimes size={11} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Employees Table */}
           <div className="cert-table-card">
             <div className="cert-table-wrap">
               <table className="cert-table">
                 <thead>
                   <tr>
-                    <th style={{ width: 50 }}>#</th>
-                    <th style={{ width: 200 }}>Employee</th>
-                    <th style={{ width: 120 }}>Department</th>
-                    <th style={{ width: 180 }}>Current Designation</th>
-                    <th style={{ width: 110 }}>Joining Date</th>
-                    <th style={{ width: 100 }}>Status</th>
-                    <th style={{ width: 100 }}>Actions</th>
+                    <th>#</th>
+                    <th>Employee Name</th>
+                    <th>Code</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Joining Date</th>
+                    <th>Status</th>
+                    <th style={{ width: 120 }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.map((emp, idx) => (
-                    <tr key={emp.id}>
-                      <td className="text-center">{idx + 1}</td>
-                      <td>
-                        <div className="fw-bold">{emp.name}</div>
-                        <small className="text-muted">{emp.code}</small>
-                      </td>
-                      <td>{emp.department}</td>
-                      <td>
-                        <span className="cert-status-badge" style={{ background: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '12px' }}>
-                          <FaBriefcase className="me-1" size={10} /> {emp.currentDesignation}
-                        </span>
-                      </td>
-                      <td>{formatDate(emp.joiningDate)}</td>
-                      <td>{getStatusBadge(emp.status)}</td>
-                      <td className="text-center">
-                        <div className="cert-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                          
-                          <button className="cert-act cert-act--edit" onClick={() => handleEdit(emp)} title="Edit Employee" style={{ background: '#e0e7ff', border: 'none', borderRadius: '6px', padding: '6px', cursor: 'pointer' }}>
-                            <FaEdit size={12} style={{ color: '#4f46e5' }} />
-                          </button>
-                        </div>
-                      </td>
+                  {currentEmployees.length > 0 ? (
+                    currentEmployees.map((emp, idx) => (
+                      <tr key={emp.id}>
+                        <td className="text-center">{startIndex + idx + 1}</td>
+                        <td className="fw-bold">{emp.name}</td>
+                        <td>{emp.code}</td>
+                        <td>{emp.department}</td>
+                        <td>
+                          <span className="badge" style={{ background: '#e0e7ff', color: '#4f46e5', padding: '4px 8px' }}>
+                            {emp.currentDesignation}
+                          </span>
+                        </td>
+                        <td>{formatDate(emp.joiningDate)}</td>
+<td>
+  <div 
+    className="d-flex align-items-center gap-1" 
+    style={{ cursor: 'pointer' }}
+    onClick={() => handleStatusToggle(emp.id, emp.name, emp.status)}
+  >
+    <div className="position-relative" style={{
+      width: '28px',
+      height: '16px',
+      borderRadius: '50px',
+      backgroundColor: emp.status === 'Active' ? '#9d174d' : '#d1d5db',
+      transition: '0.2s',
+      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)',
+      flexShrink: 0
+    }}>
+      <div className="position-absolute" style={{
+        width: '12px',
+        height: '12px',
+        borderRadius: '50%',
+        backgroundColor: 'white',
+        top: '2px',
+        left: emp.status === 'Active' ? '14px' : '2px',
+        transition: '0.2s',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+      }} />
+    </div>
+    <span className="small fw-medium" style={{
+      color: emp.status === 'Active' ? '#9d174d' : '#94a3b8',
+      minWidth: '40px'
+    }}>
+      {emp.status}
+    </span>
+  </div>
+</td>                       <td className="text-center">
+                          <div className="cert-actions">
+                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(emp)} title="Edit">
+                              <FaEdit size={12} />
+                            </button>
+                            <button className="cert-act cert-act--del" onClick={() => handleDelete(emp.id)} title="Delete">
+                              <FaTrash size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="8" className="text-center py-5">No employees found</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
+              
+   
+{showStatusModal && (
+          <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
+            <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="emp-modal-icon">{statusAction.newStatus === "y" ? "✅" : "⛔"}</div>
+              <h3 className="emp-modal-title">Confirm Status Change</h3>
+              <p className="emp-modal-body">
+                Are you sure you want to <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
+                <strong>{statusAction.name}</strong>?
+              </p>
+              <p className="emp-modal-warn">
+                {statusAction.newStatus === "n"
+                  ? "Inactive designations cannot be edited until reactivated."
+                  : "Active designations will be available for selection."}
+              </p>
+              <div className="emp-modal-actions">
+                <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>Cancel</button>
+                <button className="emp-modal-confirm" onClick={confirmStatusChange}>Confirm</button>
+              </div>
             </div>
+          </div>
+        )}
+            </div>
+            
+            {/* Pagination */}
+          {totalItems > 0 && (
+  <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <span className="emp-page-info">
+        Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} events
+      </span>
+    </div>
+    <div className="emp-page-controls">
+      <button 
+        className="emp-page-btn" 
+        disabled={page === 0} 
+        onClick={() => setPage(page - 1)}
+      >
+        ← Prev
+      </button>
+      {getPaginationRange().map((pg, i) =>
+        pg === '...' ? (
+          <span key={`dots-${i}`} className="emp-page-dots">…</span>
+        ) : (
+          <button 
+            key={pg} 
+            className={`emp-page-num ${pg === page ? 'active' : ''}`} 
+            onClick={() => setPage(pg)}
+          >
+            {pg + 1}
+          </button>
+        )
+      )}
+      <button 
+        className="emp-page-btn" 
+        disabled={page + 1 >= totalPages} 
+        onClick={() => setPage(page + 1)}
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+)}
           </div>
         </>
-      )}
-
-      {/* Designation Details Modal */}
-      {showDetails && selectedRecord && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
-              <div className="modal-header bg-primary text-white">
-                <h5 className="modal-title">
-                  <FaBriefcase className="me-2" /> Designation History - {selectedRecord.name}
-                </h5>
-                <button type="button" className="close text-white" onClick={() => setShowDetails(false)}>×</button>
-              </div>
-              <div className="modal-body">
-                {/* Basic Info */}
-                <div className="row mb-4">
-                  <div className="col-md-4">
-                    <div className="text-center p-3 bg-light rounded">
-                      <FaUserTie size={24} className="text-primary mb-2" />
-                      <h6 className="mb-0">{selectedRecord.name}</h6>
-                      <small className="text-muted">{selectedRecord.code}</small>
-                    </div>
-                  </div>
-                  <div className="col-md-4">
-                    <div className="text-center p-3 bg-light rounded">
-                      <FaBuilding size={24} className="text-primary mb-2" />
-                      <h6 className="mb-0">{selectedRecord.department}</h6>
-                      <small className="text-muted">Department</small>
-                    </div>
-                  </div>
-                  <div className="col-md-4">
-                    <div className="text-center p-3 bg-light rounded">
-                      <FaCalendarAlt size={24} className="text-primary mb-2" />
-                      <h6 className="mb-0">{formatDate(selectedRecord.joiningDate)}</h6>
-                      <small className="text-muted">Joining Date</small>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Designation History Timeline */}
-                <div className="card">
-                  <div className="card-header bg-light">
-                    <h6 className="mb-0">Designation History / Career Progression</h6>
-                  </div>
-                  <div className="card-body">
-                    <div className="position-relative" style={{ paddingLeft: '30px' }}>
-                      <div className="position-absolute" style={{ left: '15px', top: '0', bottom: '0', width: '2px', background: '#e5e7eb' }}></div>
-                      
-                      {selectedRecord.designationHistory?.map((item, idx) => (
-                        <div key={idx} className="position-relative mb-3">
-                          <div className="position-absolute rounded-circle" style={{ 
-                            left: '-22px', top: '5px', width: '12px', height: '12px', 
-                            backgroundColor: idx === selectedRecord.designationHistory.length - 1 ? '#4f46e5' : '#f59e0b' 
-                          }}></div>
-                          <div className="d-flex align-items-center gap-2">
-                            <FaBriefcase className={idx === selectedRecord.designationHistory.length - 1 ? 'text-primary' : 'text-warning'} />
-                            <strong>{item.designation}</strong>
-                            <span className="text-muted small">{formatDate(item.date)}</span>
-                            {idx === selectedRecord.designationHistory.length - 1 && (
-                              <span className="badge" style={{ background: '#d1fae5', color: '#065f46' }}>Current</span>
-                            )}
-                          </div>
-                          {idx === 0 && (
-                            <div className="text-muted small mt-1">Initial appointment as {item.designation}</div>
-                          )}
-                          {idx === selectedRecord.designationHistory.length - 1 && idx > 0 && (
-                            <div className="text-muted small mt-1">Current designation - {item.designation}</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Current Status */}
-                <div className="card mt-3">
-                  <div className="card-header bg-light">
-                    <h6 className="mb-0">Current Status</h6>
-                  </div>
-                  <div className="card-body">
-                    <div className="row">
-                      <div className="col-md-6">
-                        <strong>Status:</strong> {getStatusBadge(selectedRecord.status)}
-                      </div>
-                      <div className="col-md-6">
-                        <strong>Current Designation:</strong> {selectedRecord.currentDesignation}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowDetails(false)}>Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
 };
+
+const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default EmployeeDesignation;
