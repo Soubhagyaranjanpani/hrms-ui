@@ -132,28 +132,27 @@ const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus
   };
 
   const handleEdit = (employee) => {
-    const emp = DUMMY_EMPLOYEES.find(e => e.id === employee.id);
-    setSelectedEmployee(emp || null);
-    setEditingEmployee(employee);
-    setFormData({
-      name: employee.name,
-      code: employee.code,
-      department: employee.department,
-      currentDesignation: employee.currentDesignation,
-      joiningDate: employee.joiningDate,
-      status: employee.status
-    });
-    setEmployeeSearchTerm(emp?.name || '');
-    setShowForm(true);
-  };
+  if (employee.status === 'Inactive') {
+    toast.warning('Cannot Edit', 'This employee is inactive and cannot be edited');
+    return;
+  }
+  
+  const emp = DUMMY_EMPLOYEES.find(e => e.id === employee.id);
+  setSelectedEmployee(emp || null);
+  setEditingEmployee(employee);
+  setFormData({
+    name: employee.name,
+    code: employee.code,
+    department: employee.department,
+    currentDesignation: employee.currentDesignation,
+    joiningDate: employee.joiningDate,
+    status: employee.status
+  });
+  setEmployeeSearchTerm(emp?.name || '');
+  setShowForm(true);
+};
 
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this employee?')) {
-      const updatedEmployees = employees.filter(emp => emp.id !== id);
-      setEmployees(updatedEmployees);
-      toast.success('Deleted', 'Employee record deleted successfully');
-    }
-  };
+  
 
   const handleStatusToggle = (id, name, currentStatus) => {
   const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
@@ -335,55 +334,57 @@ const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus
               <div className="cert-form-grid-3col">
                 <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label className="required">Employee Name</label>
-                  <div className="position-relative">
-                    <div className="input-group">
-                      <span className="input-group-text bg-light">
-                        <FaSearch size={14} className="text-muted" />
-                      </span>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Type employee name to search..."
-                        value={employeeSearchTerm}
-                        onChange={(e) => {
-                          setEmployeeSearchTerm(e.target.value);
-                          setShowEmployeeDropdown(true);
-                        }}
-                        onFocus={() => setShowEmployeeDropdown(true)}
-                      />
-                    </div>
-                    
-                    {showEmployeeDropdown && employeeSearchTerm && (
-                      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
-                        <div className="card-body p-2">
-                          {employeeSearchResults.length > 0 ? (
-                            employeeSearchResults.map(emp => (
-                              <div
-                                key={emp.id}
-                                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
-                                style={{ cursor: 'pointer' }}
-                                onClick={() => handleEmployeeSelect(emp)}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                              >
-                                <div>
-                                  <div className="fw-bold">{emp.name}</div>
-                                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                                </div>
-                                <div>
-                                  <span className="badge bg-light text-dark">{emp.designation}</span>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-3 text-muted">
-                              <small>No employees found</small>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+               <div className="position-relative" style={{ maxWidth: '500px' }}>
+    <div className="input-group">
+      <input
+        type="text"
+        className="form-control"
+        placeholder="Type employee name to search..."
+        value={employeeSearchTerm}
+        onChange={(e) => {
+          setEmployeeSearchTerm(e.target.value);
+          setShowEmployeeDropdown(true);
+        }}
+        onFocus={() => {
+          if (employeeSearchTerm.length > 0) {
+            setShowEmployeeDropdown(true);
+          }
+        }}
+        style={{ fontSize: '14px', padding: '6px 12px' }}
+      />
+    </div>
+    
+    {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
+      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
+        <div className="card-body p-2">
+          {filteredEmployees.length > 0 ? (
+            filteredEmployees.map(emp => (
+              <div
+                key={emp.id}
+                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
+                style={{ cursor: 'pointer' }}
+                onClick={() => handleEmployeeSelect(emp)}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <div>
+                  <div className="fw-bold">{emp.name}</div>
+                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
+                </div>
+                <div>
+                  <span className="badge bg-light text-dark">{emp.designation}</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-3 text-muted">
+              <small>No employees found</small>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
                 </div>
                 
                 <div className="cert-field-compact">
@@ -502,16 +503,22 @@ const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus
       {emp.status}
     </span>
   </div>
-</td>                       <td className="text-center">
-                          <div className="cert-actions">
-                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(emp)} title="Edit">
-                              <FaEdit size={12} />
-                            </button>
-                            <button className="cert-act cert-act--del" onClick={() => handleDelete(emp.id)} title="Delete">
-                              <FaTrash size={12} />
-                            </button>
-                          </div>
-                        </td>
+</td>                      <td className="text-center">
+  <div className="cert-actions">
+    <button 
+      className="cert-act cert-act--edit" 
+      onClick={() => handleEdit(emp)} 
+      title={emp.status === 'Inactive' ? 'Cannot edit inactive employee' : 'Edit'}
+      disabled={emp.status === 'Inactive'}
+      style={{ 
+        opacity: emp.status === 'Inactive' ? 0.5 : 1,
+        cursor: emp.status === 'Inactive' ? 'not-allowed' : 'pointer'
+      }}
+    >
+      <FaEdit size={12} />
+    </button>
+  </div>
+</td>
                       </tr>
                     ))
                   ) : (
@@ -547,44 +554,55 @@ const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus
             </div>
             
             {/* Pagination */}
-          {totalItems > 0 && (
-  <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-      <span className="emp-page-info">
-        Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} events
-      </span>
-    </div>
-    <div className="emp-page-controls">
-      <button 
-        className="emp-page-btn" 
-        disabled={page === 0} 
-        onClick={() => setPage(page - 1)}
-      >
-        ← Prev
-      </button>
-      {getPaginationRange().map((pg, i) =>
-        pg === '...' ? (
-          <span key={`dots-${i}`} className="emp-page-dots">…</span>
-        ) : (
-          <button 
-            key={pg} 
-            className={`emp-page-num ${pg === page ? 'active' : ''}`} 
-            onClick={() => setPage(pg)}
-          >
-            {pg + 1}
-          </button>
-        )
-      )}
-      <button 
-        className="emp-page-btn" 
-        disabled={page + 1 >= totalPages} 
-        onClick={() => setPage(page + 1)}
-      >
-        Next →
-      </button>
-    </div>
-  </div>
-)}
+         <div className="cert-table-footer">
+              <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
+                Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+              </div>
+              
+              {totalPages > 0 && (
+                <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <button 
+                    className="cert-page-btn" 
+                    disabled={page === 0} 
+                    onClick={() => setPage(page - 1)}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    ← Prev
+                  </button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
+                    ) : (
+                      <button 
+                        key={pg} 
+                        className={`cert-page-num ${pg === page ? 'active' : ''}`} 
+                        onClick={() => setPage(pg)}
+                        style={{ 
+                          padding: '6px 10px', 
+                          border: '1px solid #e5e7eb', 
+                          background: pg === page ? '#9d174d' : 'white', 
+                          color: pg === page ? 'white' : '#374151',
+                          borderRadius: '6px', 
+                          cursor: 'pointer', 
+                          fontSize: '12px',
+                          minWidth: '34px'
+                        }}
+                      >
+                        {pg + 1}
+                      </button>
+                    )
+                  )}
+                  <button 
+                    className="cert-page-btn" 
+                    disabled={page + 1 >= totalPages} 
+                    onClick={() => setPage(page + 1)}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}

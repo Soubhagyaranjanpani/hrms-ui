@@ -19,7 +19,7 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
     { id: 1, employeeId: 1, employeeName: 'John Doe', employeeCode: 'EMP001', department: 'IT', designation: 'Software Engineer', serviceBookNumber: 'SB/2024/0001', serviceBookStatus: 'Active', createdAt: '2024-01-15T10:30:00Z' },
     { id: 2, employeeId: 2, employeeName: 'Jane Smith', employeeCode: 'EMP002', department: 'HR', designation: 'HR Manager', serviceBookNumber: 'SB/2024/0002', serviceBookStatus: 'Active', createdAt: '2024-02-20T11:45:00Z' },
     { id: 3, employeeId: 3, employeeName: 'Mike Johnson', employeeCode: 'EMP003', department: 'IT', designation: 'Senior Developer', serviceBookNumber: 'SB/2024/0003', serviceBookStatus: 'Active', createdAt: '2024-03-10T09:15:00Z' },
-    { id: 4, employeeId: 4, employeeName: 'Sarah Williams', employeeCode: 'EMP004', department: 'Sales', designation: 'Sales Manager', serviceBookNumber: 'SB/2023/0015', serviceBookStatus: 'Closed', createdAt: '2023-11-05T14:20:00Z' },
+    { id: 4, employeeId: 4, employeeName: 'Sarah Williams', employeeCode: 'EMP004', department: 'Sales', designation: 'Sales Manager', serviceBookNumber: 'SB/2023/0015', serviceBookStatus: 'Inactive', createdAt: '2023-11-05T14:20:00Z' },
     { id: 5, employeeId: 5, employeeName: 'David Brown', employeeCode: 'EMP005', department: 'Finance', designation: 'Accountant', serviceBookNumber: 'SB/2024/0008', serviceBookStatus: 'Active', createdAt: '2024-04-18T08:00:00Z' },
     { id: 6, employeeId: 1, employeeName: 'John Doe', employeeCode: 'EMP001', department: 'IT', designation: 'Tech Lead', serviceBookNumber: 'SB/2024/0012', serviceBookStatus: 'Active', createdAt: '2024-05-01T10:00:00Z' },
     { id: 7, employeeId: 2, employeeName: 'Jane Smith', employeeCode: 'EMP002', department: 'HR', designation: 'Sr. HR Manager', serviceBookNumber: 'SB/2024/0015', serviceBookStatus: 'Active', createdAt: '2024-05-15T09:30:00Z' },
@@ -38,6 +38,13 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
   const dropdownRef = useRef(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+const [showStatusModal, setShowStatusModal] = useState(false);
+
+const [statusAction, setStatusAction] = useState({
+  id: null,
+  name: "",
+  newStatus: ""
+});
 
 // Click outside dropdown
 useEffect(() => {
@@ -59,14 +66,7 @@ useEffect(() => {
     { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
   ];
 
-  // Filter employees for dropdown
-// const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-//   const search = searchTerm.toLowerCase();
-//   return emp.name.toLowerCase().includes(search) || 
-//          emp.code.toLowerCase().includes(search) ||
-//          emp.department.toLowerCase().includes(search);
-// });
-// Filter employees for dropdown
+ 
 const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
   const search = employeeSearchTerm.toLowerCase();
   return emp.name.toLowerCase().includes(search) || 
@@ -185,25 +185,25 @@ const handleEmployeeSelect = (employee) => {
     if (onSuccess) onSuccess(formData);
   };
 
-  const handleEdit = (book) => {
-    setEditingId(book.id);
-    setFormData({
-      employeeId: book.employeeId,
-      employeeName: book.employeeName,
-      employeeCode: book.employeeCode,
-      department: book.department,
-      designation: book.designation,
-      serviceBookNumber: book.serviceBookNumber,
-      serviceBookStatus: book.serviceBookStatus
-    });
-    setSearchTerm(book.employeeName);
-    setShowForm(true);
-  };
-
-  const handleDelete = (id) => {
-    setServiceBooks(serviceBooks.filter(sb => sb.id !== id));
-    toast.success('Deleted', 'Service Book deleted successfully');
-  };
+ const handleEdit = (book) => {
+  if (book.serviceBookStatus === 'Inactive') {
+    toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
+    return;
+  }
+  
+  setEditingId(book.id);
+  setFormData({
+    employeeId: book.employeeId,
+    employeeName: book.employeeName,
+    employeeCode: book.employeeCode,
+    department: book.department,
+    designation: book.designation,
+    serviceBookNumber: book.serviceBookNumber,
+    serviceBookStatus: book.serviceBookStatus
+  });
+  setSearchTerm(book.employeeName);
+  setShowForm(true);
+};
 
   const clearEmployee = () => {
     setFormData({
@@ -240,18 +240,8 @@ const handleEmployeeSelect = (employee) => {
     setShowForm(false);
   };
 
-  const statusOptions = [
-    { value: 'Active', label: 'Active', color: '#10b981', bg: '#d1fae5' },
-    { value: 'Closed', label: 'Closed', color: '#6b7280', bg: '#f3f4f6' },
-    { value: 'Retired', label: 'Retired', color: '#f59e0b', bg: '#fed7aa' },
-    { value: 'Terminated', label: 'Terminated', color: '#ef4444', bg: '#fee2e2' }
-  ];
-
-  const getStatusStyle = (status) => {
-    const option = statusOptions.find(opt => opt.value === status);
-    return option || statusOptions[0];
-  };
-
+  
+ 
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -261,6 +251,38 @@ const handleEmployeeSelect = (employee) => {
     resetForm();
     setShowForm(false);
   };
+
+ const handleStatusToggle = (id, name, currentStatus) => {
+  const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+  setStatusAction({
+    id,
+    name,
+    newStatus
+  });
+  setShowStatusModal(true);
+};
+
+const confirmStatusChange = () => {
+  const { id, newStatus } = statusAction;
+
+  const updatedBooks = serviceBooks.map(book =>
+    book.id === id
+      ? {
+          ...book,
+          serviceBookStatus: newStatus
+        }
+      : book
+  );
+
+  setServiceBooks(updatedBooks);
+
+  setShowStatusModal(false);
+
+  toast.success(
+    "Status Updated",
+    `${statusAction.name} is now ${newStatus}`
+  );
+};
 
   return (
     <div className="cert-root">
@@ -300,13 +322,10 @@ const handleEmployeeSelect = (employee) => {
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Employee Information</div>
               <div className="cert-form-grid-3col">
-            <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+           <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
   <label className="required">Employee Name</label>
-  <div className="position-relative">
+  <div className="position-relative" style={{ maxWidth: '500px' }}>
     <div className="input-group">
-      <span className="input-group-text bg-light">
-        <FaSearch size={14} className="text-muted" />
-      </span>
       <input
         type="text"
         className="form-control"
@@ -317,15 +336,14 @@ const handleEmployeeSelect = (employee) => {
           setShowEmployeeDropdown(true);
         }}
         onFocus={() => {
-          // Only show dropdown if there's text
           if (employeeSearchTerm.length > 0) {
             setShowEmployeeDropdown(true);
           }
         }}
+        style={{ fontSize: '14px', padding: '6px 12px' }}
       />
     </div>
     
-    {/* Show dropdown only when there's search text AND dropdown is visible */}
     {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
       <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
         <div className="card-body p-2">
@@ -358,37 +376,26 @@ const handleEmployeeSelect = (employee) => {
     )}
   </div>
 </div>
-                
                 <div className="cert-field-compact">
                   <label>Employee Code</label>
-                  <input type="text" className="bg-light" value={formData.employeeCode} readOnly />
+                  <input type="text" placeholder='Auto-Populated' className="bg-light" value={formData.employeeCode} readOnly />
                 </div>
                 
                 <div className="cert-field-compact">
                   <label>Department</label>
-                  <input type="text" className="bg-light" value={formData.department} readOnly />
+                  <input type="text" placeholder='Auto-Populated' className="bg-light" value={formData.department} readOnly />
                 </div>
                 
                 <div className="cert-field-compact">
                   <label>Designation</label>
-                  <input type="text" className="bg-light" value={formData.designation} readOnly />
+                  <input type="text" placeholder='Auto-Populated' className="bg-light" value={formData.designation} readOnly />
                 </div>
                 
                 <div className="cert-field-compact">
                   <label>Service Book Number</label>
-                  <input type="text" className="bg-light" value={formData.serviceBookNumber} readOnly />
-                  <small>Auto-generated on employee selection</small>
+                  <input type="text" placeholder='Auto-Populated' className="bg-light" value={formData.serviceBookNumber} readOnly />
                 </div>
                 
-                <div className={`cert-field-compact ${touched.serviceBookStatus && errors.serviceBookStatus ? 'has-error' : ''}`}>
-                  <label className="required">Service Book Status</label>
-                  <select value={formData.serviceBookStatus} onChange={(e) => handleChange('serviceBookStatus', e.target.value)} onBlur={() => handleBlur('serviceBookStatus')}>
-                    {statusOptions.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <FieldError msg={errors.serviceBookStatus} />
-                </div>
               </div>
             </div>
 
@@ -448,9 +455,9 @@ const handleEmployeeSelect = (employee) => {
                     <th>Employee Code</th>
                     <th>Department</th>
                     <th>Designation</th>
-                    <th>Service Book No.</th>
-                    <th>Status</th>
+                    <th>Service Book No.</th>            
                     <th>Created Date</th>
+                    <th>Status</th>
                     <th style={{ width: 100 }}>Actions</th>
                   </tr>
                 </thead>
@@ -464,22 +471,80 @@ const handleEmployeeSelect = (employee) => {
                         <td>{book.department}</td>
                         <td>{book.designation}</td>
                         <td>{book.serviceBookNumber}</td>
-                        <td>
-                          <span className="cert-status-badge" style={{ background: getStatusStyle(book.serviceBookStatus).bg, color: getStatusStyle(book.serviceBookStatus).color }}>
-                            {book.serviceBookStatus}
-                          </span>
-                        </td>
                         <td>{formatDate(book.createdAt)}</td>
+                         <td>
+  <div
+    className="d-flex align-items-center gap-1"
+    style={{ cursor: "pointer" }}
+    onClick={() =>
+      handleStatusToggle(
+        book.id,
+        book.employeeName,
+        book.serviceBookStatus
+      )
+    }
+  >
+    <div
+      style={{
+        width: "28px",
+        height: "16px",
+        borderRadius: "50px",
+        backgroundColor:
+          book.serviceBookStatus === "Active"
+            ? "#9d174d"
+            : "#d1d5db",
+        position: "relative",
+        transition: "0.2s",
+        boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)"
+      }}
+    >
+      <div
+        style={{
+          width: "12px",
+          height: "12px",
+          borderRadius: "50%",
+          background: "#fff",
+          position: "absolute",
+          top: "2px",
+          left:
+            book.serviceBookStatus === "Active"
+              ? "14px"
+              : "2px",
+          transition: "0.2s"
+        }}
+      />
+    </div>
+
+    <span
+      style={{
+        fontSize: "11px",
+        fontWeight: 500,
+        color:
+          book.serviceBookStatus === "Active"
+            ? "#9d174d"
+            : "#94a3b8"
+      }}
+    >
+      {book.serviceBookStatus}
+    </span>
+  </div>
+</td>
                         <td>
-                          <div className="cert-actions">
-                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(book)} title="Edit">
-                              <FaEdit size={12} />
-                            </button>
-                            <button className="cert-act cert-act--del" onClick={() => handleDelete(book.id)} title="Delete">
-                              <FaTrash size={12} />
-                            </button>
-                          </div>
-                        </td>
+  <div className="cert-actions">
+    <button 
+      className="cert-act cert-act--edit" 
+      onClick={() => handleEdit(book)} 
+      title={book.serviceBookStatus === 'Inactive' ? 'Cannot edit inactive record' : 'Edit'}
+      disabled={book.serviceBookStatus === 'Inactive'}
+      style={{ 
+        opacity: book.serviceBookStatus === 'Inactive' ? 0.5 : 1,
+        cursor: book.serviceBookStatus === 'Inactive' ? 'not-allowed' : 'pointer'
+      }}
+    >
+      <FaEdit size={12} />
+    </button>
+  </div>
+</td>
                       </tr>
                     ))
                   ) : (
@@ -499,47 +564,109 @@ const handleEmployeeSelect = (employee) => {
 
             
           {/* Pagination */}
-{totalItems > 0 && (
-  <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-      <span className="emp-page-info">
-        Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} events
-      </span>
-    </div>
-    <div className="emp-page-controls">
-      <button 
-        className="emp-page-btn" 
-        disabled={page === 0} 
-        onClick={() => setPage(page - 1)}
-      >
-        ← Prev
-      </button>
-      {getPaginationRange().map((pg, i) =>
-        pg === '...' ? (
-          <span key={`dots-${i}`} className="emp-page-dots">…</span>
-        ) : (
-          <button 
-            key={pg} 
-            className={`emp-page-num ${pg === page ? 'active' : ''}`} 
-            onClick={() => setPage(pg)}
-          >
-            {pg + 1}
-          </button>
-        )
-      )}
-      <button 
-        className="emp-page-btn" 
-        disabled={page + 1 >= totalPages} 
-        onClick={() => setPage(page + 1)}
-      >
-        Next →
-      </button>
-    </div>
-  </div>
-)} 
+ <div className="cert-table-footer">
+              <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
+                Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+              </div>
+              
+              {totalPages > 0 && (
+                <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <button 
+                    className="cert-page-btn" 
+                    disabled={page === 0} 
+                    onClick={() => setPage(page - 1)}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    ← Prev
+                  </button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
+                    ) : (
+                      <button 
+                        key={pg} 
+                        className={`cert-page-num ${pg === page ? 'active' : ''}`} 
+                        onClick={() => setPage(pg)}
+                        style={{ 
+                          padding: '6px 10px', 
+                          border: '1px solid #e5e7eb', 
+                          background: pg === page ? '#9d174d' : 'white', 
+                          color: pg === page ? 'white' : '#374151',
+                          borderRadius: '6px', 
+                          cursor: 'pointer', 
+                          fontSize: '12px',
+                          minWidth: '34px'
+                        }}
+                      >
+                        {pg + 1}
+                      </button>
+                    )
+                  )}
+                  <button 
+                    className="cert-page-btn" 
+                    disabled={page + 1 >= totalPages} 
+                    onClick={() => setPage(page + 1)}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}
+      {showStatusModal && (
+  <div
+    className="emp-modal-overlay"
+    onClick={() => setShowStatusModal(false)}
+  >
+    <div
+      className="emp-modal"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="emp-modal-icon">
+        {statusAction.newStatus === "Active" ? "✅" : "⛔"}
+      </div>
+
+      <h3 className="emp-modal-title">
+        Confirm Status Change
+      </h3>
+
+      <p className="emp-modal-body">
+        Are you sure you want to{" "}
+        <strong>
+          {statusAction.newStatus === "Active"
+            ? "activate"
+            : "deactivate"}
+        </strong>{" "}
+        <strong>{statusAction.name}</strong>?
+      </p>
+
+      <p className="emp-modal-warn">
+        {statusAction.newStatus === "Inactive"
+          ? "Inactive records cannot be edited until reactivated."
+          : "This record will become active again."}
+      </p>
+
+      <div className="emp-modal-actions">
+        <button
+          className="emp-modal-cancel"
+          onClick={() => setShowStatusModal(false)}
+        >
+          Cancel
+        </button>
+
+        <button
+          className="emp-modal-confirm"
+          onClick={confirmStatusChange}
+        >
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

@@ -40,7 +40,13 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  
+  const [showStatusModal, setShowStatusModal] = useState(false);
+    const [statusAction, setStatusAction] = useState({
+      id: null,
+      name: "",
+      newStatus: ""
+    });
+
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
@@ -104,7 +110,7 @@ const handleEmployeeSelect = (employee) => {
   setEmployeeSearchTerm(employee.name);
   setShowEmployeeDropdown(false);
 };
-
+  
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
@@ -182,7 +188,7 @@ const handleEmployeeSelect = (employee) => {
 
   const validateForm = () => {
     const newErrors = {};
-    
+  
     if (!formData.transferOrderNo) {
       newErrors.transferOrderNo = 'Transfer Order Number is required';
     } else if (existingOrderNos.includes(formData.transferOrderNo) && 
@@ -261,11 +267,6 @@ const handleEmployeeSelect = (employee) => {
     setShowForm(true);
   };
 
-  const handleDelete = (id) => {
-    setTransfers(transfers.filter(transfer => transfer.id !== id));
-    toast.success('Success', 'Transfer deleted successfully');
-  };
-
   const resetForm = () => {
     setFormData({
       transferOrderNo: '',
@@ -296,6 +297,37 @@ const handleEmployeeSelect = (employee) => {
   const handleBackToList = () => {
     resetForm();
     setShowForm(false);
+  };
+
+   const handleStatusToggle = (id, name, currentStatus) => {
+    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+    setStatusAction({
+      id,
+      name,
+      newStatus
+    });
+    setShowStatusModal(true);
+  };
+  const confirmStatusChange = () => {
+    const { id, newStatus } = statusAction;
+  
+    const updatedTransfers = transfers.map((transfer) =>
+      transfer.id === id
+        ? {
+            ...transfer,
+            status: newStatus
+          }
+        : transfer
+    );
+  
+    setTransfers(updatedTransfers);
+  
+    setShowStatusModal(false);
+  
+    toast.success(
+      "Status Updated",
+      `${statusAction.name} is now ${newStatus}`
+    );
   };
 
   return (
@@ -339,55 +371,57 @@ const handleEmployeeSelect = (employee) => {
               <div className="cert-form-grid-3col">
                 <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label className="required">Employee Name</label>
-                  <div className="position-relative">
-                    <div className="input-group">
-                      <span className="input-group-text bg-light">
-                        <FaSearch size={14} className="text-muted" />
-                      </span>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Type employee name to search..."
-                        value={employeeSearchTerm}
-                        onChange={(e) => {
-                          setEmployeeSearchTerm(e.target.value);
-                          setShowEmployeeDropdown(true);
-                        }}
-                        onFocus={() => setShowEmployeeDropdown(true)}
-                      />
-                    </div>
-                    
-                    {showEmployeeDropdown && employeeSearchTerm && (
-                      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
-                        <div className="card-body p-2">
-                          {filteredEmployees.length > 0 ? (
-                            filteredEmployees.map(emp => (
-                              <div
-                                key={emp.id}
-                                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
-                                style={{ cursor: 'pointer' }}
-                                onClick={() => handleEmployeeSelect(emp)}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                              >
-                                <div>
-                                  <div className="fw-bold">{emp.name}</div>
-                                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                                </div>
-                                <div>
-                                  <span className="badge bg-light text-dark">{emp.designation}</span>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-3 text-muted">
-                              <small>No employees found</small>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                 <div className="position-relative" style={{ maxWidth: '500px' }}>
+    <div className="input-group">
+      <input
+        type="text"
+        className="form-control"
+        placeholder="Type employee name to search..."
+        value={employeeSearchTerm}
+        onChange={(e) => {
+          setEmployeeSearchTerm(e.target.value);
+          setShowEmployeeDropdown(true);
+        }}
+        onFocus={() => {
+          if (employeeSearchTerm.length > 0) {
+            setShowEmployeeDropdown(true);
+          }
+        }}
+        style={{ fontSize: '14px', padding: '6px 12px' }}
+      />
+    </div>
+    
+    {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
+      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
+        <div className="card-body p-2">
+          {filteredEmployees.length > 0 ? (
+            filteredEmployees.map(emp => (
+              <div
+                key={emp.id}
+                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
+                style={{ cursor: 'pointer' }}
+                onClick={() => handleEmployeeSelect(emp)}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <div>
+                  <div className="fw-bold">{emp.name}</div>
+                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
+                </div>
+                <div>
+                  <span className="badge bg-light text-dark">{emp.designation}</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-3 text-muted">
+              <small>No employees found</small>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
                 </div>
                  
                 {/* Employee Code - Auto Populate */}
@@ -540,6 +574,7 @@ const handleEmployeeSelect = (employee) => {
                     <th>Effective Date</th>
                     <th>Reason</th>
                     <th>Document</th>
+                    <th>Status</th>
                     <th style={{ width: 100 }}>Actions</th>
                   </tr>
                 </thead>
@@ -548,7 +583,6 @@ const handleEmployeeSelect = (employee) => {
                     currentTransfers.map((transfer,idx) => (
                       <tr key={transfer.id}>
                       <td className="text-center">{startIndex + idx + 1}</td>
-
                          <td>                        
 
     {DUMMY_EMPLOYEES.find(e => e.id === transfer.employeeId)?.name || 'Unknown'}
@@ -585,14 +619,68 @@ const handleEmployeeSelect = (employee) => {
                             </a>
                           ) : <span className="text-muted">—</span>}
                         </td>
+                            <td>
+  <div
+    className="d-flex align-items-center gap-1"
+    style={{ cursor: "pointer" }}
+    onClick={() =>
+      handleStatusToggle(
+        transfer.id,
+        DUMMY_EMPLOYEES.find(e => e.id === transfer.employeeId)?.name || "",
+        transfer.status || "Active"
+      )
+    }
+  >
+    <div
+      style={{
+        width: "28px",
+        height: "16px",
+        borderRadius: "50px",
+        backgroundColor:
+          (transfer.status || "Active") === "Active"
+            ? "#9d174d"
+            : "#d1d5db",
+        position: "relative",
+        transition: ".2s"
+      }}
+    >
+      <div
+        style={{
+          width: "12px",
+          height: "12px",
+          borderRadius: "50%",
+          background: "#fff",
+          position: "absolute",
+          top: "2px",
+          left:
+            (transfer.status || "Active") === "Active"
+              ? "14px"
+              : "2px",
+          transition: ".2s"
+        }}
+      />
+    </div>
+
+    <span
+      style={{
+        fontSize: "11px",
+        fontWeight: 500,
+        color:
+          (transfer.status || "Active") === "Active"
+            ? "#9d174d"
+            : "#94a3b8"
+      }}
+    >
+      {transfer.status || "Active"}
+    </span>
+  </div>
+</td>
                         <td>
                           <div className="cert-actions">
                             <button className="cert-act cert-act--edit" onClick={() => handleEdit(transfer)} title="Edit">
                               <FaEdit size={12} />
                             </button>
-                            <button className="cert-act cert-act--del" onClick={() => handleDelete(transfer.id)} title="Delete">
-                              <FaTrash size={12} />
-                            </button>
+                           
                           </div>
                         </td>
                       </tr>
@@ -608,47 +696,109 @@ const handleEmployeeSelect = (employee) => {
 
          
           {/* Pagination */}
-{totalItems > 0 && (
-  <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-      <span className="emp-page-info">
-        Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} events
-      </span>
-    </div>
-    <div className="emp-page-controls">
-      <button 
-        className="emp-page-btn" 
-        disabled={page === 0} 
-        onClick={() => setPage(page - 1)}
-      >
-        ← Prev
-      </button>
-      {getPaginationRange().map((pg, i) =>
-        pg === '...' ? (
-          <span key={`dots-${i}`} className="emp-page-dots">…</span>
-        ) : (
-          <button 
-            key={pg} 
-            className={`emp-page-num ${pg === page ? 'active' : ''}`} 
-            onClick={() => setPage(pg)}
-          >
-            {pg + 1}
-          </button>
-        )
-      )}
-      <button 
-        className="emp-page-btn" 
-        disabled={page + 1 >= totalPages} 
-        onClick={() => setPage(page + 1)}
-      >
-        Next →
-      </button>
-    </div>
-  </div>
-)}
+ <div className="cert-table-footer">
+              <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
+                Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
+              </div>
+              
+              {totalPages > 0 && (
+                <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <button 
+                    className="cert-page-btn" 
+                    disabled={page === 0} 
+                    onClick={() => setPage(page - 1)}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    ← Prev
+                  </button>
+                  {getPaginationRange().map((pg, i) =>
+                    pg === '...' ? (
+                      <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
+                    ) : (
+                      <button 
+                        key={pg} 
+                        className={`cert-page-num ${pg === page ? 'active' : ''}`} 
+                        onClick={() => setPage(pg)}
+                        style={{ 
+                          padding: '6px 10px', 
+                          border: '1px solid #e5e7eb', 
+                          background: pg === page ? '#9d174d' : 'white', 
+                          color: pg === page ? 'white' : '#374151',
+                          borderRadius: '6px', 
+                          cursor: 'pointer', 
+                          fontSize: '12px',
+                          minWidth: '34px'
+                        }}
+                      >
+                        {pg + 1}
+                      </button>
+                    )
+                  )}
+                  <button 
+                    className="cert-page-btn" 
+                    disabled={page + 1 >= totalPages} 
+                    onClick={() => setPage(page + 1)}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}
+        {showStatusModal && (
+  <div
+    className="emp-modal-overlay"
+    onClick={() => setShowStatusModal(false)}
+  >
+    <div
+      className="emp-modal"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="emp-modal-icon">
+        {statusAction.newStatus === "Active" ? "✅" : "⛔"}
+      </div>
+
+      <h3 className="emp-modal-title">
+        Confirm Status Change
+      </h3>
+
+      <p className="emp-modal-body">
+        Are you sure you want to{" "}
+        <strong>
+          {statusAction.newStatus === "Active"
+            ? "activate"
+            : "deactivate"}
+        </strong>{" "}
+        <strong>{statusAction.name}</strong>?
+      </p>
+
+      <p className="emp-modal-warn">
+        {statusAction.newStatus === "Inactive"
+          ? "Inactive records cannot be edited until reactivated."
+          : "This record will become active again."}
+      </p>
+
+      <div className="emp-modal-actions">
+        <button
+          className="emp-modal-cancel"
+          onClick={() => setShowStatusModal(false)}
+        >
+          Cancel
+        </button>
+
+        <button
+          className="emp-modal-confirm"
+          onClick={confirmStatusChange}
+        >
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };
