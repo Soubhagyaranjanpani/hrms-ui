@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   FaSearch, FaEdit, FaTrash, FaPlus, FaTimes, FaMinus,
@@ -141,9 +140,10 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
     name: "",
     newStatus: ""
   });
-
+const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [formData, setFormData] = useState({
     employeeId: '',
+     employeeName: '',
     certificationName: '',
     issuedBy: '',
     certificateNumber: '',
@@ -337,7 +337,7 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
     setRenewalData({
       id: cert.id,
       certificationName: cert.certificationName,
-      newIssueDate: new Date().toISOString().split('T')[0],
+issueDate: '',
       newExpiryDate: '',
       newCertificateNumber: ''
     });
@@ -349,10 +349,11 @@ const Certifications = ({ user, employeeId: propEmployeeId }) => {
   const resetForm = () => {
     setFormData({
       employeeId: selectedEmployee?.id || propEmployeeId || '',
+     employeeName: selectedEmployee?.name || '', 
       certificationName: '',
       issuedBy: '',
       certificateNumber: '',
-      issueDate: new Date().toISOString().split('T')[0],
+issueDate: '',
       expiryDate: '',
       reminderDays: '30',
       notes: '',
@@ -673,18 +674,33 @@ const renderEmployeeCertPage = () => {
               <div className="cert-form-section-compact">
                 <div className="cert-section-label">Certification Details</div>
                 <div className="cert-form-grid-3col">
-                  {!propEmployeeId && (
-                    <div className={`cert-field-compact ${touched.employeeId && errors.employeeId ? 'has-error' : ''}`}>
-                      <label className="required">Employee</label>
-                      <select value={formData.employeeId} onChange={(e) => handleChange('employeeId', e.target.value)} onBlur={() => handleBlur('employeeId')}>
-                        <option value="">Select employee</option>
-                        {DUMMY_EMPLOYEES.map(emp => (
-                          <option key={emp.id} value={emp.id}>{emp.name} ({emp.department})</option>
-                        ))}
-                      </select>
-                      <FieldError msg={errors.employeeId} />
-                    </div>
-                  )}
+                {!propEmployeeId && (
+  <div className={`cert-field-compact ${touched.employeeId && errors.employeeId ? 'has-error' : ''}`} style={{ position: 'relative' }}>
+    <label className="required">Employee</label>
+    <input 
+      type="text" 
+      placeholder="Type employee name to search..." 
+      value={formData.employeeName || ''} 
+      onChange={(e) => {
+        setFormData(prev => ({ ...prev, employeeName: e.target.value, employeeId: '' }));
+        setShowEmployeeDropdown(true);
+      }}
+      autoComplete="off"
+      style={{ width: '100%', padding: '8px 12px', fontSize: '14px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+    />
+    {showEmployeeDropdown && formData.employeeName && formData.employeeName.length > 0 && (
+      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '200px', overflow: 'auto', background: 'white', border: '1px solid #d1d5db', borderRadius: '0 0 6px 6px', zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+        {DUMMY_EMPLOYEES.filter(emp => emp.name.toLowerCase().includes(formData.employeeName.toLowerCase())).map(emp => (
+          <div key={emp.id} onMouseDown={(e) => { e.preventDefault(); setFormData(prev => ({ ...prev, employeeId: emp.id, employeeName: emp.name })); setErrors(prev => ({ ...prev, employeeId: '' })); setShowEmployeeDropdown(false); }}
+            style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6', fontSize: '13px' }}>
+            <strong>{emp.name}</strong><span style={{ color: '#666', marginLeft: '8px', fontSize: '12px' }}>{emp.department} • {emp.designation}</span>
+          </div>
+        ))}
+      </div>
+    )}
+    <FieldError msg={errors.employeeId} />
+  </div>
+)}
                   
                   <div className={`cert-field-compact ${touched.certificationName && errors.certificationName ? 'has-error' : ''}`}>
                     <label className="required">Certification Name</label>
