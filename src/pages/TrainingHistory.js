@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaChalkboardTeacher, FaCalendarAlt, FaBuilding, 
@@ -9,14 +8,16 @@ import { toast } from '../components/Toast';
 
 const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [trainings, setTrainings] = useState(initialData?.trainings || [
-    { id: 1, trainingName: 'Advanced React Development', trainingProvider: 'Udemy', startDate: '2024-01-15', endDate: '2024-02-15', certificationReceived: 'Yes', trainingHours: '40', duration: '32 days', createdAt: '2024-01-15T10:30:00Z', employeeName: 'John Doe', employeeId: 1 },
+    { id: 1, trainingName: 'Advanced React Development', trainingProvider: 'Udemy', startDate: '2024-01-15', endDate: '2024-02-15', certificationReceived: 'Yes', trainingHours: '40', duration: '32 days', createdAt: '2024-01-15T10:30:00Z', employeeName: 'John Doe', employeeId: 1, certificateFileName: 'react_certificate.pdf', certificateFileData: null },
     { id: 2, trainingName: 'Leadership Program', trainingProvider: 'Harvard Business School', startDate: '2024-03-01', endDate: '2024-03-10', certificationReceived: 'Yes', trainingHours: '30', duration: '10 days', createdAt: '2024-03-01T11:45:00Z', employeeName: 'Jane Smith', employeeId: 2 },
-    { id: 3, trainingName: 'Cloud Architecture', trainingProvider: 'AWS', startDate: '2024-05-10', endDate: '2024-06-10', certificationReceived: 'Pending', trainingHours: '50', duration: '32 days', createdAt: '2024-05-10T09:15:00Z', employeeName: 'Mike Johnson', employeeId: 3 },
+    { id: 3, trainingName: 'Cloud Architecture', trainingProvider: 'AWS', startDate: '2024-05-10', endDate: '2024-06-10', certificationReceived: 'Pending', trainingHours: '50', duration: '32 days', createdAt: '2024-05-10T09:15:00Z', employeeName: 'Mike Johnson', employeeId: 3, certificateFileName: 'aws_cert.pdf', certificateFileData: null },
     { id: 4, trainingName: 'Sales Fundamentals', trainingProvider: 'Salesforce', startDate: '2024-07-05', endDate: '2024-07-20', certificationReceived: 'Yes', trainingHours: '25', duration: '16 days', createdAt: '2024-07-05T14:20:00Z', employeeName: 'Sarah Williams', employeeId: 4 },
     { id: 5, trainingName: 'Accounting Software', trainingProvider: 'Tally', startDate: '2024-09-12', endDate: '2024-09-30', certificationReceived: 'No', trainingHours: '35', duration: '19 days', createdAt: '2024-09-12T10:00:00Z', employeeName: 'David Brown', employeeId: 5 }
   ]);
   
   const [editingTraining, setEditingTraining] = useState(null);
+  const [selectedTraining, setSelectedTraining] = useState(null); // For inline detail view
+  const [documentPreview, setDocumentPreview] = useState(null); // For document preview modal
   const [formData, setFormData] = useState({
     trainingName: '',
     trainingProvider: '',
@@ -63,6 +64,24 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     const search = employeeSearchTerm.toLowerCase();
     return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
   });
+
+  // Handle row click for detail view
+  const handleRowClick = (training) => {
+    setSelectedTraining(training);
+  };
+
+  // Handle document view
+  const handleViewDocument = (e, training) => {
+    e.stopPropagation(); // Prevent row click
+    if (training.certificateFileData) {
+      setDocumentPreview({
+        data: training.certificateFileData,
+        name: training.certificateFileName
+      });
+    } else {
+      toast.info('No Document', 'No certificate has been uploaded for this training');
+    }
+  };
 
   const certificationOptions = [
     { value: 'Yes', label: 'Yes' },
@@ -224,8 +243,14 @@ const handleEmployeeSelect = (employee) => {
   };
 
   const handleEdit = (training) => {
+    if (training.status === 'Inactive') {
+      toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
+      return;
+    }
+    
+    const emp = DUMMY_EMPLOYEES.find(e => e.id === training.employeeId);
+    setSelectedEmployee(emp || null);
     setEditingTraining(training);
-    setSelectedEmployee({ id: training.employeeId, name: training.employeeName });
     setFormData({
       trainingName: training.trainingName,
       trainingProvider: training.trainingProvider,
@@ -239,6 +264,7 @@ const handleEmployeeSelect = (employee) => {
       employeeId: training.employeeId,
       employeeName: training.employeeName
     });
+    setEmployeeSearchTerm(emp?.name || '');
     setShowForm(true);
   };
 
@@ -278,12 +304,23 @@ const handleEmployeeSelect = (employee) => {
   const handleBackToList = () => {
     resetForm();
     setShowForm(false);
+    setSelectedTraining(null);
   };
 
   // Calculate stats
   const totalTrainings = trainings.length;
   const certifiedTrainings = trainings.filter(t => t.certificationReceived === 'Yes').length;
   const totalHours = trainings.reduce((sum, t) => sum + (parseInt(t.trainingHours) || 0), 0);
+
+  // Get certification status color
+  const getCertificationColor = (status) => {
+    switch(status) {
+      case 'Yes': return { bg: '#d1fae5', color: '#065f46', icon: '✅' };
+      case 'Pending': return { bg: '#fed7aa', color: '#9a3412', icon: '⏳' };
+      case 'No': return { bg: '#f3f4f6', color: '#6b7280', icon: '❌' };
+      default: return { bg: '#f3f4f6', color: '#6b7280', icon: '—' };
+    }
+  };
 
    const handleStatusToggle = (id, name, currentStatus) => {
       const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
@@ -326,12 +363,12 @@ const handleEmployeeSelect = (employee) => {
           <p className="cert-subtitle">Manage employee training records</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!showForm && (
+          {!showForm && !selectedTraining && (
             <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
               <FaPlus size={13} /> Add Training
             </button>
           )}
-          {showForm && (
+          {(showForm || selectedTraining) && (
             <button 
               type="button" 
               className="cert-back-btn" 
@@ -341,7 +378,7 @@ const handleEmployeeSelect = (employee) => {
               <FaArrowLeft size={12} /> Back
             </button>
           )}
-          {!showForm && onCancel && (
+          {!showForm && !selectedTraining && onCancel && (
             <button className="cert-cancel-btn" onClick={onCancel}>
               <FaTimes size={13} /> Cancel
             </button>
@@ -492,6 +529,42 @@ const handleEmployeeSelect = (employee) => {
     </div>
   </form>
 </div>
+            ) : selectedTraining ? (
+        <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
+          <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'8px'}}><FaChalkboardTeacher size={20}/><h2 style={{fontSize:'22px',fontWeight:700,margin:0}}>{selectedTraining.trainingName}</h2></div>
+              <div style={{display:'flex',gap:'16px',alignItems:'center',fontSize:'13px',opacity:0.9}}><span><FaBuilding/> {selectedTraining.trainingProvider}</span><span style={{background:'rgba(255,255,255,0.2)',padding:'3px 12px',borderRadius:'20px',fontSize:'12px'}}>{selectedTraining.certificationReceived}</span></div>
+            </div>
+            {/* <button onClick={handleBackToList} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',color:'white',padding:'8px 16px',borderRadius:'8px',cursor:'pointer',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px'}}><FaArrowLeft size={12}/> Back</button> */}
+          </div>
+          <div style={{padding:'32px'}}>
+            <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',marginBottom:'24px',border:'1px solid #e2e8f0',display:'flex',alignItems:'center',gap:'16px'}}>
+              <div style={{width:'50px',height:'50px',borderRadius:'50%',background:'linear-gradient(135deg,#9d174d,#be185d)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'20px',fontWeight:700}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedTraining.employeeId)?.name?.charAt(0)||'?'}</div>
+              <div><h3 style={{fontSize:'16px',fontWeight:600,color:'#1e293b',margin:'0 0 2px 0'}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedTraining.employeeId)?.name||selectedTraining.employeeName}</h3><span style={{fontSize:'13px',color:'#64748b'}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedTraining.employeeId)?.code||''}</span></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'16px',marginBottom:'28px'}}>
+              <div style={{background:'#eef2ff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaBuilding size={16} style={{color:'#4f46e5'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Training Provider</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedTraining.trainingProvider}</p></div>
+              <div style={{background:'#fffbeb',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCertificate size={16} style={{color:'#f59e0b'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Certification</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:getCertificationColor(selectedTraining.certificationReceived).bg,color:getCertificationColor(selectedTraining.certificationReceived).color}}>{getCertificationColor(selectedTraining.certificationReceived).icon} {selectedTraining.certificationReceived}</span></div>
+              <div style={{background:'#ecfdf5',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCalendarAlt size={16} style={{color:'#059669'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Start Date</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{formatDate(selectedTraining.startDate)}</p></div>
+              <div style={{background:'#fff1f2',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCalendarAlt size={16} style={{color:'#dc2626'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>End Date</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{formatDate(selectedTraining.endDate)}</p></div>
+              <div style={{background:'#f0fdf4',borderRadius:'10px',padding:'16px 18px',border:'1px solid #bbf7d0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaClock size={16} style={{color:'#166534'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Duration</span></div><p style={{fontSize:'18px',fontWeight:700,color:'#166534',margin:0}}>{calculateDuration(selectedTraining.startDate,selectedTraining.endDate)}</p></div>
+              <div style={{background:'#eef2ff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #c7d2fe'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaClock size={16} style={{color:'#4f46e5'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Training Hours</span></div><p style={{fontSize:'18px',fontWeight:700,color:'#3730a3',margin:0}}>{selectedTraining.trainingHours} hours</p></div>
+              <div style={{background:'#fff7ed',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaClock size={16} style={{color:'#ea580c'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Status</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:selectedTraining.status==='Active'?'#d1fae5':'#fee2e2',color:selectedTraining.status==='Active'?'#065f46':'#991b1b'}}>{selectedTraining.status||'Active'}</span></div>
+            </div>
+            <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',border:'1px solid #e2e8f0'}}>
+              <h4 style={{fontSize:'15px',fontWeight:600,color:'#1e293b',marginBottom:'16px',display:'flex',alignItems:'center',gap:'8px'}}><FaCertificate size={16} style={{color:'#dc2626'}}/> Training Certificate</h4>
+              {selectedTraining.certificateFileName ? (
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:'white',borderRadius:'8px',border:'1px solid #e2e8f0'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'12px'}}><div style={{width:'44px',height:'44px',borderRadius:'10px',background:'#fef2f2',display:'flex',alignItems:'center',justifyContent:'center'}}>{selectedTraining.certificateFileName.endsWith('.pdf')?<FaFilePdf size={20} style={{color:'#dc2626'}}/>:<FaFileImage size={20} style={{color:'#3b82f6'}}/>}</div><div><p style={{fontWeight:500,color:'#1e293b',margin:'0 0 2px 0',fontSize:'14px'}}>{selectedTraining.certificateFileName}</p><span style={{fontSize:'12px',color:'#94a3b8'}}>Uploaded certificate</span></div></div>
+                  <button onClick={(e)=>handleViewDocument(e,selectedTraining)} style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#9d174d',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'13px',fontWeight:500}}><FaEye size={14}/> View Certificate</button>
+                </div>
+              ) : (
+                <div style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}><FaCertificate size={36} style={{marginBottom:'12px',opacity:0.3}}/><p style={{fontWeight:500,margin:'0 0 4px 0',color:'#64748b'}}>No certificate uploaded</p><span style={{fontSize:'13px'}}>No training certificate has been uploaded</span></div>
+              )}
+            </div>
+          </div>
+        </div>
       ) : (
         <>
           {/* Search Bar */}
@@ -528,7 +601,6 @@ const handleEmployeeSelect = (employee) => {
                     <th>End Date</th>
                     <th>Hours</th>
                     <th>Certification</th>
-                    <th>Certificate</th>
                     <th>Status</th>
                     <th style={{ width: 100 }}>Actions</th>
                   </tr>
@@ -536,10 +608,15 @@ const handleEmployeeSelect = (employee) => {
                 <tbody>
                   {currentTrainings.length > 0 ? (
                     currentTrainings.map((training,idx) => (
-                      <tr key={training.id}>
+                      <tr 
+                        key={training.id}
+                        onClick={() => handleRowClick(training)}
+                        style={{ cursor: 'pointer' }}
+                        className="cert-table-row-hover"
+                      >
                      <td className="text-center">{startIndex + idx + 1}</td>
 
-                         <td>{training.employeeName}</td>
+                         <td>{DUMMY_EMPLOYEES.find(e => e.id === training.employeeId)?.name || training.employeeName}</td>
                         <td><strong>{training.trainingName}</strong></td>
                        
                         <td>{training.trainingProvider}</td>
@@ -554,24 +631,19 @@ const handleEmployeeSelect = (employee) => {
                             {training.certificationReceived}
                           </span>
                         </td>
-                        <td className="text-center">
-                          {training.certificateFileName ? (
-                            <a href={training.certificateFileData} download={training.certificateFileName} className="btn btn-sm btn-outline-primary">
-                              <FaFileAlt size={12} /> View
-                            </a>
-                          ) : <span className="text-muted">—</span>}
-                        </td>
+                     
                                 <td>
   <div
     className="d-flex align-items-center gap-1"
     style={{ cursor: "pointer" }}
-    onClick={() =>
+    onClick={(e) => {
+      e.stopPropagation();
       handleStatusToggle(
         training.id,
         DUMMY_EMPLOYEES.find(e => e.id === training.employeeId)?.name || "",
         training.status || "Active"
-      )
-    }
+      );
+    }}
   >
     <div
       style={{
@@ -618,18 +690,25 @@ const handleEmployeeSelect = (employee) => {
   </div>
 </td>
                         <td className="text-center">
-                          <div className="cert-actions">
-                           
-                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(training)} title="Edit">
+                          <div className="cert-actions" onClick={(e) => e.stopPropagation()}>
+                            <button 
+                              className="cert-act cert-act--edit" 
+                              onClick={() => handleEdit(training)} 
+                              title={training.status === 'Inactive' ? 'Cannot edit inactive record' : 'Edit'}
+                              disabled={training.status === 'Inactive'}
+                              style={{ 
+                                opacity: training.status === 'Inactive' ? 0.5 : 1,
+                                cursor: training.status === 'Inactive' ? 'not-allowed' : 'pointer'
+                              }}
+                            >
                               <FaEdit size={12} />
                             </button>
-                           
                           </div>
                         </td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan="10" className="text-center py-5">No training records found</td></tr>
+                    <tr><td colSpan="11" className="text-center py-5">No training records found</td></tr>
                   )}
                 </tbody>
               </table>
@@ -742,6 +821,131 @@ const handleEmployeeSelect = (employee) => {
     </div>
   </div>
 )}
+
+      {/* Document Preview Modal */}
+      {documentPreview && (
+        <div
+          className="emp-modal-overlay"
+          onClick={() => setDocumentPreview(null)}
+          style={{ zIndex: 1050 }}
+        >
+          <div
+            className="emp-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ 
+              maxWidth: '900px', 
+              width: '90%',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }}
+          >
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              padding: '20px 24px',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
+                <FaCertificate style={{ marginRight: '8px' }} />
+                Certificate Preview
+              </h3>
+              <button 
+                onClick={() => setDocumentPreview(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+              >
+                <FaTimes />
+              </button>
+            </div>
+            
+            <div style={{ padding: '24px' }}>
+              {documentPreview.data && documentPreview.name && documentPreview.name.endsWith('.pdf') ? (
+                <div style={{ 
+                  width: '100%', 
+                  height: '70vh',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  overflow: 'hidden'
+                }}>
+                  <iframe
+                    src={documentPreview.data}
+                    width="100%"
+                    height="100%"
+                    title="PDF Preview"
+                    style={{ border: 'none' }}
+                  />
+                </div>
+              ) : documentPreview.data ? (
+                <div style={{ textAlign: 'center' }}>
+                  <img 
+                    src={documentPreview.data} 
+                    alt="Certificate Preview" 
+                    style={{ 
+                      maxWidth: '100%', 
+                      maxHeight: '70vh',
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }} 
+                  />
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                  <p>No preview available</p>
+                </div>
+              )}
+              
+              <div style={{ 
+                marginTop: '20px', 
+                padding: '12px 16px', 
+                background: '#f9fafb', 
+                borderRadius: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <strong style={{ color: '#111827' }}>{documentPreview.name}</strong>
+                  <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '13px' }}>
+                    Uploaded certificate
+                  </p>
+                </div>
+                <a 
+                  href={documentPreview.data} 
+                  download={documentPreview.name}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    background: '#9d174d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    fontSize: '14px'
+                  }}
+                >
+                  <FaDownload /> Download
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add CSS for row hover effect */}
+      <style jsx>{`
+        .cert-table-row-hover:hover {
+          background-color: #f9fafb;
+          transition: background-color 0.2s ease;
+        }
+      `}</style>
     </div>
   );
 };

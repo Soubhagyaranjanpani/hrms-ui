@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaFileAlt, FaCalendarAlt, FaArrowUp, FaBuilding,
-  FaUpload, FaFilePdf, FaFileImage, FaTrash, FaEdit, FaPlus, FaChartLine, FaSearch,FaArrowLeft
+  FaUpload, FaFilePdf, FaFileImage, FaTrash, FaEdit, FaPlus, FaChartLine, FaSearch, FaArrowLeft, FaEye,FaArrowRight,
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [promotions, setPromotions] = useState(initialData?.promotions || [
-    { id: 1, employeeId:1,promotionOrderNo: 'PROMO/2024/001', promotionDate: '2024-03-01', previousDesignation: 'Software Engineer', newDesignation: 'Senior Software Engineer', previousGrade: 'Grade A2', newGrade: 'Grade B1', promotionType: 'Merit', effectiveDate: '2024-03-01', promotionAuthority: 'HR Director', createdAt: '2024-03-01T10:30:00Z' },
+    { id: 1, employeeId:1,promotionOrderNo: 'PROMO/2024/001', promotionDate: '2024-03-01', previousDesignation: 'Software Engineer', newDesignation: 'Senior Software Engineer', previousGrade: 'Grade A2', newGrade: 'Grade B1', promotionType: 'Merit', effectiveDate: '2024-03-01', promotionAuthority: 'HR Director', createdAt: '2024-03-01T10:30:00Z', promotionDocumentName: 'promotion_order.pdf', promotionDocumentData: null },
     { id: 2, employeeId:2,promotionOrderNo: 'PROMO/2024/002', promotionDate: '2024-06-15', previousDesignation: 'Senior Software Engineer', newDesignation: 'Tech Lead', previousGrade: 'Grade B1', newGrade: 'Grade C1', promotionType: 'Merit', effectiveDate: '2024-06-15', promotionAuthority: 'CEO', createdAt: '2024-06-15T11:45:00Z' },
-    { id: 3, employeeId:3,promotionOrderNo: 'PROMO/2024/003', promotionDate: '2024-09-20', previousDesignation: 'HR Executive', newDesignation: 'HR Manager', previousGrade: 'Grade B1', newGrade: 'Grade C2', promotionType: 'Time Scale', effectiveDate: '2024-09-20', promotionAuthority: 'HR Director', createdAt: '2024-09-20T09:15:00Z' },
+    { id: 3, employeeId:3,promotionOrderNo: 'PROMO/2024/003', promotionDate: '2024-09-20', previousDesignation: 'HR Executive', newDesignation: 'HR Manager', previousGrade: 'Grade B1', newGrade: 'Grade C2', promotionType: 'Time Scale', effectiveDate: '2024-09-20', promotionAuthority: 'HR Director', createdAt: '2024-09-20T09:15:00Z', promotionDocumentName: 'promotion_letter.pdf', promotionDocumentData: null },
     { id: 4, employeeId:4,promotionOrderNo: 'PROMO/2024/004', promotionDate: '2024-11-10', previousDesignation: 'Tech Lead', newDesignation: 'Project Manager', previousGrade: 'Grade C1', newGrade: 'Grade D1', promotionType: 'Fast Track', effectiveDate: '2024-11-10', promotionAuthority: 'Board of Directors', createdAt: '2024-11-10T14:20:00Z' },
     { id: 5, employeeId:5,promotionOrderNo: 'PROMO/2024/005', promotionDate: '2024-12-01', previousDesignation: 'Accountant', newDesignation: 'Senior Accountant', previousGrade: 'Grade A2', newGrade: 'Grade B1', promotionType: 'Merit', effectiveDate: '2024-12-01', promotionAuthority: 'Finance Director', createdAt: '2024-12-01T10:00:00Z' }
   ]);
   
   const [editingPromotion, setEditingPromotion] = useState(null);
+  const [selectedPromotion, setSelectedPromotion] = useState(null); 
+  const [documentPreview, setDocumentPreview] = useState(null); 
   const [formData, setFormData] = useState({
     promotionOrderNo: '',
     promotionDate: '',
@@ -94,6 +96,24 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     { value: 'Associate Director', label: 'Associate Director' },
     { value: 'Director', label: 'Director' }
   ];
+
+  // Handle row click for detail view
+  const handleRowClick = (promotion) => {
+    setSelectedPromotion(promotion);
+  };
+
+  // Handle document view
+  const handleViewDocument = (e, promotion) => {
+    e.stopPropagation(); // Prevent row click
+    if (promotion.promotionDocumentData) {
+      setDocumentPreview({
+        data: promotion.promotionDocumentData,
+        name: promotion.promotionDocumentName
+      });
+    } else {
+      toast.info('No Document', 'No document has been uploaded for this promotion');
+    }
+  };
 
   // Filter promotions by search
   const filteredPromotions = promotions.filter(promo => {
@@ -339,6 +359,7 @@ const handleEmployeeSelect = (employee) => {
 const handleBackToList = () => {
     resetForm();
     setShowForm(false);
+    setSelectedPromotion(null);
   };
 
    const handleStatusToggle = (id, name, currentStatus) => {
@@ -382,12 +403,12 @@ const handleBackToList = () => {
           <p className="cert-subtitle">Manage employee promotion records</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!showForm && (
+          {!showForm && !selectedPromotion && (
             <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
               <FaPlus size={13} /> Add Promotion
             </button>
           )}
-           {showForm && (
+           {(showForm || selectedPromotion) && (
                         <button 
                           type="button" 
                           className="cert-back-btn" 
@@ -397,7 +418,7 @@ const handleBackToList = () => {
                           <FaArrowLeft size={12} /> Back
                         </button>
                       )}
-          {!showForm && onCancel && (
+          {!showForm && !selectedPromotion && onCancel && (
             <button className="cert-cancel-btn" onClick={onCancel}>
               <FaTimes size={13} /> Cancel
             </button>
@@ -582,6 +603,43 @@ const handleBackToList = () => {
             </div>
           </form>
         </div>
+          ) : selectedPromotion ? (
+        <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
+          <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'8px'}}><FaArrowUp size={20}/><h2 style={{fontSize:'22px',fontWeight:700,margin:0}}>{selectedPromotion.promotionOrderNo}</h2></div>
+              <div style={{display:'flex',gap:'16px',alignItems:'center',fontSize:'13px',opacity:0.9}}><span><FaCalendarAlt/> {formatDate(selectedPromotion.createdAt)}</span><span style={{background:'rgba(255,255,255,0.2)',padding:'3px 12px',borderRadius:'20px',fontSize:'12px'}}>{selectedPromotion.promotionType}</span></div>
+            </div>
+            {/* <button onClick={handleBackToList} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',color:'white',padding:'8px 16px',borderRadius:'8px',cursor:'pointer',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px'}}><FaArrowLeft size={12}/> Back</button> */}
+          </div>
+          <div style={{padding:'32px'}}>
+            <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',marginBottom:'24px',border:'1px solid #e2e8f0',display:'flex',alignItems:'center',gap:'16px'}}>
+              <div style={{width:'50px',height:'50px',borderRadius:'50%',background:'linear-gradient(135deg,#9d174d,#be185d)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'20px',fontWeight:700}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedPromotion.employeeId)?.name?.charAt(0)||'?'}</div>
+              <div><h3 style={{fontSize:'16px',fontWeight:600,color:'#1e293b',margin:'0 0 2px 0'}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedPromotion.employeeId)?.name||'Unknown'}</h3><span style={{fontSize:'13px',color:'#64748b'}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedPromotion.employeeId)?.code||''} • {selectedPromotion.newDesignation}</span></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'16px',marginBottom:'28px'}}>
+              <div style={{background:'#fdf2f8',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCalendarAlt size={16} style={{color:'#9d174d'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Promotion Date</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{formatDate(selectedPromotion.promotionDate)}</p></div>
+              <div style={{background:'#eef2ff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaChartLine size={16} style={{color:'#4f46e5'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Promotion Type</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:'#e0e7ff',color:'#4f46e5'}}>{selectedPromotion.promotionType}</span></div>
+              <div style={{background:'#f8fafc',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaBuilding size={16} style={{color:'#6b7280'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Previous Designation</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedPromotion.previousDesignation}</p></div>
+              <div style={{background:'#ecfdf5',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaArrowUp size={16} style={{color:'#059669'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>New Designation</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#059669',margin:0}}>{selectedPromotion.newDesignation}</p></div>
+              <div style={{background:'#fffbeb',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaArrowRight size={16} style={{color:'#d97706'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Grade Progression</span></div><div style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'14px'}}><span style={{color:'#6b7280',fontWeight:500}}>{selectedPromotion.previousGrade||'N/A'}</span><FaArrowRight size={12} style={{color:'#9d174d'}}/><span style={{fontWeight:600,color:'#9d174d'}}>{selectedPromotion.newGrade||'N/A'}</span></div></div>
+              <div style={{background:'#ecfeff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCalendarAlt size={16} style={{color:'#0891b2'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Effective Date</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{formatDate(selectedPromotion.effectiveDate)}</p></div>
+              <div style={{background:'#faf5ff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaBuilding size={16} style={{color:'#7c3aed'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Authority</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedPromotion.promotionAuthority}</p></div>
+              <div style={{background:'#fff7ed',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaChartLine size={16} style={{color:'#ea580c'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Status</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:selectedPromotion.status==='Active'?'#d1fae5':'#fee2e2',color:selectedPromotion.status==='Active'?'#065f46':'#991b1b'}}>{selectedPromotion.status||'Active'}</span></div>
+            </div>
+            <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',border:'1px solid #e2e8f0'}}>
+              <h4 style={{fontSize:'15px',fontWeight:600,color:'#1e293b',marginBottom:'16px',display:'flex',alignItems:'center',gap:'8px'}}><FaFilePdf size={16} style={{color:'#dc2626'}}/> Promotion Order Document</h4>
+              {selectedPromotion.promotionDocumentName ? (
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:'white',borderRadius:'8px',border:'1px solid #e2e8f0'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'12px'}}><div style={{width:'44px',height:'44px',borderRadius:'10px',background:'#fef2f2',display:'flex',alignItems:'center',justifyContent:'center'}}>{selectedPromotion.promotionDocumentName.endsWith('.pdf')?<FaFilePdf size={20} style={{color:'#dc2626'}}/>:<FaFileImage size={20} style={{color:'#3b82f6'}}/>}</div><div><p style={{fontWeight:500,color:'#1e293b',margin:'0 0 2px 0',fontSize:'14px'}}>{selectedPromotion.promotionDocumentName}</p><span style={{fontSize:'12px',color:'#94a3b8'}}>Uploaded document</span></div></div>
+                  <button onClick={(e)=>handleViewDocument(e,selectedPromotion)} style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#9d174d',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'13px',fontWeight:500}}><FaEye size={14}/> View Document</button>
+                </div>
+              ) : (
+                <div style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}><FaFileAlt size={36} style={{marginBottom:'12px',opacity:0.3}}/><p style={{fontWeight:500,margin:'0 0 4px 0',color:'#64748b'}}>No document uploaded</p><span style={{fontSize:'13px'}}>No promotion order document has been uploaded</span></div>
+              )}
+            </div>
+          </div>
+        </div>
       ) : (
         // List View
         <>
@@ -623,7 +681,6 @@ const handleBackToList = () => {
           <th>Promotion Type</th>
           <th>Effective Date</th>
           <th>Authority</th>
-          <th>Document</th>
           <th>Status</th>
           <th style={{ width: 100 }}>Actions</th>
         </tr>
@@ -631,7 +688,12 @@ const handleBackToList = () => {
       <tbody>
         {currentPromotions.length > 0 ? (
           currentPromotions.map((promo,idx) => (
-            <tr key={promo.id}>
+            <tr 
+              key={promo.id}
+              onClick={() => handleRowClick(promo)}
+              style={{ cursor: 'pointer' }}
+              className="cert-table-row-hover"
+            >
            <td className="text-center">{startIndex + idx + 1}</td>
 
                <td>                        
@@ -648,30 +710,25 @@ const handleBackToList = () => {
               <td>{promo.previousGrade || '—'}</td>
               <td>{promo.newGrade || '—'}</td>
               <td>
-                <span className="cert-status-badge" style={{ background: '#e0e7ff', color: '#4f46e5' }}>
+                <span className="cert-status-badge" style={{ background: '#dd8aca', color: '#4f46e5' }}>
                   {promo.promotionType}
                 </span>
               </td>
               <td>{formatDate(promo.effectiveDate)}</td>
               <td>{promo.promotionAuthority}</td>
-              <td className="text-center">
-                {promo.promotionDocumentName ? (
-                  <a href={promo.promotionDocumentData} download={promo.promotionDocumentName} className="btn btn-sm btn-outline-primary">
-                    <FaFileAlt size={12} /> View
-                  </a>
-                ) : <span className="text-muted">—</span>}
-              </td>
+             
                                  <td>
   <div
     className="d-flex align-items-center gap-1"
     style={{ cursor: "pointer" }}
-    onClick={() =>
+    onClick={(e) => {
+      e.stopPropagation();
       handleStatusToggle(
         promo.id,
         DUMMY_EMPLOYEES.find(e => e.id === promo.employeeId)?.name || "",
         promo.status || "Active"
-      )
-    }
+      );
+    }}
   >
     <div
       style={{
@@ -719,7 +776,7 @@ const handleBackToList = () => {
 </td>
             
               <td>
-  <div className="cert-actions">
+  <div className="cert-actions" onClick={(e) => e.stopPropagation()}>
     <button 
       className="cert-act cert-act--edit" 
       onClick={() => handleEdit(promo)} 
@@ -738,7 +795,7 @@ const handleBackToList = () => {
           ))
         ) : (
           <tr>
-            <td colSpan="11" className="text-center py-5">No promotion records found</td>
+            <td colSpan="14" className="text-center py-5">No promotion records found</td>
           </tr>
         )}
       </tbody>
@@ -850,6 +907,131 @@ const handleBackToList = () => {
     </div>
   </div>
 )}
+
+      {/* Document Preview Modal */}
+      {documentPreview && (
+        <div
+          className="emp-modal-overlay"
+          onClick={() => setDocumentPreview(null)}
+          style={{ zIndex: 1050 }}
+        >
+          <div
+            className="emp-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ 
+              maxWidth: '900px', 
+              width: '90%',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }}
+          >
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              padding: '20px 24px',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
+                <FaFileAlt style={{ marginRight: '8px' }} />
+                Document Preview
+              </h3>
+              <button 
+                onClick={() => setDocumentPreview(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+              >
+                <FaTimes />
+              </button>
+            </div>
+            
+            <div style={{ padding: '24px' }}>
+              {documentPreview.data && documentPreview.name && documentPreview.name.endsWith('.pdf') ? (
+                <div style={{ 
+                  width: '100%', 
+                  height: '70vh',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  overflow: 'hidden'
+                }}>
+                  <iframe
+                    src={documentPreview.data}
+                    width="100%"
+                    height="100%"
+                    title="PDF Preview"
+                    style={{ border: 'none' }}
+                  />
+                </div>
+              ) : documentPreview.data ? (
+                <div style={{ textAlign: 'center' }}>
+                  <img 
+                    src={documentPreview.data} 
+                    alt="Document Preview" 
+                    style={{ 
+                      maxWidth: '100%', 
+                      maxHeight: '70vh',
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }} 
+                  />
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                  <p>No preview available</p>
+                </div>
+              )}
+              
+              <div style={{ 
+                marginTop: '20px', 
+                padding: '12px 16px', 
+                background: '#f9fafb', 
+                borderRadius: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <strong style={{ color: '#111827' }}>{documentPreview.name}</strong>
+                  <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '13px' }}>
+                    Uploaded document
+                  </p>
+                </div>
+                <a 
+                  href={documentPreview.data} 
+                  download={documentPreview.name}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    background: '#9d174d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    fontSize: '14px'
+                  }}
+                >
+                  <FaFileAlt /> Download
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add CSS for row hover effect */}
+      <style jsx>{`
+        .cert-table-row-hover:hover {
+          background-color: #f9fafb;
+          transition: background-color 0.2s ease;
+        }
+      `}</style>
     </div>
   );
 };

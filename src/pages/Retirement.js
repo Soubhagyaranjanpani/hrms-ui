@@ -2,20 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaCalendarAlt, FaBuilding, 
   FaUpload, FaFilePdf, FaFileImage, FaEdit, FaTrash, FaPlus,
-  FaFileAlt, FaSearch, FaUserTie, FaEye, FaDownload, FaRupeeSign, FaClock, FaArrowLeft
+  FaFileAlt, FaSearch, FaUserTie, FaEye, FaDownload, FaRupeeSign, FaClock, FaArrowLeft,FaCheckCircle
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [retirements, setRetirements] = useState(initialData?.retirements || [
-    { id: 1, retirementDate: '2045-12-31', retirementType: 'Superannuation', pensionEligibility: 'Yes', pensionNumber: 'PEN/2045/001', retirementOrder: 'ORD/RET/2045/001', retirementBenefits: 'Gratuity, Provident Fund, Leave Encashment', createdAt: '2024-01-15T10:30:00Z', employeeName: 'John Doe', employeeCode: 'EMP001', superannuationDate: '2045-12-31' },
-    { id: 2, retirementDate: '2040-06-15', retirementType: 'Superannuation', pensionEligibility: 'Yes', pensionNumber: 'PEN/2040/002', retirementOrder: 'ORD/RET/2040/002', retirementBenefits: 'Gratuity, Provident Fund', createdAt: '2024-02-20T11:45:00Z', employeeName: 'Jane Smith', employeeCode: 'EMP002', superannuationDate: '2040-06-15' },
-    { id: 3, retirementDate: '2042-03-20', retirementType: 'Voluntary', pensionEligibility: 'Pending', pensionNumber: '', retirementOrder: 'ORD/RET/2042/003', retirementBenefits: 'Pending approval', createdAt: '2024-03-10T09:15:00Z', employeeName: 'Mike Johnson', employeeCode: 'EMP003', superannuationDate: '2042-03-20' },
-    { id: 4, retirementDate: '2038-08-10', retirementType: 'Medical', pensionEligibility: 'Yes', pensionNumber: 'PEN/2038/004', retirementOrder: 'ORD/RET/2038/004', retirementBenefits: 'Medical benefits, Provident Fund', createdAt: '2024-04-05T14:20:00Z', employeeName: 'Sarah Williams', employeeCode: 'EMP004', superannuationDate: '2038-08-10' },
-    { id: 5, retirementDate: '2048-01-05', retirementType: 'Superannuation', pensionEligibility: 'No', pensionNumber: '', retirementOrder: 'ORD/RET/2048/005', retirementBenefits: 'Provident Fund only', createdAt: '2024-05-12T10:00:00Z', employeeName: 'David Brown', employeeCode: 'EMP005', superannuationDate: '2048-01-05' }
+    { id: 1, retirementDate: '2045-12-31', retirementType: 'Superannuation', pensionEligibility: 'Yes', pensionNumber: 'PEN/2045/001', retirementOrder: 'ORD/RET/2045/001', retirementBenefits: 'Gratuity, Provident Fund, Leave Encashment', createdAt: '2024-01-15T10:30:00Z', employeeName: 'John Doe', employeeCode: 'EMP001', superannuationDate: '2045-12-31', employeeId: 1, retirementOrderFileName: 'retirement_order.pdf', retirementOrderFileData: null },
+    { id: 2, retirementDate: '2040-06-15', retirementType: 'Superannuation', pensionEligibility: 'Yes', pensionNumber: 'PEN/2040/002', retirementOrder: 'ORD/RET/2040/002', retirementBenefits: 'Gratuity, Provident Fund', createdAt: '2024-02-20T11:45:00Z', employeeName: 'Jane Smith', employeeCode: 'EMP002', superannuationDate: '2040-06-15', employeeId: 2 },
+    { id: 3, retirementDate: '2042-03-20', retirementType: 'Voluntary', pensionEligibility: 'Pending', pensionNumber: '', retirementOrder: 'ORD/RET/2042/003', retirementBenefits: 'Pending approval', createdAt: '2024-03-10T09:15:00Z', employeeName: 'Mike Johnson', employeeCode: 'EMP003', superannuationDate: '2042-03-20', employeeId: 3, retirementOrderFileName: 'voluntary_retirement.pdf', retirementOrderFileData: null },
+    { id: 4, retirementDate: '2038-08-10', retirementType: 'Medical', pensionEligibility: 'Yes', pensionNumber: 'PEN/2038/004', retirementOrder: 'ORD/RET/2038/004', retirementBenefits: 'Medical benefits, Provident Fund', createdAt: '2024-04-05T14:20:00Z', employeeName: 'Sarah Williams', employeeCode: 'EMP004', superannuationDate: '2038-08-10', employeeId: 4 },
+    { id: 5, retirementDate: '2048-01-05', retirementType: 'Superannuation', pensionEligibility: 'No', pensionNumber: '', retirementOrder: 'ORD/RET/2048/005', retirementBenefits: 'Provident Fund only', createdAt: '2024-05-12T10:00:00Z', employeeName: 'David Brown', employeeCode: 'EMP005', superannuationDate: '2048-01-05', employeeId: 5 }
   ]);
   
   const [editingRecord, setEditingRecord] = useState(null);
+  const [selectedRecord, setSelectedRecord] = useState(null); // For inline detail view
+  const [documentPreview, setDocumentPreview] = useState(null); // For document preview modal
   const [formData, setFormData] = useState({
     retirementDate: '',
     retirementType: 'Superannuation',
@@ -61,6 +63,24 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
     const search = employeeSearchTerm.toLowerCase();
     return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
   });
+
+  // Handle row click for detail view
+  const handleRowClick = (record) => {
+    setSelectedRecord(record);
+  };
+
+  // Handle document view
+  const handleViewDocument = (e, record) => {
+    e.stopPropagation(); // Prevent row click
+    if (record.retirementOrderFileData) {
+      setDocumentPreview({
+        data: record.retirementOrderFileData,
+        name: record.retirementOrderFileName
+      });
+    } else {
+      toast.info('No Document', 'No retirement order document has been uploaded');
+    }
+  };
 
   // Filter retirements by search
   const filteredRetirements = retirements.filter(record => {
@@ -231,16 +251,13 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
 
  const handleEdit = (record) => {
   if (record.status === 'Inactive') {
+    toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
     return;
   }
   
+  const emp = DUMMY_EMPLOYEES.find(e => e.id === record.employeeId);
+  setSelectedEmployee(emp || null);
   setEditingRecord(record);
-  setSelectedEmployee({ 
-    id: record.employeeId, 
-    name: record.employeeName,
-    code: record.employeeCode,
-    superannuationDate: record.superannuationDate
-  });
   setFormData({
     retirementDate: record.retirementDate,
     retirementType: record.retirementType,
@@ -256,6 +273,7 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
     employeeCode: record.employeeCode,
     superannuationDate: record.superannuationDate
   });
+  setEmployeeSearchTerm(emp?.name || '');
   setShowForm(true);
 };
 
@@ -290,12 +308,36 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
   const handleBackToList = () => {
     resetForm();
     setShowForm(false);
+    setSelectedRecord(null);
   };
 
   // Calculate stats
   const totalRetirements = retirements.length;
   const pensionEligible = retirements.filter(r => r.pensionEligibility === 'Yes').length;
   const upcomingRetirements = retirements.filter(r => new Date(r.retirementDate) > new Date()).length;
+
+  // Get retirement type color
+  const getRetirementTypeColor = (type) => {
+    switch(type) {
+      case 'Superannuation': return { bg: '#d1fae5', color: '#065f46' };
+      case 'Voluntary': return { bg: '#e0e7ff', color: '#4f46e5' };
+      case 'Medical': return { bg: '#fee2e2', color: '#991b1b' };
+      case 'Compulsory': return { bg: '#fef3c7', color: '#92400e' };
+      case 'Early': return { bg: '#fce7f3', color: '#9d174d' };
+      case 'VRS': return { bg: '#ffedd5', color: '#9a3412' };
+      default: return { bg: '#f3f4f6', color: '#6b7280' };
+    }
+  };
+
+  // Get pension eligibility color
+  const getPensionEligibilityColor = (status) => {
+    switch(status) {
+      case 'Yes': return { bg: '#d1fae5', color: '#065f46', icon: '✅' };
+      case 'Pending': return { bg: '#fed7aa', color: '#9a3412', icon: '⏳' };
+      case 'No': return { bg: '#f3f4f6', color: '#6b7280', icon: '❌' };
+      default: return { bg: '#f3f4f6', color: '#6b7280', icon: '—' };
+    }
+  };
 
    const handleStatusToggle = (id, name, currentStatus) => {
     const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
@@ -338,12 +380,12 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
           <p className="cert-subtitle">Manage employee retirement records</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!showForm && (
+          {!showForm && !selectedRecord && (
             <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
               <FaPlus size={13} /> Add Retirement Record
             </button>
           )}
-          {showForm && (
+          {(showForm || selectedRecord) && (
             <button 
               type="button" 
               className="cert-back-btn" 
@@ -353,7 +395,7 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
               <FaArrowLeft size={12} /> Back
             </button>
           )}
-          {!showForm && onCancel && (
+          {!showForm && !selectedRecord && onCancel && (
             <button className="cert-cancel-btn" onClick={onCancel}>
               <FaTimes size={13} /> Cancel
             </button>
@@ -507,6 +549,49 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
             </div>
           </form>
         </div>
+           ) : selectedRecord ? (
+        <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
+          <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'8px'}}><FaCalendarAlt size={20}/><h2 style={{fontSize:'22px',fontWeight:700,margin:0}}>Retirement Record</h2></div>
+              <div style={{display:'flex',gap:'16px',alignItems:'center',fontSize:'13px',opacity:0.9}}><span><FaCalendarAlt/> {formatDate(selectedRecord.createdAt)}</span><span style={{background:'rgba(255,255,255,0.2)',padding:'3px 12px',borderRadius:'20px',fontSize:'12px'}}>{selectedRecord.retirementType}</span></div>
+            </div>
+            {/* <button onClick={handleBackToList} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',color:'white',padding:'8px 16px',borderRadius:'8px',cursor:'pointer',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px'}}><FaArrowLeft size={12}/> Back</button> */}
+          </div>
+          <div style={{padding:'32px'}}>
+            <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',marginBottom:'24px',border:'1px solid #e2e8f0',display:'flex',alignItems:'center',gap:'16px'}}>
+              <div style={{width:'50px',height:'50px',borderRadius:'50%',background:'linear-gradient(135deg,#9d174d,#be185d)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'20px',fontWeight:700}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedRecord.employeeId)?.name?.charAt(0)||'?'}</div>
+              <div><h3 style={{fontSize:'16px',fontWeight:600,color:'#1e293b',margin:'0 0 2px 0'}}>{selectedRecord.employeeName}</h3><span style={{fontSize:'13px',color:'#64748b'}}>{selectedRecord.employeeCode}</span></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'16px',marginBottom:'28px'}}>
+              <div style={{background:'#fff1f2',borderRadius:'10px',padding:'16px 18px',border:'1px solid #fecaca'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCalendarAlt size={16} style={{color:'#dc2626'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Retirement Date</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#991b1b',margin:0}}>{formatDate(selectedRecord.retirementDate)}</p></div>
+              <div style={{background:'#eef2ff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaBuilding size={16} style={{color:'#4f46e5'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Retirement Type</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:getRetirementTypeColor(selectedRecord.retirementType).bg,color:getRetirementTypeColor(selectedRecord.retirementType).color}}>{selectedRecord.retirementType}</span></div>
+              <div style={{background:'#ecfdf5',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCheckCircle size={16} style={{color:'#059669'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Pension Eligibility</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:getPensionEligibilityColor(selectedRecord.pensionEligibility).bg,color:getPensionEligibilityColor(selectedRecord.pensionEligibility).color}}>{getPensionEligibilityColor(selectedRecord.pensionEligibility).icon} {selectedRecord.pensionEligibility}</span></div>
+              <div style={{background:'#f8fafc',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaFileAlt size={16} style={{color:'#6b7280'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Pension Number</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedRecord.pensionNumber||'—'}</p></div>
+              <div style={{background:'#f8fafc',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaFileAlt size={16} style={{color:'#6b7280'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Retirement Order</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedRecord.retirementOrder}</p></div>
+              <div style={{background:'#fff7ed',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaClock size={16} style={{color:'#ea580c'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Status</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:selectedRecord.status==='Active'?'#d1fae5':'#fee2e2',color:selectedRecord.status==='Active'?'#065f46':'#991b1b'}}>{selectedRecord.status||'Active'}</span></div>
+            </div>
+            <div style={{background:'#f0fdf4',borderRadius:'12px',padding:'20px',marginBottom:'24px',border:'1px solid #bbf7d0'}}>
+              <label style={{fontSize:'14px',fontWeight:600,color:'#166534',display:'block',marginBottom:'8px'}}><FaRupeeSign style={{marginRight:'8px'}}/> Retirement Benefits</label>
+              <p style={{fontSize:'15px',color:'#065f46',margin:0,lineHeight:1.6,fontWeight:500}}>{selectedRecord.retirementBenefits||'No benefits specified'}</p>
+            </div>
+            <div style={{background:'#eef2ff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #c7d2fe',marginBottom:'24px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaClock size={16} style={{color:'#4f46e5'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Superannuation Date</span></div>
+              <p style={{fontSize:'15px',fontWeight:600,color:'#3730a3',margin:0}}>{formatDate(selectedRecord.superannuationDate)}</p>
+            </div>
+            <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',border:'1px solid #e2e8f0'}}>
+              <h4 style={{fontSize:'15px',fontWeight:600,color:'#1e293b',marginBottom:'16px',display:'flex',alignItems:'center',gap:'8px'}}><FaFilePdf size={16} style={{color:'#dc2626'}}/> Retirement Order Document</h4>
+              {selectedRecord.retirementOrderFileName ? (
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:'white',borderRadius:'8px',border:'1px solid #e2e8f0'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'12px'}}><div style={{width:'44px',height:'44px',borderRadius:'10px',background:'#fef2f2',display:'flex',alignItems:'center',justifyContent:'center'}}>{selectedRecord.retirementOrderFileName.endsWith('.pdf')?<FaFilePdf size={20} style={{color:'#dc2626'}}/>:<FaFileImage size={20} style={{color:'#3b82f6'}}/>}</div><div><p style={{fontWeight:500,color:'#1e293b',margin:'0 0 2px 0',fontSize:'14px'}}>{selectedRecord.retirementOrderFileName}</p><span style={{fontSize:'12px',color:'#94a3b8'}}>Uploaded document</span></div></div>
+                  <button onClick={(e)=>handleViewDocument(e,selectedRecord)} style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#9d174d',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'13px',fontWeight:500}}><FaEye size={14}/> View Document</button>
+                </div>
+              ) : (
+                <div style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}><FaFileAlt size={36} style={{marginBottom:'12px',opacity:0.3}}/><p style={{fontWeight:500,margin:'0 0 4px 0',color:'#64748b'}}>No document uploaded</p><span style={{fontSize:'13px'}}>No retirement order document has been uploaded</span></div>
+              )}
+            </div>
+          </div>
+        </div>
       ) : (
         <>
           {/* Search Bar */}
@@ -544,7 +629,6 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
                     <th>Pension Number</th>
                     <th>Retirement Order</th>
                     <th>Benefits</th>
-                    <th>Document</th>
                    <th>Status</th>
                     <th style={{ width: 100 }}>Actions</th>
                   </tr>
@@ -552,7 +636,12 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
                 <tbody>
                   {currentRetirements.length > 0 ? (
                     currentRetirements.map((record,idx) => (
-                      <tr key={record.id}>
+                      <tr 
+                        key={record.id}
+                        onClick={() => handleRowClick(record)}
+                        style={{ cursor: 'pointer' }}
+                        className="cert-table-row-hover"
+                      >
                      <td className="text-center">{startIndex + idx + 1}</td>
                         <td><strong>{record.employeeName}</strong><br /><small>{record.employeeCode}</small></td>
                         <td>{formatDate(record.retirementDate)}</td>
@@ -568,24 +657,19 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
                         <td>{record.pensionNumber || '—'}</td>
                         <td>{record.retirementOrder}</td>
                         <td>{record.retirementBenefits ? (record.retirementBenefits.length > 25 ? record.retirementBenefits.substring(0, 25) + '...' : record.retirementBenefits) : '—'}</td>
-                        <td className="text-center">
-                          {record.retirementOrderFileName ? (
-                            <a href={record.retirementOrderFileData} download={record.retirementOrderFileName} className="btn btn-sm btn-outline-primary">
-                              <FaFileAlt size={12} /> View
-                            </a>
-                          ) : <span className="text-muted">—</span>}
-                        </td>
+                      
                         <td>
   <div
     className="d-flex align-items-center gap-1"
     style={{ cursor: "pointer" }}
-    onClick={() =>
+    onClick={(e) => {
+      e.stopPropagation();
       handleStatusToggle(
         record.id,
         DUMMY_EMPLOYEES.find(e => e.id === record.employeeId)?.name || "",
         record.status || "Active"
-      )
-    }
+      );
+    }}
   >
     <div
       style={{
@@ -632,7 +716,7 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
   </div>
 </td>
                        <td>
-  <div className="cert-actions">
+  <div className="cert-actions" onClick={(e) => e.stopPropagation()}>
     <button 
       className="cert-act cert-act--edit" 
       onClick={() => handleEdit(record)} 
@@ -650,7 +734,7 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan="9" className="text-center py-5">No retirement records found</td></tr>
+                    <tr><td colSpan="11" className="text-center py-5">No retirement records found</td></tr>
                   )}
                 </tbody>
               </table>
@@ -763,6 +847,131 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
     </div>
   </div>
 )}
+
+      {/* Document Preview Modal */}
+      {documentPreview && (
+        <div
+          className="emp-modal-overlay"
+          onClick={() => setDocumentPreview(null)}
+          style={{ zIndex: 1050 }}
+        >
+          <div
+            className="emp-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ 
+              maxWidth: '900px', 
+              width: '90%',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }}
+          >
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              padding: '20px 24px',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
+                <FaFileAlt style={{ marginRight: '8px' }} />
+                Document Preview
+              </h3>
+              <button 
+                onClick={() => setDocumentPreview(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+              >
+                <FaTimes />
+              </button>
+            </div>
+            
+            <div style={{ padding: '24px' }}>
+              {documentPreview.data && documentPreview.name && documentPreview.name.endsWith('.pdf') ? (
+                <div style={{ 
+                  width: '100%', 
+                  height: '70vh',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  overflow: 'hidden'
+                }}>
+                  <iframe
+                    src={documentPreview.data}
+                    width="100%"
+                    height="100%"
+                    title="PDF Preview"
+                    style={{ border: 'none' }}
+                  />
+                </div>
+              ) : documentPreview.data ? (
+                <div style={{ textAlign: 'center' }}>
+                  <img 
+                    src={documentPreview.data} 
+                    alt="Document Preview" 
+                    style={{ 
+                      maxWidth: '100%', 
+                      maxHeight: '70vh',
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }} 
+                  />
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                  <p>No preview available</p>
+                </div>
+              )}
+              
+              <div style={{ 
+                marginTop: '20px', 
+                padding: '12px 16px', 
+                background: '#f9fafb', 
+                borderRadius: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <strong style={{ color: '#111827' }}>{documentPreview.name}</strong>
+                  <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '13px' }}>
+                    Uploaded document
+                  </p>
+                </div>
+                <a 
+                  href={documentPreview.data} 
+                  download={documentPreview.name}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    background: '#9d174d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    fontSize: '14px'
+                  }}
+                >
+                  <FaDownload /> Download
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add CSS for row hover effect */}
+      <style jsx>{`
+        .cert-table-row-hover:hover {
+          background-color: #f9fafb;
+          transition: background-color 0.2s ease;
+        }
+      `}</style>
     </div>
   );
 };

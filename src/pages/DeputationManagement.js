@@ -2,20 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaBuilding, FaCalendarAlt, FaUpload, 
   FaFilePdf, FaFileImage, FaTrash, FaEdit, FaPlus, FaUserTie,
-  FaFileAlt, FaSearch, FaExchangeAlt, FaClock, FaArrowLeft
+  FaFileAlt, FaSearch, FaExchangeAlt, FaClock, FaArrowLeft, FaEye
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const DeputationManagement = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [deputations, setDeputations] = useState(initialData?.deputations || [
-    { id: 1,employeeId:1, deputationOrderNo: 'DEP/2024/001', deputationOrganization: 'Ministry of Corporate Affairs', startDate: '2024-01-15', endDate: '2024-06-15', deputationType: 'Government', reportingAuthority: 'HR Director', createdAt: '2024-01-15T10:30:00Z' },
+    { id: 1,employeeId:1, deputationOrderNo: 'DEP/2024/001', deputationOrganization: 'Ministry of Corporate Affairs', startDate: '2024-01-15', endDate: '2024-06-15', deputationType: 'Government', reportingAuthority: 'HR Director', createdAt: '2024-01-15T10:30:00Z', orderFileName: 'deputation_order.pdf', orderFileData: null },
     { id: 2,employeeId:2, deputationOrderNo: 'DEP/2024/002', deputationOrganization: 'PwC India', startDate: '2024-03-01', endDate: '2024-08-31', deputationType: 'Project Based', reportingAuthority: 'Project Director', createdAt: '2024-03-01T11:45:00Z' },
-    { id: 3, employeeId:3,deputationOrderNo: 'DEP/2024/003', deputationOrganization: 'Harvard Business School', startDate: '2024-05-10', endDate: '2024-07-20', deputationType: 'Training', reportingAuthority: 'Department Head', createdAt: '2024-05-10T09:15:00Z' },
+    { id: 3, employeeId:3,deputationOrderNo: 'DEP/2024/003', deputationOrganization: 'Harvard Business School', startDate: '2024-05-10', endDate: '2024-07-20', deputationType: 'Training', reportingAuthority: 'Department Head', createdAt: '2024-05-10T09:15:00Z', orderFileName: 'training_deputation.pdf', orderFileData: null },
     { id: 4, employeeId:4,deputationOrderNo: 'DEP/2024/004', deputationOrganization: 'World Bank', startDate: '2024-08-01', endDate: '2025-01-31', deputationType: 'International', reportingAuthority: 'CEO', createdAt: '2024-08-01T14:20:00Z' },
     { id: 5, employeeId:5,deputationOrderNo: 'DEP/2024/005', deputationOrganization: 'NITI Aayog', startDate: '2024-10-15', endDate: '2025-03-15', deputationType: 'Domestic', reportingAuthority: 'Managing Director', createdAt: '2024-10-15T10:00:00Z' }
   ]);
   
   const [editingDeputation, setEditingDeputation] = useState(null);
+  const [selectedDeputation, setSelectedDeputation] = useState(null); // For inline detail view
+  const [documentPreview, setDocumentPreview] = useState(null); // For document preview modal
   const [formData, setFormData] = useState({
     deputationOrderNo: '',
     deputationOrganization: '',
@@ -59,6 +61,24 @@ const DeputationManagement = ({ employeeId, initialData, onSuccess, onCancel }) 
     const search = searchTerm.toLowerCase();
     return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
   });
+
+  // Handle row click for detail view
+  const handleRowClick = (deputation) => {
+    setSelectedDeputation(deputation);
+  };
+
+  // Handle document view
+  const handleViewDocument = (e, deputation) => {
+    e.stopPropagation(); // Prevent row click
+    if (deputation.orderFileData) {
+      setDocumentPreview({
+        data: deputation.orderFileData,
+        name: deputation.orderFileName
+      });
+    } else {
+      toast.info('No Document', 'No document has been uploaded for this deputation');
+    }
+  };
 
   // Deputation Types
   const deputationTypes = [
@@ -259,7 +279,6 @@ const handleEmployeeSelect = (employee) => {
   const emp = DUMMY_EMPLOYEES.find(e => e.id === deputation.employeeId);  
   setSelectedEmployee(emp || null); 
   setEditingDeputation(deputation);
-  setSelectedEmployee({ id: deputation.employeeId, name: deputation.employeeName });
   setFormData({
     deputationOrderNo: deputation.deputationOrderNo,
     deputationOrganization: deputation.deputationOrganization,
@@ -303,6 +322,12 @@ const handleEmployeeSelect = (employee) => {
   const handleCancelForm = () => {
     resetForm();
     setShowForm(false);
+  };
+
+  const handleBackToList = () => {
+    resetForm();
+    setShowForm(false);
+    setSelectedDeputation(null);
   };
 
   const getDuration = (startDate, endDate) => {
@@ -350,6 +375,18 @@ const handleEmployeeSelect = (employee) => {
           `${statusAction.name} is now ${newStatus}`
         );
       };
+
+  // Get deputation type color
+  const getDeputationTypeColor = (type) => {
+    switch(type) {
+      case 'Domestic': return { bg: '#d1fae5', color: '#065f46' };
+      case 'International': return { bg: '#e0e7ff', color: '#4f46e5' };
+      case 'Government': return { bg: '#fef3c7', color: '#92400e' };
+      case 'Training': return { bg: '#fce7f3', color: '#9d174d' };
+      case 'Project Based': return { bg: '#ffedd5', color: '#9a3412' };
+      default: return { bg: '#f3f4f6', color: '#6b7280' };
+    }
+  };
   
   return (
     <div className="cert-root">
@@ -360,22 +397,22 @@ const handleEmployeeSelect = (employee) => {
           <p className="cert-subtitle">Manage employee deputation records</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!showForm && (
+          {!showForm && !selectedDeputation && (
             <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
               <FaPlus size={13} /> Add Deputation
             </button>
           )}
-          {showForm && (
+          {(showForm || selectedDeputation) && (
             <button 
               type="button" 
               className="cert-back-btn" 
-              onClick={handleCancelForm}
+              onClick={handleBackToList}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
             >
               <FaArrowLeft size={12} /> Back
             </button>
           )}
-          {!showForm && onCancel && (
+          {!showForm && !selectedDeputation && onCancel && (
             <button className="cert-cancel-btn" onClick={onCancel}>
               <FaTimes size={13} /> Cancel
             </button>
@@ -537,6 +574,42 @@ const handleEmployeeSelect = (employee) => {
             </div>
           </form>
         </div>
+           ) : selectedDeputation ? (
+        <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
+          <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'8px'}}><FaExchangeAlt size={20}/><h2 style={{fontSize:'22px',fontWeight:700,margin:0}}>{selectedDeputation.deputationOrderNo}</h2></div>
+              <div style={{display:'flex',gap:'16px',alignItems:'center',fontSize:'13px',opacity:0.9}}><span><FaCalendarAlt/> {formatDate(selectedDeputation.createdAt)}</span><span style={{background:'rgba(255,255,255,0.2)',padding:'3px 12px',borderRadius:'20px',fontSize:'12px'}}>{selectedDeputation.deputationType}</span></div>
+            </div>
+            {/* <button onClick={handleBackToList} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',color:'white',padding:'8px 16px',borderRadius:'8px',cursor:'pointer',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px'}}><FaArrowLeft size={12}/> Back</button> */}
+          </div>
+          <div style={{padding:'32px'}}>
+            <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',marginBottom:'24px',border:'1px solid #e2e8f0',display:'flex',alignItems:'center',gap:'16px'}}>
+              <div style={{width:'50px',height:'50px',borderRadius:'50%',background:'linear-gradient(135deg,#9d174d,#be185d)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'20px',fontWeight:700}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedDeputation.employeeId)?.name?.charAt(0)||'?'}</div>
+              <div><h3 style={{fontSize:'16px',fontWeight:600,color:'#1e293b',margin:'0 0 2px 0'}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedDeputation.employeeId)?.name||'Unknown'}</h3><span style={{fontSize:'13px',color:'#64748b'}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedDeputation.employeeId)?.code||''}</span></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'16px',marginBottom:'28px'}}>
+              <div style={{background:'#fdf2f8',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaBuilding size={16} style={{color:'#9d174d'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Organization</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedDeputation.deputationOrganization}</p></div>
+              <div style={{background:'#eef2ff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaExchangeAlt size={16} style={{color:'#4f46e5'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Deputation Type</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:'#e0e7ff',color:'#4f46e5'}}>{selectedDeputation.deputationType}</span></div>
+              <div style={{background:'#ecfdf5',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCalendarAlt size={16} style={{color:'#059669'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Start Date</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{formatDate(selectedDeputation.startDate)}</p></div>
+              <div style={{background:'#fff1f2',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCalendarAlt size={16} style={{color:'#dc2626'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>End Date</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{formatDate(selectedDeputation.endDate)}</p></div>
+              <div style={{background:'#f0fdf4',borderRadius:'10px',padding:'16px 18px',border:'1px solid #bbf7d0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaClock size={16} style={{color:'#166534'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Duration</span></div><p style={{fontSize:'18px',fontWeight:700,color:'#166534',margin:0}}>{getDuration(selectedDeputation.startDate,selectedDeputation.endDate)}</p></div>
+              <div style={{background:'#faf5ff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaUserTie size={16} style={{color:'#7c3aed'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Reporting Authority</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedDeputation.reportingAuthority}</p></div>
+              <div style={{background:'#fff7ed',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaClock size={16} style={{color:'#ea580c'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Status</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:selectedDeputation.status==='Active'?'#d1fae5':'#fee2e2',color:selectedDeputation.status==='Active'?'#065f46':'#991b1b'}}>{selectedDeputation.status||'Active'}</span></div>
+            </div>
+            <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',border:'1px solid #e2e8f0'}}>
+              <h4 style={{fontSize:'15px',fontWeight:600,color:'#1e293b',marginBottom:'16px',display:'flex',alignItems:'center',gap:'8px'}}><FaFilePdf size={16} style={{color:'#dc2626'}}/> Deputation Order Document</h4>
+              {selectedDeputation.orderFileName ? (
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:'white',borderRadius:'8px',border:'1px solid #e2e8f0'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'12px'}}><div style={{width:'44px',height:'44px',borderRadius:'10px',background:'#fef2f2',display:'flex',alignItems:'center',justifyContent:'center'}}>{selectedDeputation.orderFileName.endsWith('.pdf')?<FaFilePdf size={20} style={{color:'#dc2626'}}/>:<FaFileImage size={20} style={{color:'#3b82f6'}}/>}</div><div><p style={{fontWeight:500,color:'#1e293b',margin:'0 0 2px 0',fontSize:'14px'}}>{selectedDeputation.orderFileName}</p><span style={{fontSize:'12px',color:'#94a3b8'}}>Uploaded document</span></div></div>
+                  <button onClick={(e)=>handleViewDocument(e,selectedDeputation)} style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 20px',background:'#9d174d',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'13px',fontWeight:500}}><FaEye size={14}/> View Document</button>
+                </div>
+              ) : (
+                <div style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}><FaFileAlt size={36} style={{marginBottom:'12px',opacity:0.3}}/><p style={{fontWeight:500,margin:'0 0 4px 0',color:'#64748b'}}>No document uploaded</p><span style={{fontSize:'13px'}}>No deputation order document has been uploaded</span></div>
+              )}
+            </div>
+          </div>
+        </div>
       ) : (
         <>
           {/* Search Bar */}
@@ -574,7 +647,6 @@ const handleEmployeeSelect = (employee) => {
                     <th>End Date</th>
                     <th>Deputation Type</th>
                     <th>Reporting Authority</th>
-                    <th>Document</th>
                     <th>Status</th>
                     <th style={{ width: 100 }}>Actions</th>
                   </tr>
@@ -582,7 +654,12 @@ const handleEmployeeSelect = (employee) => {
                 <tbody>
                   {currentDeputations.length > 0 ? (
                     currentDeputations.map((dep,idx) => (
-                      <tr key={dep.id}>
+                      <tr 
+                        key={dep.id}
+                        onClick={() => handleRowClick(dep)}
+                        style={{ cursor: 'pointer' }}
+                        className="cert-table-row-hover"
+                      >
                      <td className="text-center">{startIndex + idx + 1}</td>
                         <td>                        
     {DUMMY_EMPLOYEES.find(e => e.id === dep.employeeId)?.name || 'Unknown'}
@@ -598,24 +675,19 @@ const handleEmployeeSelect = (employee) => {
                           </span>
                         </td>
                         <td>{dep.reportingAuthority}</td>
-                        <td className="text-center">
-                          {dep.orderFileName ? (
-                            <a href={dep.orderFileData} download={dep.orderFileName} className="btn btn-sm btn-outline-primary">
-                              <FaFileAlt size={12} /> View
-                            </a>
-                          ) : <span className="text-muted">—</span>}
-                        </td>
+                      
                                                <td>
   <div
     className="d-flex align-items-center gap-1"
     style={{ cursor: "pointer" }}
-    onClick={() =>
+    onClick={(e) => {
+      e.stopPropagation();
       handleStatusToggle(
         dep.id,
         DUMMY_EMPLOYEES.find(e => e.id === dep.employeeId)?.name || "",
         dep.status || "Active"
-      )
-    }
+      );
+    }}
   >
     <div
       style={{
@@ -662,7 +734,7 @@ const handleEmployeeSelect = (employee) => {
   </div>
 </td>
                         <td className="text-center">
-  <div className="cert-actions">
+  <div className="cert-actions" onClick={(e) => e.stopPropagation()}>
     <button 
       className="cert-act cert-act--edit" 
       onClick={() => handleEdit(dep)} 
@@ -681,7 +753,7 @@ const handleEmployeeSelect = (employee) => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="9" className="text-center py-5">No deputation records found</td>
+                      <td colSpan="11" className="text-center py-5">No deputation records found</td>
                     </tr>
                   )}
                 </tbody>
@@ -792,6 +864,131 @@ const handleEmployeeSelect = (employee) => {
     </div>
   </div>
 )}
+
+      {/* Document Preview Modal */}
+      {documentPreview && (
+        <div
+          className="emp-modal-overlay"
+          onClick={() => setDocumentPreview(null)}
+          style={{ zIndex: 1050 }}
+        >
+          <div
+            className="emp-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ 
+              maxWidth: '900px', 
+              width: '90%',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }}
+          >
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              padding: '20px 24px',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
+                <FaFileAlt style={{ marginRight: '8px' }} />
+                Document Preview
+              </h3>
+              <button 
+                onClick={() => setDocumentPreview(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+              >
+                <FaTimes />
+              </button>
+            </div>
+            
+            <div style={{ padding: '24px' }}>
+              {documentPreview.data && documentPreview.name && documentPreview.name.endsWith('.pdf') ? (
+                <div style={{ 
+                  width: '100%', 
+                  height: '70vh',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  overflow: 'hidden'
+                }}>
+                  <iframe
+                    src={documentPreview.data}
+                    width="100%"
+                    height="100%"
+                    title="PDF Preview"
+                    style={{ border: 'none' }}
+                  />
+                </div>
+              ) : documentPreview.data ? (
+                <div style={{ textAlign: 'center' }}>
+                  <img 
+                    src={documentPreview.data} 
+                    alt="Document Preview" 
+                    style={{ 
+                      maxWidth: '100%', 
+                      maxHeight: '70vh',
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }} 
+                  />
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                  <p>No preview available</p>
+                </div>
+              )}
+              
+              <div style={{ 
+                marginTop: '20px', 
+                padding: '12px 16px', 
+                background: '#f9fafb', 
+                borderRadius: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <strong style={{ color: '#111827' }}>{documentPreview.name}</strong>
+                  <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '13px' }}>
+                    Uploaded document
+                  </p>
+                </div>
+                <a 
+                  href={documentPreview.data} 
+                  download={documentPreview.name}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    background: '#9d174d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    fontSize: '14px'
+                  }}
+                >
+                  <FaFileAlt /> Download
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add CSS for row hover effect */}
+      <style jsx>{`
+        .cert-table-row-hover:hover {
+          background-color: #f9fafb;
+          transition: background-color 0.2s ease;
+        }
+      `}</style>
     </div>
   );
 };
