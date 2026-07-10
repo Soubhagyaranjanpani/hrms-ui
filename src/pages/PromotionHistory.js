@@ -83,6 +83,27 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     createdAt: '2024-12-01T10:00:00Z'
   }
 ]);
+const branches = [
+  { id: 1, name: 'Mumbai' },
+  { id: 2, name: 'Delhi' },
+  { id: 3, name: 'Bangalore' },
+  { id: 4, name: 'Chennai' },
+  { id: 5, name: 'Kolkata' },
+  { id: 6, name: 'Pune' },
+  { id: 7, name: 'Hyderabad' },
+  { id: 8, name: 'Ahmedabad' }
+];
+
+const departments = [
+  { id: 1, name: 'IT' },
+  { id: 2, name: 'HR' },
+  { id: 3, name: 'Finance' },
+  { id: 4, name: 'Sales' },
+  { id: 5, name: 'Marketing' },
+  { id: 6, name: 'Operations' },
+  { id: 7, name: 'R&D' },
+  { id: 8, name: 'Administration' }
+];
   const [editingPromotion, setEditingPromotion] = useState(null);
   const [selectedPromotion, setSelectedPromotion] = useState(null); 
   const [documentPreview, setDocumentPreview] = useState(null); 
@@ -620,10 +641,18 @@ const handleBackToList = () => {
  readOnly placeholder="Auto-populated" />
 </div>
 
-{/* New Branch - Manual */}
-<div className={`cert-field-compact`}>
-  <label>New Branch</label>
-  <input type="text" placeholder="Enter new branch" value={formData.newBranch} onChange={(e) => handleChange('newBranch', e.target.value)} />
+{/* New Branch - Dropdown */}
+<div className={`cert-field-compact ${touched.newBranch && errors.newBranch ? 'has-error' : ''}`}>
+  <label className="required">New Branch</label>
+  <select 
+    value={formData.newBranch} 
+    onChange={(e) => handleChange('newBranch', e.target.value)}
+    onBlur={() => handleBlur('newBranch')}
+  >
+    <option value="">Select Branch</option>
+    {branches.map(branch => <option key={branch.id} value={branch.name}>{branch.name}</option>)}
+  </select>
+  <FieldError msg={errors.newBranch} />
 </div>
 
 {/* Old Department - Auto */}
@@ -633,10 +662,18 @@ const handleBackToList = () => {
  readOnly placeholder="Auto-populated" />
 </div>
 
-{/* New Department - Manual */}
-<div className={`cert-field-compact`}>
-  <label>New Department</label>
-  <input type="text" placeholder="Enter new department" value={formData.newDepartment} onChange={(e) => handleChange('newDepartment', e.target.value)} />
+{/* New Department - Dropdown */}
+<div className={`cert-field-compact ${touched.newDepartment && errors.newDepartment ? 'has-error' : ''}`}>
+  <label className="required">New Department</label>
+  <select 
+    value={formData.newDepartment} 
+    onChange={(e) => handleChange('newDepartment', e.target.value)}
+    onBlur={() => handleBlur('newDepartment')}
+  >
+    <option value="">Select Department</option>
+    {departments.map(dept => <option key={dept.id} value={dept.name}>{dept.name}</option>)}
+  </select>
+  <FieldError msg={errors.newDepartment} />
 </div>
 
 {/* Old Designation - Auto */}
@@ -645,11 +682,18 @@ const handleBackToList = () => {
   <input type="text" className="form-control bg-light" value={formData.oldDesignation || selectedEmployee?.designation || ''}
  readOnly placeholder="Auto-populated" />
 </div>
-                       <div className={`cert-field-compact ${touched.newDesignation && errors.newDesignation ? 'has-error' : ''}`}>
-    <label className="required">New Designation</label>
-    <input type="text" placeholder="Enter new designation" value={formData.newDesignation} onChange={(e) => handleChange('newDesignation', e.target.value)} onBlur={() => handleBlur('newDesignation')} />
-    <FieldError msg={errors.newDesignation} />
-  </div> 
+                     <div className={`cert-field-compact ${touched.newDesignation && errors.newDesignation ? 'has-error' : ''}`}>
+  <label className="required">New Designation</label>
+  <select 
+    value={formData.newDesignation} 
+    onChange={(e) => handleChange('newDesignation', e.target.value)}
+    onBlur={() => handleBlur('newDesignation')}
+  >
+    <option value="">Select New Designation</option>
+    {designations.map(des => <option key={des.value} value={des.value}>{des.label}</option>)}
+  </select>
+  <FieldError msg={errors.newDesignation} />
+</div>
                 <div className={`cert-field-compact ${touched.promotionOrderNo && errors.promotionOrderNo ? 'has-error' : ''}`}>
                   <label className="required">Promotion Order Number</label>
                   <input type="text" placeholder="e.g., ARI/PROMO/2024/001" value={formData.promotionOrderNo} onChange={(e) => handleChange('promotionOrderNo', e.target.value)} onBlur={() => handleBlur('promotionOrderNo')} />
@@ -672,13 +716,16 @@ const handleBackToList = () => {
                   <FieldError msg={errors.promotionType} />
                 </div>
                 
-                <div className="cert-field-compact">
-                  <label>Old Grade</label>
-                  <select value={formData.oldGrade} onChange={(e) => handleChange('oldGrade', e.target.value)}>
-                    <option value="">Select Grade</option>
-                    {grades.map(grade => <option key={grade.value} value={grade.value}>{grade.label}</option>)}
-                  </select>
-                </div>
+               <div className="cert-field-compact">
+  <label>Old Grade</label>
+  <input 
+    type="text" 
+    className="form-control" 
+    placeholder="Enter old grade" 
+    value={formData.oldGrade} 
+    onChange={(e) => handleChange('oldGrade', e.target.value)} 
+  />
+</div>
                 
                 <div className="cert-field-compact">
                   <label>New Grade</label>
