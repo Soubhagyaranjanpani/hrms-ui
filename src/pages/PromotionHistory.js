@@ -4,33 +4,107 @@ import {
   FaUpload, FaFilePdf, FaFileImage, FaTrash, FaEdit, FaPlus, FaChartLine, FaSearch, FaArrowLeft, FaEye,FaArrowRight,
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import DocumentActions from './DocumentsAction';
 
 const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [promotions, setPromotions] = useState(initialData?.promotions || [
-    { id: 1, employeeId:1,promotionOrderNo: 'PROMO/2024/001', promotionDate: '2024-03-01', previousDesignation: 'Software Engineer', newDesignation: 'Senior Software Engineer', previousGrade: 'Grade A2', newGrade: 'Grade B1', promotionType: 'Merit', effectiveDate: '2024-03-01', promotionAuthority: 'HR Director', createdAt: '2024-03-01T10:30:00Z', promotionDocumentName: 'promotion_order.pdf', promotionDocumentData: null },
-    { id: 2, employeeId:2,promotionOrderNo: 'PROMO/2024/002', promotionDate: '2024-06-15', previousDesignation: 'Senior Software Engineer', newDesignation: 'Tech Lead', previousGrade: 'Grade B1', newGrade: 'Grade C1', promotionType: 'Merit', effectiveDate: '2024-06-15', promotionAuthority: 'CEO', createdAt: '2024-06-15T11:45:00Z' },
-    { id: 3, employeeId:3,promotionOrderNo: 'PROMO/2024/003', promotionDate: '2024-09-20', previousDesignation: 'HR Executive', newDesignation: 'HR Manager', previousGrade: 'Grade B1', newGrade: 'Grade C2', promotionType: 'Time Scale', effectiveDate: '2024-09-20', promotionAuthority: 'HR Director', createdAt: '2024-09-20T09:15:00Z', promotionDocumentName: 'promotion_letter.pdf', promotionDocumentData: null },
-    { id: 4, employeeId:4,promotionOrderNo: 'PROMO/2024/004', promotionDate: '2024-11-10', previousDesignation: 'Tech Lead', newDesignation: 'Project Manager', previousGrade: 'Grade C1', newGrade: 'Grade D1', promotionType: 'Fast Track', effectiveDate: '2024-11-10', promotionAuthority: 'Board of Directors', createdAt: '2024-11-10T14:20:00Z' },
-    { id: 5, employeeId:5,promotionOrderNo: 'PROMO/2024/005', promotionDate: '2024-12-01', previousDesignation: 'Accountant', newDesignation: 'Senior Accountant', previousGrade: 'Grade A2', newGrade: 'Grade B1', promotionType: 'Merit', effectiveDate: '2024-12-01', promotionAuthority: 'Finance Director', createdAt: '2024-12-01T10:00:00Z' }
-  ]);
-  
+  {
+    id: 1,
+    employeeId: 1,
+    promotionOrderNo: 'PROMO/2024/001',
+    promotionDate: '2024-03-01',
+    oldDesignation: 'Software Engineer',
+    newDesignation: 'Senior Software Engineer',
+    oldGrade: 'Grade A2',
+    newGrade: 'Grade B1',
+    promotionType: 'Merit',
+    effectiveDate: '2024-03-01',
+    promotionAuthority: 'HR Director',
+    createdAt: '2024-03-01T10:30:00Z',
+    promotionDocumentName: 'promotion_order.pdf',
+    promotionDocumentData: null
+  },
+  {
+    id: 2,
+    employeeId: 2,
+    promotionOrderNo: 'PROMO/2024/002',
+    promotionDate: '2024-06-15',
+    oldDesignation: 'Senior Software Engineer',
+    newDesignation: 'Tech Lead',
+    oldGrade: 'Grade B1',
+    newGrade: 'Grade C1',
+    promotionType: 'Merit',
+    effectiveDate: '2024-06-15',
+    promotionAuthority: 'CEO',
+    createdAt: '2024-06-15T11:45:00Z'
+  },
+  {
+    id: 3,
+    employeeId: 3,
+    promotionOrderNo: 'PROMO/2024/003',
+    promotionDate: '2024-09-20',
+    oldDesignation: 'HR Executive',
+    newDesignation: 'HR Manager',
+    oldGrade: 'Grade B1',
+    newGrade: 'Grade C2',
+    promotionType: 'Time Scale',
+    effectiveDate: '2024-09-20',
+    promotionAuthority: 'HR Director',
+    createdAt: '2024-09-20T09:15:00Z',
+    promotionDocumentName: 'promotion_letter.pdf',
+    promotionDocumentData: null
+  },
+  {
+    id: 4,
+    employeeId: 4,
+    promotionOrderNo: 'PROMO/2024/004',
+    promotionDate: '2024-11-10',
+    oldDesignation: 'Tech Lead',
+    newDesignation: 'Project Manager',
+    oldGrade: 'Grade C1',
+    newGrade: 'Grade D1',
+    promotionType: 'Fast Track',
+    effectiveDate: '2024-11-10',
+    promotionAuthority: 'Board of Directors',
+    createdAt: '2024-11-10T14:20:00Z'
+  },
+  {
+    id: 5,
+    employeeId: 5,
+    promotionOrderNo: 'PROMO/2024/005',
+    promotionDate: '2024-12-01',
+    oldDesignation: 'Accountant',
+    newDesignation: 'Senior Accountant',
+    oldGrade: 'Grade A2',
+    newGrade: 'Grade B1',
+    promotionType: 'Merit',
+    effectiveDate: '2024-12-01',
+    promotionAuthority: 'Finance Director',
+    createdAt: '2024-12-01T10:00:00Z'
+  }
+]);
   const [editingPromotion, setEditingPromotion] = useState(null);
   const [selectedPromotion, setSelectedPromotion] = useState(null); 
   const [documentPreview, setDocumentPreview] = useState(null); 
-  const [formData, setFormData] = useState({
+ const [formData, setFormData] = useState({
     promotionOrderNo: '',
     promotionDate: '',
-    previousDesignation: '',
+    oldDesignation: '',
     newDesignation: '',
-    previousGrade: '',
+    oldGrade: '',
     newGrade: '',
     promotionType: 'Merit',
     effectiveDate: '',
     promotionAuthority: '',
+     oldBranch: '',  
+    newBranch: '',    
+    oldDepartment: '',     
+    newDepartment: '',  
     promotionDocument: null,
     promotionDocumentData: null,
     promotionDocumentName: null
-  });
+});
+
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [existingOrderNos, setExistingOrderNos] = useState([]);
@@ -47,14 +121,14 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     name: "",
     newStatus: ""
   });
-
-  const DUMMY_EMPLOYEES = [
-    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
-    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
-  ];
+  const [showDocumentActions, setShowDocumentActions] = useState(false);
+ const DUMMY_EMPLOYEES = [
+    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer', branch: 'Mumbai' },
+    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager', branch: 'Delhi' },
+    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer', branch: 'Bangalore' },
+    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager', branch: 'Pune' },
+    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant', branch: 'Chennai' }
+];
 
   // Dummy data for dropdowns
   const promotionTypes = [
@@ -104,7 +178,9 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
 
   // Handle document view
   const handleViewDocument = (e, promotion) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation(); 
+     setSelectedPromotion(promotion); 
+    setShowDocumentActions(true);
     if (promotion.promotionDocumentData) {
       setDocumentPreview({
         data: promotion.promotionDocumentData,
@@ -119,7 +195,7 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const filteredPromotions = promotions.filter(promo => {
     const search = searchTerm.toLowerCase();
     return promo.promotionOrderNo.toLowerCase().includes(search) ||
-           promo.previousDesignation.toLowerCase().includes(search) ||
+           promo.oldDesignation.toLowerCase().includes(search) ||
            promo.newDesignation.toLowerCase().includes(search) ||
            promo.promotionType.toLowerCase().includes(search);
   });
@@ -138,6 +214,19 @@ const handleEmployeeSelect = (employee) => {
   setSelectedEmployee(employee);
   setEmployeeSearchTerm(employee.name);
   setShowEmployeeDropdown(false);
+
+  setFormData(prev => ({
+    ...prev,
+    oldDesignation: employee.designation || "",
+    oldGrade: employee.grade || "",
+    oldDepartment: employee.department || "",
+    oldBranch: employee.branch || "",
+
+    newDesignation: editingPromotion ? prev.newDesignation : "",
+    newGrade: editingPromotion ? prev.newGrade : "",
+    newDepartment: editingPromotion ? prev.newDepartment : "",
+    newBranch: editingPromotion ? prev.newBranch : "",
+  }));
 };
 
   const getPaginationRange = () => {
@@ -161,13 +250,18 @@ const handleEmployeeSelect = (employee) => {
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  // Get last promotion date for validation
-  const getLastPromotionDate = () => {
-    if (promotions.length === 0) return null;
-    const dates = promotions.map(p => new Date(p.promotionDate));
-    const maxDate = new Date(Math.max(...dates));
-    return maxDate.toISOString().split('T')[0];
-  };
+ const getLastPromotionDate = () => {
+  const filteredPromotions = editingPromotion
+    ? promotions.filter(p => p.id !== editingPromotion.id)
+    : promotions;
+
+  if (filteredPromotions.length === 0) return null;
+
+  const dates = filteredPromotions.map(p => new Date(p.promotionDate));
+  const maxDate = new Date(Math.max(...dates));
+
+  return maxDate.toISOString().split('T')[0];
+};
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -208,11 +302,14 @@ const handleEmployeeSelect = (employee) => {
     }
     else if (field === 'promotionDate') {
       if (!value) error = 'Promotion Date is required';
-      else if (lastPromotionDate && new Date(value) <= new Date(lastPromotionDate)) {
-        error = `Promotion Date must be greater than last promotion date (${formatDate(lastPromotionDate)})`;
+else if (
+  !editingPromotion &&
+  lastPromotionDate &&
+  new Date(value) <= new Date(lastPromotionDate)
+) {        error = `Promotion Date must be greater than last promotion date (${formatDate(lastPromotionDate)})`;
       }
     }
-    else if (field === 'previousDesignation' && !value) error = 'Previous Designation is required';
+    else if (field === 'oldDesignation' && !value) error = 'Old Designation is required';
     else if (field === 'newDesignation' && !value) error = 'New Designation is required';
     else if (field === 'promotionType' && !value) error = 'Promotion Type is required';
     else if (field === 'effectiveDate') {
@@ -245,11 +342,15 @@ const handleEmployeeSelect = (employee) => {
     
     if (!formData.promotionDate) {
       newErrors.promotionDate = 'Promotion Date is required';
-    } else if (lastPromotionDate && new Date(formData.promotionDate) <= new Date(lastPromotionDate)) {
-      newErrors.promotionDate = `Promotion Date must be greater than last promotion date`;
+          }else if (
+  !editingPromotion &&
+  lastPromotionDate &&
+  new Date(formData.promotionDate) <= new Date(lastPromotionDate)
+) {
+                newErrors.promotionDate = `Promotion Date must be greater than last promotion date`;
     }
     
-    if (!formData.previousDesignation) newErrors.previousDesignation = 'Previous Designation is required';
+    // if (!formData.previousDesignation) newErrors.previousDesignation = 'Previous Designation is required';
     if (!formData.newDesignation) newErrors.newDesignation = 'New Designation is required';
     if (!formData.promotionType) newErrors.promotionType = 'Promotion Type is required';
     
@@ -260,7 +361,8 @@ const handleEmployeeSelect = (employee) => {
     }
     
     if (!formData.promotionAuthority) newErrors.promotionAuthority = 'Promotion Authority is required';
-    
+     if (!formData.newBranch) newErrors.newBranch = 'New Branch is required';        
+    if (!formData.newDepartment) newErrors.newDepartment = 'New Department is required'; 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -279,20 +381,29 @@ const handleEmployeeSelect = (employee) => {
     }
     
     if (editingPromotion) {
-      const updated = promotions.map(promo =>
-        promo.id === editingPromotion.id
-          ? { ...formData, id: promo.id, createdAt: promo.createdAt }
-          : promo
-      );
+  const updated = promotions.map(promo =>
+  promo.id === editingPromotion.id
+    ? {
+        ...promo,
+        ...formData,
+        employeeId: selectedEmployee?.id,
+      }
+    : promo
+);
       setPromotions(updated);
       toast.success('Success', 'Promotion updated successfully');
       setEditingPromotion(null);
     } else {
-      const newPromotion = {
-        id: Date.now(),
-        ...formData,
-        createdAt: new Date().toISOString()
-      };
+    const newPromotion = {
+  id: Date.now(),
+  employeeId: selectedEmployee?.id,
+  ...formData,
+  oldBranch: formData.oldBranch,
+  newBranch: formData.newBranch,
+  oldDepartment: formData.oldDepartment,
+  newDepartment: formData.newDepartment,
+  createdAt: new Date().toISOString()
+};
       setPromotions([newPromotion, ...promotions]);
       toast.success('Success', 'Promotion added successfully');
     }
@@ -302,28 +413,33 @@ const handleEmployeeSelect = (employee) => {
   };
 
  const handleEdit = (promotion) => {
-  if (promotion.status === 'Inactive') {
-    toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
-    return;
-  }
-  
-  const emp = DUMMY_EMPLOYEES.find(e => e.id === promotion.employeeId);  
-  setSelectedEmployee(emp || null);  
+  const emp = DUMMY_EMPLOYEES.find(e => e.id === promotion.employeeId);
+
+  setSelectedEmployee(emp || null);
   setEditingPromotion(promotion);
+
   setFormData({
-    promotionOrderNo: promotion.promotionOrderNo,
-    promotionDate: promotion.promotionDate,
-    previousDesignation: promotion.previousDesignation,
-    newDesignation: promotion.newDesignation,
-    previousGrade: promotion.previousGrade || '',
+    promotionOrderNo: promotion.promotionOrderNo || '',
+    promotionDate: promotion.promotionDate || '',
+    oldDesignation: promotion.oldDesignation || '',
+    newDesignation: promotion.newDesignation || '',
+    oldGrade: promotion.oldGrade || '',
     newGrade: promotion.newGrade || '',
-    promotionType: promotion.promotionType,
-    effectiveDate: promotion.effectiveDate,
-    promotionAuthority: promotion.promotionAuthority,
+    promotionType: promotion.promotionType || 'Merit',
+    effectiveDate: promotion.effectiveDate || '',
+    promotionAuthority: promotion.promotionAuthority || '',
+
+    oldBranch: promotion.oldBranch || emp?.branch || '',
+    newBranch: promotion.newBranch || '',
+
+    oldDepartment: promotion.oldDepartment || emp?.department || '',
+    newDepartment: promotion.newDepartment || '',
+
     promotionDocument: null,
-    promotionDocumentData: promotion.promotionDocumentData,
-    promotionDocumentName: promotion.promotionDocumentName
+    promotionDocumentData: promotion.promotionDocumentData || null,
+    promotionDocumentName: promotion.promotionDocumentName || null
   });
+
   setEmployeeSearchTerm(emp?.name || '');
   setShowForm(true);
 };
@@ -332,24 +448,28 @@ const handleEmployeeSelect = (employee) => {
     setFormData({
       promotionOrderNo: '',
       promotionDate: '',
-      previousDesignation: '',
+      oldDesignation: '',
       newDesignation: '',
-      previousGrade: '',
+      oldGrade: '',
       newGrade: '',
       promotionType: 'Merit',
       effectiveDate: '',
       promotionAuthority: '',
+      oldBranch: '', 
+      newBranch: '',    
+       oldDepartment: '',      
+      newDepartment: '',
       promotionDocument: null,
       promotionDocumentData: null,
       promotionDocumentName: null,
-      
     });
     setErrors({});
     setTouched({});
     setEditingPromotion(null);
-     setSelectedEmployee(null);      
-  setEmployeeSearchTerm('');   
-  };
+    setSelectedEmployee(null);      
+    setEmployeeSearchTerm('');   
+};
+
 
   const handleCancelForm = () => {
     resetForm();
@@ -359,6 +479,7 @@ const handleEmployeeSelect = (employee) => {
 const handleBackToList = () => {
     resetForm();
     setShowForm(false);
+     setShowDocumentActions(false);
     setSelectedPromotion(null);
   };
 
@@ -393,6 +514,10 @@ const handleBackToList = () => {
         `${statusAction.name} is now ${newStatus}`
       );
     };
+
+       const handleGenerateLetter = (promotion) => {
+    console.log('Generate clicked for:', promotion.promotionOrderNo);
+  };
 
   return (
     <div className="cert-root">
@@ -488,24 +613,43 @@ const handleBackToList = () => {
   </div>
                 </div>
                 
-                {/* Employee Code - Auto Populate */}
-                <div className="cert-field-compact">
-                  <label>Employee Code</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                
-                {/* Department - Auto Populate */}
-                <div className="cert-field-compact">
-                  <label>Department</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                
-                {/* Designation - Auto Populate */}
-                <div className="cert-field-compact">
-                  <label>Designation</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                       
+              {/* Old Branch - Auto */}
+<div className="cert-field-compact">
+  <label>Old Branch</label>
+  <input type="text" className="form-control bg-light" value={formData.oldBranch || selectedEmployee?.branch || ''}
+ readOnly placeholder="Auto-populated" />
+</div>
+
+{/* New Branch - Manual */}
+<div className={`cert-field-compact`}>
+  <label>New Branch</label>
+  <input type="text" placeholder="Enter new branch" value={formData.newBranch} onChange={(e) => handleChange('newBranch', e.target.value)} />
+</div>
+
+{/* Old Department - Auto */}
+<div className="cert-field-compact">
+  <label>Old Department</label>
+  <input type="text" className="form-control bg-light" value={formData.oldDepartment || selectedEmployee?.department || ''}
+ readOnly placeholder="Auto-populated" />
+</div>
+
+{/* New Department - Manual */}
+<div className={`cert-field-compact`}>
+  <label>New Department</label>
+  <input type="text" placeholder="Enter new department" value={formData.newDepartment} onChange={(e) => handleChange('newDepartment', e.target.value)} />
+</div>
+
+{/* Old Designation - Auto */}
+<div className="cert-field-compact">
+  <label>Old Designation</label>
+  <input type="text" className="form-control bg-light" value={formData.oldDesignation || selectedEmployee?.designation || ''}
+ readOnly placeholder="Auto-populated" />
+</div>
+                       <div className={`cert-field-compact ${touched.newDesignation && errors.newDesignation ? 'has-error' : ''}`}>
+    <label className="required">New Designation</label>
+    <input type="text" placeholder="Enter new designation" value={formData.newDesignation} onChange={(e) => handleChange('newDesignation', e.target.value)} onBlur={() => handleBlur('newDesignation')} />
+    <FieldError msg={errors.newDesignation} />
+  </div> 
                 <div className={`cert-field-compact ${touched.promotionOrderNo && errors.promotionOrderNo ? 'has-error' : ''}`}>
                   <label className="required">Promotion Order Number</label>
                   <input type="text" placeholder="e.g., ARI/PROMO/2024/001" value={formData.promotionOrderNo} onChange={(e) => handleChange('promotionOrderNo', e.target.value)} onBlur={() => handleBlur('promotionOrderNo')} />
@@ -528,27 +672,9 @@ const handleBackToList = () => {
                   <FieldError msg={errors.promotionType} />
                 </div>
                 
-                <div className={`cert-field-compact ${touched.previousDesignation && errors.previousDesignation ? 'has-error' : ''}`}>
-                  <label className="required">Previous Designation</label>
-                  <select value={formData.previousDesignation} onChange={(e) => handleChange('previousDesignation', e.target.value)} onBlur={() => handleBlur('previousDesignation')}>
-                    <option value="">Select Designation</option>
-                    {designations.map(des => <option key={des.value} value={des.value}>{des.label}</option>)}
-                  </select>
-                  <FieldError msg={errors.previousDesignation} />
-                </div>
-                
-                <div className={`cert-field-compact ${touched.newDesignation && errors.newDesignation ? 'has-error' : ''}`}>
-                  <label className="required">New Designation</label>
-                  <select value={formData.newDesignation} onChange={(e) => handleChange('newDesignation', e.target.value)} onBlur={() => handleBlur('newDesignation')}>
-                    <option value="">Select Designation</option>
-                    {designations.map(des => <option key={des.value} value={des.value}>{des.label}</option>)}
-                  </select>
-                  <FieldError msg={errors.newDesignation} />
-                </div>
-                
                 <div className="cert-field-compact">
-                  <label>Previous Grade</label>
-                  <select value={formData.previousGrade} onChange={(e) => handleChange('previousGrade', e.target.value)}>
+                  <label>Old Grade</label>
+                  <select value={formData.oldGrade} onChange={(e) => handleChange('oldGrade', e.target.value)}>
                     <option value="">Select Grade</option>
                     {grades.map(grade => <option key={grade.value} value={grade.value}>{grade.label}</option>)}
                   </select>
@@ -577,7 +703,7 @@ const handleBackToList = () => {
                   <FieldError msg={errors.promotionAuthority} />
                 </div>
                 
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                {/* <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label>Promotion Document</label>
                   <div className="border rounded p-3 text-center bg-light">
                     <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="promotion-doc-upload" />
@@ -591,7 +717,7 @@ const handleBackToList = () => {
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -603,6 +729,16 @@ const handleBackToList = () => {
             </div>
           </form>
         </div>
+          ) : showDocumentActions && selectedPromotion ? (
+        <DocumentActions 
+          title="Promotion Letter"
+          documentName={selectedPromotion.promotionDocumentName}
+          documentData={selectedPromotion.promotionDocumentData}
+          onGenerate={() => handleGenerateLetter(selectedPromotion)}
+          onBack={handleBackToList}
+          generateLabel="Generate Letter"
+          themeColor="#9d174d"
+        />
           ) : selectedPromotion ? (
         <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
           <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
@@ -620,9 +756,9 @@ const handleBackToList = () => {
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'16px',marginBottom:'28px'}}>
               <div style={{background:'#fdf2f8',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCalendarAlt size={16} style={{color:'#9d174d'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Promotion Date</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{formatDate(selectedPromotion.promotionDate)}</p></div>
               <div style={{background:'#eef2ff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaChartLine size={16} style={{color:'#4f46e5'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Promotion Type</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:'#e0e7ff',color:'#4f46e5'}}>{selectedPromotion.promotionType}</span></div>
-              <div style={{background:'#f8fafc',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaBuilding size={16} style={{color:'#6b7280'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Previous Designation</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedPromotion.previousDesignation}</p></div>
+              <div style={{background:'#f8fafc',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaBuilding size={16} style={{color:'#6b7280'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Old Designation</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedPromotion.oldDesignation}</p></div>
               <div style={{background:'#ecfdf5',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaArrowUp size={16} style={{color:'#059669'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>New Designation</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#059669',margin:0}}>{selectedPromotion.newDesignation}</p></div>
-              <div style={{background:'#fffbeb',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaArrowRight size={16} style={{color:'#d97706'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Grade Progression</span></div><div style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'14px'}}><span style={{color:'#6b7280',fontWeight:500}}>{selectedPromotion.previousGrade||'N/A'}</span><FaArrowRight size={12} style={{color:'#9d174d'}}/><span style={{fontWeight:600,color:'#9d174d'}}>{selectedPromotion.newGrade||'N/A'}</span></div></div>
+              <div style={{background:'#fffbeb',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaArrowRight size={16} style={{color:'#d97706'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Grade Progression</span></div><div style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'14px'}}><span style={{color:'#6b7280',fontWeight:500}}>{selectedPromotion.oldGrade||'N/A'}</span><FaArrowRight size={12} style={{color:'#9d174d'}}/><span style={{fontWeight:600,color:'#9d174d'}}>{selectedPromotion.newGrade||'N/A'}</span></div></div>
               <div style={{background:'#ecfeff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCalendarAlt size={16} style={{color:'#0891b2'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Effective Date</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{formatDate(selectedPromotion.effectiveDate)}</p></div>
               <div style={{background:'#faf5ff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaBuilding size={16} style={{color:'#7c3aed'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Authority</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedPromotion.promotionAuthority}</p></div>
               <div style={{background:'#fff7ed',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaChartLine size={16} style={{color:'#ea580c'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Status</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:selectedPromotion.status==='Active'?'#d1fae5':'#fee2e2',color:selectedPromotion.status==='Active'?'#065f46':'#991b1b'}}>{selectedPromotion.status||'Active'}</span></div>
@@ -674,10 +810,6 @@ const handleBackToList = () => {
           <th>Employee</th>
           <th>Order No.</th>
           <th>Promotion Date</th>
-          <th>Previous Designation</th>
-          <th>New Designation</th>
-          <th>Previous Grade</th>
-          <th>New Grade</th>
           <th>Promotion Type</th>
           <th>Effective Date</th>
           <th>Authority</th>
@@ -701,14 +833,6 @@ const handleBackToList = () => {
 </td>
               <td><strong>{promo.promotionOrderNo}</strong></td>
               <td>{formatDate(promo.promotionDate)}</td>
-              <td>{promo.previousDesignation}</td>
-              <td>
-                <span className="cert-status-badge" style={{ background: '#d1fae5', color: '#065f46' }}>
-                  <FaArrowUp className="me-1" size={10} /> {promo.newDesignation}
-                </span>
-              </td>
-              <td>{promo.previousGrade || '—'}</td>
-              <td>{promo.newGrade || '—'}</td>
               <td>
                 <span className="cert-status-badge" style={{ background: '#dd8aca', color: '#4f46e5' }}>
                   {promo.promotionType}
