@@ -5,6 +5,7 @@ import {
   FaFileAlt, FaSearch, FaAward, FaUserTie, FaEye, FaDownload, FaStar, FaArrowLeft,FaClock
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import DocumentActions from './DocumentsAction';
 
 const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [awards, setAwards] = useState(initialData?.awards || [
@@ -46,7 +47,7 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
         name: "",
         newStatus: ""
       });
-
+  const [showDocumentActions, setShowDocumentActions] = useState(false);
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
@@ -67,7 +68,9 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
 
   // Handle document view
   const handleViewDocument = (e, award) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation(); 
+     setSelectedAward(award); 
+      setShowDocumentActions(true);
     if (award.certificateFileData) {
       setDocumentPreview({
         data: award.certificateFileData,
@@ -345,6 +348,10 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
           );
         };
 
+         const handleGenerateLetter = (award) => {
+    console.log('Generate clicked for:', award.awardOrderNo);
+  };
+
   return (
     <div className="cert-root">
       {/* Header */}
@@ -490,7 +497,7 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                   <textarea rows="3" placeholder="Brief description of the award and achievement..." value={formData.description} onChange={(e) => handleChange('description', e.target.value)} />
                 </div>
                 
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                {/* <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label>Award Certificate</label>
                   <div className="border rounded p-3 text-center bg-light">
                     <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="certificate-upload" />
@@ -504,7 +511,7 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -516,6 +523,16 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
             </div>
           </form>
         </div>
+         ) : showDocumentActions && selectedAward ? (
+                  <DocumentActions 
+                    title="Award Order Document"
+                    documentName={selectedAward.awardOrderFileName}
+                    documentData={selectedAward.awardOrderFileData}
+                    onGenerate={() => handleGenerateLetter(selectedAward)}
+                    onBack={handleBackToList}
+                    generateLabel="Generate Letter"
+                    themeColor="#9d174d"
+                  />
            ) : selectedAward ? (
         <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
           <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>

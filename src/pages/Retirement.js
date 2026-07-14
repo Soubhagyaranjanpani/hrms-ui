@@ -5,6 +5,7 @@ import {
   FaFileAlt, FaSearch, FaUserTie, FaEye, FaDownload, FaRupeeSign, FaClock, FaArrowLeft,FaCheckCircle
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import DocumentActions from './DocumentsAction';
 
 const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [retirements, setRetirements] = useState(initialData?.retirements || [
@@ -50,7 +51,8 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
     name: "",
     newStatus: ""
   });
- 
+   const [selectedRetirement, setSelectedRetirement] = useState(null); 
+   const [showDocumentActions, setShowDocumentActions] = useState(false);
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer', superannuationDate: '2045-12-31' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager', superannuationDate: '2040-06-15' },
@@ -71,7 +73,9 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
 
   // Handle document view
   const handleViewDocument = (e, record) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation(); 
+     setSelectedRetirement(record); 
+    setShowDocumentActions(true);
     if (record.retirementOrderFileData) {
       setDocumentPreview({
         data: record.retirementOrderFileData,
@@ -371,6 +375,10 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
     );
   };
 
+    const handleGenerateLetter = (retirement) => {
+    console.log('Generate clicked for:', retirement.retirementOrderNo);
+  };
+
   return (
     <div className="cert-root">
       {/* Header */}
@@ -523,7 +531,7 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
                   <textarea rows="2" placeholder="e.g., Gratuity, Leave Encashment, Provident Fund" value={formData.retirementBenefits} onChange={(e) => handleChange('retirementBenefits', e.target.value)} />
                 </div>
                 
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                {/* <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label>Retirement Order Upload</label>
                   <div className="border rounded p-3 text-center bg-light">
                     <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="retirement-order-upload" />
@@ -537,7 +545,7 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -549,6 +557,18 @@ const RetirementRecords = ({ employeeId, initialData, onSuccess, onCancel }) => 
             </div>
           </form>
         </div>
+        
+           ) : showDocumentActions && selectedRetirement ? (
+                  <DocumentActions 
+                    title="Retirement Letter"
+                    documentName={selectedRetirement.retirementOrderFileName}
+                    documentData={selectedRetirement.retirementOrderFileData}
+                    onGenerate={() => handleGenerateLetter(selectedRetirement)}
+                    onBack={handleBackToList}
+                    generateLabel="Generate Letter"
+                    themeColor="#9d174d"
+                  />
+
            ) : selectedRecord ? (
         <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
           <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>

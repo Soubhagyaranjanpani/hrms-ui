@@ -426,7 +426,7 @@ const confirmStatusChange = () => {
   );
 
   setEmployees(updatedEmployees);
-
+ 
   setShowStatusModal(false);
 
   toast.success(
@@ -441,7 +441,6 @@ const renderEmployeeCertPage = () => {
   const empCerts = getEmployeeCertificates(selectedEmployee.id);
 
 
-  
   return (
     <div>
       <div className="cert-header" style={{ marginBottom: '24px' }}>
@@ -737,22 +736,7 @@ const renderEmployeeCertPage = () => {
                     <small style={{ fontSize: '11px', color: '#666' }}>Email notifications sent before expiry</small>
                   </div>
                   
-                  <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
-                    <label>Upload Certificate (Optional)</label>
-                    <div style={{ border: '1px dashed #ccc', borderRadius: '6px', padding: '12px', textAlign: 'center', background: '#f9fafb' }}>
-                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="certificate-upload" />
-                      <label htmlFor="certificate-upload" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: '#4f46e5', color: 'white', borderRadius: '6px', fontSize: '13px' }}>
-                        <FaUpload size={12} /> Choose File
-                      </label>
-                      {formData.certificateFileName && (
-                        <div style={{ marginTop: '10px', fontSize: '13px', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          {formData.certificateFileName.endsWith('.pdf') ? <FaFilePdf size={14} /> : <FaFileImage size={14} />}
-                          {formData.certificateFileName}
-                        </div>
-                      )}
-                      <small style={{ fontSize: '11px', color: '#666', display: 'block', marginTop: '8px' }}>Supported: PDF, JPG, PNG (Max 5MB)</small>
-                    </div>
-                  </div>
+                
                 </div>
               </div>
               

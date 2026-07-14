@@ -5,6 +5,7 @@ import {
   FaFileAlt, FaSearch, FaCheckCircle, FaClock, FaUserTie, FaEye, FaDownload, FaArrowLeft, FaTrash
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import DocumentActions from './DocumentsAction';
 
 const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [disciplinaries, setDisciplinaries] = useState(initialData?.disciplinaries || [
@@ -48,7 +49,7 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
           name: "",
           newStatus: ""
         });
-
+  const [showDocumentActions, setShowDocumentActions] = useState(false);
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
@@ -69,7 +70,9 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
 
   // Handle document view
   const handleViewDocument = (e, record) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation(); 
+     setSelectedRecord(record);
+      setShowDocumentActions(true);
     if (record.supportingDocumentsData) {
       setDocumentPreview({
         data: record.supportingDocumentsData,
@@ -389,6 +392,10 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
     }
   };
   
+   const handleGenerateLetter = (record) => {
+    console.log('Generate clicked for:', record.recordOrderNo);
+  };
+
   return (
     <div className="cert-root">
       {/* Header */}
@@ -552,7 +559,7 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
                 </div>
                 
                 {/* Supporting Documents */}
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                {/* <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label>Supporting Documents</label>
                   <div className="border rounded p-3 text-center bg-light">
                     <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="disciplinary-doc-upload" />
@@ -566,7 +573,7 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -578,6 +585,16 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
             </div>
           </form>
         </div>
+         ) : showDocumentActions && selectedRecord ? (
+          <DocumentActions 
+            title="Record Letter"
+            documentName={selectedRecord.recordOrderFileName}
+            documentData={selectedRecord.recordOrderFileData}
+            onGenerate={() => handleGenerateLetter(selectedRecord)}
+            onBack={handleBackToList}
+            generateLabel="Generate Letter"
+            themeColor="#9d174d"
+          />
            ) : selectedRecord ? (
         <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
           <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>

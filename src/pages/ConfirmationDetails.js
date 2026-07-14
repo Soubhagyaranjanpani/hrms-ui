@@ -4,6 +4,7 @@ import {
   FaUpload, FaFilePdf, FaFileImage, FaTrash, FaEdit, FaPlus, FaCheckCircle, FaSearch, FaArrowLeft, FaArrowRight, FaEye, FaClock
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import DocumentActions from './DocumentsAction';
 
 const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onSuccess, onCancel }) => {
   const [confirmations, setConfirmations] = useState(initialData?.confirmations || [
@@ -42,7 +43,7 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
     name: "",
     newStatus: ""
   });
-
+  const [showDocumentActions, setShowDocumentActions] = useState(false);
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
@@ -65,6 +66,8 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
 
   const handleViewDocument = (e, confirmation) => {
     e.stopPropagation();
+     setSelectedConfirmation(confirmation); 
+      setShowDocumentActions(true);
     if (confirmation.confirmationDocumentData) {
       setDocumentPreview({
         data: confirmation.confirmationDocumentData,
@@ -204,39 +207,48 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
   };
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      toast.warning('Validation Error', 'Please fix the highlighted fields');
-      return;
-    }
-    const ConfirmationData = {
-      ...formData,
-      employeeId: selectedEmployee?.id || null,  
-      id: editingConfirmation ? editingConfirmation.id : Date.now(),
-      createdAt: editingConfirmation ? editingConfirmation.createdAt : new Date().toISOString()
-    };
-    if (editingConfirmation) {
-      const updated = confirmations.map(conf =>
-        conf.id === editingConfirmation.id
-          ? { ...formData, id: conf.id, createdAt: conf.createdAt }
-          : conf
-      );
-      setConfirmations(updated);
-      toast.success('Success', 'Confirmation details updated successfully');
-      setEditingConfirmation(null);
-    } else {
-      const newConfirmation = {
-        id: Date.now(),
-        ...formData,
-        createdAt: new Date().toISOString()
-      };
-      setConfirmations([newConfirmation, ...confirmations]);
-      toast.success('Success', 'Confirmation details added successfully');
-    }
-    resetForm();
-    setShowForm(false);
-    setPage(0);
+  e.preventDefault();
+  if (!validateForm()) {
+    toast.warning('Validation Error', 'Please fix the highlighted fields');
+    return;
+  }
+  
+  // Get employee data
+  const empData = selectedEmployee || null;
+  
+  const confirmationData = {
+    ...formData,
+    employeeId: empData?.id || null,
+    employeeName: empData?.name || null,
+    employeeCode: empData?.code || null,  
+    employeeDepartment: empData?.department || null, 
+    employeeDesignation: empData?.designation || null,
+    id: editingConfirmation ? editingConfirmation.id : Date.now(),
+    createdAt: editingConfirmation ? editingConfirmation.createdAt : new Date().toISOString()
   };
+  
+  if (editingConfirmation) {
+    const updated = confirmations.map(conf =>
+      conf.id === editingConfirmation.id
+        ? { ...confirmationData, id: conf.id, createdAt: conf.createdAt }
+        : conf
+    );
+    setConfirmations(updated);
+    toast.success('Success', 'Confirmation details updated successfully');
+    setEditingConfirmation(null);
+  } else {
+    const newConfirmation = {
+      id: Date.now(),
+      ...confirmationData,
+      createdAt: new Date().toISOString()
+    };
+    setConfirmations([newConfirmation, ...confirmations]);
+    toast.success('Success', 'Confirmation details added successfully');
+  }
+  resetForm();
+  setShowForm(false);
+  setPage(0);
+};
 
   const handleEdit = (confirmation) => {
     if (confirmation.status === 'Inactive') {
@@ -302,6 +314,10 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
     setConfirmations(updatedConfirmations);
     setShowStatusModal(false);
     toast.success("Status Updated", `${statusAction.name} is now ${newStatus}`);
+  };
+
+   const handleGenerateLetter = (confirmation) => {
+    console.log('Generate clicked for:', confirmation.confirmationOrderNo);
   };
 
   return (
@@ -445,10 +461,9 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
                 <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label>Remarks</label>
                   <textarea rows="3" placeholder="Additional remarks about confirmation..." value={formData.remarks} onChange={(e) => handleChange('remarks', e.target.value)} />
-                  <small>Optional: Any special notes or comments</small>
                 </div>
                 
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                {/* <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label>Confirmation Document</label>
                   <div className="border rounded p-3 text-center bg-light">
                     <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="confirmation-doc-upload" />
@@ -462,7 +477,7 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -474,6 +489,16 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
             </div>
           </form>
         </div>
+         ) : showDocumentActions && selectedConfirmation ? (
+                  <DocumentActions 
+                    title="Confirmation Letter"
+                    documentName={selectedConfirmation.confirmationOrderFileName}
+                    documentData={selectedConfirmation.confirmationOrderFileData}
+                    onGenerate={() => handleGenerateLetter(selectedConfirmation)}
+                    onBack={handleBackToList}
+                    generateLabel="Generate Letter"
+                    themeColor="#9d174d"
+                  />
       ) : selectedConfirmation ? (
         // PROFESSIONAL INLINE DETAIL VIEW
         <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
@@ -707,7 +732,9 @@ const ConfirmationDetails = ({ employeeId, employeeJoiningDate, initialData, onS
                         className="cert-table-row-hover"
                       >
                         <td className="text-center">{startIndex + idx + 1}</td>
-                        <td>{DUMMY_EMPLOYEES.find(e => e.id === conf.employeeId)?.name || 'Unknown'}</td>
+                        <td>{DUMMY_EMPLOYEES.find(e => e.id === conf.employeeId)?.name || 
+   conf.employeeName || 
+   'Unknown'}</td>
                         <td><strong>{conf.confirmationOrderNo}</strong></td>
                         <td>
                           <span className="cert-status-badge" style={{ background: '#d1fae5', color: '#065f46' }}>

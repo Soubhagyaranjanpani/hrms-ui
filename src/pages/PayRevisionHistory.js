@@ -5,6 +5,7 @@ import {
   FaFileAlt, FaSearch, FaArrowUp, FaMoneyBillWave, FaUserTie, FaArrowLeft, FaEye,FaClock
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import DocumentActions from './DocumentsAction';
 
 const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [revisions, setRevisions] = useState(initialData?.revisions || [
@@ -46,7 +47,7 @@ const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) =>
         name: "",
         newStatus: ""
       });
-
+  const [showDocumentActions, setShowDocumentActions] = useState(false);
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
@@ -62,7 +63,9 @@ const PayRevisionHistory = ({ employeeId, initialData, onSuccess, onCancel }) =>
 
   // Handle document view
   const handleViewDocument = (e, revision) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation(); 
+     setSelectedRevision(revision); 
+      setShowDocumentActions(true);
     if (revision.revisionDocumentData) {
       setDocumentPreview({
         data: revision.revisionDocumentData,
@@ -256,40 +259,48 @@ const handleEmployeeSelect = (employee) => {
 
   // Fixed handleSubmit function
   const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      toast.warning('Validation Error', 'Please fix the highlighted fields');
-      return;
-    }
-     const appointmentData = {
+  e.preventDefault();
+  if (!validateForm()) {
+    toast.warning('Validation Error', 'Please fix the highlighted fields');
+    return;
+  }
+  
+  // Get employee data
+  const empData = selectedEmployee || null;
+  
+  const revisionData = {
     ...formData,
-    employeeId: selectedEmployee?.id || null,  
+    employeeId: empData?.id || null,
+    employeeName: empData?.name || null,  // Store employee name
+    employeeCode: empData?.code || null,  // Store employee code
+    employeeDepartment: empData?.department || null, // Store department
+    employeeDesignation: empData?.designation || null, // Store designation
     id: editingRevision ? editingRevision.id : Date.now(),
     createdAt: editingRevision ? editingRevision.createdAt : new Date().toISOString()
   };
-    if (editingRevision) {
-      const updated = revisions.map(rev =>
-        rev.id === editingRevision.id
-          ? { ...formData, id: rev.id, createdAt: rev.createdAt, employeeId: employeeId }
-          : rev
-      );
-      setRevisions(updated);
-      toast.success('Success', 'Pay revision updated successfully');
-      setEditingRevision(null);
-    } else {
-      const newRevision = {
-        id: Date.now(),
-        ...formData,
-        employeeId: employeeId,
-        createdAt: new Date().toISOString()
-      };
-      setRevisions([newRevision, ...revisions]);
-      toast.success('Success', 'Pay revision added successfully');
-    }
-    resetForm();
-    setShowForm(false);
-    setPage(0);
-  };
+  
+  if (editingRevision) {
+    const updated = revisions.map(rev =>
+      rev.id === editingRevision.id
+        ? { ...revisionData, id: rev.id, createdAt: rev.createdAt }
+        : rev
+    );
+    setRevisions(updated);
+    toast.success('Success', 'Pay revision updated successfully');
+    setEditingRevision(null);
+  } else {
+    const newRevision = {
+      id: Date.now(),
+      ...revisionData,
+      createdAt: new Date().toISOString()
+    };
+    setRevisions([newRevision, ...revisions]);
+    toast.success('Success', 'Pay revision added successfully');
+  }
+  resetForm();
+  setShowForm(false);
+  setPage(0);
+};
 
  const handleEdit = (revision) => {
   if (revision.status === 'Inactive') {
@@ -382,6 +393,10 @@ const handleEmployeeSelect = (employee) => {
             `${statusAction.name} is now ${newStatus}`
           );
         };
+
+          const handleGenerateLetter = (revision) => {
+    console.log('Generate clicked for:', revision.revisionOrderNo);
+  };
 
   return (
     <div className="cert-root">
@@ -547,7 +562,7 @@ const handleEmployeeSelect = (employee) => {
                   </div>
                 </div>
                 
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                {/* <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label>Revision Document</label>
                   <div className="border rounded p-3 text-center bg-light">
                     <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="revision-doc-upload" />
@@ -561,7 +576,7 @@ const handleEmployeeSelect = (employee) => {
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -573,6 +588,16 @@ const handleEmployeeSelect = (employee) => {
             </div>
           </form>
         </div>
+         ) : showDocumentActions && selectedRevision ? (
+          <DocumentActions 
+            title="Revision Letter"
+            documentName={selectedRevision.revisionOrderFileName}
+            documentData={selectedRevision.revisionOrderFileData}
+            onGenerate={() => handleGenerateLetter(selectedRevision)}
+            onBack={handleBackToList}
+            generateLabel="Generate Letter"
+            themeColor="#9d174d"
+          />
            ) : selectedRevision ? (
         <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
           <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>

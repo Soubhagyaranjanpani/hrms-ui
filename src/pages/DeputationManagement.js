@@ -5,6 +5,7 @@ import {
   FaFileAlt, FaSearch, FaExchangeAlt, FaClock, FaArrowLeft, FaEye
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import DocumentActions from './DocumentsAction';
 
 const DeputationManagement = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [deputations, setDeputations] = useState(initialData?.deputations || [
@@ -46,7 +47,7 @@ const DeputationManagement = ({ employeeId, initialData, onSuccess, onCancel }) 
       name: "",
       newStatus: ""
     });
-
+  const [showDocumentActions, setShowDocumentActions] = useState(false);
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
@@ -69,7 +70,9 @@ const DeputationManagement = ({ employeeId, initialData, onSuccess, onCancel }) 
 
   // Handle document view
   const handleViewDocument = (e, deputation) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation();
+      setSelectedDeputation(deputation); 
+      setShowDocumentActions(true);
     if (deputation.orderFileData) {
       setDocumentPreview({
         data: deputation.orderFileData,
@@ -79,7 +82,7 @@ const DeputationManagement = ({ employeeId, initialData, onSuccess, onCancel }) 
       toast.info('No Document', 'No document has been uploaded for this deputation');
     }
   };
-
+  
   // Deputation Types
   const deputationTypes = [
     { value: 'Domestic', label: 'Domestic Deputation' },
@@ -388,6 +391,10 @@ const handleEmployeeSelect = (employee) => {
     }
   };
   
+   const handleGenerateLetter = (deputation) => {
+    console.log('Generate clicked for:', deputation.deputationOrderNo);
+  };
+
   return (
     <div className="cert-root">
       {/* Header */}
@@ -547,22 +554,7 @@ const handleEmployeeSelect = (employee) => {
                   <FieldError msg={errors.reportingAuthority} />
                 </div>
                 
-                {/* Order Upload */}
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
-                  <label>Order Upload</label>
-                  <div className="border rounded p-3 text-center bg-light">
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="order-upload" />
-                    <label htmlFor="order-upload" className="btn btn-outline-primary btn-sm">
-                      <FaUpload size={12} /> Choose File
-                    </label>
-                    {formData.orderFileName && (
-                      <div className="mt-2 text-primary">
-                        {formData.orderFileName.endsWith('.pdf') ? <FaFilePdf /> : <FaFileImage />} {formData.orderFileName}
-                      </div>
-                    )}
-                    <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
-                  </div>
-                </div>
+               
               </div>
             </div>
             
@@ -574,6 +566,16 @@ const handleEmployeeSelect = (employee) => {
             </div>
           </form>
         </div>
+        ) : showDocumentActions && selectedDeputation ? (
+          <DocumentActions 
+            title="Deputation Letter"
+            documentName={selectedDeputation.deputationOrderFileName}
+            documentData={selectedDeputation.deputationOrderFileData}
+            onGenerate={() => handleGenerateLetter(selectedDeputation)}
+            onBack={handleBackToList}
+            generateLabel="Generate Letter"
+            themeColor="#9d174d"
+          />
            ) : selectedDeputation ? (
         <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
           <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>

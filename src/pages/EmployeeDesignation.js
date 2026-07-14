@@ -52,18 +52,18 @@ const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus
     { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
   ];
 
-  const DESIGNATIONS = [
-    'Software Engineer',
-    'Senior Developer',
-    'Tech Lead',
-    'Product Manager',
-    'HR Manager',
-    'HR Executive',
-    'Sales Manager',
-    'Marketing Manager',
-    'Operations Manager',
-    'Accountant'
-  ];
+ const DESIGNATIONS = [
+  'Software Engineer',
+  'Senior Developer',
+  'Tech Lead',
+  'Product Manager',
+  'HR Manager',
+  'HR Executive',
+  'Sales Manager',
+  'Marketing Manager',
+  'Operations Manager',
+  'Accountant'
+];
 
   const departments = ['IT', 'HR', 'Finance', 'Sales', 'Marketing', 'Operations'];
   const statuses = ['Active', 'Inactive'];
@@ -332,7 +332,7 @@ const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Employee Details</div>
               <div className="cert-form-grid-3col">
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                <div className="cert-field-compact" style={{ gridColumn: 'span 1' }}>
                   <label className="required">Employee Name</label>
                <div className="position-relative" style={{ maxWidth: '500px' }}>
     <div className="input-group">
@@ -387,21 +387,21 @@ const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus
   </div>
                 </div>
                 
-                <div className="cert-field-compact">
-                  <label>Employee Code</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                
-                <div className="cert-field-compact">
-                  <label>Department</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                
-                <div className="cert-field-compact">
-                  <label>Designation</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                
+              {/* New Designation - Dropdown */}
+<div className={`cert-field-compact ${touched.currentDesignation && errors.currentDesignation ? 'has-error' : ''}`}>
+  <label className="required">Designation</label>
+  <select 
+    value={formData.currentDesignation} 
+    onChange={(e) => handleChange('currentDesignation', e.target.value)}
+    onBlur={() => handleBlur('currentDesignation')}
+  >
+    <option value="">Select Designation</option>
+    {DESIGNATIONS.map(des => (
+      <option key={des} value={des}>{des}</option>
+    ))}
+  </select>
+  <FieldError msg={errors.currentDesignation} />
+</div>
                 <div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
                   <label className="required">Joining Date</label>
                   <input type="date" value={formData.joiningDate} onChange={(e) => handleChange('joiningDate', e.target.value)} onBlur={() => handleBlur('joiningDate')} />

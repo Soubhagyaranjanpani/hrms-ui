@@ -6,6 +6,7 @@ import {
   FaSearch, FaArrowLeft, FaArrowRight, FaEye, FaClock
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import DocumentActions from './DocumentsAction';
 
 const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [appointments, setAppointments] = useState(initialData?.appointments || [
@@ -52,7 +53,7 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
     name: "",
     newStatus: ""
   });
-
+  const [showDocumentActions, setShowDocumentActions] = useState(false);
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
@@ -113,6 +114,8 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
 
   const handleViewDocument = (e, appointment) => {
     e.stopPropagation();
+     setSelectedAppointment(appointment); 
+    setShowDocumentActions(true);
     if (appointment.appointmentOrderFileData) {
       setDocumentPreview({
         data: appointment.appointmentOrderFileData,
@@ -299,40 +302,49 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      toast.warning('Validation Error', 'Please fix the highlighted fields');
-      return;
-    }
-    const appointmentData = {
-      ...formData,
-      employeeId: selectedEmployee?.id || null,  
-      id: editingAppointment ? editingAppointment.id : Date.now(),
-      createdAt: editingAppointment ? editingAppointment.createdAt : new Date().toISOString()
-    };
-    if (editingAppointment) {
-      const updated = appointments.map(apt =>
-        apt.id === editingAppointment.id
-          ? { ...formData, id: apt.id, createdAt: apt.createdAt }
-          : apt
-      );
-      setAppointments(updated);
-      toast.success('Success', 'Appointment updated successfully');
-      setEditingAppointment(null);
-    } else {
-      const newAppointment = {
-        id: Date.now(),
-        ...formData,
-        createdAt: new Date().toISOString()
-      };
-      setAppointments([newAppointment, ...appointments]);
-      toast.success('Success', 'Appointment added successfully');
-    }
-    resetForm();
-    setShowForm(false);
-    setPage(0);
+ const handleSubmit = (e) => {
+  e.preventDefault();
+  if (!validateForm()) {
+    toast.warning('Validation Error', 'Please fix the highlighted fields');
+    return;
+  }
+  
+  // Get employee data
+  const empData = selectedEmployee || null;
+  
+  const appointmentData = {
+    ...formData,
+    employeeId: empData?.id || null,
+    employeeName: empData?.name || null,
+    employeeCode: empData?.code || null,  
+    employeeDepartment: empData?.department || null, 
+    employeeDesignation: empData?.designation || null, 
+    id: editingAppointment ? editingAppointment.id : Date.now(),
+    createdAt: editingAppointment ? editingAppointment.createdAt : new Date().toISOString()
   };
+  
+  if (editingAppointment) {
+    const updated = appointments.map(apt =>
+      apt.id === editingAppointment.id
+        ? { ...appointmentData, id: apt.id, createdAt: apt.createdAt }
+        : apt
+    );
+    setAppointments(updated);
+    toast.success('Success', 'Appointment updated successfully');
+    setEditingAppointment(null);
+  } else {
+    const newAppointment = {
+      id: Date.now(),
+      ...appointmentData,
+      createdAt: new Date().toISOString()
+    };
+    setAppointments([newAppointment, ...appointments]);
+    toast.success('Success', 'Appointment added successfully');
+  }
+  resetForm();
+  setShowForm(false);
+  setPage(0);
+};
 
   const handleEdit = (appointment) => {
     if (appointment.status === 'Inactive') {
@@ -429,6 +441,10 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
     );
   };
 
+   const handleGenerateLetter = (appointment) => {
+    console.log('Generate clicked for:', appointment.appointmentOrderNo);
+  };
+
   return (
     <div className="cert-root">
       {/* Header */}
@@ -492,7 +508,7 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                         style={{ fontSize: '14px', padding: '6px 12px' }}
                       />
                     </div>
-                    
+                     
                     {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
                       <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
                         <div className="card-body p-2">
@@ -535,7 +551,7 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                   <label>Department</label>
                   <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
                 </div>
-
+ 
                 <div className="cert-field-compact">
                   <label>Designation</label>
                   <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
@@ -623,7 +639,7 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                   <small>Auto-calculated</small>
                 </div>
                 
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                {/* <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label>Appointment Order Upload</label>
                   <div className="border rounded p-3 text-center bg-light">
                     <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="appointment-order-upload" />
@@ -637,7 +653,7 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -649,6 +665,16 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
             </div>
           </form>
         </div>
+         ) : showDocumentActions && selectedAppointment ? (
+                  <DocumentActions 
+                    title="Appointment Letter"
+                    documentName={selectedAppointment.appointmentOrderFileName}
+                    documentData={selectedAppointment.appointmentOrderFileData}
+                    onGenerate={() => handleGenerateLetter(selectedAppointment)}
+                    onBack={handleBackToList}
+                    generateLabel="Generate Letter"
+                    themeColor="#9d174d"
+                  />
       ) : selectedAppointment ? (
         <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
           {/* Top Banner */}
@@ -931,8 +957,11 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                       >
                         <td className="text-center">{startIndex + idx + 1}</td>
                         <td>                        
-                          {DUMMY_EMPLOYEES.find(e => e.id === apt.employeeId)?.name || 'Unknown'}
-                        </td>
+<td>
+  {DUMMY_EMPLOYEES.find(e => e.id === apt.employeeId)?.name || 
+   apt.employeeName || 
+   'Unknown'}
+</td>                        </td>
                         <td><strong>{apt.appointmentOrderNo}</strong></td>
                         <td>{formatDate(apt.appointmentDate)}</td>
                         <td>{apt.appointmentAuthority}</td>

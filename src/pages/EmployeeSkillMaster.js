@@ -115,6 +115,19 @@ const filteredSkillList = AVAILABLE_SKILLS.filter(skill =>
     ]
   };
 
+  const DESIGNATIONS = [
+  'Software Engineer',
+  'Senior Developer',
+  'Tech Lead',
+  'Product Manager',
+  'HR Manager',
+  'HR Executive',
+  'Sales Manager',
+  'Marketing Manager',
+  'Operations Manager',
+  'Accountant'
+];
+
   const departments = ['IT', 'HR', 'Finance', 'Sales', 'Marketing', 'Operations'];
   const designations = ['Software Engineer', 'Senior Developer', 'Tech Lead', 'HR Manager', 'Sales Manager', 'Accountant', 'Marketing Manager', 'Operations Manager', 'Product Manager'];
 
@@ -393,7 +406,7 @@ const handleView = (employee) => {
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Employee Details</div>
               <div className="cert-form-grid-3col">
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                <div className="cert-field-compact" style={{ gridColumn: 'span 1' }}>
                   <label className="required">Employee Name</label>
                <div className="position-relative" style={{ maxWidth: '500px' }}>
     <div className="input-group">
@@ -448,20 +461,21 @@ const handleView = (employee) => {
   </div>
                 </div>
                 
-                <div className="cert-field-compact">
-                  <label>Employee Code</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                
-                <div className="cert-field-compact">
-                  <label>Department</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                
-                <div className="cert-field-compact">
-                  <label>Designation</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
-                </div>
+                {/* New Designation - Dropdown */}
+<div className={`cert-field-compact ${touched.currentDesignation && errors.currentDesignation ? 'has-error' : ''}`}>
+  <label className="required">Designation</label>
+  <select 
+    value={formData.currentDesignation} 
+    onChange={(e) => handleChange('currentDesignation', e.target.value)}
+    onBlur={() => handleBlur('currentDesignation')}
+  >
+    <option value="">Select Designation</option>
+    {DESIGNATIONS.map(des => (
+      <option key={des} value={des}>{des}</option>
+    ))}
+  </select>
+  <FieldError msg={errors.currentDesignation} />
+</div>
                 
                 <div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
                   <label className="required">Joining Date</label>
@@ -469,93 +483,240 @@ const handleView = (employee) => {
                   <FieldError msg={errors.joiningDate} />
                 </div>
      {/* Skills */}
-<div
-  className="cert-field-compact"
->
-  <label className="required">Skills</label>
+{/* Skills with Checkboxes - Search + Selected Display */}
+<div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+ 
+    {/* Search Results Dropdown with Checkboxes */}
+    {showSkillDropdown && skillSearchTerm && (
+      <div 
+        className="card position-absolute w-100 shadow mt-1"
+        style={{
+          zIndex: 999,
+          maxHeight: 200,
+          overflowY: "auto",
+          border: '1px solid #e5e7eb'
+        }}
+      >
+        {AVAILABLE_SKILLS.filter(
+          skill =>
+            skill.toLowerCase().includes(skillSearchTerm.toLowerCase()) &&
+            !formData.skills.includes(skill)
+        ).length > 0 ? (
+          AVAILABLE_SKILLS.filter(
+            skill =>
+              skill.toLowerCase().includes(skillSearchTerm.toLowerCase()) &&
+              !formData.skills.includes(skill)
+          ).map(skill => (
+            <div
+              key={skill}
+              className="d-flex align-items-center px-3 py-2"
+              style={{ 
+                cursor: "pointer",
+                borderBottom: '1px solid #f3f4f6',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "#f3f4f6"}
+              onMouseLeave={e => e.currentTarget.style.background = "#fff"}
+              onClick={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  skills: [...(prev.skills || []), skill]
+                }));
+                setSkillSearchTerm("");
+                setShowSkillDropdown(false);
+              }}
+            >
+              <input
+                type="checkbox"
+                className="me-2"
+                checked={false}
+                readOnly
+                style={{ 
+                  accentColor: '#9d174d',
+                  width: '16px',
+                  height: '16px',
+                  cursor: 'pointer'
+                }}
+              />
+              <span>{skill}</span>
+            </div>
+          ))
+        ) : (
+          <div className="text-center py-3 text-muted">
+            <small>No skills found matching "{skillSearchTerm}"</small>
+          </div>
+        )}
+      </div>
+    )}
+  
 
-  <input
-    type="text"
-    className="form-control"
-    placeholder="Search skill..."
-    value={skillSearchTerm}
-    onChange={(e) => {
-      setSkillSearchTerm(e.target.value);
-      setShowSkillDropdown(true);
-    }}
-    onFocus={() => setShowSkillDropdown(true)}
-  />
-
-  {showSkillDropdown && skillSearchTerm && (
-    <div
-      className="card position-absolute w-100 shadow mt-1"
-      style={{
-        zIndex: 999,
-        maxHeight: 180,
-        overflowY: "auto"
-      }}
-    >
-      {AVAILABLE_SKILLS.filter(
-        skill =>
-          skill.toLowerCase().includes(skillSearchTerm.toLowerCase()) &&
-          !formData.skills.includes(skill)
-      ).map(skill => (
+  {/* All Skills with Checkboxes - Grid View */}
+  <div className="mt-3">
+    <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '8px', display: 'block' }}>
+      All Skills
+    </label>
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+      gap: '8px',
+      padding: '12px',
+      background: '#f8fafc',
+      borderRadius: '8px',
+      border: '1px solid #e2e8f0',
+      maxHeight: '200px',
+      overflowY: 'auto'
+    }}>
+      {AVAILABLE_SKILLS.map(skill => (
         <div
           key={skill}
-          className="px-3 py-2"
-          style={{ cursor: "pointer" }}
-          onMouseDown={(e) => {
-  e.preventDefault();
-
-  setFormData(prev => ({
-    ...prev,
-    skills: [...(prev.skills || []), skill]
-  }));
-
-  setSkillSearchTerm("");
-  setShowSkillDropdown(false);
-}}
-          onMouseEnter={e =>
-            (e.currentTarget.style.background = "#f3f4f6")
-          }
-          onMouseLeave={e =>
-            (e.currentTarget.style.background = "#fff")
-          }
+          className="d-flex align-items-center"
+          style={{
+            padding: '6px 10px',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            background: formData.skills?.includes(skill) ? '#fce7f3' : 'transparent',
+            border: formData.skills?.includes(skill) ? '1px solid #fbcfe8' : '1px solid transparent'
+          }}
+          onClick={() => {
+            setFormData(prev => {
+              const updatedSkills = prev.skills?.includes(skill)
+                ? prev.skills.filter(s => s !== skill)
+                : [...(prev.skills || []), skill];
+              return {
+                ...prev,
+                skills: updatedSkills
+              };
+            });
+          }}
         >
-          {skill}
+          <input
+            type="checkbox"
+            className="me-2"
+            checked={formData.skills?.includes(skill) || false}
+            readOnly
+            style={{ 
+              accentColor: '#9d174d',
+              width: '16px',
+              height: '16px',
+              cursor: 'pointer',
+              flexShrink: 0
+            }}
+          />
+          <span style={{
+            fontSize: '13px',
+            color: formData.skills?.includes(skill) ? '#9d174d' : '#374151',
+            fontWeight: formData.skills?.includes(skill) ? '500' : '400'
+          }}>
+            {skill}
+          </span>
         </div>
       ))}
     </div>
-  )}
+  </div>
 
-  {/* Selected Skills */}
-
-  <div className="d-flex flex-wrap gap-2 mt-2">
-    {formData.skills.map(skill => (
-      <span
-        key={skill}
-        className="badge bg-primary d-flex align-items-center"
-        style={{
-          padding: "8px 12px",
-          fontSize: "13px"
-        }}
-      >
-        {skill}
-
-        <FaTimes
+  {/* Selected Skills Display - Badge Style */}
+  <div className="mt-3">
+    <div style={{ 
+      display: 'flex', 
+      justifyContent: 'space-between', 
+      alignItems: 'center',
+      marginBottom: '8px'
+    }}>
+      <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151' }}>
+        Selected Skills ({formData.skills?.length || 0})
+      </label>
+      {formData.skills && formData.skills.length > 0 && (
+        <button
+          type="button"
           style={{
-            cursor: "pointer",
-            marginLeft: 8
+            padding: '2px 12px',
+            fontSize: '11px',
+            color: '#ef4444',
+            background: 'transparent',
+            border: '1px solid #fecaca',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
           }}
-          onClick={() =>
-            setFormData(prev => ({
-              ...prev,
-              skills: prev.skills.filter(s => s !== skill)
-            }))
-          }
-        />
-      </span>
-    ))}
+          onClick={() => {
+            setFormData(prev => ({ ...prev, skills: [] }));
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#fef2f2';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          Clear All
+        </button>
+      )}
+    </div>
+    
+    <div 
+      className="d-flex flex-wrap gap-2"
+      style={{
+        padding: '12px',
+        background: '#f8fafc',
+        borderRadius: '8px',
+        border: '1px solid #e2e8f0',
+        minHeight: '50px'
+      }}
+    >
+      {formData.skills && formData.skills.length > 0 ? (
+        formData.skills.map(skill => (
+          <span
+            key={skill}
+            className="badge d-flex align-items-center"
+            style={{
+              background: 'linear-gradient(135deg, #9d174d, #be185d)',
+              color: 'white',
+              padding: '8px 12px',
+              fontSize: '13px',
+              borderRadius: '6px',
+              fontWeight: '500',
+              boxShadow: '0 2px 4px rgba(157,23,77,0.2)',
+              animation: 'fadeIn 0.3s ease-in-out'
+            }}
+          >
+            {skill}
+            <FaTimes
+              style={{
+                cursor: 'pointer',
+                marginLeft: '8px',
+                fontSize: '12px',
+                opacity: 0.8,
+                transition: 'opacity 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = '1';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '0.8';
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setFormData(prev => ({
+                  ...prev,
+                  skills: prev.skills.filter(s => s !== skill)
+                }));
+              }}
+            />
+          </span>
+        ))
+      ) : (
+        <div style={{ 
+          width: '100%', 
+          textAlign: 'center', 
+          color: '#94a3b8', 
+          fontSize: '13px',
+          padding: '8px 0'
+        }}>
+          No skills selected
+        </div>
+      )}
+    </div>
   </div>
 </div>
               </div>
