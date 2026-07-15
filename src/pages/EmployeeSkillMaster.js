@@ -32,8 +32,6 @@ const [showSkillDropdown, setShowSkillDropdown] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
-    department: '',
-    designation: '',
     status: 'Active',
     joiningDate: '',
     retirementDate: '',
@@ -171,8 +169,7 @@ useEffect(() => {
   setFormData(prev => ({
     ...prev,
     name: employee.name,
-    department: employee.department,
-    designation: employee.designation,
+   
     skills: existingSkills 
   }));
   setEmployeeSearchTerm(employee.name);
@@ -203,8 +200,6 @@ useEffect(() => {
   setEditingEmployee(employee);
   setFormData({
     name: employee.name,
-    department: employee.department,
-    designation: employee.designation,
     status: employee.status,
     joiningDate: employee.joiningDate,
     retirementDate: employee.retirementDate || '',
@@ -259,8 +254,6 @@ const confirmStatusChange = () => {
   const validateField = (field, value) => {
     let error = '';
     if (field === 'name' && !value) error = 'Employee Name is required';
-    else if (field === 'department' && !value) error = 'Department is required';
-    else if (field === 'designation' && !value) error = 'Designation is required';
     else if (field === 'joiningDate' && !value) error = 'Joining Date is required';
     setErrors(prev => ({ ...prev, [field]: error }));
     return error === '';
@@ -274,8 +267,6 @@ const confirmStatusChange = () => {
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name) newErrors.name = 'Employee Name is required';
-    if (!formData.department) newErrors.department = 'Department is required';
-    if (!formData.designation) newErrors.designation = 'Designation is required';
     if (!formData.joiningDate) newErrors.joiningDate = 'Joining Date is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -315,8 +306,6 @@ const confirmStatusChange = () => {
  const resetForm = () => {
   setFormData({
     name: '',
-    department: '',
-    designation: '',
     status: 'Active',
     joiningDate: '',
     retirementDate: '',
@@ -406,9 +395,9 @@ const handleView = (employee) => {
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Employee Details</div>
               <div className="cert-form-grid-3col">
-                <div className="cert-field-compact" style={{ gridColumn: 'span 1' }}>
-                  <label className="required">Employee Name</label>
-               <div className="position-relative" style={{ maxWidth: '500px' }}>
+               <div className="cert-field-compact" style={{ gridColumn: 'span 1' }}>
+  <label className="required">Employee Name</label>
+  <div className="position-relative" style={{ maxWidth: '500px' }}>
     <div className="input-group">
       <input
         type="text"
@@ -431,8 +420,8 @@ const handleView = (employee) => {
     {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
       <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
         <div className="card-body p-2">
-          {filteredEmployees.length > 0 ? (
-            filteredEmployees.map(emp => (
+          {employeeSearchResults.length > 0 ? (
+            employeeSearchResults.map(emp => (
               <div
                 key={emp.id}
                 className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
@@ -443,7 +432,7 @@ const handleView = (employee) => {
               >
                 <div>
                   <div className="fw-bold">{emp.name}</div>
-                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
+                  <small className="text-muted">Code: {emp.code}</small>
                 </div>
                 <div>
                   <span className="badge bg-light text-dark">{emp.designation}</span>
@@ -459,29 +448,25 @@ const handleView = (employee) => {
       </div>
     )}
   </div>
-                </div>
-                
-                {/* New Designation - Dropdown */}
-<div className={`cert-field-compact ${touched.currentDesignation && errors.currentDesignation ? 'has-error' : ''}`}>
-  <label className="required">Designation</label>
-  <select 
-    value={formData.currentDesignation} 
-    onChange={(e) => handleChange('currentDesignation', e.target.value)}
-    onBlur={() => handleBlur('currentDesignation')}
-  >
-    <option value="">Select Designation</option>
-    {DESIGNATIONS.map(des => (
-      <option key={des} value={des}>{des}</option>
-    ))}
-  </select>
-  <FieldError msg={errors.currentDesignation} />
 </div>
+
+{/* Joining Date */}
+<div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
+  <label className="required">Joining Date</label>
+  <input 
+    type="date" 
+    value={formData.joiningDate} 
+    onChange={(e) => handleChange('joiningDate', e.target.value)} 
+    onBlur={() => handleBlur('joiningDate')} 
+    className="form-control"
+  />
+  <FieldError msg={errors.joiningDate} />
+</div>
+
+
                 
-                <div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
-                  <label className="required">Joining Date</label>
-                  <input type="date" value={formData.joiningDate} onChange={(e) => handleChange('joiningDate', e.target.value)} onBlur={() => handleBlur('joiningDate')} />
-                  <FieldError msg={errors.joiningDate} />
-                </div>
+              
+                
      {/* Skills */}
 {/* Skills with Checkboxes - Search + Selected Display */}
 <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
@@ -759,8 +744,7 @@ const handleView = (employee) => {
                   <tr>
                     <th>#</th>
                     <th>Employee Name</th>
-                    <th>Department</th>
-                    <th>Designation</th>           
+                            
                     <th>Joining Date</th>
                     <th>Skills</th>
                      <th>Status</th>
@@ -774,8 +758,7 @@ const skills = emp.skills || [];                      return (
                         <tr key={emp.id}>
                           <td className="text-center">{startIndex + idx + 1}</td>
                           <td className="fw-bold">{emp.name}</td>
-                          <td>{emp.department}</td>
-                          <td>{emp.designation}</td>
+                         
                           <td>{formatDate(emp.joiningDate)}</td>
                           <td>
                             <span className="badge" style={{ background: '#d1fae5', color: '#065f46', padding: '4px 8px' }}>
@@ -1074,99 +1057,85 @@ const skills = emp.skills || [];                      return (
 
         <div className="modal-body" style={{ padding: '16px 20px', background: '#f9fafb' }}>
           {/* Employee Card */}
-          <div style={{
-            background: 'white',
-            borderRadius: '6px',
-            padding: '14px 16px',
-            border: '1px solid #e5e7eb',
-            marginBottom: '12px'
-          }}>
-            <div className="d-flex align-items-center gap-3">
-              <div style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #9d174d, #7c1340)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '18px',
-                fontWeight: '600',
-                flexShrink: 0
-              }}>
-                {viewEmployee.name?.charAt(0) || 'E'}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <h6 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#1f2937' }}>
-                    {viewEmployee.name}
-                  </h6>
-                  <span style={{
-                    fontSize: '10px',
-                    fontWeight: '500',
-                    padding: '1px 10px',
-                    borderRadius: '12px',
-                    background: viewEmployee.status === 'Active' ? '#d1fae5' : '#fee2e2',
-                    color: viewEmployee.status === 'Active' ? '#065f46' : '#991b1b'
-                  }}>
-                    {viewEmployee.status === 'Active' ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
-                  <span><span style={{ fontWeight: '500', color: '#374151' }}>Department:</span> {viewEmployee.department}</span>
-                  <span><span style={{ fontWeight: '500', color: '#374151' }}>Designation:</span> {viewEmployee.designation}</span>
-                  <span><span style={{ fontWeight: '500', color: '#374151' }}>Joining:</span> {formatDate(viewEmployee.joiningDate)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Employee Card */}
+<div style={{
+  background: 'white',
+  borderRadius: '6px',
+  padding: '14px 16px',
+  border: '1px solid #e5e7eb',
+  marginBottom: '12px'
+}}>
+  <div className="d-flex align-items-center gap-3">
+    <div style={{
+      width: '44px',
+      height: '44px',
+      borderRadius: '50%',
+      background: 'linear-gradient(135deg, #9d174d, #7c1340)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'white',
+      fontSize: '18px',
+      fontWeight: '600',
+      flexShrink: 0
+    }}>
+      {viewEmployee.name?.charAt(0) || 'E'}
+    </div>
+    <div style={{ flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <h6 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#1f2937' }}>
+          {viewEmployee.name}
+        </h6>
+        <span style={{
+          fontSize: '10px',
+          fontWeight: '500',
+          padding: '1px 10px',
+          borderRadius: '12px',
+          background: viewEmployee.status === 'Active' ? '#d1fae5' : '#fee2e2',
+          color: viewEmployee.status === 'Active' ? '#065f46' : '#991b1b'
+        }}>
+          {viewEmployee.status === 'Active' ? 'Active' : 'Inactive'}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+        <span><span style={{ fontWeight: '500', color: '#374151' }}>Joining:</span> {formatDate(viewEmployee.joiningDate)}</span>
+      </div>
+    </div>
+  </div>
+</div>
 
           {/* Info Grid - Colorful Cards */}
-          <div className="row g-2 mb-3">
-            <div className="col-4">
-              <div style={{
-                background: 'white',
-                padding: '8px 10px',
-                borderRadius: '6px',
-                border: '1px solid #e5e7eb',
-                textAlign: 'center',
-                borderTop: '3px solid #4f46e5'
-              }}>
-                <div style={{ fontSize: '16px' }}>🏢</div>
-                <div style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Department</div>
-                <div style={{ fontSize: '12px', fontWeight: '500', color: '#1f2937', marginTop: '2px' }}>{viewEmployee.department}</div>
-              </div>
-            </div>
-            <div className="col-4">
-              <div style={{
-                background: 'white',
-                padding: '8px 10px',
-                borderRadius: '6px',
-                border: '1px solid #e5e7eb',
-                textAlign: 'center',
-                borderTop: '3px solid #7c3aed'
-              }}>
-                <div style={{ fontSize: '16px' }}>💼</div>
-                <div style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Designation</div>
-                <div style={{ fontSize: '12px', fontWeight: '500', color: '#1f2937', marginTop: '2px' }}>{viewEmployee.designation}</div>
-              </div>
-            </div>
-            <div className="col-4">
-              <div style={{
-                background: 'white',
-                padding: '8px 10px',
-                borderRadius: '6px',
-                border: '1px solid #e5e7eb',
-                textAlign: 'center',
-                borderTop: '3px solid #059669'
-              }}>
-                <div style={{ fontSize: '16px' }}>📚</div>
-                <div style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Skills</div>
-                <div style={{ fontSize: '12px', fontWeight: '500', color: '#1f2937', marginTop: '2px' }}>{viewEmployee.skills?.length || 0}</div>
-              </div>
-            </div>
-          </div>
+         {/* Info Grid - Colorful Cards */}
+<div className="row g-2 mb-3">
+  <div className="col-6">
+    <div style={{
+      background: 'white',
+      padding: '8px 10px',
+      borderRadius: '6px',
+      border: '1px solid #e5e7eb',
+      textAlign: 'center',
+      borderTop: '3px solid #4f46e5'
+    }}>
+      <div style={{ fontSize: '16px' }}>📅</div>
+      <div style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Joining Date</div>
+      <div style={{ fontSize: '12px', fontWeight: '500', color: '#1f2937', marginTop: '2px' }}>{formatDate(viewEmployee.joiningDate)}</div>
+    </div>
+  </div>
+  <div className="col-6">
+    <div style={{
+      background: 'white',
+      padding: '8px 10px',
+      borderRadius: '6px',
+      border: '1px solid #e5e7eb',
+      textAlign: 'center',
+      borderTop: '3px solid #059669'
+    }}>
+      <div style={{ fontSize: '16px' }}>📚</div>
+      <div style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Skills</div>
+      <div style={{ fontSize: '12px', fontWeight: '500', color: '#1f2937', marginTop: '2px' }}>{viewEmployee.skills?.length || 0}</div>
+    </div>
+  </div>
+</div>
 
           {/* Skills Section - Colorful */}
           <div style={{
