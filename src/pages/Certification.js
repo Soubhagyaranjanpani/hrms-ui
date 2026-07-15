@@ -554,7 +554,7 @@ const renderEmployeeCertPage = () => {
                 <label style={{ fontSize: '13px' }}>Reminder Days</label>
                 <input type="number" placeholder="30" value={formData.reminderDays} min="0" max="365" onChange={(e) => handleChange('reminderDays', e.target.value)} />
               </div>
-              <div className="cert-field-compact" style={{ gridColumn: 'span 2' }}>
+              {/* <div className="cert-field-compact" style={{ gridColumn: 'span 2' }}>
                 <label style={{ fontSize: '13px' }}>Upload Certificate (Optional)</label>
                 <div style={{ border: '1px dashed #ccc', borderRadius: '6px', padding: '12px', textAlign: 'center', background: 'white' }}>
                   <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="page-cert-upload" />
@@ -565,7 +565,7 @@ const renderEmployeeCertPage = () => {
                     <span style={{ marginLeft: '8px', fontSize: '13px', color: '#10b981' }}>{formData.certificateFileName}</span>
                   )}
                 </div>
-              </div>
+              </div> */}
               <div className="cert-field-compact" style={{ gridColumn: 'span 2' }}>
                 <label style={{ fontSize: '13px' }}>Notes</label>
                 <textarea rows={2} placeholder="Additional information..." value={formData.notes} onChange={(e) => handleChange('notes', e.target.value)} />
