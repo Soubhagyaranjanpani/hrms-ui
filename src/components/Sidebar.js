@@ -97,6 +97,8 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/department', icon: <FaSitemap />, label: 'Departments', roles: ['Admin'] },
     { path: '/role', icon: <FaUserTag />, label: 'Roles', roles: ['Admin'] },
     { path: '/leave', icon: <FaCalendarCheck />, label: 'Leave', roles: ['Admin'] },
+    { path: '/skills', icon: <FaCalendarCheck />, label: 'skill', roles: ['Admin'] },
+
   ];
 
   // Payroll section items - only Admin and HR
