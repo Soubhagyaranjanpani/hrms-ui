@@ -254,7 +254,7 @@ const confirmStatusChange = () => {
   const validateField = (field, value) => {
     let error = '';
     if (field === 'name' && !value) error = 'Employee Name is required';
-    else if (field === 'joiningDate' && !value) error = 'Joining Date is required';
+    // else if (field === 'joiningDate' && !value) error = 'Joining Date is required';
     setErrors(prev => ({ ...prev, [field]: error }));
     return error === '';
   };
@@ -267,7 +267,7 @@ const confirmStatusChange = () => {
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name) newErrors.name = 'Employee Name is required';
-    if (!formData.joiningDate) newErrors.joiningDate = 'Joining Date is required';
+    // if (!formData.joiningDate) newErrors.joiningDate = 'Joining Date is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -451,7 +451,7 @@ const handleView = (employee) => {
 </div>
 
 {/* Joining Date */}
-<div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
+{/* <div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
   <label className="required">Joining Date</label>
   <input 
     type="date" 
@@ -461,7 +461,7 @@ const handleView = (employee) => {
     className="form-control"
   />
   <FieldError msg={errors.joiningDate} />
-</div>
+</div> */}
 
 
                 
@@ -743,9 +743,7 @@ const handleView = (employee) => {
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Employee Name</th>
-                            
-                    <th>Joining Date</th>
+                    <th>Employee Name</th>                         
                     <th>Skills</th>
                      <th>Status</th>
                     <th style={{ width: 140 }}>Actions</th>
@@ -759,7 +757,6 @@ const skills = emp.skills || [];                      return (
                           <td className="text-center">{startIndex + idx + 1}</td>
                           <td className="fw-bold">{emp.name}</td>
                          
-                          <td>{formatDate(emp.joiningDate)}</td>
                           <td>
                             <span className="badge" style={{ background: '#d1fae5', color: '#065f46', padding: '4px 8px' }}>
                               {skills.length} Skills
@@ -1104,23 +1101,9 @@ const skills = emp.skills || [];                      return (
   </div>
 </div>
 
-          {/* Info Grid - Colorful Cards */}
          {/* Info Grid - Colorful Cards */}
 <div className="row g-2 mb-3">
-  <div className="col-6">
-    <div style={{
-      background: 'white',
-      padding: '8px 10px',
-      borderRadius: '6px',
-      border: '1px solid #e5e7eb',
-      textAlign: 'center',
-      borderTop: '3px solid #4f46e5'
-    }}>
-      <div style={{ fontSize: '16px' }}>📅</div>
-      <div style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Joining Date</div>
-      <div style={{ fontSize: '12px', fontWeight: '500', color: '#1f2937', marginTop: '2px' }}>{formatDate(viewEmployee.joiningDate)}</div>
-    </div>
-  </div>
+  
   <div className="col-6">
     <div style={{
       background: 'white',
