@@ -1054,7 +1054,6 @@ const skills = emp.skills || [];                      return (
 
         <div className="modal-body" style={{ padding: '16px 20px', background: '#f9fafb' }}>
           {/* Employee Card */}
-          {/* Employee Card */}
 <div style={{
   background: 'white',
   borderRadius: '6px',
