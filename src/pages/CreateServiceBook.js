@@ -1124,7 +1124,7 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Employee Information</div>
               <div className="cert-form-grid-3col">
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                <div className="cert-field-compact" style={{ gridColumn: 'span 1' }}>
                   <label className="required">Employee Name <span className="req">*</span></label>
                   <div className="position-relative" ref={dropdownRef}>
                     <input
@@ -1174,42 +1174,6 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
                   </div>
                 </div>
 
-                <div className={`cert-field-compact ${isFieldErr('employeeCode') ? 'has-error' : ''} ${isFieldOk('employeeCode') ? 'has-ok' : ''}`}>
-                  <label>Employee Code <span className="req">*</span></label>
-                  <input
-                    type="text"
-                    placeholder="Auto-Populated"
-                    className="bg-light"
-                    value={formData.employeeCode}
-                    readOnly
-                  />
-                  <FieldError msg={errors.employeeCode} />
-                </div>
-                
-                <div className={`cert-field-compact ${isFieldErr('department') ? 'has-error' : ''} ${isFieldOk('department') ? 'has-ok' : ''}`}>
-                  <label>Department <span className="req">*</span></label>
-                  <input
-                    type="text"
-                    placeholder="Auto-Populated"
-                    className="bg-light"
-                    value={formData.department}
-                    readOnly
-                  />
-                  <FieldError msg={errors.department} />
-                </div>
-                
-                <div className={`cert-field-compact ${isFieldErr('designation') ? 'has-error' : ''} ${isFieldOk('designation') ? 'has-ok' : ''}`}>
-                  <label>Designation <span className="req">*</span></label>
-                  <input
-                    type="text"
-                    placeholder="Auto-Populated"
-                    className="bg-light"
-                    value={formData.designation}
-                    readOnly
-                  />
-                  <FieldError msg={errors.designation} />
-                </div>
-                
                 <div className={`cert-field-compact ${isFieldErr('serviceBookNumber') ? 'has-error' : ''} ${isFieldOk('serviceBookNumber') ? 'has-ok' : ''}`}>
                   <label>Service Book Number <span className="req">*</span></label>
                   <input
