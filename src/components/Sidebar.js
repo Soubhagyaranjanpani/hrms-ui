@@ -48,7 +48,6 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/employees', icon: <FaUsers />, label: 'Employee List', roles: ['Admin', 'Hr', 'Manager'] },
     { path: '/EmployeeGrade', icon: <FaUserTag />, label: 'Employee Grade', roles: ['Admin', 'Hr'] },
         {path: '/Certification', icon: <FaChalkboardTeacher />, label: 'Certification', roles: ['Admin', 'Hr']},
-    { path: '/designation', icon: <FaCheck />, label: 'Designation', roles: ['Admin'] },
     {path: '/EmployeeDesignation', icon:<FaCheck />,label: 'Employee Designation',roles:['Admin','Hr']},
     {path: '/EmployeeSkillMaster', icon:< FaBook/>,label:'Employee Skill Master',roles:['Admin','Hr']},
   ];
@@ -96,6 +95,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/branch', icon: <FaBuilding />, label: 'Branches', roles: ['Admin'] },
     { path: '/department', icon: <FaSitemap />, label: 'Departments', roles: ['Admin'] },
     { path: '/role', icon: <FaUserTag />, label: 'Roles', roles: ['Admin'] },
+        { path: '/designation', icon: <FaCheck />, label: 'Designation', roles: ['Admin'] },
     { path: '/leave', icon: <FaCalendarCheck />, label: 'Leave', roles: ['Admin'] },
     { path: '/skills', icon: <FaCalendarCheck />, label: 'skill', roles: ['Admin'] },
 

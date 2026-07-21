@@ -1,615 +1,751 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  FaSearch, FaUserTie, FaBuilding, FaBriefcase, FaCalendarAlt, 
-  FaTimes, FaEdit, FaSave, FaPlus, FaTrash,
-  FaArrowLeft, FaEye
-} from 'react-icons/fa';
-import { toast } from '../components/Toast';
+import { useState, useEffect, useCallback } from "react";
+import {
+  FaSearch, FaEdit, FaArrowLeft, FaSave, FaExclamationCircle, FaUserPlus, FaTimes
+} from "react-icons/fa";
+import axios from "axios";
+import { toast } from "../components/Toast";
+import LoadingSpinner from "../components/LoadingSpinner";
+import { BASE_URL, STORAGE_KEYS } from "../config/api.config";
+
+/*
+  NOTE: bound to the real backend contract:
+
+  GET  /employee-designation?flag=0|1                 -> list (plain array OR wrapped, both handled)
+  POST /employee-designation        body:{employeeId, designationId}  -> EmployeeDesignationResponse
+  PUT  /employee-designation/{id}   body:{employeeId, designationId}  -> EmployeeDesignationResponse
+  PUT  /employee-designation/{id}/status?active=true|false
+  GET  /api/designations/list?flag=0                   -> designation master list (for dropdown)
+
+  employeeId is a plain number input below (no employee master list/search API confirmed yet).
+  Swap it for a real <select>/search-dropdown once you share that endpoint.
+
+  IMPORTANT: this assumes EmployeeDesignationResponse now includes `employeeId`
+  (see the one-line backend fix) so the edit form can prefill it correctly.
+*/
+
+/* ─── Validation Rules ─── */
+const RULES = {
+  employeeId: {
+    required: true,
+    isPositiveInt: true,
+  },
+  designationId: {
+    required: true,
+    patternMsg: "Please select a designation",
+  },
+};
+
+const validate = (field, value) => {
+  const r = RULES[field];
+  if (!r) return "";
+  const v = String(value ?? "").trim();
+  if (r.required && !v) return "This field is required";
+  if (r.isPositiveInt && (!/^\d+$/.test(v) || Number(v) <= 0)) {
+    return "Enter a valid positive number";
+  }
+  return "";
+};
+
+const FieldError = ({ msg }) =>
+  msg ? (
+    <span className="field-err">
+      <FaExclamationCircle size={10} /> {msg}
+    </span>
+  ) : null;
 
 const EmployeeDesignation = ({ user, onCancel }) => {
-  const [employees, setEmployees] = useState([
-    { id: 1, name: 'John Doe', code: 'EMP001', email: 'john@example.com', department: 'IT', currentDesignation: 'Software Engineer', joiningDate: '2020-01-15', status: 'Active' },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', email: 'jane@example.com', department: 'HR', currentDesignation: 'HR Manager', joiningDate: '2019-06-10', status: 'Active' },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', email: 'mike@example.com', department: 'IT', currentDesignation: 'Senior Developer', joiningDate: '2021-03-20', status: 'Active' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', email: 'sarah@example.com', department: 'Sales', currentDesignation: 'Sales Manager', joiningDate: '2010-08-01', status: 'Inactive' },
-    { id: 5, name: 'David Brown', code: 'EMP005', email: 'david@example.com', department: 'Finance', currentDesignation: 'Accountant', joiningDate: '2022-01-10', status: 'Inactive' },
-    { id: 6, name: 'Emily Wilson', code: 'EMP006', email: 'emily@example.com', department: 'Marketing', currentDesignation: 'Marketing Manager', joiningDate: '2018-09-15', status: 'Active' },
-    { id: 7, name: 'Robert Taylor', code: 'EMP007', email: 'robert@example.com', department: 'Operations', currentDesignation: 'Operations Manager', joiningDate: '2017-03-10', status: 'Active' },
-    { id: 8, name: 'Lisa Anderson', code: 'EMP008', email: 'lisa@example.com', department: 'IT', currentDesignation: 'Product Manager', joiningDate: '2019-11-20', status: 'Active' },
-    { id: 9, name: 'Amit Kumar', code: 'EMP009', email: 'amit@example.com', department: 'IT', currentDesignation: 'Tech Lead', joiningDate: '2018-05-15', status: 'Inactive' },
-    { id: 10, name: 'Priya Singh', code: 'EMP010', email: 'priya@example.com', department: 'HR', currentDesignation: 'HR Executive', joiningDate: '2021-08-20', status: 'Active' }
-  ]);
+  const [view, setView] = useState("list");
+  const [editMode, setEditMode] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filteredEmployees, setFilteredEmployees] = useState(employees);
-  const [showForm, setShowForm] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [designations, setDesignations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [searchName, setSearchName] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
   const [showStatusModal, setShowStatusModal] = useState(false);
-const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus: '' });
+  const [statusAction, setStatusAction] = useState({ id: null, newStatus: null, name: "" });
+
   const [formData, setFormData] = useState({
-    name: '',
-    code: '',
-    department: '',
-    currentDesignation: '',
-    joiningDate: '',
-    status: 'Active'
+    employeeId: "",
+    designationId: "",
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-  const [page, setPage] = useState(0);
-  const [rowsPerPage] = useState(4);
-  
-  // Employee Search State
-  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
-  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  const DUMMY_EMPLOYEES = [
-    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
-    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
-  ];
+  const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  const axiosConfig = {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      "Content-Type": "application/json",
+    },
+  };
 
- const DESIGNATIONS = [
-  'Software Engineer',
-  'Senior Developer',
-  'Tech Lead',
-  'Product Manager',
-  'HR Manager',
-  'HR Executive',
-  'Sales Manager',
-  'Marketing Manager',
-  'Operations Manager',
-  'Accountant'
-];
+  const ensureToken = () => {
+    const token = getAuthToken();
+    if (!token) {
+      toast.error("Authentication Required", "Please login to continue");
+      return false;
+    }
+    return true;
+  };
 
-  const departments = ['IT', 'HR', 'Finance', 'Sales', 'Marketing', 'Operations'];
-  const statuses = ['Active', 'Inactive'];
+  /* ─── Helper: Parse API response (handles plain array OR wrapped) ─── */
+  const parseApiResponse = (res) => {
+    const data = res.data;
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      if (Array.isArray(data.response)) return data.response;
+      if (Array.isArray(data.data)) return data.data;
+      if (data.status && Array.isArray(data.content)) return data.content;
+    }
+    if (Array.isArray(data)) return data;
+    return [];
+  };
 
-  // Filter employees by search
+  /* ─── Debounced Search ─── */
   useEffect(() => {
-    const search = searchTerm.toLowerCase();
-    const filtered = employees.filter(emp => 
-      emp.name.toLowerCase().includes(search) ||
-      emp.code.toLowerCase().includes(search) ||
-      emp.department.toLowerCase().includes(search) ||
-      emp.currentDesignation.toLowerCase().includes(search)
-    );
-    setFilteredEmployees(filtered);
-    setPage(0);
-  }, [searchTerm, employees]);
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchName);
+      setPage(0);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [searchName]);
 
-  // Pagination
+  /* ─── Fetch Designations (for dropdown) ─── */
+  const fetchDesignations = useCallback(async () => {
+    if (!ensureToken()) return;
+    try {
+      const res = await axios.get(`${BASE_URL}/api/designations/list?flag=0`, axiosConfig);
+      const data = parseApiResponse(res);
+      const mapped = data.map((des) => ({
+        id: des.id,
+        designationName: des.designationName || des.name || "",
+      }));
+      setDesignations(mapped);
+    } catch (err) {
+      console.error("Fetch designations error:", err);
+      setDesignations([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ─── Fetch Employee-Designation records ─── */
+  const fetchEmployees = useCallback(async () => {
+    if (!ensureToken()) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/employee-designation?flag=0`, axiosConfig);
+      const data = parseApiResponse(res);
+
+      const mapped = data.map((emp) => ({
+        id: emp.id,
+        employeeId: emp.employeeId,
+        employeeName: emp.employeeName || "",
+        designationName: emp.designationName || "",
+        createdDate: emp.createdDate || "",
+        updatedDate: emp.updatedDate || null,
+        status: emp.isActive ? "y" : "n",
+      }));
+
+      setEmployees(mapped);
+    } catch (err) {
+      console.error("Fetch error:", err);
+      toast.error("Error", err.response?.data?.message || "Failed to fetch employees");
+      setEmployees([]);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    fetchDesignations();
+    fetchEmployees();
+  }, [fetchDesignations, fetchEmployees]);
+
+  /* ─── Filter & Sort ─── */
+  const filteredEmployees = employees
+    .filter((emp) => {
+      const query = debouncedSearch.toLowerCase();
+      return (
+        emp.employeeName?.toLowerCase().includes(query) ||
+        emp.designationName?.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => {
+      if (a.status === "y" && b.status === "n") return -1;
+      if (a.status === "n" && b.status === "y") return 1;
+      return 0;
+    });
+
   const totalItems = filteredEmployees.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
   const startIndex = page * rowsPerPage;
   const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
 
-  const employeeSearchResults = DUMMY_EMPLOYEES.filter(emp => {
-    const search = employeeSearchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
-  });
-
-  const handleEmployeeSelect = (employee) => {
-    setSelectedEmployee(employee);
-    setFormData(prev => ({
-      ...prev,
-      name: employee.name,
-      code: employee.code,
-      department: employee.department,
-      currentDesignation: employee.designation
-    }));
-    setEmployeeSearchTerm(employee.name);
-    setShowEmployeeDropdown(false);
+  /* ─── Form Handlers ─── */
+  const handleChange = (field, value) => {
+    const updated = { ...formData, [field]: value };
+    setFormData(updated);
+    if (touched[field]) {
+      setErrors((prev) => ({ ...prev, [field]: validate(field, value) }));
+    }
   };
 
+  const handleBlur = (field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    setErrors((prev) => ({ ...prev, [field]: validate(field, formData[field]) }));
+  };
+
+  const resetForm = () => {
+    setFormData({ employeeId: "", designationId: "" });
+    setErrors({});
+    setTouched({});
+    setEditMode(false);
+    setSelectedEmployee(null);
+  };
+
+  /* ─── Submit Handler (Create / Update) ─── */
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!ensureToken()) return;
+
+    const fields = ["employeeId", "designationId"];
+    const newTouched = {};
+    const newErrors = {};
+    fields.forEach((f) => {
+      newTouched[f] = true;
+      const err = validate(f, formData[f]);
+      if (err) newErrors[f] = err;
+    });
+    setTouched(newTouched);
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      toast.warning("Validation Error", "Please fix the highlighted fields");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        employeeId: Number(formData.employeeId),
+        designationId: Number(formData.designationId),
+      };
+
+      let res;
+      if (editMode) {
+        res = await axios.put(
+          `${BASE_URL}/employee-designation/${selectedEmployee.id}`,
+          payload,
+          axiosConfig
+        );
+      } else {
+        res = await axios.post(`${BASE_URL}/employee-designation`, payload, axiosConfig);
+      }
+
+      if (res.status >= 200 && res.status < 300) {
+        toast.success("Success", editMode ? "Employee designation updated" : "Employee designation created");
+        resetForm();
+        setView("list");
+        fetchEmployees();
+      }
+    } catch (err) {
+      console.error("Submit error:", err);
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data ||
+        err.message ||
+        "Something went wrong";
+      toast.error("Error", typeof msg === "string" ? msg : "Something went wrong");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /* ─── Edit Handler ─── */
+  const handleEdit = (employee) => {
+    if (employee.status !== "y") {
+      toast.warning("Inactive", "Cannot edit an inactive employee");
+      return;
+    }
+    if (!employee.employeeId) {
+      toast.error(
+        "Missing Data",
+        "employeeId not found in response — make sure the backend mapToResponse() sets it"
+      );
+      return;
+    }
+    // designationId isn't in the response DTO either — we only know the name.
+    // Try to resolve it from the loaded designations list by matching the name.
+    const matchedDesignation = designations.find(
+      (d) => d.designationName === employee.designationName
+    );
+
+    setFormData({
+      employeeId: String(employee.employeeId),
+      designationId: matchedDesignation ? String(matchedDesignation.id) : "",
+    });
+    setSelectedEmployee(employee);
+    setEditMode(true);
+    setView("form");
+  };
+
+  /* ─── Status Toggle ─── */
+  const handleStatusToggle = (id, currentStatus, name) => {
+    const newStatus = currentStatus === "y" ? "n" : "y";
+    setStatusAction({ id, newStatus, name });
+    setShowStatusModal(true);
+  };
+
+  const confirmStatusChange = async () => {
+    if (!ensureToken()) return;
+    const { id } = statusAction;
+    setLoading(true);
+    try {
+      const active = statusAction.newStatus === "y";
+      await axios.put(
+        `${BASE_URL}/employee-designation/${id}/status?active=${active}`,
+        null,
+        axiosConfig
+      );
+      toast.success("Status Updated", `Employee status changed to ${active ? "Active" : "Inactive"}`);
+      fetchEmployees();
+    } catch (err) {
+      console.error("Status change error:", err);
+      toast.error("Error", err.response?.data?.message || "Failed to change status");
+    } finally {
+      setLoading(false);
+      setShowStatusModal(false);
+      setStatusAction({ id: null, newStatus: null, name: "" });
+    }
+  };
+
+  /* ─── Pagination ─── */
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
     const left = Math.max(0, page - delta);
     const right = Math.min(totalPages - 1, page + delta);
-    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    if (left > 0) {
+      range.push(0);
+      if (left > 1) range.push("...");
+    }
     for (let i = left; i <= right; i++) range.push(i);
-    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    if (right < totalPages - 1) {
+      if (right < totalPages - 2) range.push("...");
+      range.push(totalPages - 1);
+    }
     return range;
   };
 
-  const handleAddNew = () => {
-    setEditingEmployee(null);
-    setFormData({
-      name: '',
-      code: '',
-      department: '',
-      currentDesignation: '',
-      joiningDate: '',
-      status: 'Active'
-    });
-    setEmployeeSearchTerm('');
-    setSelectedEmployee(null);
-    setShowForm(true);
-  };
-
-  const handleEdit = (employee) => {
-  if (employee.status === 'Inactive') {
-    toast.warning('Cannot Edit', 'This employee is inactive and cannot be edited');
-    return;
-  }
-  
-  const emp = DUMMY_EMPLOYEES.find(e => e.id === employee.id);
-  setSelectedEmployee(emp || null);
-  setEditingEmployee(employee);
-  setFormData({
-    name: employee.name,
-    code: employee.code,
-    department: employee.department,
-    currentDesignation: employee.currentDesignation,
-    joiningDate: employee.joiningDate,
-    status: employee.status
-  });
-  setEmployeeSearchTerm(emp?.name || '');
-  setShowForm(true);
-};
-
-  
-
-  const handleStatusToggle = (id, name, currentStatus) => {
-  const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-  setStatusAction({
-    id,
-    name,
-    newStatus
-  });
-  setShowStatusModal(true);
-};
-
-  const handleChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
-    if (touched[field]) {
-      validateField(field, value);
-    }
-  };
-
-  const validateField = (field, value) => {
-    let error = '';
-    if (field === 'name' && !value) error = 'Name is required';
-    else if (field === 'code' && !value) error = 'Employee Code is required';
-    else if (field === 'department' && !value) error = 'Department is required';
-    else if (field === 'currentDesignation' && !value) error = 'Designation is required';
-    else if (field === 'joiningDate' && !value) error = 'Joining Date is required';
-    setErrors(prev => ({ ...prev, [field]: error }));
-    return error === '';
-  };
-
-  const handleBlur = (field) => {
-    setTouched(prev => ({ ...prev, [field]: true }));
-    validateField(field, formData[field]);
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.name) newErrors.name = 'Name is required';
-    if (!formData.code) newErrors.code = 'Employee Code is required';
-    if (!formData.department) newErrors.department = 'Department is required';
-    if (!formData.currentDesignation) newErrors.currentDesignation = 'Designation is required';
-    if (!formData.joiningDate) newErrors.joiningDate = 'Joining Date is required';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      toast.warning('Validation Error', 'Please fill all required fields');
-      return;
-    }
-    
-    if (editingEmployee) {
-      const updatedEmployees = employees.map(emp => 
-        emp.id === editingEmployee.id ? { ...emp, ...formData } : emp
-      );
-      setEmployees(updatedEmployees);
-      toast.success('Success', 'Employee updated successfully');
-      setEditingEmployee(null);
-    } else {
-      const newEmployee = {
-        id: employees.length > 0 ? Math.max(...employees.map(e => e.id)) + 1 : 1,
-        ...formData,
-        email: formData.code.toLowerCase() + '@example.com'
-      };
-      setEmployees([newEmployee, ...employees]);
-      toast.success('Success', 'Employee added successfully');
-    }
-    resetForm();
-    setShowForm(false);
-    setPage(0);
-  };
-
-  const confirmStatusChange = () => {
-  const { id, newStatus } = statusAction;
-  
-  const updatedEmployees = employees.map(emp => {
-    if (emp.id === id) {
-      return { ...emp, status: newStatus };
-    }
-    return emp;
-  });
-  setEmployees(updatedEmployees);
-  
-  if (filteredEmployees.length > 0) {
-    setFilteredEmployees(filteredEmployees.map(emp => {
-      if (emp.id === id) {
-        return { ...emp, status: newStatus };
-      }
-      return emp;
-    }));
-  }
-  
-  setShowStatusModal(false);
-  toast.success('Status Updated', `Employee ${statusAction.name} is now ${newStatus}`);
-};
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      code: '',
-      department: '',
-      currentDesignation: '',
-      joiningDate: '',
-      status: 'Active'
-    });
-    setErrors({});
-    setTouched({});
-    setEditingEmployee(null);
-    setEmployeeSearchTerm('');
-    setSelectedEmployee(null);
-  };
-
-  const handleCancelForm = () => {
-    resetForm();
-    setShowForm(false);
-  };
-
-  const handleBackToList = () => {
-    resetForm();
-    setShowForm(false);
-  };
-
-  const handleCancel = () => {
-    if (onCancel) onCancel();
-  };
-
   const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   };
 
-  const getStatusBadge = (status) => {
-    const styles = {
-      Active: { bg: '#d1fae5', color: '#065f46' },
-      Inactive: { bg: '#fee2e2', color: '#991b1b' }
-    };
-    const style = styles[status] || styles.Active;
-    return <span className="badge" style={{ backgroundColor: style.bg, color: style.color, padding: '4px 8px' }}>{status}</span>;
-  };
+  const isFieldOk = (f) => touched[f] && !errors[f] && String(formData[f] ?? "").trim();
+  const isFieldErr = (f) => touched[f] && !!errors[f];
+
+  if (loading && view === "list" && employees.length === 0) {
+    return <LoadingSpinner message="Loading employees..." />;
+  }
 
   return (
-    <div className="cert-root">
-      {/* Header */}
-      <div className="cert-header">
-        <div>
-          <h1 className="cert-title">Employee Designation</h1>
-          <p className="cert-subtitle">Manage employee designation details and career progression</p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!showForm && (
-            <button className="cert-add-btn" onClick={handleAddNew}>
-              <FaPlus size={13} /> Add Employee
-            </button>
-          )}
-          {showForm && (
-            <button 
-              type="button" 
-              className="cert-back-btn" 
-              onClick={handleBackToList}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
-            >
-              <FaArrowLeft size={12} /> Back
-            </button>
-          )}
-          {!showForm && onCancel && (
-            <button className="cert-cancel-btn" onClick={handleCancel}>
-              <FaTimes size={13} /> Cancel
-            </button>
-          )}
-        </div>
-      </div>
-
-      {showForm ? (
-        <div className="cert-form-wrap mb-4">
-          <form onSubmit={handleSubmit} className="cert-form-compact">
-            <div className="cert-form-section-compact">
-              <div className="cert-section-label">Employee Details</div>
-              <div className="cert-form-grid-3col">
-                <div className="cert-field-compact" style={{ gridColumn: 'span 1' }}>
-                  <label className="required">Employee Name</label>
-               <div className="position-relative" style={{ maxWidth: '500px' }}>
-    <div className="input-group">
-      <input
-        type="text"
-        className="form-control"
-        placeholder="Type employee name to search..."
-        value={employeeSearchTerm}
-        onChange={(e) => {
-          setEmployeeSearchTerm(e.target.value);
-          setShowEmployeeDropdown(true);
-        }}
-        onFocus={() => {
-          if (employeeSearchTerm.length > 0) {
-            setShowEmployeeDropdown(true);
-          }
-        }}
-        style={{ fontSize: '14px', padding: '6px 12px' }}
-      />
-    </div>
-    
-    {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
-      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
-        <div className="card-body p-2">
-          {filteredEmployees.length > 0 ? (
-            filteredEmployees.map(emp => (
-              <div
-                key={emp.id}
-                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
-                style={{ cursor: 'pointer' }}
-                onClick={() => handleEmployeeSelect(emp)}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+    <>
+      <div className="emp-root">
+        {/* Header */}
+        <div className="emp-header" style={view === "form" ? { justifyContent: "space-between" } : {}}>
+          {view === "form" ? (
+            <>
+              <div>
+                <h1 className="emp-title">{editMode ? "Edit Employee Designation" : "Add Employee Designation"}</h1>
+                <p className="emp-subtitle">
+                  {editMode ? "Update employee designation" : "Assign designation to employee"}
+                </p>
+              </div>
+              <button
+                className="emp-back-btn"
+                onClick={() => {
+                  resetForm();
+                  setView("list");
+                }}
               >
+                <FaArrowLeft size={12} /> Back to List
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="emp-header-left">
                 <div>
-                  <div className="fw-bold">{emp.name}</div>
-                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                </div>
-                <div>
-                  <span className="badge bg-light text-dark">{emp.designation}</span>
+                  <h1 className="emp-title">Employee Designation</h1>
+                  <p className="emp-subtitle">{totalItems} total employees</p>
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="text-center py-3 text-muted">
-              <small>No employees found</small>
-            </div>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <button
+                  className="emp-add-btn"
+                  onClick={() => {
+                    resetForm();
+                    setView("form");
+                  }}
+                >
+                  <FaUserPlus size={13} /> Add Employee
+                </button>
+                {onCancel && (
+                  <button className="emp-cancel-btn" onClick={onCancel}>
+                    <FaTimes size={13} /> Close
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </div>
-      </div>
-    )}
-  </div>
-                </div>
-                
-              {/* New Designation - Dropdown */}
-<div className={`cert-field-compact ${touched.currentDesignation && errors.currentDesignation ? 'has-error' : ''}`}>
-  <label className="required">Designation</label>
-  <select 
-    value={formData.currentDesignation} 
-    onChange={(e) => handleChange('currentDesignation', e.target.value)}
-    onBlur={() => handleBlur('currentDesignation')}
-  >
-    <option value="">Select Designation</option>
-    {DESIGNATIONS.map(des => (
-      <option key={des} value={des}>{des}</option>
-    ))}
-  </select>
-  <FieldError msg={errors.currentDesignation} />
-</div>
-                <div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
-                  <label className="required">Joining Date</label>
-                  <input type="date" value={formData.joiningDate} onChange={(e) => handleChange('joiningDate', e.target.value)} onBlur={() => handleBlur('joiningDate')} />
-                  <FieldError msg={errors.joiningDate} />
-                </div>
-              
+
+        {/* LIST VIEW */}
+        {view === "list" ? (
+          <>
+            <div className="emp-search-bar">
+              <div className="emp-search-wrap">
+                <FaSearch className="emp-search-icon" size={12} />
+                <input
+                  className="emp-search-input"
+                  type="text"
+                  placeholder="Search by employee name or designation…"
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                />
+                {searchName && (
+                  <button className="emp-search-clear" onClick={() => setSearchName("")}>
+                    <FaTimes size={11} />
+                  </button>
+                )}
               </div>
             </div>
-            
-            <div className="cert-form-actions">
-              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
-              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <FaSave size={12} /> {editingEmployee ? 'Update Employee' : 'Save Employee'}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : (
-        <>
-          {/* Search Bar */}
-          <div className="emp-search-bar">
-            <div className="emp-search-wrap">
-              <FaSearch className="emp-search-icon" size={12} />
-              <input
-                className="emp-search-input"
-                type="text"
-                placeholder="Search by Name, Code, Department or Designation..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              {searchTerm && (
-                <button className="cert-search-clear" onClick={() => setSearchTerm('')}>
-                  <FaTimes size={11} />
-                </button>
+
+            <div className="emp-table-card">
+              <div className="emp-table-wrap">
+                <table className="emp-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 44 }}>#</th>
+                      <th>Employee Name</th>
+                      <th>Designation</th>
+                      <th>Created Date</th>
+                      <th style={{ width: 80 }}>Status</th>
+                      <th style={{ width: 70, textAlign: "center" }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentEmployees.length > 0 ? (
+                      currentEmployees.map((emp, idx) => (
+                        <tr key={emp.id} className="emp-row">
+                          <td className="emp-sno">{startIndex + idx + 1}</td>
+                          <td>
+                            <div className="emp-name">{emp.employeeName || "—"}</div>
+                          </td>
+                          <td>
+                            <span
+                              style={{
+                                background: "#e0e7ff",
+                                color: "#3730a3",
+                                padding: "3px 10px",
+                                borderRadius: "12px",
+                                fontSize: "12px",
+                                fontWeight: "500",
+                              }}
+                            >
+                              {emp.designationName || "—"}
+                            </span>
+                          </td>
+                          <td>{formatDate(emp.createdDate)}</td>
+                          <td>
+                            <div
+                              onClick={() =>
+                                handleStatusToggle(emp.id, emp.status, emp.employeeName)
+                              }
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "28px",
+                                  height: "16px",
+                                  borderRadius: "50px",
+                                  backgroundColor:
+                                    emp.status === "y"
+                                      ? "var(--accent-indigo)"
+                                      : "var(--border-medium)",
+                                  position: "relative",
+                                  transition: "0.2s",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: "12px",
+                                    height: "12px",
+                                    borderRadius: "50%",
+                                    backgroundColor: "white",
+                                    position: "absolute",
+                                    top: "2px",
+                                    left: emp.status === "y" ? "14px" : "2px",
+                                    transition: "0.2s",
+                                    boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                                  }}
+                                />
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: "500",
+                                  color:
+                                    emp.status === "y"
+                                      ? "var(--accent-indigo)"
+                                      : "var(--text-muted)",
+                                }}
+                              >
+                                {emp.status === "y" ? "Active" : "Inactive"}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="emp-actions">
+                              <button
+                                className="emp-act emp-act--edit"
+                                onClick={() => handleEdit(emp)}
+                                title={
+                                  emp.status !== "y"
+                                    ? "Cannot edit inactive employee"
+                                    : "Edit"
+                                }
+                                style={{ opacity: emp.status !== "y" ? 0.5 : 1 }}
+                                disabled={emp.status !== "y"}
+                              >
+                                <FaEdit size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="6" className="emp-empty">
+                          <div className="emp-empty-inner">
+                            <span className="emp-empty-icon">👤</span>
+                            <p>No employees found</p>
+                            <small>Try a different search or add a new employee</small>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalItems > 0 && (
+                <div
+                  className="emp-pagination"
+                  style={{ justifyContent: "space-between", flexWrap: "wrap" }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <span className="emp-page-info">
+                      Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)}{" "}
+                      of {totalItems} employees
+                    </span>
+                  </div>
+                  <div className="emp-page-controls">
+                    <button
+                      className="emp-page-btn"
+                      disabled={page === 0}
+                      onClick={() => setPage(page - 1)}
+                    >
+                      ← Prev
+                    </button>
+                    {getPaginationRange().map((pg, i) =>
+                      pg === "..." ? (
+                        <span key={`dots-${i}`} className="emp-page-dots">
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={pg}
+                          className={`emp-page-num ${pg === page ? "active" : ""}`}
+                          onClick={() => setPage(pg)}
+                        >
+                          {pg + 1}
+                        </button>
+                      )
+                    )}
+                    <button
+                      className="emp-page-btn"
+                      disabled={page + 1 >= totalPages}
+                      onClick={() => setPage(page + 1)}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
-          </div>
+          </>
+        ) : (
+          /* ========== FORM VIEW ========== */
+          <div className="emp-form-wrap">
+            <form onSubmit={handleSubmit} noValidate className="emp-form-compact">
+              <div className="emp-form-section-compact">
+                <div className="emp-section-label">Employee Information</div>
+                <div className="emp-form-grid-3col">
+                  {/* Employee ID */}
+                  <div
+                    className={`emp-field-compact ${
+                      isFieldErr("employeeId") ? "has-error" : ""
+                    } ${isFieldOk("employeeId") ? "has-ok" : ""}`}
+                  >
+                    <label>
+                      Employee ID <span className="req">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Enter employee ID"
+                      value={formData.employeeId}
+                      onChange={(e) => handleChange("employeeId", e.target.value)}
+                      onBlur={() => handleBlur("employeeId")}
+                    />
+                    <FieldError msg={errors.employeeId} />
+                  </div>
 
-          {/* Employees Table */}
-          <div className="cert-table-card">
-            <div className="cert-table-wrap">
-              <table className="cert-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Employee Name</th>
-                    <th>Code</th>
-                    <th>Department</th>
-                    <th>Designation</th>
-                    <th>Joining Date</th>
-                    <th>Status</th>
-                    <th style={{ width: 120 }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentEmployees.length > 0 ? (
-                    currentEmployees.map((emp, idx) => (
-                      <tr key={emp.id}>
-                        <td className="text-center">{startIndex + idx + 1}</td>
-                        <td className="fw-bold">{emp.name}</td>
-                        <td>{emp.code}</td>
-                        <td>{emp.department}</td>
-                        <td>
-                          <span className="badge" style={{ background: '#e0e7ff', color: '#4f46e5', padding: '4px 8px' }}>
-                            {emp.currentDesignation}
-                          </span>
-                        </td>
-                        <td>{formatDate(emp.joiningDate)}</td>
-<td>
-  <div 
-    className="d-flex align-items-center gap-1" 
-    style={{ cursor: 'pointer' }}
-    onClick={() => handleStatusToggle(emp.id, emp.name, emp.status)}
-  >
-    <div className="position-relative" style={{
-      width: '28px',
-      height: '16px',
-      borderRadius: '50px',
-      backgroundColor: emp.status === 'Active' ? '#9d174d' : '#d1d5db',
-      transition: '0.2s',
-      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)',
-      flexShrink: 0
-    }}>
-      <div className="position-absolute" style={{
-        width: '12px',
-        height: '12px',
-        borderRadius: '50%',
-        backgroundColor: 'white',
-        top: '2px',
-        left: emp.status === 'Active' ? '14px' : '2px',
-        transition: '0.2s',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
-      }} />
-    </div>
-    <span className="small fw-medium" style={{
-      color: emp.status === 'Active' ? '#9d174d' : '#94a3b8',
-      minWidth: '40px'
-    }}>
-      {emp.status}
-    </span>
-  </div>
-</td>                      <td className="text-center">
-  <div className="cert-actions">
-    <button 
-      className="cert-act cert-act--edit" 
-      onClick={() => handleEdit(emp)} 
-      title={emp.status === 'Inactive' ? 'Cannot edit inactive employee' : 'Edit'}
-      disabled={emp.status === 'Inactive'}
-      style={{ 
-        opacity: emp.status === 'Inactive' ? 0.5 : 1,
-        cursor: emp.status === 'Inactive' ? 'not-allowed' : 'pointer'
-      }}
-    >
-      <FaEdit size={12} />
-    </button>
-  </div>
-</td>
-                      </tr>
-                    ))
+                  {/* Designation Dropdown */}
+                  <div
+                    className={`emp-field-compact ${
+                      isFieldErr("designationId") ? "has-error" : ""
+                    } ${isFieldOk("designationId") ? "has-ok" : ""}`}
+                  >
+                    <label>
+                      Designation <span className="req">*</span>
+                    </label>
+                    <select
+                      value={formData.designationId}
+                      onChange={(e) => handleChange("designationId", e.target.value)}
+                      onBlur={() => handleBlur("designationId")}
+                    >
+                      <option value="">Select Designation</option>
+                      {designations.map((des) => (
+                        <option key={des.id} value={des.id}>
+                          {des.designationName}
+                        </option>
+                      ))}
+                    </select>
+                    {designations.length === 0 && (
+                      <small style={{ color: "#f59e0b", fontSize: "11px", marginTop: "4px", display: "block" }}>
+                        No designations loaded. Please check the API.
+                      </small>
+                    )}
+                    <FieldError msg={errors.designationId} />
+                  </div>
+                </div>
+
+                {editMode && selectedEmployee && (
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      padding: "10px 12px",
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      color: "#64748b",
+                    }}
+                  >
+                    Currently: <strong>{selectedEmployee.employeeName}</strong> —{" "}
+                    <strong>{selectedEmployee.designationName}</strong>
+                  </div>
+                )}
+              </div>
+
+              {/* Form Actions */}
+              <div className="emp-form-actions">
+                <button
+                  type="button"
+                  className="emp-cancel-btn"
+                  onClick={() => {
+                    resetForm();
+                    setView("list");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="emp-add-btn"
+                  disabled={submitting}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+                >
+                  {submitting ? (
+                    <>
+                      <span className="emp-spinner" />{" "}
+                      {editMode ? "Updating…" : "Creating…"}
+                    </>
                   ) : (
-                    <tr>
-                      <td colSpan="8" className="text-center py-5">No employees found</td>
-                    </tr>
+                    <>
+                      <FaSave size={12} /> {editMode ? "Update Employee" : "Save Employee"}
+                    </>
                   )}
-                </tbody>
-              </table>
-              
-   
-{showStatusModal && (
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Status Confirmation Modal */}
+        {showStatusModal && (
           <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
             <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="emp-modal-icon">{statusAction.newStatus === "y" ? "✅" : "⛔"}</div>
+              <div className="emp-modal-icon">
+                {statusAction.newStatus === "y" ? "✅" : "⛔"}
+              </div>
               <h3 className="emp-modal-title">Confirm Status Change</h3>
               <p className="emp-modal-body">
-                Are you sure you want to <strong>{statusAction.newStatus === "y" ? "activate" : "deactivate"}</strong>{" "}
+                Are you sure you want to{" "}
+                <strong>
+                  {statusAction.newStatus === "y" ? "activate" : "deactivate"}
+                </strong>{" "}
                 <strong>{statusAction.name}</strong>?
               </p>
               <p className="emp-modal-warn">
                 {statusAction.newStatus === "n"
-                  ? "Inactive designations cannot be edited until reactivated."
-                  : "Active designations will be available for selection."}
+                  ? "Inactive employees cannot be edited until reactivated."
+                  : "Active employees will be available for selection and editing."}
               </p>
               <div className="emp-modal-actions">
-                <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>Cancel</button>
-                <button className="emp-modal-confirm" onClick={confirmStatusChange}>Confirm</button>
+                <button
+                  className="emp-modal-cancel"
+                  onClick={() => setShowStatusModal(false)}
+                >
+                  Cancel
+                </button>
+                <button className="emp-modal-confirm" onClick={confirmStatusChange}>
+                  Confirm
+                </button>
               </div>
             </div>
           </div>
         )}
-            </div>
-            
-            {/* Pagination */}
-         <div className="cert-table-footer">
-              <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
-                Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
-              </div>
-              
-              {totalPages > 0 && (
-                <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <button 
-                    className="cert-page-btn" 
-                    disabled={page === 0} 
-                    onClick={() => setPage(page - 1)}
-                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-                  >
-                    ← Prev
-                  </button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === '...' ? (
-                      <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
-                    ) : (
-                      <button 
-                        key={pg} 
-                        className={`cert-page-num ${pg === page ? 'active' : ''}`} 
-                        onClick={() => setPage(pg)}
-                        style={{ 
-                          padding: '6px 10px', 
-                          border: '1px solid #e5e7eb', 
-                          background: pg === page ? '#9d174d' : 'white', 
-                          color: pg === page ? 'white' : '#374151',
-                          borderRadius: '6px', 
-                          cursor: 'pointer', 
-                          fontSize: '12px',
-                          minWidth: '34px'
-                        }}
-                      >
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button 
-                    className="cert-page-btn" 
-                    disabled={page + 1 >= totalPages} 
-                    onClick={() => setPage(page + 1)}
-                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-                  >
-                    Next →
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+      </div>
+    </>
   );
 };
-
-const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default EmployeeDesignation;

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, FaUserTie, FaBuilding, FaBriefcase, FaCalendarAlt, 
@@ -8,18 +7,13 @@ import {
   FaPlus, FaSave, FaEdit, FaTrash, FaArrowLeft, FaCode
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import axios from "axios";
+import { BASE_URL, STORAGE_KEYS } from "../config/api.config";
 
 const EmployeeSkillMaster = ({ user, onCancel }) => {
- const [employees, setEmployees] = useState([
-  { id: 1, name: 'John Doe', department: 'IT', designation: 'Software Engineer', status: 'Active', joiningDate: '2020-01-15', retirementDate: null, skills: ['React.js', 'Node.js', 'JavaScript'] },
-  { id: 2, name: 'Jane Smith', department: 'HR', designation: 'HR Manager', status: 'Active', joiningDate: '2019-06-10', retirementDate: null, skills: ['HR Management', 'Payroll Processing', 'Recruitment'] },
-  { id: 3, name: 'Mike Johnson', department: 'IT', designation: 'Senior Developer', status: 'Active', joiningDate: '2021-03-20', retirementDate: null, skills: ['Python', 'AWS', 'Docker'] },
-  { id: 4, name: 'Sarah Williams', department: 'Sales', designation: 'Sales Manager', status: 'Active ', joiningDate: '2010-08-01', retirementDate: '2024-03-31', skills: ['Salesforce', 'CRM'] },
-  { id: 5, name: 'David Brown', department: 'Finance', designation: 'Accountant', status: 'Active', joiningDate: '2022-01-10', retirementDate: null, skills: ['Financial Accounting', 'Tally', 'Excel'] },
-  { id: 6, name: 'Emily Wilson', department: 'Marketing', designation: 'Marketing Manager', status: 'Active', joiningDate: '2018-09-15', retirementDate: null, skills: ['Digital Marketing', 'SEO', 'Google Analytics'] },
-  { id: 7, name: 'Robert Taylor', department: 'Operations', designation: 'Operations Manager', status: 'Active', joiningDate: '2017-03-10', retirementDate: null, skills: ['Operations Management', 'Supply Chain'] },
-  { id: 8, name: 'Lisa Anderson', department: 'IT', designation: 'Product Manager', status: 'Active', joiningDate: '2019-11-20', retirementDate: null, skills: ['Product Management', 'Agile', 'JIRA'] }
-]);
+ const [employees, setEmployees] = useState([]);
+const [empLoading, setEmpLoading] = useState(false);
+const [empError, setEmpError] = useState(null);
 const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
 const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
 const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -48,6 +42,28 @@ const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus
  const [viewEmployee, setViewEmployee] = useState(null);
 const [showViewModal, setShowViewModal] = useState(false);
 
+// ===== SKILLS: bound to API (replaces old hardcoded AVAILABLE_SKILLS array) =====
+const [skills, setSkills] = useState([]);       // raw active skills from API: [{id, name, isActive}]
+const [skillsLoading, setSkillsLoading] = useState(false);
+const [skillsError, setSkillsError] = useState(null);
+
+// Same auth pattern used everywhere else in this project (e.g. Branch.jsx)
+const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+const axiosConfig = {
+  headers: {
+    Authorization: `Bearer ${getAuthToken()}`,
+    "Content-Type": "application/json",
+  },
+};
+const ensureToken = () => {
+  const token = getAuthToken();
+  if (!token) {
+    toast.error("Authentication Required", "Please login to continue");
+    return false;
+  }
+  return true;
+};
+
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
@@ -56,19 +72,13 @@ const [showViewModal, setShowViewModal] = useState(false);
     { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
   ];
 
-const AVAILABLE_SKILLS = [
-  'React.js', 'Node.js', 'MongoDB', 'JavaScript', 'TypeScript', 'Python',
-  'AWS', 'Docker', 'Kubernetes', 'HR Management', 'Payroll Processing',
-  'Recruitment', 'Financial Accounting', 'Tally', 'Excel',
-  'Digital Marketing', 'SEO', 'Google Analytics', 'Operations Management',
-  'Supply Chain', 'Product Management', 'Agile', 'JIRA', 'Salesforce',
-  'CRM', 'HTML', 'CSS', 'Java', 'C#', 'PHP', 'Laravel', 'Vue.js',
-  'Angular', 'SQL', 'PostgreSQL', 'Git', 'CI/CD', 'Jenkins'
-];
+// AVAILABLE_SKILLS ab hardcoded nahi hai — API se aaye `skills` state se derive ho raha hai (sirf isActive:true wale)
+const AVAILABLE_SKILLS = skills.map(skill => skill.name);
 
 const filteredSkillList = AVAILABLE_SKILLS.filter(skill =>
   skill.toLowerCase().includes(skillSearchTerm.toLowerCase())
 );
+
   // Employee Skills Data
   const EMPLOYEE_SKILLS = {
     1: [
@@ -128,6 +138,83 @@ const filteredSkillList = AVAILABLE_SKILLS.filter(skill =>
 
   const departments = ['IT', 'HR', 'Finance', 'Sales', 'Marketing', 'Operations'];
   const designations = ['Software Engineer', 'Senior Developer', 'Tech Lead', 'HR Manager', 'Sales Manager', 'Accountant', 'Marketing Manager', 'Operations Manager', 'Product Manager'];
+
+  // ===== FETCH SKILLS FROM API (flag=0 → isActive true list) =====
+  const fetchSkills = async () => {
+    if (!ensureToken()) return;
+    setSkillsLoading(true);
+    setSkillsError(null);
+    try {
+      // NOTE: BASE_URL already includes /hrms (e.g. http://localhost:8080/hrms)
+      // so do NOT prefix /hrms again here, or the URL becomes /hrms/hrms/...
+      const res = await axios.get(`${BASE_URL}/api/skills/list?flag=0`, axiosConfig);
+      if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+        // Sirf active skills form me dikhani hain
+        const activeSkills = res.data.response.filter(skill => skill.isActive === true);
+        setSkills(activeSkills);
+      } else {
+        setSkills([]);
+      }
+    } catch (err) {
+      console.error('Fetch skills error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to fetch skills');
+      setSkillsError(err.response?.data?.message || 'Failed to load skills');
+      setSkills([]);
+    } finally {
+      setSkillsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSkills();
+  }, []);
+
+  const fetchEmployees = async () => {
+    if (!ensureToken()) return;
+    setEmpLoading(true);
+    setEmpError(null);
+    try {
+      const res = await axios.get(`${BASE_URL}/employee-skill?flag=0`, axiosConfig);
+      console.log('employee-skill raw response:', res.data);
+
+      const rows = Array.isArray(res.data) ? res.data : (Array.isArray(res.data?.response) ? res.data.response : []);
+
+      // Group by employeeId
+      const grouped = {};
+      rows.forEach((row) => {
+        if (row.isDeleted) return; // skip soft-deleted mappings
+        const empId = row.employeeId;
+        if (!grouped[empId]) {
+          grouped[empId] = {
+            id: empId,
+            name: row.employeeName || '—',
+            department: '—',       // not provided by this API
+            designation: '—',      // not provided by this API
+            status: 'Active',      // not provided at employee level by this API
+            joiningDate: '',
+            retirementDate: null,
+            skills: []
+          };
+        }
+        if (row.isActive && row.skillName) {
+          grouped[empId].skills.push(row.skillName);
+        }
+      });
+
+      setEmployees(Object.values(grouped));
+    } catch (err) {
+      console.error('Fetch employee-skill error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to fetch employee skill data');
+      setEmpError(err.response?.data?.message || 'Failed to load employees');
+      setEmployees([]);
+    } finally {
+      setEmpLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
 
   useEffect(() => {
     const search = searchTerm.toLowerCase();
@@ -450,25 +537,9 @@ const handleView = (employee) => {
   </div>
 </div>
 
-{/* Joining Date */}
-{/* <div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
-  <label className="required">Joining Date</label>
-  <input 
-    type="date" 
-    value={formData.joiningDate} 
-    onChange={(e) => handleChange('joiningDate', e.target.value)} 
-    onBlur={() => handleBlur('joiningDate')} 
-    className="form-control"
-  />
-  <FieldError msg={errors.joiningDate} />
-</div> */}
-
-
-                
-              
                 
      {/* Skills */}
-{/* Skills with Checkboxes - Search + Selected Display */}
+{/* Skills with Checkboxes - Search + Selected Display (now bound to API) */}
 <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
  
     {/* Search Results Dropdown with Checkboxes */}
@@ -535,7 +606,7 @@ const handleView = (employee) => {
     )}
   
 
-  {/* All Skills with Checkboxes - Grid View */}
+  {/* All Skills with Checkboxes - Grid View (data source: GET /hrms/api/skills/list?flag=0) */}
   <div className="mt-3">
     <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '8px', display: 'block' }}>
       All Skills
@@ -551,52 +622,73 @@ const handleView = (employee) => {
       maxHeight: '200px',
       overflowY: 'auto'
     }}>
-      {AVAILABLE_SKILLS.map(skill => (
-        <div
-          key={skill}
-          className="d-flex align-items-center"
-          style={{
-            padding: '6px 10px',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            background: formData.skills?.includes(skill) ? '#fce7f3' : 'transparent',
-            border: formData.skills?.includes(skill) ? '1px solid #fbcfe8' : '1px solid transparent'
-          }}
-          onClick={() => {
-            setFormData(prev => {
-              const updatedSkills = prev.skills?.includes(skill)
-                ? prev.skills.filter(s => s !== skill)
-                : [...(prev.skills || []), skill];
-              return {
-                ...prev,
-                skills: updatedSkills
-              };
-            });
-          }}
-        >
-          <input
-            type="checkbox"
-            className="me-2"
-            checked={formData.skills?.includes(skill) || false}
-            readOnly
-            style={{ 
-              accentColor: '#9d174d',
-              width: '16px',
-              height: '16px',
-              cursor: 'pointer',
-              flexShrink: 0
-            }}
-          />
-          <span style={{
-            fontSize: '13px',
-            color: formData.skills?.includes(skill) ? '#9d174d' : '#374151',
-            fontWeight: formData.skills?.includes(skill) ? '500' : '400'
-          }}>
-            {skill}
-          </span>
+      {skillsLoading ? (
+        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '10px 0', color: '#6b7280', fontSize: '13px' }}>
+          Loading skills...
         </div>
-      ))}
+      ) : skillsError ? (
+        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '10px 0', color: '#ef4444', fontSize: '13px' }}>
+          {skillsError}{' '}
+          <button
+            type="button"
+            onClick={fetchSkills}
+            style={{ marginLeft: '6px', border: 'none', background: 'transparent', color: '#9d174d', textDecoration: 'underline', cursor: 'pointer', fontSize: '13px' }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : AVAILABLE_SKILLS.length === 0 ? (
+        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '10px 0', color: '#9ca3af', fontSize: '13px' }}>
+          No active skills found
+        </div>
+      ) : (
+        AVAILABLE_SKILLS.map(skill => (
+          <div
+            key={skill}
+            className="d-flex align-items-center"
+            style={{
+              padding: '6px 10px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              background: formData.skills?.includes(skill) ? '#fce7f3' : 'transparent',
+              border: formData.skills?.includes(skill) ? '1px solid #fbcfe8' : '1px solid transparent'
+            }}
+            onClick={() => {
+              setFormData(prev => {
+                const updatedSkills = prev.skills?.includes(skill)
+                  ? prev.skills.filter(s => s !== skill)
+                  : [...(prev.skills || []), skill];
+                return {
+                  ...prev,
+                  skills: updatedSkills
+                };
+              });
+            }}
+          >
+            <input
+              type="checkbox"
+              className="me-2"
+              checked={formData.skills?.includes(skill) || false}
+              readOnly
+              style={{ 
+                accentColor: '#9d174d',
+                width: '16px',
+                height: '16px',
+                cursor: 'pointer',
+                flexShrink: 0
+              }}
+            />
+            <span style={{
+              fontSize: '13px',
+              color: formData.skills?.includes(skill) ? '#9d174d' : '#374151',
+              fontWeight: formData.skills?.includes(skill) ? '500' : '400'
+            }}>
+              {skill}
+            </span>
+          </div>
+        ))
+      )}
     </div>
   </div>
 
@@ -750,7 +842,26 @@ const handleView = (employee) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentEmployees.length > 0 ? (
+                  {empLoading ? (
+                    <tr>
+                      <td colSpan="8" className="text-center py-5" style={{ color: '#6b7280' }}>
+                        Loading employees...
+                      </td>
+                    </tr>
+                  ) : empError ? (
+                    <tr>
+                      <td colSpan="8" className="text-center py-5" style={{ color: '#ef4444' }}>
+                        {empError}{' '}
+                        <button
+                          type="button"
+                          onClick={fetchEmployees}
+                          style={{ marginLeft: '6px', border: 'none', background: 'transparent', color: '#9d174d', textDecoration: 'underline', cursor: 'pointer' }}
+                        >
+                          Retry
+                        </button>
+                      </td>
+                    </tr>
+                  ) : currentEmployees.length > 0 ? (
                     currentEmployees.map((emp, idx) => {
 const skills = emp.skills || [];                      return (
                         <tr key={emp.id}>
