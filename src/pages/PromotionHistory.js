@@ -28,7 +28,6 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [documentPreview, setDocumentPreview] = useState(null);
   const [docLoading, setDocLoading] = useState(false);
 
-  // ✅ FormData keyed by IDs (what the API actually needs) + display names
   const [formData, setFormData] = useState({
     promotionOrderNo: '',
     promotionDate: '',
@@ -36,9 +35,7 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     oldGrade: '',
     newGrade: '',
     serviceBookNo: '',
-
     employeeId: null,
-
     oldBranchId: null,
     newBranchId: null,
     oldDepartmentId: null,
@@ -49,7 +46,6 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     promotionAuthorityId: null,
     oldGradeId: null,
     newGradeId: null,
-
     oldBranchName: '',
     newBranchName: '',
     oldDepartmentName: '',
@@ -58,7 +54,6 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     newDesignationName: '',
     promotionTypeName: '',
     promotionAuthorityName: '',
-
     remarks: '',
   });
 
@@ -76,14 +71,14 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus: '' });
   const [showDocumentActions, setShowDocumentActions] = useState(false);
 
-  // ─── Axios config ──────────────────────────────────────
+  // ─── Token helper ──────────────────────────────────────────
   const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
-  const axiosConfig = {
+  const getAxiosConfig = () => ({
     headers: {
       Authorization: `Bearer ${getAuthToken()}`,
       'Content-Type': 'application/json',
     },
-  };
+  });
 
   const ensureToken = () => {
     const token = getAuthToken();
@@ -94,12 +89,7 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     return true;
   };
 
-  // ─── Reverse-lookup helpers (name -> id) ───────────────
-  // Needed because the GET /api/promotions list only returns display NAMES
-  // (oldDesignation, newBranch, previousGrade, promotionAuthority, etc.),
-  // not the underlying IDs — except employeeId. To populate the edit form's
-  // ID-based dropdowns we have to match against the lookup lists we already
-  // fetched on mount.
+  // ─── Reverse-lookup helpers ───────────────────────────────
   const getBranchIdByName = (name) => branchList.find(b => b.name === name)?.id || null;
   const getDepartmentIdByName = (name) => departmentList.find(d => d.name === name)?.id || null;
   const getDesignationIdByName = (name) => designationList.find(d => d.name === name)?.id || null;
@@ -107,11 +97,27 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const getPromotionTypeIdByName = (name) => promotionTypeList.find(pt => pt.promotionTypeName === name)?.id || null;
   const getPromotionAuthorityIdByName = (name) => promotionAuthorityList.find(a => a.name === name)?.id || null;
 
-  // ─── Fetch branches ─────────────────────────────────────
+  // ─── Fetch single employee details ────────────────────────
+  const fetchEmployeeDetails = useCallback(async (employeeId) => {
+    try {
+      const res = await axios.get(`${BASE_URL}/api/employees/${employeeId}`, getAxiosConfig());
+      if (res.data?.status === 200 && res.data.response) {
+        return res.data.response;
+      } else if (res.data && typeof res.data === 'object' && !res.data.status) {
+        return res.data;
+      }
+      return null;
+    } catch (err) {
+      console.error('Error fetching employee details:', err);
+      return null;
+    }
+  }, []);
+
+  // ─── Data fetching functions (all use getAxiosConfig) ────
   const fetchBranches = useCallback(async () => {
     if (!ensureToken()) return;
     try {
-      const res = await axios.get(`${BASE_URL}/branches/list?flag=0`, axiosConfig);
+      const res = await axios.get(`${BASE_URL}/branches/list?flag=0`, getAxiosConfig());
       if (res.data?.status === 200 && Array.isArray(res.data.response)) {
         setBranchList(res.data.response.map(b => ({ id: b.id, name: b.name || b.branchName })));
       } else {
@@ -124,11 +130,10 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     }
   }, []);
 
-  // ─── Fetch departments ──────────────────────────────────
   const fetchDepartments = useCallback(async () => {
     if (!ensureToken()) return;
     try {
-      const res = await axios.get(`${BASE_URL}/departments/list?flag=0`, axiosConfig);
+      const res = await axios.get(`${BASE_URL}/departments/list?flag=0`, getAxiosConfig());
       if (res.data?.status === 200 && Array.isArray(res.data.response)) {
         setDepartmentList(res.data.response.map(d => ({ id: d.id, name: d.name })));
       } else {
@@ -141,11 +146,10 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     }
   }, []);
 
-  // ─── Fetch designations ──────────────────────────────────
   const fetchDesignations = useCallback(async () => {
     if (!ensureToken()) return;
     try {
-      const res = await axios.get(`${BASE_URL}/api/designations/list?flag=0`, axiosConfig);
+      const res = await axios.get(`${BASE_URL}/api/designations/list?flag=0`, getAxiosConfig());
       if (res.data?.status === 200 && Array.isArray(res.data.response)) {
         setDesignationList(res.data.response.map(d => ({ id: d.id, name: d.name || d.designationName || '' })));
       } else {
@@ -158,11 +162,10 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     }
   }, []);
 
-  // ─── Fetch employee grades ──────────────────────────
   const fetchGrades = useCallback(async () => {
     if (!ensureToken()) return;
     try {
-      const res = await axios.get(`${BASE_URL}/api/grades`, axiosConfig);
+      const res = await axios.get(`${BASE_URL}/api/grades`, getAxiosConfig());
       if (res.data?.status === 200) {
         let gradesData = Array.isArray(res.data.response)
           ? res.data.response
@@ -178,11 +181,10 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     }
   }, []);
 
-  // ─── Fetch promotion authorities ──────────────────────────
   const fetchPromotionAuthorities = useCallback(async () => {
     if (!ensureToken()) return;
     try {
-      const res = await axios.get(`${BASE_URL}/employee-designation?flag=0`, axiosConfig);
+      const res = await axios.get(`${BASE_URL}/employee-designation?flag=0`, getAxiosConfig());
       let authoritiesData = [];
       if (Array.isArray(res.data)) authoritiesData = res.data;
       else if (res.data?.status === 200 && Array.isArray(res.data.response)) authoritiesData = res.data.response;
@@ -200,11 +202,10 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     }
   }, []);
 
-  // ─── Fetch promotion types ──────────────────────────────
   const fetchPromotionTypes = useCallback(async () => {
     if (!ensureToken()) return;
     try {
-      const res = await axios.get(`${BASE_URL}/api/promotion-types?flag=0`, axiosConfig);
+      const res = await axios.get(`${BASE_URL}/api/promotion-types?flag=0`, getAxiosConfig());
       let typesData = [];
       if (Array.isArray(res.data)) typesData = res.data;
       else if (res.data?.status === 200 && Array.isArray(res.data.response)) typesData = res.data.response;
@@ -221,13 +222,10 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     }
   }, []);
 
-  // ─── Fetch employees ───────────────────────────────────
   const fetchEmployees = useCallback(async () => {
     if (!ensureToken()) return;
     try {
-      // ✅ The endpoint paginates (default size 10) — request a large page so every
-      // employee is available in the search dropdown, not just the first 10.
-      const res = await axios.get(`${BASE_URL}/api/employees`, { ...axiosConfig, params: { size: 1000, page: 0 } });
+      const res = await axios.get(`${BASE_URL}/api/employees`, { ...getAxiosConfig(), params: { size: 1000, page: 0 } });
       if (res.data?.status === 200) {
         let employeesData = Array.isArray(res.data.response)
           ? res.data.response
@@ -243,7 +241,6 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     }
   }, []);
 
-  // ─── Fetch promotions (list shape = doc 2: PromotionRecordResponse) ────
   const fetchPromotions = useCallback(async () => {
     if (!ensureToken()) return;
     setLoading(true);
@@ -251,11 +248,9 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       const params = { page: 0, size: 100 };
       if (searchTerm) params.search = searchTerm;
 
-      const res = await axios.get(`${BASE_URL}/api/promotions`, { ...axiosConfig, params });
+      const res = await axios.get(`${BASE_URL}/api/promotions`, { ...getAxiosConfig(), params });
       if (res.data?.status === 200) {
         let list = res.data.response?.content || [];
-        // Client-side filter by employeeId if this component is scoped to one employee,
-        // since the backend /api/promotions list endpoint doesn't take an employeeId param.
         if (employeeId) {
           list = list.filter(p => String(p.employeeId) === String(employeeId));
         }
@@ -289,9 +284,12 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     loadAllData();
   }, [fetchBranches, fetchDepartments, fetchDesignations, fetchGrades, fetchPromotionTypes, fetchPromotionAuthorities, fetchEmployees, fetchPromotions]);
 
-  // ─── Update existing order numbers (matches API field: promotionOrderNumber) ──
+  // ─── Update existing order numbers ────────────────────
   useEffect(() => {
-    setExistingOrderNos(promotions.map(promo => promo.promotionOrderNumber));
+    // Filter out null/undefined to avoid false uniqueness errors
+    setExistingOrderNos(
+      promotions.map(promo => promo.promotionOrderNumber).filter(Boolean)
+    );
   }, [promotions]);
 
   // ─── Helpers ─────────────────────────────────────────
@@ -303,11 +301,20 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const getStatusLabel = (promo) => (promo?.isActive === false ? 'Inactive' : 'Active');
 
   const getLastPromotionDate = () => {
-    const filtered = editingPromotion
-      ? promotions.filter(p => p.id !== editingPromotion.id)
-      : promotions;
+    const empId = formData.employeeId || selectedEmployee?.id;
+    if (!empId) return null;
+
+    const filtered = promotions.filter(p =>
+      String(p.employeeId) === String(empId) &&
+      (!editingPromotion || p.id !== editingPromotion.id)
+    );
     if (filtered.length === 0) return null;
-    const dates = filtered.map(p => new Date(p.promotionDate));
+
+    const dates = filtered
+      .map(p => new Date(p.promotionDate))
+      .filter(d => !isNaN(d.getTime()));
+    if (dates.length === 0) return null;
+
     const maxDate = new Date(Math.max(...dates));
     return maxDate.toISOString().split('T')[0];
   };
@@ -348,7 +355,6 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     if (touched.promotionAuthorityName) validateField('promotionAuthorityName', value);
   };
 
-  // ✅ New Grade is an ID-backed dropdown (backend requires newGradeId)
   const handleNewGradeChange = (value) => {
     const selected = gradeList.find(g => g.name === value);
     setFormData(prev => ({ ...prev, newGrade: value, newGradeId: selected?.id || null }));
@@ -360,6 +366,7 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     validateField(field, formData[field]);
   };
 
+  // ─── validateField – returns error string (empty = no error) ─
   const validateField = (field, value) => {
     let error = '';
     const lastPromotionDate = getLastPromotionDate();
@@ -387,20 +394,35 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     else if (field === 'newGrade' && !value) error = 'New Grade is required';
 
     setErrors(prev => ({ ...prev, [field]: error }));
-    return error === '';
+    return error; // ← returns error string
   };
 
+  // ─── validateForm – only returns true when no errors ──────
   const validateForm = () => {
     const newErrors = {};
+    const newTouched = {};
     const fields = [
-      'promotionOrderNo', 'promotionDate', 'newDesignationName', 'promotionTypeName',
-      'effectiveDate', 'promotionAuthorityName', 'newBranchName', 'newDepartmentName', 'newGrade'
+      'promotionOrderNo',
+      'promotionDate',
+      'newDesignationName',
+      'promotionTypeName',
+      'effectiveDate',
+      'promotionAuthorityName',
+      'newBranchName',
+      'newDepartmentName',
+      'newGrade'
     ];
     fields.forEach(f => {
+      newTouched[f] = true;
       const err = validateField(f, formData[f]);
-      if (err) newErrors[f] = err;
+      if (err) newErrors[f] = err;   // ← only add if error string is non‑empty
     });
     setErrors(newErrors);
+    setTouched(prev => ({ ...prev, ...newTouched }));
+
+    console.log('FORM DATA →', JSON.stringify(formData, null, 2));
+    console.log('VALIDATION ERRORS →', JSON.stringify(newErrors, null, 2));
+
     return Object.keys(newErrors).length === 0;
   };
 
@@ -429,9 +451,6 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   };
 
   // ─── Submit ──────────────────────────────────────────────────
-  // ✅ Uses POST /api/promotions (CreatePromotionUseCase), NOT /api/promotions/save.
-  // /save writes to a different table (PromotionHistory) that the GET list never reads from —
-  // records created there would silently never appear in this list.
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!ensureToken()) return;
@@ -465,15 +484,11 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       };
 
       const url = editingPromotion
-        ? `${BASE_URL}/api/promotions/${editingPromotion.id}`
-        : `${BASE_URL}/api/promotions`;
+        ? `${BASE_URL}/api/promotions/${editingPromotion.id}/update`
+        : `${BASE_URL}/api/promotions/create`;
       const method = editingPromotion ? 'put' : 'post';
 
-      // Note: the update endpoint currently only persists promotionOrderNumber,
-      // salary, dates and remarks server-side (see UpdatePromotionRecordUseCase) —
-      // designation/department/branch/grade edits won't take effect until that
-      // use case is updated to apply them.
-      const res = await axios[method](url, payload, axiosConfig);
+      const res = await axios[method](url, payload, getAxiosConfig());
 
       if (res.data?.status === 200 || res.data?.status === 201) {
         toast.success('Success', editingPromotion ? 'Promotion updated successfully' : 'Promotion saved successfully');
@@ -492,21 +507,23 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     }
   };
 
-  // ─── Edit ──────────────────────────────────────────
-  // ✅ The list response only has name strings (oldDesignation, newBranch, previousGrade,
-  // promotionAuthority, promotionType) — reverse-lookup their IDs from the lists we fetched
-  // on mount so the ID-based <select> dropdowns are correctly pre-selected.
-  const handleEdit = (promotion) => {
+  // ─── Edit ──────────────────────────────────────────────────
+  const handleEdit = async (promotion) => {
     if (promotion.isActive === false) {
       toast.warning('Inactive', 'Cannot edit an inactive promotion');
       return;
     }
-    const emp = employees.find(e => e.id === promotion.employeeId);
+    let emp = employees.find(e => e.id === promotion.employeeId);
+    if (!emp) {
+      const details = await fetchEmployeeDetails(promotion.employeeId);
+      if (details) emp = details;
+    }
     if (emp) {
       setSelectedEmployee(emp);
       setEmployeeSearchTerm(emp.name);
     }
 
+    // Populate form with promotion data
     setFormData({
       promotionOrderNo: promotion.promotionOrderNumber || '',
       promotionDate: promotion.promotionDate || '',
@@ -546,7 +563,6 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   };
 
   // ─── Status toggle via API ───────────────────────────
-  // ✅ Correct endpoint: PUT /api/promotions/{id}/status?active=true|false (query param, no body)
   const handleStatusToggle = (id, name, currentIsActive) => {
     const newStatus = currentIsActive ? 'Inactive' : 'Active';
     setStatusAction({ id, name, newStatus });
@@ -561,7 +577,7 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       const res = await axios.put(
         `${BASE_URL}/api/promotions/${id}/status`,
         null,
-        { ...axiosConfig, params: { active: newStatus === 'Active' } }
+        { ...getAxiosConfig(), params: { active: newStatus === 'Active' } }
       );
       if (res.data?.status === 200) {
         toast.success('Status Updated', 'Promotion status changed');
@@ -579,9 +595,6 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   };
 
   // ─── View document ────────────────────────────────────
-  // ✅ The API stores documents on disk (documentPath/documentName only) — there's no
-  // base64 field. Fetch the bytes from GET /api/promotions/{id}/document as a blob
-  // and build an object URL for preview/download.
   const handleViewDocument = async (e, promotion) => {
     e.stopPropagation();
     setSelectedPromotion(promotion);
@@ -608,7 +621,7 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     }
   };
 
-  // ─── Pagination / search (matches API field names) ───
+  // ─── Pagination / search ─────────────────────────────
   const filteredPromotions = promotions.filter(promo => {
     const search = searchTerm.toLowerCase();
     return promo.promotionOrderNumber?.toLowerCase().includes(search) ||
@@ -640,10 +653,7 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     return emp.name?.toLowerCase().includes(search) || emp.email?.toLowerCase().includes(search);
   });
 
-  // ✅ The /api/employees response (see sample) only gives: departmentName, branchName,
-  // gradeName, gradeId — it has NO designation/designationId/code/serviceBookNo fields at
-  // all. Map from the fields that actually exist, and reverse-lookup department/branch IDs
-  // from the master lists we already fetched (gradeId is thankfully given directly).
+  // ✅ proper mapping of employee fields
   const handleEmployeeSelect = (employee) => {
     setSelectedEmployee(employee);
     setEmployeeSearchTerm(employee.name);
@@ -652,31 +662,15 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     setFormData(prev => ({
       ...prev,
       employeeId: employee.id,
-
-      // Not available from this API for any employee — leave blank so the "Old
-      // Designation" box just shows nothing instead of stale/garbage data. If you
-      // need this, the employee master API needs to start returning it.
-      oldDesignationName: '',
-      oldDesignationId: null,
-
-      oldGrade: employee.gradeName || '',
-      oldGradeId: employee.gradeId || null,
-
-      oldDepartmentName: employee.departmentName || '',
-      oldDepartmentId: getDepartmentIdByName(employee.departmentName),
-
       oldBranchName: employee.branchName || '',
       oldBranchId: getBranchIdByName(employee.branchName),
-
-      // Not available from this API — remove/replace once your backend exposes it
-      serviceBookNo: '',
-
-      newDesignationName: prev.newDesignationName || '',
-      newDesignationId: prev.newDesignationId || null,
-      newDepartmentName: prev.newDepartmentName || '',
-      newDepartmentId: prev.newDepartmentId || null,
-      newBranchName: prev.newBranchName || '',
-      newBranchId: prev.newBranchId || null,
+      oldDepartmentName: employee.departmentName || '',
+      oldDepartmentId: getDepartmentIdByName(employee.departmentName),
+      oldGrade: employee.gradeName || '',
+      oldGradeId: employee.gradeId || null,
+      oldDesignationName: employee.designation || '',
+      oldDesignationId: employee.designationId || null,
+      serviceBookNo: employee.serviceBookNo || '',
     }));
   };
 
@@ -821,7 +815,7 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                 <div className="cert-field-compact">
                   <label>Old Designation</label>
                   <input type="text" className="form-control bg-light"
-                    value={formData.oldDesignationName || ''} readOnly placeholder="Not available from employee record — select if needed" />
+                    value={formData.oldDesignationName || selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
                 </div>
 
                 <div className={`cert-field-compact ${touched.newDesignationName && errors.newDesignationName ? 'has-error' : ''}`}>
@@ -1267,6 +1261,16 @@ const PromotionHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
           border-top-color: #fff; animation: spin 0.6s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .has-error input, .has-error select {
+          border-color: #dc3545 !important;
+          box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.25) !important;
+        }
+        .text-danger.small {
+          color: #dc3545;
+          font-size: 12px;
+          display: block;
+          margin-top: 4px;
+        }
       `}</style>
     </div>
   );
