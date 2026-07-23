@@ -551,12 +551,26 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                   <label>Department</label>
                   <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
                 </div>
- 
+  <div className={`cert-field-compact ${touched.initialDepartment && errors.initialDepartment ? 'has-error' : ''}`}>
+                  <label className="required">Initial Department</label>
+                  <select value={formData.initialDepartment} onChange={(e) => handleChange('initialDepartment', e.target.value)}>
+                    <option value="">Select Department</option>
+                    {departments.map(dept => <option key={dept.id} value={dept.name}>{dept.name}</option>)}
+                  </select>
+                  <FieldError msg={errors.initialDepartment} />
+                </div>
                 <div className="cert-field-compact">
                   <label>Designation</label>
                   <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
                 </div>
-
+ <div className={`cert-field-compact ${touched.initialDesignation && errors.initialDesignation ? 'has-error' : ''}`}>
+                  <label className="required">Initial Designation</label>
+                  <select value={formData.initialDesignation} onChange={(e) => handleChange('initialDesignation', e.target.value)} onBlur={() => handleBlur('initialDesignation')}>
+                    <option value="">Select Designation</option>
+                    {designations.map(des => <option key={des.id} value={des.name}>{des.name}</option>)}
+                  </select>
+                  <FieldError msg={errors.initialDesignation} />
+                </div>
                 <div className={`cert-field-compact ${touched.appointmentOrderNo && errors.appointmentOrderNo ? 'has-error' : ''}`}>
                   <label className="required">Appointment Order Number</label>
                   <input type="text" placeholder="e.g., ARI/APP/2024/001" value={formData.appointmentOrderNo} onChange={(e) => handleChange('appointmentOrderNo', e.target.value)} onBlur={() => handleBlur('appointmentOrderNo')} />
@@ -594,23 +608,7 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                   <FieldError msg={errors.employmentType} />
                 </div>
                 
-                <div className={`cert-field-compact ${touched.initialDesignation && errors.initialDesignation ? 'has-error' : ''}`}>
-                  <label className="required">Initial Designation</label>
-                  <select value={formData.initialDesignation} onChange={(e) => handleChange('initialDesignation', e.target.value)} onBlur={() => handleBlur('initialDesignation')}>
-                    <option value="">Select Designation</option>
-                    {designations.map(des => <option key={des.id} value={des.name}>{des.name}</option>)}
-                  </select>
-                  <FieldError msg={errors.initialDesignation} />
-                </div>
-                
-                <div className={`cert-field-compact ${touched.initialDepartment && errors.initialDepartment ? 'has-error' : ''}`}>
-                  <label className="required">Initial Department</label>
-                  <select value={formData.initialDepartment} onChange={(e) => handleChange('initialDepartment', e.target.value)}>
-                    <option value="">Select Department</option>
-                    {departments.map(dept => <option key={dept.id} value={dept.name}>{dept.name}</option>)}
-                  </select>
-                  <FieldError msg={errors.initialDepartment} />
-                </div>
+              
                 
                 <div className={`cert-field-compact ${touched.initialBranch && errors.initialBranch ? 'has-error' : ''}`}>
                   <label className="required">Initial Branch</label>
