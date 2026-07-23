@@ -633,7 +633,12 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
       <div className="search-container">
       
         {/* Branch Filter */}
+        
         <div>
+          <div style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a', marginBottom: '16px' }}>
+                      <FaFilter style={{ marginRight: '8px' }} /> Filters
+                    </div>
+                    
           <label className="search-label">
             <FaBriefcase size={11} style={{ marginRight: '4px' }} /> Branch
           </label>
