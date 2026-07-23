@@ -548,7 +548,7 @@ const AuditTrail = ({ user, onCancel }) => {
     tableCell: { padding: '13px 16px', borderBottom: '1px solid #f1f5f9', fontSize: '13px', color: '#334155' },
     secondaryBtn: { padding: '8px 18px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: 'white', color: '#475569', fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', transition: 'all 0.2s ease' },
     primaryBtn: { padding: '8px 20px', borderRadius: '10px', border: 'none', background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryLight} 100%)`, color: 'white', fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', transition: 'all 0.3s ease', boxShadow: `0 2px 8px ${primaryShadow}` },
-    successBtn: { padding: '8px 20px', borderRadius: '10px', border: 'none', background: '#059669', color: 'white', fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', transition: 'all 0.3s ease' },
+    primaryBtn: { padding: '8px 20px', borderRadius: '10px', border: 'none', background: '#9d174d', color: 'white', fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', transition: 'all 0.3s ease' },
     dangerBtn: { padding: '8px 20px', borderRadius: '10px', border: '1.5px solid #fecaca', background: 'white', color: '#dc2626', fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', transition: 'all 0.2s ease' },
   };
 
@@ -667,7 +667,7 @@ const AuditTrail = ({ user, onCancel }) => {
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = 'white'; }}>
               <FaDownload size={12} /> Export
             </button>
-            <button onClick={handleSearch} style={styles.successBtn}>
+            <button onClick={handleSearch} style={styles.primaryBtn}>
               <FaSearch size={12} /> Search
             </button>
             <button onClick={handleClearFilters} style={styles.dangerBtn} 
