@@ -476,9 +476,10 @@ const ServiceBookTimeline = ({ employeeId, onCancel }) => {
           <div style={styles.filterCard}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FaFilter size={14} color="#0f172a" /> Search Employees
-                </h3>
+               <div style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a', marginBottom: '16px' }}>
+                           <FaFilter style={{ marginRight: '8px' }} /> Filters
+                         </div>
+                         
                 {hasSearched && (
                   <span style={{ fontSize: '12px', color: '#9d174d', background: '#eef2ff', padding: '3px 12px', borderRadius: '12px', fontWeight: '500' }}>
                     {totalItems.toLocaleString()} results • {searchStats.searchTime}
