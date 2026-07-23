@@ -1,5 +1,5 @@
-// export const BASE_URL = "http://localhost:8080/hrms";
-export const BASE_URL = "http://103.133.215.182:8081/hrms";
+export const BASE_URL = "http://localhost:8080/hrms";
+//export const BASE_URL = "http://103.133.215.182:8081/hrms";
 
 
 // export const BASE_URL = "http://192.168.1.200:8081/hrms";
@@ -63,6 +63,9 @@ export const API_ENDPOINTS = {
   UPLOAD_DOCUMENT: `${BASE_URL}/api/documents/upload`,
   GET_EMPLOYEE_DOCUMENTS: (employeeId) => `${BASE_URL}/api/documents/employee/${employeeId}`,
 
+// ── Employee Designation ──────────────────────
+  EMPLOYEE_DESIGNATION: `${BASE_URL}/employee/designation`,
+
 
 
   // ── Tasks ───────────────────────────────────
@@ -115,8 +118,6 @@ export const API_ENDPOINTS = {
 
 
 };
-
-
 
 
 

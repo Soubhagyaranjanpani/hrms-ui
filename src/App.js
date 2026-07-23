@@ -52,7 +52,7 @@ import AuditTrail from './pages/AuditTrail';
 import ServicebookReport from './pages/ServicebookReport';
 import EmployeeDesignation from './pages/EmployeeDesignation';
 import EmployeeskillMaster from './pages/EmployeeSkillMaster';
-
+import DocumentsAction from './pages/DocumentsAction';
 
 
 
@@ -188,7 +188,7 @@ function App() {
           <Route path="ServicebookReport" element={<ServicebookReport user={currentUser}/>}/>
           <Route path="EmployeeDesignation" element={<EmployeeDesignation user={currentUser}/>}/>
           <Route path="EmployeeSkillMaster" element={<EmployeeskillMaster user={currentUser}/>}/>
-
+          <Route path="DocumentsAction" element={<DocumentsAction user={currentUser}/>}/>
           <Route path="SalaryConfig" element={<SalaryConfig user={currentUser} />} />
           <Route path="EmployeeGrade" element={<EmployeeGrade user={currentUser} />} />
           <Route path="reports" element={<Reports user={currentUser} />} />

@@ -1,94 +1,161 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useRef, useEffect } from 'react';
 import { 
-  FaSearch, FaUserTie, FaTimes, FaUpload, FaFilePdf, FaFileWord, 
-  FaFileImage, FaDownload, FaTrash, FaEye, FaFolder, FaFolderOpen,
-  FaCloudUploadAlt, FaCheckCircle, FaExclamationTriangle, FaFileAlt,
-  FaCalendarAlt, FaBuilding, FaChartLine, FaExchangeAlt, FaTrophy, 
-  FaRupeeSign, FaChalkboardTeacher, FaClock, FaPlus, FaEdit, FaSave, FaArrowLeft
+  FaSearch, FaPlus, FaTimes, FaFilePdf, FaFileWord, 
+  FaFileImage, FaDownload, FaTrash, FaEdit, FaFileAlt,
+  FaChartLine, FaExchangeAlt, FaTrophy, FaRupeeSign, 
+  FaChalkboardTeacher, FaClock, FaSave, FaArrowLeft,
+  FaChevronDown, FaUpload, FaEye, FaFilter, FaBuilding,
+  FaUserTie, FaBriefcase, FaCheckCircle, FaCalendarAlt,
+  FaUser
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [documents, setDocuments] = useState([
-    { id: 1, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order.pdf', fileType: 'pdf', fileSize: '1.2 MB', date: '2020-01-15', uploadedBy: 'HR Admin', uploadedOn: '2020-01-15', employeeName: 'John Doe', employeeId: 1 },
-    { id: 2, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2021-03-01', uploadedBy: 'HR Manager', uploadedOn: '2021-03-01', employeeName: 'John Doe', employeeId: 1 },
-    { id: 3, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2022-06-01', uploadedBy: 'HR Admin', uploadedOn: '2022-06-01', employeeName: 'Jane Smith', employeeId: 2 },
-    { id: 4, category: 'salaryRevision', title: 'Salary Revision', fileName: 'Salary_Revision.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2023-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2023-01-01', employeeName: 'Mike Johnson', employeeId: 3 },
-    { id: 5, category: 'training', title: 'Training Certificate', fileName: 'Training_Certificate.jpg', fileType: 'jpg', fileSize: '2.1 MB', date: '2021-08-10', uploadedBy: 'Employee', uploadedOn: '2021-08-15', employeeName: 'Sarah Williams', employeeId: 4 },
-    { id: 6, category: 'award', title: 'Award Certificate', fileName: 'Award_Certificate.pdf', fileType: 'pdf', fileSize: '1.5 MB', date: '2022-01-20', uploadedBy: 'CEO Office', uploadedOn: '2022-01-20', employeeName: 'David Brown', employeeId: 5 }
+    { id: 1, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order.pdf', fileType: 'pdf', fileSize: '1.2 MB', date: '2020-01-15', uploadedBy: 'HR Admin', uploadedOn: '2020-01-15', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Software Engineer' },
+    { id: 2, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2021-03-01', uploadedBy: 'HR Manager', uploadedOn: '2021-03-01', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Software Engineer' },
+    { id: 3, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2022-06-01', uploadedBy: 'HR Admin', uploadedOn: '2022-06-01', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'HR Manager' },
+    { id: 4, category: 'salaryRevision', title: 'Salary Revision', fileName: 'Salary_Revision.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2023-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2023-01-01', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Senior Developer' },
+    { id: 5, category: 'training', title: 'Training Certificate', fileName: 'Training_Certificate.jpg', fileType: 'jpg', fileSize: '2.1 MB', date: '2021-08-10', uploadedBy: 'Employee', uploadedOn: '2021-08-15', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Sales Manager' },
+    { id: 6, category: 'award', title: 'Award Certificate', fileName: 'Award_Certificate.pdf', fileType: 'pdf', fileSize: '1.5 MB', date: '2022-01-20', uploadedBy: 'CEO Office', uploadedOn: '2022-01-20', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Accountant' }
   ]);
-  
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
+
+  // Search and Filter States 
   const [searchTerm, setSearchTerm] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [employeeNameSearch, setEmployeeNameSearch] = useState('');
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
-  const [showForm, setShowForm] = useState(false);
-const [editingDoc, setEditingDoc] = useState(null);
-  const [uploadErrors, setUploadErrors] = useState({});
-  const [viewingDoc, setViewingDoc] = useState(null);
-  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [selectedBranch, setSelectedBranch] = useState('all');
+  const [selectedDesignation, setSelectedDesignation] = useState('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
+  
+  // Pagination States
   const [page, setPage] = useState(0);
-  const [rowsPerPage] = useState(4);
-  const [uploadData, setUploadData] = useState({
-  category: '',
-  title: '',
-  date: '',
-  file: null,
-  fileName: '',
-  fileData: ''
-});
-const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
-const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false); 
+  const [rowsPerPage] = useState(5);
+  
+  // View Modal State
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState(null);
+
+  // Refs
+  const employeeInputRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const employeeNameInputRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target) && 
+          employeeInputRef.current && !employeeInputRef.current.contains(event.target)) {
+        setShowEmployeeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const DUMMY_EMPLOYEES = [
-    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
-    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
+    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', branch: 'Mumbai', designation: 'Software Engineer' },
+    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', branch: 'Delhi', designation: 'HR Manager' },
+    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', branch: 'Bangalore', designation: 'Senior Developer' },
+    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', branch: 'Mumbai', designation: 'Sales Manager' },
+    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', branch: 'Delhi', designation: 'Accountant' },
+    { id: 6, name: 'Robert Wilson', code: 'EMP006', department: 'IT', branch: 'Bangalore', designation: 'DevOps Engineer' },
+    { id: 7, name: 'Emily Davis', code: 'EMP007', department: 'HR', branch: 'Mumbai', designation: 'Recruitment Specialist' },
+    { id: 8, name: 'James Taylor', code: 'EMP008', department: 'Finance', branch: 'Bangalore', designation: 'Financial Analyst' },
+    { id: 9, name: 'Lisa Anderson', code: 'EMP009', department: 'Sales', branch: 'Delhi', designation: 'Sales Executive' },
+    { id: 10, name: 'Michael Brown', code: 'EMP010', department: 'IT', branch: 'Mumbai', designation: 'System Administrator' }
   ];
 
   const documentCategories = [
     { id: 'appointment', label: 'Appointment Orders', icon: <FaFileAlt />, color: '#4f46e5', bg: '#e0e7ff' },
     { id: 'promotion', label: 'Promotion Orders', icon: <FaChartLine />, color: '#f59e0b', bg: '#fed7aa' },
     { id: 'transfer', label: 'Transfer Orders', icon: <FaExchangeAlt />, color: '#06b6d4', bg: '#cffafe' },
-    { id: 'salaryRevision', label: 'Salary Revision Orders', icon: <FaRupeeSign />, color: '#ec489a', bg: '#fce7f3' },
+    { id: 'salaryRevision', label: 'Salary Revision', icon: <FaRupeeSign />, color: '#ec489a', bg: '#fce7f3' },
     { id: 'training', label: 'Training Certificates', icon: <FaChalkboardTeacher />, color: '#8b5cf6', bg: '#ede9fe' },
     { id: 'award', label: 'Awards', icon: <FaTrophy />, color: '#ef4444', bg: '#fee2e2' },
     { id: 'retirement', label: 'Retirement Documents', icon: <FaClock />, color: '#64748b', bg: '#f1f5f9' }
   ];
 
- const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-  const search = employeeSearchTerm.toLowerCase();  
-  return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
-});
+  // Get unique values for filters
+  const departments = ['all', ...new Set(documents.map(doc => doc.department))];
+  const branches = ['all', ...new Set(documents.map(doc => doc.branch))];
+  const designations = ['all', ...new Set(documents.map(doc => doc.designation))];
 
-  // Filter documents
- const getFilteredDocuments = () => {
-  let docs = documents;
-  
-  if (searchTerm.trim()) {
-    const search = searchTerm.toLowerCase();
-    docs = docs.filter(doc => 
-      doc.employeeName.toLowerCase().includes(search) ||
-      doc.title.toLowerCase().includes(search) ||
-      doc.fileName.toLowerCase().includes(search)
-    );
-  }
-  
-  if (selectedEmployee) {
-    docs = docs.filter(doc => doc.employeeId === selectedEmployee.id);
-  }
-  
-  if (activeCategory !== 'all') {
-    docs = docs.filter(doc => doc.category === activeCategory);
-  }
-  
-  return docs;
-};
+  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => 
+    emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
+    emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+    emp.department.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+    emp.designation.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  );
+
+  // Get unique employee names from documents for the employee name input
+  const uniqueEmployeeNames = [...new Set(documents.map(doc => doc.employeeName))];
+
+  const getFilteredDocuments = () => {
+    let docs = documents;
+    
+    // Filter by employee name (exact match from dropdown)
+    if (employeeNameSearch && employeeNameSearch !== '') {
+      docs = docs.filter(doc => doc.employeeName === employeeNameSearch);
+    }
+    
+    // Search by keyword
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      docs = docs.filter(doc => 
+        doc.employeeName.toLowerCase().includes(search) ||
+        doc.title.toLowerCase().includes(search) ||
+        doc.fileName.toLowerCase().includes(search) ||
+        doc.department?.toLowerCase().includes(search) ||
+        doc.branch?.toLowerCase().includes(search) ||
+        doc.designation?.toLowerCase().includes(search)
+      );
+    }
+    
+    // Filter by employee
+    if (selectedEmployee) {
+      docs = docs.filter(doc => doc.employeeId === selectedEmployee.id);
+    }
+    
+    // Filter by category
+    if (activeCategory !== 'all') {
+      docs = docs.filter(doc => doc.category === activeCategory);
+    }
+    
+    // Filter by department
+    if (selectedDepartment !== 'all') {
+      docs = docs.filter(doc => doc.department === selectedDepartment);
+    }
+    
+    // Filter by branch
+    if (selectedBranch !== 'all') {
+      docs = docs.filter(doc => doc.branch === selectedBranch);
+    }
+    
+    // Filter by designation
+    if (selectedDesignation !== 'all') {
+      docs = docs.filter(doc => doc.designation === selectedDesignation);
+    }
+    
+    // Filter by date range
+    if (fromDate) {
+      docs = docs.filter(doc => doc.date >= fromDate);
+    }
+    if (toDate) {
+      docs = docs.filter(doc => doc.date <= toDate);
+    }
+    
+    return docs;
+  };
+
   const filteredDocs = getFilteredDocuments();
-  
-  // Pagination
   const totalItems = filteredDocs.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
@@ -107,170 +174,63 @@ const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
 
   const handleEmployeeSelect = (employee) => {
     setSelectedEmployee(employee);
-    setSearchTerm('');
-    setShowDropdown(false);
-    setActiveCategory('all');
+    setEmployeeSearchTerm(employee.name);
+    setEmployeeNameSearch(employee.name);
+    setShowEmployeeDropdown(false);
     setPage(0);
+    setHasSearched(true);
     toast.success('Employee Selected', `Showing documents for ${employee.name}`);
+  };
+
+  const handleEmployeeNameSelect = (name) => {
+    setEmployeeNameSearch(name);
+    setPage(0);
+    setHasSearched(true);
+    toast.success('Employee Selected', `Showing documents for ${name}`);
   };
 
   const handleClearEmployee = () => {
     setSelectedEmployee(null);
+    setEmployeeSearchTerm('');
+    setEmployeeNameSearch('');
+    setPage(0);
+  };
+
+  const handleSearch = () => {
+    setHasSearched(true);
+    setPage(0);
+    if (!searchTerm && !employeeNameSearch && !selectedEmployee && activeCategory === 'all' && 
+        selectedDepartment === 'all' && selectedBranch === 'all' && selectedDesignation === 'all' &&
+        !fromDate && !toDate) {
+      toast.info('Showing All', 'Displaying all documents');
+    } else {
+      toast.success('Search Complete', `Found ${filteredDocs.length} documents`);
+    }
+  };
+
+  const handleReset = () => {
     setSearchTerm('');
+    setSelectedEmployee(null);
+    setEmployeeSearchTerm('');
+    setEmployeeNameSearch('');
     setActiveCategory('all');
+    setSelectedDepartment('all');
+    setSelectedBranch('all');
+    setSelectedDesignation('all');
+    setFromDate('');
+    setToDate('');
+    setHasSearched(false);
     setPage(0);
+    toast.info('Reset', 'Search filters cleared');
   };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/jpg', 'image/png'];
-      if (!allowedTypes.includes(file.type)) {
-        toast.warning('Invalid File Type', 'Only PDF, DOCX, JPG, PNG files are allowed');
-        return;
-      }
-      
-      if (file.size > 20 * 1024 * 1024) {
-        toast.warning('File too large', 'Maximum file size is 20 MB');
-        return;
-      }
-      
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setUploadData({
-          ...uploadData,
-          file: file,
-          fileName: file.name,
-          fileData: reader.result
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleUpload = () => {
-    const errors = {};
-    if (!uploadData.category) errors.category = 'Category is required';
-    if (!uploadData.title) errors.title = 'Title is required';
-    if (!uploadData.date) errors.date = 'Date is required';
-    if (!uploadData.file) errors.file = 'File is required';
-    
-    if (Object.keys(errors).length > 0) {
-      setUploadErrors(errors);
-      toast.warning('Missing Fields', 'Please fill all required fields');
-      return;
-    }
-    
-    const selectedEmp = selectedEmployee || { id: null, name: 'Unknown' };
-    
-    const newDocument = {
-      id: documents.length + 1,
-      category: uploadData.category,
-      title: uploadData.title,
-      fileName: uploadData.fileName,
-      fileType: uploadData.fileName.split('.').pop(),
-      fileSize: (uploadData.file.size / (1024 * 1024)).toFixed(2) + ' MB',
-      date: uploadData.date,
-      uploadedBy: 'Current User',
-      uploadedOn: new Date().toISOString().split('T')[0],
-      fileData: uploadData.fileData,
-      employeeId: selectedEmp.id,
-      employeeName: selectedEmp.name
-    };
-    
-    setDocuments([newDocument, ...documents]);
-    toast.success('Success', 'Document uploaded successfully');
-setShowForm(false);
-    resetUploadForm();
-    setPage(0);
-  };
-
-  const resetUploadForm = () => {
-    setUploadData({
-      category: '',
-      title: '',
-      date: '',
-      file: null,
-      fileName: '',
-      fileData: ''
-    });
-    setUploadErrors({});
-  };
-
-  const handleSubmit = (e) => {
-  e.preventDefault();
-  
-  const errors = {};
-  if (!selectedEmployee) errors.employee = 'Please select an employee';
-  if (!uploadData.category) errors.category = 'Category is required';
-  if (!uploadData.title) errors.title = 'Title is required';
-  if (!uploadData.date) errors.date = 'Date is required';
- if (!editingDoc && !uploadData.file) {
-    errors.file = 'File is required';
-  }  
-  if (Object.keys(errors).length > 0) {
-    setUploadErrors(errors);
-    toast.warning('Missing Fields', 'Please fill all required fields');
-    return;
-  }
-  
-  const newDocument = {
-    id: documents.length + 1,
-    category: uploadData.category,
-    title: uploadData.title,
-    fileName: uploadData.fileName,
-    fileType: uploadData.fileName.split('.').pop(),
- fileSize: uploadData.file && uploadData.file.size ? 
-  (uploadData.file.size / (1024 * 1024)).toFixed(2) + ' MB' : 
-  (editingDoc && editingDoc.fileSize ? editingDoc.fileSize : ''),    date: uploadData.date,
-    uploadedBy: 'Current User',
-    uploadedOn: new Date().toISOString().split('T')[0],
-    fileData: uploadData.fileData,
-    employeeId: selectedEmployee.id,
-    employeeName: selectedEmployee.name
-  };
-  
-  setDocuments([newDocument, ...documents]);
-  toast.success('Success', 'Document uploaded successfully');
-  resetUploadForm();
-  setShowForm(false);
-  setSelectedEmployee(null);
-  setEmployeeSearchTerm('');
-  setPage(0);
-};
-
-  const handleDelete = (docId) => {
-    setDocuments(documents.filter(doc => doc.id !== docId));
-    toast.success('Success', 'Document deleted successfully');
-  };
-
- const handleEdit = (doc) => {
-  setEditingDoc(doc);
-  setUploadData({
-    category: doc.category,
-    title: doc.title,
-    date: doc.date,
-    file: null,
-    fileName: doc.fileName,
-    fileData: doc.fileData || ''
-  });
-  setSelectedEmployee(DUMMY_EMPLOYEES.find(e => e.id === doc.employeeId) || null);
-  setEmployeeSearchTerm(doc.employeeName);
-  setShowForm(true);
-};
 
   const handleDownload = (doc) => {
-    const link = document.createElement('a');
-    link.href = doc.fileData;
-    link.download = doc.fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success('Success', 'Download started');
+    toast.info('Download', `Downloading ${doc.fileName}`);
   };
 
-  const handleCancel = () => {
-    if (onCancel) onCancel();
+  const handleView = (doc) => {
+    setViewingDoc(doc);
+    setShowViewModal(true);
   };
 
   const formatDate = (dateStr) => {
@@ -283,242 +243,609 @@ setShowForm(false);
   };
 
   const getFileIcon = (fileType) => {
-    if (fileType === 'pdf') return <FaFilePdf style={{ color: '#dc2626' }} size={24} />;
-    if (fileType === 'docx' || fileType === 'doc') return <FaFileWord style={{ color: '#2563eb' }} size={24} />;
-    if (fileType === 'jpg' || fileType === 'jpeg' || fileType === 'png') return <FaFileImage style={{ color: '#10b981' }} size={24} />;
-    return <FaFileAlt style={{ color: '#6b7280' }} size={24} />;
+    if (fileType === 'pdf') return <FaFilePdf style={{ color: '#dc2626' }} size={20} />;
+    if (fileType === 'docx' || fileType === 'doc') return <FaFileWord style={{ color: '#2563eb' }} size={20} />;
+    if (fileType === 'jpg' || fileType === 'jpeg' || fileType === 'png') return <FaFileImage style={{ color: '#10b981' }} size={20} />;
+    return <FaFileAlt style={{ color: '#6b7280' }} size={20} />;
   };
 
-  // Stats
-  const totalDocs = documents.length;
-  const filteredTotal = filteredDocs.length;
-const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
-  return (
-    
+  // Check if any filter is active
+  const hasActiveFilters = searchTerm || employeeNameSearch || selectedEmployee || activeCategory !== 'all' || 
+                           selectedDepartment !== 'all' || selectedBranch !== 'all' || 
+                           selectedDesignation !== 'all' || fromDate || toDate;
 
-  <div className="cert-root">
-    {/* ===== HEADER ===== */}
-    <div className="cert-header">
-      <div>
-        <h1 className="cert-title">Service Book Document Repository</h1>
-        <p className="cert-subtitle">Centralized employee document storage</p>
-      </div>
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-        {!showForm && (
-          <button className="cert-add-btn" onClick={() => { resetUploadForm(); setShowForm(true); setEditingDoc(null); }}>
-            <FaPlus size={13} /> Upload Document
-          </button>
-        )}
-        {showForm && (
-          <button type="button" className="cert-back-btn" onClick={() => { resetUploadForm(); setShowForm(false); setEditingDoc(null); setSelectedEmployee(null); setEmployeeSearchTerm(''); }}>
-            <FaArrowLeft size={12} /> Back
-          </button>
-        )}
+  // Filter employee names based on search
+  const filteredEmployeeNames = uniqueEmployeeNames.filter(name =>
+    name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  );
+
+  return (
+    <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100vh' }}>
+      <style>{`
+        .service-doc-btn {
+          padding: 10px 20px;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          transition: all 0.2s;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .service-doc-btn-primary {
+          background: #9d174d;
+          color: white;
+          box-shadow: 0 4px 12px rgba(157, 23, 77, 0.3);
+        }
+        .service-doc-btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(157, 23, 77, 0.4);
+        }
+        .service-doc-btn-secondary {
+          background: #f1f5f9;
+          color: #475569;
+        }
+        .service-doc-btn-secondary:hover {
+          background: #e2e8f0;
+        }
+        .service-doc-btn-danger {
+          background: #fee2e2;
+          color: #ef4444;
+        }
+        .service-doc-btn-danger:hover {
+          background: #fecaca;
+        }
+        .service-doc-btn-success {
+          background: #10b981;
+          color: white;
+        }
+        .service-doc-btn-success:hover {
+          background: #059669;
+        }
+        .service-doc-input {
+          padding: 8px 12px;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 13px;
+          outline: none;
+          transition: all 0.2s;
+          width: 100%;
+          box-sizing: border-box;
+          background: white;
+        }
+        .service-doc-input:focus {
+          border-color: #9d174d;
+          box-shadow: 0 0 0 3px rgba(157, 23, 77, 0.1);
+        }
+        .service-doc-input[type="date"] {
+          min-height: 38px;
+        }
+        .service-doc-select {
+          padding: 8px 32px 8px 12px;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 13px;
+          outline: none;
+          width: 100%;
+          appearance: none;
+          -webkit-appearance: none;
+          background: white;
+          cursor: pointer;
+          box-sizing: border-box;
+          min-height: 38px;
+        }
+        .service-doc-select:focus {
+          border-color: #9d174d;
+          box-shadow: 0 0 0 3px rgba(157, 23, 77, 0.1);
+        }
+        .service-doc-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 13px;
+        }
+        .service-doc-table th {
+          padding: 12px 16px;
+          text-align: left;
+          font-size: 11px;
+          font-weight: 700;
+          color: #64748b;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          background: #f8fafc;
+          border-bottom: 2px solid #e2e8f0;
+        }
+        .service-doc-table td {
+          padding: 10px 16px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .service-doc-table tr:hover td {
+          background: #f8fafc;
+        }
+        .service-doc-badge {
+          padding: 4px 12px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 600;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .service-doc-dropdown {
+          position: absolute;
+          top: calc(100% + 2px);
+          left: 0;
+          right: 0;
+          background: white;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 8px;
+          max-height: 250px;
+          overflow-y: auto;
+          z-index: 1000;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+          margin-top: 0;
+        }
+        .service-doc-dropdown-item {
+          padding: 10px 14px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .service-doc-dropdown-item:last-child {
+          border-bottom: none;
+        }
+        .service-doc-dropdown-item:hover {
+          background: #f8f0f3;
+        }
+        .service-doc-dropdown-item .emp-name {
+          font-weight: 600;
+          color: #0f172a;
+        }
+        .service-doc-dropdown-item .emp-details {
+          font-size: 12px;
+          color: #94a3b8;
+        }
+        .service-doc-dropdown-item .emp-branch {
+          padding: 2px 10px;
+          background: #f1f5f9;
+          border-radius: 12px;
+          font-size: 11px;
+          color: #64748b;
+        }
+        .service-doc-pagination {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .service-doc-page-btn {
+          padding: 6px 12px;
+          border: 1px solid #e2e8f0;
+          border-radius: 6px;
+          background: white;
+          cursor: pointer;
+          font-size: 12px;
+          transition: all 0.2s;
+        }
+        .service-doc-page-btn:hover:not(:disabled) {
+          background: #f1f5f9;
+        }
+        .service-doc-page-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        .service-doc-page-btn.active {
+          background: #9d174d;
+          color: white;
+          border-color: #9d174d;
+        }
+        .service-doc-modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(15, 23, 42, 0.6);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1050;
+          padding: 20px;
+        }
+        .service-doc-modal-content {
+          background: white;
+          border-radius: 16px;
+          width: 95%;
+          max-width: 900px;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+          overflow: hidden;
+        }
+        .service-doc-modal-header {
+          padding: 16px 24px;
+          background: linear-gradient(135deg, #9d174d, #9d174d);
+          color: white;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-shrink: 0;
+        }
+        .service-doc-modal-body {
+          padding: 20px 24px;
+          overflow-y: auto;
+          flex: 1;
+        }
+        .service-doc-modal-footer {
+          padding: 12px 24px;
+          border-top: 1px solid #e2e8f0;
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-shrink: 0;
+        }
+        .search-container {
+          display: grid;
+          grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr auto;
+          gap: 12px;
+          background: white;
+          padding: 20px;
+          border-radius: 12px;
+          border: 1px solid #e2e8f0;
+          margin-bottom: 16px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+          align-items: end;
+        }
+        @media (max-width: 1200px) {
+          .search-container {
+            grid-template-columns: 1fr 1fr 1fr;
+          }
+        }
+        @media (max-width: 768px) {
+          .search-container {
+            grid-template-columns: 1fr 1fr;
+          }
+        }
+        @media (max-width: 480px) {
+          .search-container {
+            grid-template-columns: 1fr;
+          }
+        }
+        .search-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #64748b;
+          display: block;
+          margin-bottom: 4px;
+        }
+        .empty-state {
+          text-align: center;
+          padding: 60px 20px;
+          color: #94a3b8;
+        }
+        .empty-state svg {
+          color: #cbd5e1;
+          margin-bottom: 16px;
+        }
+        .filter-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 10px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 500;
+          margin-left: 6px;
+        }
+        .employee-input-wrapper {
+          position: relative;
+          width: 100%;
+        }
+        .employee-input-wrapper .service-doc-input {
+          padding-right: 30px;
+        }
+        .employee-clear-btn {
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #94a3b8;
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .employee-clear-btn:hover {
+          color: #ef4444;
+        }
+        .selected-employee-info {
+          font-size: 11px;
+          color: #10b981;
+          margin-top: 4px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .employee-name-dropdown {
+          position: absolute;
+          top: calc(100% + 2px);
+          left: 0;
+          right: 0;
+          background: white;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 8px;
+          max-height: 200px;
+          overflow-y: auto;
+          z-index: 1000;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+          margin-top: 0;
+        }
+        .employee-name-item {
+          padding: 10px 14px;
+          cursor: pointer;
+          transition: all 0.2s;
+          border-bottom: 1px solid #f1f5f9;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .employee-name-item:last-child {
+          border-bottom: none;
+        }
+        .employee-name-item:hover {
+          background: #f8f0f3;
+        }
+        .employee-name-item .name-text {
+          font-weight: 500;
+          color: #0f172a;
+        }
+        .employee-name-item .count-badge {
+          margin-left: auto;
+          padding: 2px 10px;
+          background: #f1f5f9;
+          border-radius: 12px;
+          font-size: 11px;
+          color: #64748b;
+        }
+      `}</style>
+
+      {/* HEADER */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Service Book Document Repository</h1>
+          <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>Centralized employee document storage</p>
+        </div>
         {onCancel && (
-          <button className="cert-cancel-btn" onClick={handleCancel}>
+          <button className="service-doc-btn service-doc-btn-secondary" onClick={onCancel}>
             <FaTimes size={13} /> Cancel
           </button>
         )}
       </div>
-    </div>
 
-    {showForm ? (
-      /* ===== FORM VIEW ===== */
-      <div className="cert-form-wrap mb-4">
-        <form onSubmit={handleSubmit} className="cert-form-compact">
-          <div className="cert-form-section-compact">
-            <div className="cert-section-label">{editingDoc ? 'Edit Document' : 'Upload New Document'}</div>
-            <div className="cert-form-grid-3col">
-              {/* Employee Selection */}
-<div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
-  <label className="required">Employee Name</label>
-  <div className="position-relative">
-    <div className="input-group">
-      <span className="input-group-text bg-light">
-        <FaSearch size={14} className="text-muted" />
-      </span>
-      <input
-        type="text"
-        className="form-control"
-        placeholder="Type employee name to search..."
-        value={employeeSearchTerm}
-        onChange={(e) => {
-          setEmployeeSearchTerm(e.target.value);
-          setShowEmployeeDropdown(true);
-        }}
-        onFocus={() => setShowEmployeeDropdown(true)}
-      />
-    </div>
-    
-    {showEmployeeDropdown && employeeSearchTerm && (
-      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
-        <div className="card-body p-2">
-          {filteredEmployees.length > 0 ? (
-            filteredEmployees.map(emp => (
-              <div
-                key={emp.id}
-                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
-                style={{ cursor: 'pointer' }}
-                onClick={() => {
-                  setSelectedEmployee(emp);
-                  setEmployeeSearchTerm(emp.name);
-                  setShowEmployeeDropdown(false);
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <div>
-                  <div className="fw-bold">{emp.name}</div>
-                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                </div>
-                <div>
-                  <span className="badge bg-light text-dark">{emp.designation}</span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-3 text-muted">
-              <small>No employees found</small>
-            </div>
-          )}
-        </div>
-      </div>
-    )}
-  </div>
-</div>
-
-{/* Employee Code - Auto Populate */}
-<div className="cert-field-compact">
-  <label>Employee Code</label>
-  <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
-</div>
-
-{/* Department - Auto Populate */}
-<div className="cert-field-compact">
-  <label>Department</label>
-  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
-</div>
-
-{/* Designation - Auto Populate */}
-<div className="cert-field-compact">
-  <label>Designation</label>
-  <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
-</div>
-              <div className={`cert-field-compact ${uploadErrors.category ? 'has-error' : ''}`}>
-                <label className="required">Document Category</label>
-                <select 
-                  value={uploadData.category} 
-                  onChange={(e) => {
-                    setUploadData({...uploadData, category: e.target.value});
-                    setUploadErrors({...uploadErrors, category: ''});
-                  }}
-                >
-                  <option value="">Select Category</option>
-                  {documentCategories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.label}</option>
-                  ))}
-                </select>
-                <FieldError msg={uploadErrors.category} />
-              </div>
-              
-              <div className={`cert-field-compact ${uploadErrors.date ? 'has-error' : ''}`}>
-                <label className="required">Document Date</label>
-                <input 
-                  type="date" 
-                  value={uploadData.date}
-                  onChange={(e) => {
-                    setUploadData({...uploadData, date: e.target.value});
-                    setUploadErrors({...uploadErrors, date: ''});
-                  }}
-                />
-                <FieldError msg={uploadErrors.date} />
-              </div>
-              
-              <div className={`cert-field-compact ${uploadErrors.title ? 'has-error' : ''}`}>
-                <label className="required">Document Title</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g., Appointment Order, Promotion Letter"
-                  value={uploadData.title}
-                  onChange={(e) => {
-                    setUploadData({...uploadData, title: e.target.value});
-                    setUploadErrors({...uploadErrors, title: ''});
-                  }}
-                />
-                <FieldError msg={uploadErrors.title} />
-              </div>
-              
-              <div className={`cert-field-compact ${uploadErrors.file ? 'has-error' : ''}`} style={{ gridColumn: 'span 3' }}>
-                <label className="required">Upload File</label>
-                <div className="border rounded p-3 text-center bg-light">
-                  <input 
-                    type="file" 
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" 
-                    onChange={handleFileChange} 
-                    style={{ display: 'none' }} 
-                    id="doc-upload-form" 
-                  />
-                  <label htmlFor="doc-upload-form" className="btn btn-outline-primary btn-sm" style={{ cursor: 'pointer' }}>
-                    <FaUpload className="me-1" /> Choose File
-                  </label>
-                  {uploadData.fileName && (
-                    <div className="mt-2 text-primary">
-                      {uploadData.fileName.endsWith('.pdf') ? <FaFilePdf /> : uploadData.fileName.endsWith('.jpg') || uploadData.fileName.endsWith('.png') ? <FaFileImage /> : <FaFileWord />} {uploadData.fileName}
-                    </div>
-                  )}
-                  <small className="text-muted d-block mt-2">Supported: PDF, DOCX, JPG, PNG (Max 20MB)</small>
-                </div>
-                <FieldError msg={uploadErrors.file} />
-              </div>
-            </div>
-          </div>
-          
-          <div className="cert-form-actions">
-            <button type="button" className="cert-cancel-btn" onClick={() => { resetUploadForm(); setShowForm(false); setEditingDoc(null); }}>Cancel</button>
-            <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <FaSave size={12} /> {editingDoc ? 'Update Document' : 'Upload Document'}
-            </button>
-          </div>
-        </form>
-      </div>
-    ) : (
-      <>
-        {/* Search Bar */}
-        <div className="emp-search-bar">
-          <div className="emp-search-wrap">
-            <FaSearch className="cert-search-icon" size={12} />
-            <input
-              className="emp-search-input"
-              type="text"
-              placeholder="Search by employee name or document title..."
-              value={searchTerm}
-              onChange={(e) => { 
-                setSearchTerm(e.target.value); 
+      <div className="search-container">
+      
+        {/* Branch Filter */}
+        <div>
+          <label className="search-label">
+            <FaBriefcase size={11} style={{ marginRight: '4px' }} /> Branch
+          </label>
+          <div style={{ position: 'relative' }}>
+            <select
+              className="service-doc-select"
+              value={selectedBranch}
+              onChange={(e) => {
+                setSelectedBranch(e.target.value);
                 setPage(0);
+                if (e.target.value !== 'all') {
+                  setHasSearched(true);
+                }
               }}
-            />
-            {searchTerm && (
-              <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setPage(0); }}>
-                <FaTimes size={11} />
-              </button>
-            )}
+            >
+              <option value="all">All Branches</option>
+              {branches.filter(b => b !== 'all').map(branch => (
+                <option key={branch} value={branch}>{branch}</option>
+              ))}
+            </select>
+            <FaChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
           </div>
         </div>
 
-        {/* Documents Table */}
-        <div className="cert-table-card">
-          <div className="cert-table-wrap">
-            <table className="cert-table">
+        {/* Department Filter */}
+        <div>
+          <label className="search-label">
+            <FaBuilding size={11} style={{ marginRight: '4px' }} /> Department
+          </label>
+          <div style={{ position: 'relative' }}>
+            <select
+              className="service-doc-select"
+              value={selectedDepartment}
+              onChange={(e) => {
+                setSelectedDepartment(e.target.value);
+                setPage(0);
+                if (e.target.value !== 'all') {
+                  setHasSearched(true);
+                }
+              }}
+            >
+              <option value="all">All Departments</option>
+              {departments.filter(d => d !== 'all').map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
+            <FaChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+          </div>
+        </div>
+
+        {/* Designation Filter */}
+        <div>
+          <label className="search-label">
+            <FaUserTie size={11} style={{ marginRight: '4px' }} /> Designation
+          </label>
+          <div style={{ position: 'relative' }}>
+            <select
+              className="service-doc-select"
+              value={selectedDesignation}
+              onChange={(e) => {
+                setSelectedDesignation(e.target.value);
+                setPage(0);
+                if (e.target.value !== 'all') {
+                  setHasSearched(true);
+                }
+              }}
+            >
+              <option value="all">All Designations</option>
+              {designations.filter(d => d !== 'all').map(desig => (
+                <option key={desig} value={desig}>{desig}</option>
+              ))}
+            </select>
+            <FaChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+          </div>
+        </div>
+
+ {/* Search Input */}
+        <div>
+          <label className="search-label">
+            <FaSearch size={11} style={{ marginRight: '4px' }} /> Employee Name
+          </label>
+          <input
+            className="service-doc-input"
+            type="text"
+            placeholder="Search by name..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(0);
+              if (e.target.value) {
+                setHasSearched(true);
+              }
+            }}
+          />
+        </div>
+
+        {/* From Date */}
+        <div>
+          <label className="search-label">
+            <FaCalendarAlt size={11} style={{ marginRight: '4px' }} /> From Date
+          </label>
+          <input
+            type="date"
+            className="service-doc-input"
+            value={fromDate}
+            onChange={(e) => {
+              setFromDate(e.target.value);
+              setPage(0);
+              if (e.target.value) {
+                setHasSearched(true);
+              }
+            }}
+          />
+        </div>
+
+        {/* To Date */}
+        <div>
+          <label className="search-label">
+            <FaCalendarAlt size={11} style={{ marginRight: '4px' }} /> To Date
+          </label>
+          <input
+            type="date"
+            className="service-doc-input"
+            value={toDate}
+            min={fromDate || undefined}
+            onChange={(e) => {
+              setToDate(e.target.value);
+              setPage(0);
+              if (e.target.value) {
+                setHasSearched(true);
+              }
+            }}
+          />
+        </div>
+
+        {/* Search & Reset Buttons */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="service-doc-btn service-doc-btn-primary" onClick={handleSearch}>
+            <FaSearch size={14} /> Search
+          </button>
+         
+        </div>
+      </div>
+
+      {/* DOCUMENTS TABLE */}
+      {(hasSearched || hasActiveFilters) ? (
+        <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          {/* Results Summary */}
+          <div style={{ padding: '12px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+              <span style={{ fontWeight: '600', color: '#0f172a' }}>{totalItems}</span>
+              <span style={{ color: '#64748b' }}> document(s) found</span>
+              {employeeNameSearch && (
+                <span className="filter-tag" style={{ background: '#dbeafe', color: '#2563eb' }}>
+                  <FaUser size={10} /> {employeeNameSearch}
+                </span>
+              )}
+              {selectedEmployee && (
+                <span className="filter-tag" style={{ background: '#e0e7ff', color: '#4f46e5' }}>
+                  <FaUserTie size={10} /> {selectedEmployee.name}
+                </span>
+              )}
+              {activeCategory !== 'all' && (
+                <span className="filter-tag" style={{ background: '#fce7f3', color: '#ec489a' }}>
+                  {documentCategories.find(c => c.id === activeCategory)?.label}
+                </span>
+              )}
+              {selectedDepartment !== 'all' && (
+                <span className="filter-tag" style={{ background: '#dbeafe', color: '#2563eb' }}>
+                  <FaBuilding size={10} /> {selectedDepartment}
+                </span>
+              )}
+              {selectedBranch !== 'all' && (
+                <span className="filter-tag" style={{ background: '#d1fae5', color: '#059669' }}>
+                  <FaBriefcase size={10} /> {selectedBranch}
+                </span>
+              )}
+              {selectedDesignation !== 'all' && (
+                <span className="filter-tag" style={{ background: '#fef3c7', color: '#d97706' }}>
+                  <FaUserTie size={10} /> {selectedDesignation}
+                </span>
+              )}
+              {fromDate && (
+                <span className="filter-tag" style={{ background: '#e0e7ff', color: '#4f46e5' }}>
+                  <FaCalendarAlt size={10} /> From: {formatDate(fromDate)}
+                </span>
+              )}
+              {toDate && (
+                <span className="filter-tag" style={{ background: '#e0e7ff', color: '#4f46e5' }}>
+                  <FaCalendarAlt size={10} /> To: {formatDate(toDate)}
+                </span>
+              )}
+              {searchTerm && (
+                <span className="filter-tag" style={{ background: '#fef3c7', color: '#d97706' }}>
+                  <FaSearch size={10} /> {searchTerm}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table className="service-doc-table">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th style={{ width: '50px', textAlign: 'center' }}>#</th>
                   <th>Employee</th>
-                  <th>Document Title</th>
+                  <th>Department</th>
+                  <th>Branch</th>
+                  <th>Designation</th>
                   <th>Category</th>
                   <th>Date</th>
-                  <th>File Name</th>
-                  <th>Size</th>
-                  <th style={{ width: 100 }}>Actions</th>
+                  <th style={{ width: '120px', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -527,29 +854,33 @@ const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}<
                     const category = getCategoryInfo(doc.category);
                     return (
                       <tr key={doc.id}>
-                        <td className="text-center">{startIndex + idx + 1}</td>
-                        <td className="fw-bold">{doc.employeeName}</td>
+                        <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>{startIndex + idx + 1}</td>
+                        <td style={{ fontWeight: '600', color: '#0f172a' }}>{doc.employeeName}</td>
                         <td>
-                          <div className="d-flex align-items-center gap-2">
-                            {getFileIcon(doc.fileType)}
-                            <strong>{doc.title}</strong>
-                          </div>
+                          <span style={{ padding: '2px 10px', background: '#dbeafe', borderRadius: '12px', fontSize: '11px', color: '#2563eb' }}>
+                            {doc.department || '—'}
+                          </span>
                         </td>
                         <td>
-                          <span className="badge" style={{ backgroundColor: category.bg, color: category.color, padding: '4px 8px' }}>
+                          <span style={{ padding: '2px 10px', background: '#d1fae5', borderRadius: '12px', fontSize: '11px', color: '#059669' }}>
+                            {doc.branch || '—'}
+                          </span>
+                        </td>
+                        <td style={{ color: '#334155' }}>{doc.designation || '—'}</td>
+                        <td>
+                          <span className="service-doc-badge" style={{ backgroundColor: category.bg, color: category.color }}>
                             {category.icon} {category.label}
                           </span>
                         </td>
-                        <td>{formatDate(doc.date)}</td>
-                        <td>{doc.fileName}</td>
-                        <td>{doc.fileSize}</td>
-                        <td className="text-center">
-                          <div className="cert-actions">
-                            <button className="cert-act cert-act--edit" onClick={() => handleEdit(doc)} title="Edit">
-  <FaEdit size={12} />
-</button>
-                            <button className="cert-act cert-act--del" onClick={() => handleDelete(doc.id)} title="Delete">
-                              <FaTrash size={12} />
+                        <td style={{ color: '#334155' }}>{formatDate(doc.date)}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <button
+                              style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6366f1' }}
+                              onClick={() => handleView(doc)}
+                              title="View"
+                            >
+                              <FaEye size={12} />
                             </button>
                           </div>
                         </td>
@@ -558,135 +889,102 @@ const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}<
                   })
                 ) : (
                   <tr>
-                    <td colSpan="8" className="text-center py-5">No documents found</td>
+                    <td colSpan="8">
+                      <div className="empty-state">
+                        <FaFileAlt size={48} />
+                        <div style={{ fontSize: '16px', fontWeight: '500', color: '#475569' }}>No documents found</div>
+                        <div style={{ fontSize: '13px', marginTop: '4px' }}>Try adjusting your search or filter criteria</div>
+                      </div>
+                    </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
 
-          
-       {/* Pagination */}
-{totalItems > 0 && (
-  <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-      <span className="emp-page-info">
-        Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} events
-      </span>
-    </div>
-    <div className="emp-page-controls">
-      <button 
-        className="emp-page-btn" 
-        disabled={page === 0} 
-        onClick={() => setPage(page - 1)}
-      >
-        ← Prev
-      </button>
-      {getPaginationRange().map((pg, i) =>
-        pg === '...' ? (
-          <span key={`dots-${i}`} className="emp-page-dots">…</span>
-        ) : (
-          <button 
-            key={pg} 
-            className={`emp-page-num ${pg === page ? 'active' : ''}`} 
-            onClick={() => setPage(pg)}
-          >
-            {pg + 1}
-          </button>
-        )
-      )}
-      <button 
-        className="emp-page-btn" 
-        disabled={page + 1 >= totalPages} 
-        onClick={() => setPage(page + 1)}
-      >
-        Next →
-      </button>
-    </div>
-  </div>
-)}
-        </div>
-      </>
-    )}
-
-    {/* ===== VIEW MODAL ===== */}
-    {showViewModal && viewingDoc && (
-      <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-        <div className="modal-dialog modal-dialog-centered modal-lg">
-          <div className="modal-content">
-            <div className="modal-header bg-primary text-white">
-              <h5 className="modal-title"><FaFileAlt className="mr-2" /> Document Preview</h5>
-              <button type="button" className="close text-white" onClick={() => setShowViewModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="row mb-3">
-                <div className="col-md-6"><p><strong>Title:</strong> {viewingDoc.title}</p></div>
-                <div className="col-md-6"><p><strong>Employee:</strong> {viewingDoc.employeeName}</p></div>
-                <div className="col-md-6"><p><strong>Date:</strong> {formatDate(viewingDoc.date)}</p></div>
-                <div className="col-md-6"><p><strong>File Name:</strong> {viewingDoc.fileName}</p></div>
-                <div className="col-md-6"><p><strong>File Size:</strong> {viewingDoc.fileSize}</p></div>
-                <div className="col-md-6"><p><strong>Uploaded By:</strong> {viewingDoc.uploadedBy}</p></div>
-              </div>
-              <hr />
-              <div className="text-center">
-                {viewingDoc.fileType === 'pdf' ? (
-                  <iframe src={viewingDoc.fileData} title="PDF Preview" style={{ width: '100%', height: '400px', border: 'none' }} />
-                ) : viewingDoc.fileType === 'jpg' || viewingDoc.fileType === 'jpeg' || viewingDoc.fileType === 'png' ? (
-                  <img src={viewingDoc.fileData} alt={viewingDoc.title} style={{ maxWidth: '100%', maxHeight: '300px' }} />
-                ) : (
-                  <div className="py-5">
-                    <FaFileWord size={64} className="text-primary mb-3" />
-                    <p>Preview not available for this file type</p>
-                  </div>
+          {/* PAGINATION */}
+          {totalItems > 0 && (
+            <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#64748b' }}>
+                Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems}
+              </span>
+              <div className="service-doc-pagination">
+                <button className="service-doc-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                {getPaginationRange().map((pg, i) => 
+                  pg === '...' ? 
+                    <span key={`dots-${i}`} style={{ padding: '6px 8px', color: '#94a3b8' }}>…</span> : 
+                    <button key={pg} className={`service-doc-page-btn ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>{pg + 1}</button>
                 )}
+                <button className="service-doc-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
               </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowViewModal(false)}>Close</button>
-              <button className="btn btn-primary" onClick={() => handleDownload(viewingDoc)}><FaDownload className="mr-1" /> Download</button>
-            </div>
-          </div>
+          )}
         </div>
-      </div>
-    )}
-  
+      ) : (
+        <></>
+      )}
 
-      {/* View Document Modal */}
+      {/* VIEW MODAL */}
       {showViewModal && viewingDoc && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
-              <div className="modal-header bg-primary text-white">
-                <h5 className="modal-title"><FaFileAlt className="mr-2" /> Document Preview</h5>
-                <button type="button" className="close text-white" onClick={() => setShowViewModal(false)}>×</button>
-              </div>
-              <div className="modal-body">
-                <div className="row mb-3">
-                  <div className="col-md-6"><p><strong>Title:</strong> {viewingDoc.title}</p></div>
-                  <div className="col-md-6"><p><strong>Employee:</strong> {viewingDoc.employeeName}</p></div>
-                  <div className="col-md-6"><p><strong>Date:</strong> {formatDate(viewingDoc.date)}</p></div>
-                  <div className="col-md-6"><p><strong>File Name:</strong> {viewingDoc.fileName}</p></div>
-                  <div className="col-md-6"><p><strong>File Size:</strong> {viewingDoc.fileSize}</p></div>
-                  <div className="col-md-6"><p><strong>Uploaded By:</strong> {viewingDoc.uploadedBy}</p></div>
+        <div className="service-doc-modal">
+          <div className="service-doc-modal-content">
+            <div className="service-doc-modal-header">
+              <h5 style={{ margin: 0, fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <FaFileAlt /> Document Preview
+              </h5>
+              <button onClick={() => setShowViewModal(false)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', width: '36px', height: '36px', borderRadius: '8px', cursor: 'pointer', color: 'white', fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            </div>
+            <div className="service-doc-modal-body">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Employee</span>
+                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.employeeName}</div>
                 </div>
-                <hr />
-                <div className="text-center">
-                  {viewingDoc.fileType === 'pdf' ? (
-                    <iframe src={viewingDoc.fileData} title="PDF Preview" style={{ width: '100%', height: '400px', border: 'none' }} />
-                  ) : viewingDoc.fileType === 'jpg' || viewingDoc.fileType === 'jpeg' || viewingDoc.fileType === 'png' ? (
-                    <img src={viewingDoc.fileData} alt={viewingDoc.title} style={{ maxWidth: '100%', maxHeight: '300px' }} />
-                  ) : (
-                    <div className="py-5">
-                      <FaFileWord size={64} className="text-primary mb-3" />
-                      <p>Preview not available for this file type</p>
-                    </div>
-                  )}
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Department</span>
+                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.department || '—'}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Branch</span>
+                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.branch || '—'}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Designation</span>
+                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.designation || '—'}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Category</span>
+                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.title}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Date</span>
+                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{formatDate(viewingDoc.date)}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>File Name</span>
+                  <div style={{ fontWeight: '500', color: '#0f172a', fontFamily: 'monospace', fontSize: '12px' }}>{viewingDoc.fileName}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>File Size</span>
+                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.fileSize}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Uploaded By</span>
+                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.uploadedBy}</div>
                 </div>
               </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowViewModal(false)}>Close</button>
-                <button className="btn btn-primary" onClick={() => handleDownload(viewingDoc)}><FaDownload className="mr-1" /> Download</button>
+              <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '12px 0 16px' }} />
+              <div style={{ textAlign: 'center', padding: '40px 20px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <FaFileAlt size={64} style={{ color: '#6366f1', marginBottom: '12px' }} />
+                <p style={{ color: '#64748b' }}>Document preview available in full version</p>
+                <p style={{ fontSize: '12px', color: '#94a3b8' }}>{viewingDoc.fileName}</p>
               </div>
+            </div>
+            <div className="service-doc-modal-footer">
+              <button className="service-doc-btn service-doc-btn-secondary" onClick={() => setShowViewModal(false)}>Close</button>
+              <button className="service-doc-btn service-doc-btn-primary" onClick={() => handleDownload(viewingDoc)}>
+                <FaDownload size={13} /> Download
+              </button>
             </div>
           </div>
         </div>

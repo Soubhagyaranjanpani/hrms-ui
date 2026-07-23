@@ -958,7 +958,7 @@ const Reports = () => {
                     </select>
                   </div>
                 </div>
-
+ 
                 {/* Action Buttons */}
                 <div style={styles.filterActions}>
                   <button
@@ -978,7 +978,7 @@ const Reports = () => {
                     onClick={handleGenerateReport}
                     disabled={loading}
                   >
-                    {loading ? (
+                    {loading ? ( 
                       <><span className="emp-spinner" style={{ width: '14px', height: '14px', marginRight: '6px' }} /> Generating...</>
                     ) : (
                       <><FaChartBar size={13} /> Generate Report</>
