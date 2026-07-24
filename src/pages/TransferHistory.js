@@ -5,6 +5,7 @@ import {
   FaBriefcase, FaFileAlt, FaSearch, FaArrowRight, FaArrowLeft, FaEye,FaClock
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import DocumentActions from './DocumentsAction';
 
 const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [transfers, setTransfers] = useState(initialData?.transfers || [
@@ -48,23 +49,41 @@ const TransferHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       name: "",
       newStatus: ""
     });
-
+      // const [selectedPromotion, setSelectedPromotion] = useState(null); 
+  const [showDocumentActions, setShowDocumentActions] = useState(false);
   const DUMMY_EMPLOYEES = [
-    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
-    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
-  ];
-
+  { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer', branch: 'Mumbai - Head Office' },
+  { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager', branch: 'Delhi - North Region' },
+  { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer', branch: 'Bangalore - South Region' },
+  { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager', branch: 'Mumbai - Head Office' },
+  { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant', branch: 'Kolkata - East Region' }
+];
   // Handle row click for detail view
   const handleRowClick = (transfer) => {
     setSelectedTransfer(transfer);
   };
 
-  // Handle document view
+  // Add handleGenerateDocument
+const handleGenerateDocument = async () => {
+  try {
+    toast.info('Generating', 'Generating transfer document...');
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    toast.success('Success', 'Document generated successfully');
+    return {
+      data: 'data:application/pdf;base64,...',
+      name: `transfer_order_${Date.now()}.pdf`
+    };
+  } catch (error) {
+    toast.error('Error', 'Failed to generate document');
+    throw error;
+  }
+};
+
+ // Handle document view
   const handleViewDocument = (e, transfer) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation(); 
+     setSelectedTransfer(transfer); 
+    setShowDocumentActions(true);
     if (transfer.transferOrderFileData) {
       setDocumentPreview({
         data: transfer.transferOrderFileData,
@@ -129,6 +148,14 @@ const handleEmployeeSelect = (employee) => {
   setSelectedEmployee(employee);
   setEmployeeSearchTerm(employee.name);
   setShowEmployeeDropdown(false);
+  
+  // ✅ Auto-populate from branch
+  if (employee.branch) {
+    setFormData(prev => ({
+      ...prev,
+      fromBranch: employee.branch
+    }));
+  }
 };
   
   const getPaginationRange = () => {
@@ -207,63 +234,89 @@ const handleEmployeeSelect = (employee) => {
   };
 
   const validateForm = () => {
-    const newErrors = {};
+  const newErrors = {};
+
+  if (!formData.transferOrderNo) {
+    newErrors.transferOrderNo = 'Transfer Order Number is required';
+  } else if (existingOrderNos.includes(formData.transferOrderNo) && 
+      (!editingTransfer || editingTransfer.transferOrderNo !== formData.transferOrderNo)) {
+    newErrors.transferOrderNo = 'Order Number already exists';
+  }
   
-    if (!formData.transferOrderNo) {
-      newErrors.transferOrderNo = 'Transfer Order Number is required';
-    } else if (existingOrderNos.includes(formData.transferOrderNo) && 
-        (!editingTransfer || editingTransfer.transferOrderNo !== formData.transferOrderNo)) {
-      newErrors.transferOrderNo = 'Order Number already exists';
+  if (!formData.transferDate) newErrors.transferDate = 'Transfer Date is required';
+  if (!formData.transferType) newErrors.transferType = 'Transfer Type is required';
+  
+ 
+  if (!selectedEmployee && !formData.fromDepartment) {
+    newErrors.fromDepartment = 'Please select an employee first';
+  }
+  
+  if (!selectedEmployee && !formData.fromBranch) {
+    newErrors.fromBranch = 'Please select an employee first';
+  }
+  
+  if (!formData.fromBranch && !selectedEmployee?.branch) {
+    newErrors.fromBranch = 'From Branch is required (select employee)';
+  }
+  
+  if (!formData.toDepartment) newErrors.toDepartment = 'To Department is required';
+  if (!formData.toBranch) newErrors.toBranch = 'To Branch is required';
+  if (!formData.effectiveDate) newErrors.effectiveDate = 'Effective Date is required';
+  if (!formData.transferReason) newErrors.transferReason = 'Transfer Reason is required';
+  
+  if (formData.transferDate && formData.effectiveDate) {
+    if (new Date(formData.effectiveDate) < new Date(formData.transferDate)) {
+      newErrors.effectiveDate = 'Effective Date must be on or after Transfer Date';
     }
-    
-    if (!formData.transferDate) newErrors.transferDate = 'Transfer Date is required';
-    if (!formData.transferType) newErrors.transferType = 'Transfer Type is required';
-    if (!formData.fromDepartment) newErrors.fromDepartment = 'From Department is required';
-    if (!formData.toDepartment) newErrors.toDepartment = 'To Department is required';
-    if (!formData.fromBranch) newErrors.fromBranch = 'From Branch is required';
-    if (!formData.toBranch) newErrors.toBranch = 'To Branch is required';
-    if (!formData.effectiveDate) newErrors.effectiveDate = 'Effective Date is required';
-    if (!formData.transferReason) newErrors.transferReason = 'Transfer Reason is required';
-    
-    if (formData.transferDate && formData.effectiveDate) {
-      if (new Date(formData.effectiveDate) < new Date(formData.transferDate)) {
-        newErrors.effectiveDate = 'Effective Date must be on or after Transfer Date';
-      }
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  }
+  
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      toast.warning('Validation Error', 'Please fix the highlighted fields');
-      return;
-    }
-    
-    if (editingTransfer) {
-      const updated = transfers.map(transfer =>
-        transfer.id === editingTransfer.id
-          ? { ...formData, id: transfer.id, createdAt: transfer.createdAt }
-          : transfer
-      );
-      setTransfers(updated);
-      toast.success('Success', 'Transfer updated successfully');
-      setEditingTransfer(null);
-    } else {
-      const newTransfer = {
-        id: Date.now(),
-        ...formData,
-        createdAt: new Date().toISOString()
-      };
-      setTransfers([newTransfer, ...transfers]);
-      toast.success('Success', 'Transfer added successfully');
-    }
-    resetForm();
-    setShowForm(false);
-    setPage(0);
+  e.preventDefault();
+  if (!validateForm()) {
+    toast.warning('Validation Error', 'Please fix the highlighted fields');
+    return;
+  }
+  
+  // Get employee data
+  const empData = selectedEmployee || null;
+  
+  const transferData = {
+    ...formData,
+    employeeId: empData?.id || null,
+    employeeName: empData?.name || null,  
+    employeeCode: empData?.code || null,  
+    employeeDepartment: empData?.department || null, 
+    employeeDesignation: empData?.designation || null, 
+    id: editingTransfer ? editingTransfer.id : Date.now(),
+    createdAt: editingTransfer ? editingTransfer.createdAt : new Date().toISOString()
   };
+  
+  if (editingTransfer) {
+    const updated = transfers.map(transfer =>
+      transfer.id === editingTransfer.id
+        ? { ...transferData, id: transfer.id, createdAt: transfer.createdAt }
+        : transfer
+    );
+    setTransfers(updated);
+    toast.success('Success', 'Transfer updated successfully');
+    setEditingTransfer(null);
+  } else {
+    const newTransfer = {
+      id: Date.now(),
+      ...transferData,
+      createdAt: new Date().toISOString()
+    };
+    setTransfers([newTransfer, ...transfers]);
+    toast.success('Success', 'Transfer added successfully');
+  }
+  resetForm();
+  setShowForm(false);
+  setPage(0);
+};
 
   const handleEdit = (transfer) => {
     if (transfer.status === 'Inactive') {
@@ -295,7 +348,7 @@ const handleEmployeeSelect = (employee) => {
   const resetForm = () => {
     setFormData({
       transferOrderNo: '',
-      transferDate: '',
+       transferDate: '',
       transferType: 'Permanent',
       fromDepartment: '',
       toDepartment: '',
@@ -319,11 +372,12 @@ const handleEmployeeSelect = (employee) => {
     setShowForm(false);
   };
   
-  const handleBackToList = () => {
-    resetForm();
-    setShowForm(false);
-    setSelectedTransfer(null);
-  };
+ const handleBackToList = () => {
+  resetForm();
+  setShowForm(false);
+  setShowDocumentActions(false);
+  setSelectedTransfer(null);
+};
 
    const handleStatusToggle = (id, name, currentStatus) => {
     const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
@@ -366,6 +420,10 @@ const handleEmployeeSelect = (employee) => {
       case 'Project Based': return { bg: '#fef3c7', color: '#92400e' };
       default: return { bg: '#f3f4f6', color: '#6b7280' };
     }
+  };
+
+   const handleGenerateLetter = (transfer) => {
+    console.log('Generate clicked for:', transfer.transferOrderNo);
   };
 
   return (
@@ -468,12 +526,7 @@ const handleEmployeeSelect = (employee) => {
                   <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
                 </div>
                 
-                {/* Department - Auto Populate */}
-                <div className="cert-field-compact">
-                  <label>Department</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                
+               
                 {/* Designation - Auto Populate */}
                 <div className="cert-field-compact">
                   <label>Designation</label>
@@ -499,14 +552,13 @@ const handleEmployeeSelect = (employee) => {
                   </select>
                   <FieldError msg={errors.transferType} />
                 </div>
+                 
+              
                 
-                <div className={`cert-field-compact ${touched.fromDepartment && errors.fromDepartment ? 'has-error' : ''}`}>
-                  <label className="required">From Department</label>
-                  <select value={formData.fromDepartment} onChange={(e) => handleChange('fromDepartment', e.target.value)} onBlur={() => handleBlur('fromDepartment')}>
-                    <option value="">Select Department</option>
-                    {departments.map(dept => <option key={dept.id} value={dept.name}>{dept.name}</option>)}
-                  </select>
-                  <FieldError msg={errors.fromDepartment} />
+                 {/* Department - Auto Populate */}
+                <div className="cert-field-compact">
+                  <label>Department</label>
+                  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
                 </div>
                 
                 <div className={`cert-field-compact ${touched.toDepartment && errors.toDepartment ? 'has-error' : ''}`}>
@@ -518,14 +570,27 @@ const handleEmployeeSelect = (employee) => {
                   <FieldError msg={errors.toDepartment} />
                 </div>
                 
-                <div className={`cert-field-compact ${touched.fromBranch && errors.fromBranch ? 'has-error' : ''}`}>
+                {/* <div className={`cert-field-compact ${touched.fromBranch && errors.fromBranch ? 'has-error' : ''}`}>
                   <label className="required">From Branch</label>
                   <select value={formData.fromBranch} onChange={(e) => handleChange('fromBranch', e.target.value)} onBlur={() => handleBlur('fromBranch')}>
                     <option value="">Select Branch</option>
                     {branches.map(branch => <option key={branch.id} value={branch.name}>{branch.name}</option>)}
                   </select>
                   <FieldError msg={errors.fromBranch} />
-                </div>
+                </div> */}
+                {/* From Branch - Auto-populated */}
+<div className="cert-field-compact">
+  <label className="required">Branch</label>
+  <input 
+    type="text" 
+    className="form-control bg-light" 
+    value={selectedEmployee?.branch || formData.branch || ''} 
+    readOnly 
+    placeholder="Auto-populated from employee"
+    style={{ fontSize: '14px', padding: '6px 12px' }}
+  />
+  
+</div>
                 
                 <div className={`cert-field-compact ${touched.toBranch && errors.toBranch ? 'has-error' : ''}`}>
                   <label className="required">To Branch</label>
@@ -548,7 +613,7 @@ const handleEmployeeSelect = (employee) => {
                   <FieldError msg={errors.transferReason} />
                 </div>
                 
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                {/* <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label>Transfer Order Upload</label>
                   <div className="border rounded p-3 text-center bg-light">
                     <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="transfer-order-upload" />
@@ -562,7 +627,7 @@ const handleEmployeeSelect = (employee) => {
                     )}
                     <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -574,6 +639,17 @@ const handleEmployeeSelect = (employee) => {
             </div>
           </form>
         </div>
+ 
+   ) : showDocumentActions && selectedTransfer ? (
+          <DocumentActions 
+            title="Transfer Letter"
+            documentName={selectedTransfer.transferOrderFileName}
+            documentData={selectedTransfer.transferOrderFileData}
+            onGenerate={() => handleGenerateLetter(selectedTransfer)}
+            onBack={handleBackToList}
+            generateLabel="Generate Letter"
+            themeColor="#9d174d"
+          />
               ) : selectedTransfer ? (
         <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
           <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>

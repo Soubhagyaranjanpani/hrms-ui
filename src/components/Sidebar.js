@@ -24,8 +24,9 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   const [payrollOpen, setPayrollOpen] = useState(true);
   const [documentsOpen, setDocumentsOpen] = useState(true);
   const [tasksOpen, setTasksOpen] = useState(true);
-  const [userRole, setUserRole] = useState(null);
+ const [subMenuOpen, setSubMenuOpen] = useState({});
 
+  const [userRole, setUserRole] = useState(null);
   useEffect(() => {
     // Get user role from localStorage or your auth context
     // Convert to proper case for comparison
@@ -91,15 +92,44 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   ];
 
   // Master section items - only for Admin
-  const masterItems = [
-    { path: '/branch', icon: <FaBuilding />, label: 'Branches', roles: ['Admin'] },
-    { path: '/department', icon: <FaSitemap />, label: 'Departments', roles: ['Admin'] },
-    { path: '/role', icon: <FaUserTag />, label: 'Roles', roles: ['Admin'] },
-        { path: '/designation', icon: <FaCheck />, label: 'Designation', roles: ['Admin'] },
-    { path: '/leave', icon: <FaCalendarCheck />, label: 'Leave', roles: ['Admin'] },
-    { path: '/skills', icon: <FaCalendarCheck />, label: 'skill', roles: ['Admin'] },
+  // const masterItems = [
+  //   { path: '/branch', icon: <FaBuilding />, label: 'Branches', roles: ['Admin'] },
+  //   { path: '/department', icon: <FaSitemap />, label: 'Departments', roles: ['Admin'] },
+  //   { path: '/role', icon: <FaUserTag />, label: 'Roles', roles: ['Admin'] },
+  //       { path: '/designation', icon: <FaCheck />, label: 'Designation', roles: ['Admin'] },
+  //   { path: '/leave', icon: <FaCalendarCheck />, label: 'Leave', roles: ['Admin'] },
+  //   { path: '/skills', icon: <FaCalendarCheck />, label: 'skill', roles: ['Admin'] },
+  //   {path: '/SourceMaster', icon: <FaDatabase />, label: 'SourceMaster', roles : ['Admin','Hr'] },
 
-  ];
+  // ];
+// Master section items - with Recruitment Sub-Module
+const masterItems = [
+  { path: '/branch', icon: <FaBuilding />, label: 'Branches', roles: ['Admin'] },
+  { path: '/department', icon: <FaSitemap />, label: 'Departments', roles: ['Admin'] },
+  { path: '/role', icon: <FaUserTag />, label: 'Roles', roles: ['Admin'] },
+  { path: '/designation', icon: <FaCheck />, label: 'Designation', roles: ['Admin'] },
+  { path: '/leave', icon: <FaCalendarCheck />, label: 'Leave', roles: ['Admin'] },
+  { path: '/skills', icon: <FaCalendarCheck />, label: 'Skill', roles: ['Admin'] },
+    {
+    icon: <FaDatabase />,
+    label: 'Recruitment',
+    roles: ['Admin', 'Hr'],
+    isSubMenu: true,
+    children: [
+      { path: '/SourceMaster', icon: <FaDatabase />, label: 'Source Master', roles: ['Admin', 'Hr'] },
+      { path: '/InterviewType', icon: <FaUserPlus />, label: 'Interview Type', roles: ['Admin', 'Hr'] },
+      { path: '/InterviewRound', icon: <FaBriefcase />, label: 'Interview Round', roles: ['Admin', 'Hr'] },
+      { path: '/CandidateStatus', icon: <FaUsers />, label: 'Candidate Status', roles: ['Admin', 'Hr'] },
+      { path: '/RejectionReason', icon: <FaCalendarCheck />, label: 'Rejection Reason', roles: ['Admin', 'Hr'] },
+      { path: '/OfferStatus', icon: <FaTasks />, label: 'Offer Status', roles: ['Admin', 'Hr'] },
+      { path: '/Noticeperiod', icon: <FaCheck />, label: 'Notice period', roles: ['Admin', 'Hr'] },
+      { path: '/SkillMaster', icon: <FaUserPlus />, label: 'Skill Master', roles: ['Admin', 'Hr'] },
+     { path: '/InterviewPanel', icon: <FaUserPlus />, label: 'Interview Panel', roles: ['Admin', 'Hr'] },
+     { path: '/JobLocation', icon: <FaUserPlus />, label: 'Job Location', roles: ['Admin', 'Hr'] },
+
+    ]
+  },
+];
 
   // Payroll section items - only Admin and HR
   const payrollItems = [
@@ -599,7 +629,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
         )}
 
         {/* Master Section - Only for Admin */}
-        {hasAnyVisibleItems(masterItems) && !sidebarCollapsed && (
+        {/* {hasAnyVisibleItems(masterItems) && !sidebarCollapsed && (
           <li style={{ margin: '16px 10px 8px 10px' }}>
             <div
               onClick={toggleMaster}
@@ -633,8 +663,166 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
               {masterOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
           </li>
-        )}
+        )} */}
+// ===== MASTER SECTION =====
+{hasAnyVisibleItems(masterItems) && !sidebarCollapsed && (
+  <li style={{ margin: '16px 10px 8px 10px' }}>
+    <div
+      onClick={toggleMaster}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '8px 10px',
+        color: 'var(--sidebar-heading)',
+        fontSize: '11px',
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+        cursor: 'pointer',
+        borderRadius: '8px',
+        transition: 'all 0.2s ease',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.color = 'var(--sidebar-text-active)';
+        e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.color = 'var(--sidebar-heading)';
+        e.currentTarget.style.background = 'transparent';
+      }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <FaDatabase size={12} />
+        <span>MASTER</span>
+      </span>
+      {masterOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
+    </div>
+  </li>
+)}
 
+{/* Master Items - Support Sub-Menu */}
+{(masterOpen || sidebarCollapsed) && (
+  <>
+    {masterItems.map((item, index) => {
+      // ✅ Check if item has children (Sub-Menu)
+      if (item.children) {
+        return hasAccess(item.roles) && (
+          <li key={`master-${index}`} style={{ margin: '3px 10px' }}>
+            <div
+              onClick={() => {
+                // Toggle sub-menu
+                const key = `recruitment-${index}`;
+                setSubMenuOpen(prev => ({
+                  ...prev,
+                  [key]: !prev[key]
+                }));
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 14px',
+                paddingLeft: '38px',
+                color: 'var(--sidebar-text)',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = 'var(--sidebar-text-active)';
+                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = 'var(--sidebar-text)';
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {item.icon}
+                <span>{item.label}</span>
+              </span>
+              {subMenuOpen[`recruitment-${index}`] ? (
+                <BsChevronDown size={10} />
+              ) : (
+                <BsChevronRight size={10} />
+              )}
+            </div>
+            
+            {/* Sub-Menu Items */}
+            {subMenuOpen[`recruitment-${index}`] && (
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {item.children.map((child, childIdx) => (
+                  hasAccess(child.roles) && (
+                    <li key={`child-${childIdx}`} style={{ margin: '2px 0' }}>
+                      <NavLink
+                        to={child.path}
+                        title={sidebarCollapsed ? child.label : ''}
+                        style={({ isActive }) => ({
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '8px 14px',
+                          paddingLeft: '54px',
+                          color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                          textDecoration: 'none',
+                          borderRadius: '8px',
+                          transition: 'all 0.2s ease',
+                          background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                          borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                          fontSize: '13px',
+                          fontWeight: isActive ? 500 : 400,
+                          whiteSpace: 'nowrap',
+                          cursor: 'pointer',
+                        })}
+                      >
+                        {child.icon}
+                        <span>{child.label}</span>
+                      </NavLink>
+                    </li>
+                  )
+                ))}
+              </ul>
+            )}
+          </li>
+        );
+      }
+      
+      // ✅ Normal menu item (no children)
+      return hasAccess(item.roles) && (
+        <li key={`master-${index}`} style={{ margin: '3px 10px' }}>
+          <NavLink
+            to={item.path}
+            title={sidebarCollapsed ? item.label : ''}
+            style={({ isActive }) => ({
+              display: 'flex',
+              alignItems: 'center',
+              gap: sidebarCollapsed ? '0' : '12px',
+              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+              padding: sidebarCollapsed ? '11px' : '11px 14px',
+              paddingLeft: sidebarCollapsed ? '11px' : '38px',
+              color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+              textDecoration: 'none',
+              borderRadius: '10px',
+              transition: 'all 0.2s ease',
+              background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+              borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+              fontSize: '14px',
+              fontWeight: isActive ? 600 : 400,
+              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+            })}
+          >
+            <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+            {!sidebarCollapsed && <span>{item.label}</span>}
+          </NavLink>
+        </li>
+      );
+    })}
+  </>
+)}
         {/* Master Items */}
         {(masterOpen || sidebarCollapsed) && (
           <>

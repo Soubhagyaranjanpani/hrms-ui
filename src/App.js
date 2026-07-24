@@ -53,9 +53,10 @@ import ServicebookReport from './pages/ServicebookReport';
 import EmployeeDesignation from './pages/EmployeeDesignation';
 import EmployeeskillMaster from './pages/EmployeeSkillMaster';
 import DocumentsAction from './pages/DocumentsAction';
-
-
-
+import SourceMaster from './Masters/Recruitment/SourceMaster';
+import InterviewType from './Masters/Recruitment/InterviewType';
+import InterviewRound from './Masters/Recruitment/InterviewRound';
+import CandidateStatus from './Masters/Recruitment/CandidateStatus';
 import { ToastContainer } from './components/Toast';
 import { STORAGE_KEYS } from './config/api.config';
 import ApprovedLeaves from './Leave/ApproveRejectLeave';
@@ -192,9 +193,10 @@ function App() {
           <Route path="SalaryConfig" element={<SalaryConfig user={currentUser} />} />
           <Route path="EmployeeGrade" element={<EmployeeGrade user={currentUser} />} />
           <Route path="reports" element={<Reports user={currentUser} />} />
-
-
-
+          <Route path="SourceMaster" element={<SourceMaster user={currentUser}/>} />
+          <Route path="InterviewType" element={<InterviewType user={currentUser}/>}/>
+          <Route path="InterviewRound" element={<InterviewRound user={currentUser}/>}/>
+         <Route path="CandidateStatus" element={<CandidateStatus user={currentUser}/>}/>
 
 
         </Route>
