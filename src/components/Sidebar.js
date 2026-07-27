@@ -664,7 +664,6 @@ const masterItems = [
             </div>
           </li>
         )} */}
-// ===== MASTER SECTION =====
 {hasAnyVisibleItems(masterItems) && !sidebarCollapsed && (
   <li style={{ margin: '16px 10px 8px 10px' }}>
     <div
