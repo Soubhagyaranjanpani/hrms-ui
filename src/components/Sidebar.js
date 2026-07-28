@@ -628,42 +628,6 @@ const masterItems = [
           </>
         )}
 
-        {/* Master Section - Only for Admin */}
-        {/* {hasAnyVisibleItems(masterItems) && !sidebarCollapsed && (
-          <li style={{ margin: '16px 10px 8px 10px' }}>
-            <div
-              onClick={toggleMaster}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '8px 10px',
-                color: 'var(--sidebar-heading)',
-                fontSize: '11px',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                cursor: 'pointer',
-                borderRadius: '8px',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.color = 'var(--sidebar-text-active)';
-                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.color = 'var(--sidebar-heading)';
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FaDatabase size={12} />
-                <span>MASTER</span>
-              </span>
-              {masterOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
-            </div>
-          </li>
-        )} */}
 {hasAnyVisibleItems(masterItems) && !sidebarCollapsed && (
   <li style={{ margin: '16px 10px 8px 10px' }}>
     <div
@@ -822,43 +786,7 @@ const masterItems = [
     })}
   </>
 )}
-        {/* Master Items */}
-        {(masterOpen || sidebarCollapsed) && (
-          <>
-            {masterItems.map((item, index) => (
-              hasAccess(item.roles) && (
-                <li key={`master-${index}`} style={{ margin: '3px 10px' }}>
-                  <NavLink
-                    to={item.path}
-                    title={sidebarCollapsed ? item.label : ''}
-                    style={({ isActive }) => ({
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: sidebarCollapsed ? '0' : '12px',
-                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                      padding: sidebarCollapsed ? '11px' : '11px 14px',
-                      paddingLeft: sidebarCollapsed ? '11px' : '38px',
-                      color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
-                      textDecoration: 'none',
-                      borderRadius: '10px',
-                      transition: 'all 0.2s ease',
-                      background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
-                      borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
-                      fontSize: '14px',
-                      fontWeight: isActive ? 600 : 400,
-                      whiteSpace: 'nowrap',
-                      cursor: 'pointer',
-                    })}
-                  >
-                    <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
-                    {!sidebarCollapsed && <span>{item.label}</span>}
-                  </NavLink>
-                </li>
-              )
-            ))}
-          </>
-        )}
-
+       
         {/* Payroll Section - Only Admin and HR */}
         {hasAnyVisibleItems(payrollItems) && !sidebarCollapsed && (
           <li style={{ margin: '16px 10px 8px 10px' }}>
