@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useCallback} from 'react';
 import { 
   FaSave, FaTimes, FaFileAlt, FaCalendarAlt, FaBuilding,FaCheckCircle,
   FaBriefcase, FaUpload, FaFilePdf, FaFileImage, FaTrash, FaEdit, FaPlus, 
@@ -7,6 +7,8 @@ import {
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import DocumentActions from './DocumentsAction';
+import axios from "axios";
+import { BASE_URL, STORAGE_KEYS } from "../config/api.config";
 
 const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [appointments, setAppointments] = useState(initialData?.appointments || [
@@ -21,22 +23,31 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
+
+  // ✅ formData now carries both <field>Id AND <field>Name for every dropdown-backed field
   const [formData, setFormData] = useState({
+    employeeId: '',
+    employeeCode: '',
     appointmentOrderNo: '',
     appointmentDate: '',
-    appointmentAuthority: '',
-    appointmentType: 'Permanent',
-    employmentType: 'Full-Time',
-    initialDesignation: '',
-    initialDepartment: '',
-    initialBranch: '',
+    appointmentAuthorityId: '',
+    appointmentAuthorityName: '',
+    appointmentTypeId: '',
+    appointmentTypeName: '',
+    employmentTypeId: '',
+    employmentTypeName: '',
+    initialDesignationId: '',
+    initialDesignationName: '',
+    initialDepartmentId: '',
+    initialDepartmentName: '',
+    initialBranchId: '',
+    initialBranchName: '',
     joiningDate: '',
     probationPeriod: '6',
     confirmationDueDate: '',
-    appointmentOrderFile: null,
-    appointmentOrderFileData: null,
-    appointmentOrderFileName: null
+    remarks: '',
   });
+
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [existingOrderNos, setExistingOrderNos] = useState([]);
@@ -54,77 +65,489 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
     newStatus: ""
   });
   const [showDocumentActions, setShowDocumentActions] = useState(false);
-  const DUMMY_EMPLOYEES = [
-    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
-    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
-  ];
+  const [loading, setLoading] = useState(false);
+const [apiError, setApiError] = useState(null);
+const [docLoading, setDocLoading] = useState(false);
+const [submitting, setSubmitting] = useState(false);  
 
-  const appointmentTypes = [
-    { value: 'Permanent', label: 'Permanent' },
-    { value: 'Contract', label: 'Contract' },
-    { value: 'Temporary', label: 'Temporary' },
-    { value: 'Probation', label: 'Probation' },
-    { value: 'Consultant', label: 'Consultant' }
-  ];
+  // ============================================
+// ✅ DROPDOWN STATES
+// ============================================
+const [departmentsList, setDepartmentsList] = useState([]);
+const [loadingDepartments, setLoadingDepartments] = useState(false);
+const [designationsList, setDesignationsList] = useState([]);
+const [loadingDesignations, setLoadingDesignations] = useState(false);
+const [branchesList, setBranchesList] = useState([]);
+const [loadingBranches, setLoadingBranches] = useState(false);
+const [appointmentAuthoritiesList, setAppointmentAuthoritiesList] = useState([]);
+const [loadingAuthorities, setLoadingAuthorities] = useState(false);
+const [employmentTypesList, setEmploymentTypesList] = useState([]);
+const [loadingEmploymentTypes, setLoadingEmploymentTypes] = useState(false);
+const [appointmentTypesList, setAppointmentTypesList] = useState([]);
+const [loadingAppointmentTypes, setLoadingAppointmentTypes] = useState(false);
+const [employees, setEmployees] = useState([]);
+const [loadingEmployees, setLoadingEmployees] = useState(false);
 
-  const employmentTypes = [
-    { value: 'Full-Time', label: 'Full-Time' },
-    { value: 'Part-Time', label: 'Part-Time' },
-    { value: 'Contractual', label: 'Contractual' },
-    { value: 'Intern', label: 'Intern' }
-  ];
+  // ============================================
+// ✅ AUTH FUNCTIONS
+// ============================================
+const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
 
-  const appointmentAuthorities = [
-    { value: 'Managing Director', label: 'Managing Director' },
-    { value: 'CEO', label: 'CEO' },
-    { value: 'HR Director', label: 'HR Director' },
-    { value: 'Board of Directors', label: 'Board of Directors' }
-  ];
+const getAxiosConfig = () => ({
+  headers: {
+    Authorization: `Bearer ${getAuthToken()}`,
+    "Content-Type": "application/json",
+  },
+});
 
-  const departments = [
-    { id: 1, name: 'IT' },
-    { id: 2, name: 'HR' },
-    { id: 3, name: 'Finance' },
-    { id: 4, name: 'Sales' },
-    { id: 5, name: 'Marketing' }
-  ];
+const ensureToken = () => {
+  const token = getAuthToken();
+  if (!token) {
+    toast.error("Authentication Required", "Please login to continue");
+    return false;
+  }
+  return true;
+};
 
-  const branches = [
-    { id: 1, name: 'Mumbai' },
-    { id: 2, name: 'Delhi' },
-    { id: 3, name: 'Bangalore' },
-    { id: 4, name: 'Chennai' },
-    { id: 5, name: 'Kolkata' }
-  ];
+// ============================================
+// ✅ REVERSE-LOOKUP HELPERS (name -> id), normalized match
+// ============================================
+const norm = (s) => (s || '').trim().toLowerCase();
+const getDeptIdByName = (name) => departmentsList.find(d => norm(d.name) === norm(name))?.id || '';
+const getDesigIdByName = (name) => designationsList.find(d => norm(d.name) === norm(name))?.id || '';
+const getBranchIdByName = (name) => branchesList.find(b => norm(b.name) === norm(name))?.id || '';
+const getAuthorityIdByName = (name) => appointmentAuthoritiesList.find(a => norm(a.name) === norm(name))?.id || '';
+const getAptTypeIdByName = (name) => appointmentTypesList.find(t => norm(t.name) === norm(name))?.id || '';
+const getEmpTypeIdByName = (name) => employmentTypesList.find(t => norm(t.name) === norm(name))?.id || '';
 
-  const designations = [
-    { id: 1, name: 'Software Engineer' },
-    { id: 2, name: 'Senior Software Engineer' },
-    { id: 3, name: 'Tech Lead' },
-    { id: 4, name: 'HR Executive' },
-    { id: 5, name: 'HR Manager' }
-  ];
+// ============================================
+// ✅ FETCH APPOINTMENTS - GET API
+// ============================================
+const fetchAppointments = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoading(true);
+  setApiError(null);
+  try {
+    const res = await axios.get(
+      `${BASE_URL}/api/appointments`,
+      getAxiosConfig()
+    );
+    
+    console.log("📥 Response:", res.data);
+    
+    // ✅ Parse response
+    let data = [];
+    if (res.data?.response?.content && Array.isArray(res.data.response.content)) {
+      data = res.data.response.content;
+    } else if (res.data?.response && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    // ✅ Map backend fields to frontend fields
+    const mapped = data.map((item) => ({
+      id: item.id,
+      employeeId: item.employeeId,
+      employeeName: item.employee || 'Unknown',
+      employeeCode: item.employeeCode || '',
+      appointmentOrderNo: item.appointmentOrderNumber || '',
+      appointmentDate: item.appointmentDate || '',
+      appointmentAuthority: item.appointmentAuthority || '',
+      appointmentAuthorityDesignation: item.appointmentAuthorityDesignation || '',
+      appointmentType: item.appointmentType || '',
+      employmentType: item.employmentType || '',
+      initialDesignation: item.designation || '',
+      initialDepartment: item.department || '',
+      initialBranch: item.branch || '',
+      joiningDate: item.joiningDate || '',
+      probationPeriod: item.probationPeriodMonths || 0,
+      confirmationDueDate: item.confirmationDueDate || '',
+      status: item.isActive ? "Active" : "Inactive",
+      isActive: item.isActive,
+      documentPath: item.documentPath || '',
+      documentName: item.documentName || '',
+      remarks: item.remarks || '',
+      processedBy: item.processedBy || '',
+      createdAt: item.createdAt || '',
+      appointmentOrderFileName: item.documentName || '',
+      appointmentOrderFileData: item.documentData || null,
+    }));
+    
+    console.log("✅ Mapped Appointments:", mapped);
+    setAppointments(mapped);
+    
+  } catch (err) {
+    console.error("❌ Fetch error:", err);
+    setApiError(err.response?.data?.message || "Failed to fetch appointments");
+    toast.error("Error", "Failed to load appointments");
+    setAppointments([]);
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+// ✅ Fetch Employees from API
+const fetchEmployees = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoadingEmployees(true);
+  try {
+    const res = await axios.get(
+      `${BASE_URL}/api/employees?page=0&size=100`,
+      getAxiosConfig()
+    );
+    
+    let data = [];
+    if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.response?.content && Array.isArray(res.data.response.content)) {
+      data = res.data.response.content;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map((item) => ({
+      id: item.id,
+      name: item.name || item.fullName || 'Unknown',
+      code: item.code || item.employeeCode || '',
+      email: item.email || '',
+      department: item.department || item.departmentName || '',
+      designation: item.designation || item.designationName || '',
+    }));
+    
+    setEmployees(mapped);
+  } catch (err) {
+    console.error('Fetch employees error:', err);
+    setEmployees([]);
+  } finally {
+    setLoadingEmployees(false);
+  }
+}, []);
+
+// ============================================
+// ✅ HELPER FUNCTIONS - COPY PASTE ALL
+// ============================================
+const getAppointmentTypeLabel = (type) => {
+  if (!type) return '—';
+  return type;
+};
+
+const getEmploymentTypeLabel = (type) => {
+  if (!type) return '—';
+  return type;
+};
+
+const getAuthorityLabel = (authority) => {
+  if (!authority) return '—';
+  return authority;
+};
+
+const getDepartmentLabel = (dept) => {
+  if (!dept) return '—';
+  return dept;
+};
+
+const getBranchLabel = (branch) => {
+  if (!branch) return '—';
+  return branch;
+};
+
+const getDesignationLabel = (designation) => {
+  if (!designation) return '—';
+  return designation;
+};
+
+const getEmployeeName = (appointment) => {
+  if (appointment.employeeName) return appointment.employeeName;
+  if (appointment.employee) return appointment.employee;
+  const emp = employees.find(e => e.id === appointment.employeeId);
+  return emp?.name || 'Unknown';
+};
+
+const getEmployeeCode = (appointment) => {
+  if (appointment.employeeCode) return appointment.employeeCode;
+  const emp = employees.find(e => e.id === appointment.employeeId);
+  return emp?.code || '';
+};
+// ============================================
+// ✅ FETCH FUNCTIONS FOR DROPDOWNS
+// ============================================
+
+// 1. Fetch Departments
+const fetchDepartments = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoadingDepartments(true);
+  try {
+    const res = await axios.get(
+      `${BASE_URL}/departments/list?flag=1`,
+      getAxiosConfig()
+    );
+    
+    let data = [];
+    if (res.data?.response?.content && Array.isArray(res.data.response.content)) {
+      data = res.data.response.content;
+    } else if (res.data?.response && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map((item) => ({
+      id: item.id,
+      name: item.name || item.departmentName || item.department || '',
+    }));
+    setDepartmentsList(mapped);
+  } catch (err) {
+    console.error('Fetch departments error:', err);
+    setDepartmentsList([]);
+  } finally {
+    setLoadingDepartments(false);
+  }
+}, []);
+
+// 2. Fetch Designations
+const fetchDesignations = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoadingDesignations(true);
+  try {
+    const res = await axios.get(
+      `${BASE_URL}/api/designations/list?flag=1`,
+      getAxiosConfig()
+    );
+    
+    let data = [];
+    if (res.data?.response?.content && Array.isArray(res.data.response.content)) {
+      data = res.data.response.content;
+    } else if (res.data?.response && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map((item) => ({
+      id: item.id,
+      name: item.name || item.designationName || item.designation || '',
+    }));
+    setDesignationsList(mapped);
+  } catch (err) {
+    console.error('Fetch designations error:', err);
+    setDesignationsList([]);
+  } finally {
+    setLoadingDesignations(false);
+  }
+}, []);
+
+// 3. Fetch Branches
+const fetchBranches = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoadingBranches(true);
+  try {
+    const res = await axios.get(
+      `${BASE_URL}/branches/list?flag=1`,
+      getAxiosConfig()
+    );
+    
+    let data = [];
+    if (res.data?.response?.content && Array.isArray(res.data.response.content)) {
+      data = res.data.response.content;
+    } else if (res.data?.response && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map((item) => ({
+      id: item.id,
+      name: item.name || item.branchName || item.branch || '',
+    }));
+    setBranchesList(mapped);
+  } catch (err) {
+    console.error('Fetch branches error:', err);
+    setBranchesList([]);
+  } finally {
+    setLoadingBranches(false);
+  }
+}, []);
+
+// 4. Fetch Appointment Authorities
+const fetchAppointmentAuthorities = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoadingAuthorities(true);
+  try {
+    const res = await axios.get(
+      `${BASE_URL}/employee-designation?flag=1`,
+      getAxiosConfig()
+    );
+    
+    let data = [];
+    if (res.data?.response?.content && Array.isArray(res.data.response.content)) {
+      data = res.data.response.content;
+    } else if (res.data?.response && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const authorityMap = new Map();
+    data.forEach((item) => {
+      const authorityName = item.employeeName || item.name || item.authority || '';
+      if (authorityName && !authorityMap.has(authorityName)) {
+        authorityMap.set(authorityName, {
+          id: item.id || authorityMap.size + 1,
+          name: authorityName,
+          designation: item.designationName || item.designation || '',
+        });
+      }
+    });
+    
+    setAppointmentAuthoritiesList(Array.from(authorityMap.values()));
+  } catch (err) {
+    console.error('Fetch appointment authorities error:', err);
+    setAppointmentAuthoritiesList([]);
+  } finally {
+    setLoadingAuthorities(false);
+  }
+}, []);
+
+// 5. Fetch Employment Types
+const fetchEmploymentTypes = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoadingEmploymentTypes(true);
+  try {
+    const res = await axios.get(
+      `${BASE_URL}/api/employment-types/list?flag=1`,
+      getAxiosConfig()
+    );
+    
+    let data = [];
+    if (res.data?.response?.content && Array.isArray(res.data.response.content)) {
+      data = res.data.response.content;
+    } else if (res.data?.response && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map((item) => ({
+      id: item.id,
+      name: item.name || item.employmentTypeName || item.employmentType || '',
+    }));
+    setEmploymentTypesList(mapped);
+  } catch (err) {
+    console.error('Fetch employment types error:', err);
+    setEmploymentTypesList([]);
+  } finally {
+    setLoadingEmploymentTypes(false);
+  }
+}, []);
+
+// 6. Fetch Appointment Types
+const fetchAppointmentTypes = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoadingAppointmentTypes(true);
+  try {
+    const res = await axios.get(
+      `${BASE_URL}/api/appointment-types/list?flag=1`,
+      getAxiosConfig()
+    );
+    
+    let data = [];
+    if (res.data?.response?.content && Array.isArray(res.data.response.content)) {
+      data = res.data.response.content;
+    } else if (res.data?.response && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map((item) => ({
+      id: item.id,
+      name: item.name || item.appointmentTypeName || item.appointmentType || '',
+    }));
+    setAppointmentTypesList(mapped);
+  } catch (err) {
+    console.error('Fetch appointment types error:', err);
+    setAppointmentTypesList([]);
+  } finally {
+    setLoadingAppointmentTypes(false);
+  }
+}, []);
+
+// ============================================
+// ✅ LOAD DROPDOWNS ON MOUNT
+// ============================================
+useEffect(() => {
+  const loadDropdowns = async () => {
+    await Promise.all([
+       fetchEmployees(),
+      fetchDepartments(),
+      fetchDesignations(),
+      fetchBranches(),
+      fetchAppointmentAuthorities(),
+      fetchEmploymentTypes(),
+      fetchAppointmentTypes(),
+    ]);
+        await fetchAppointments();
+
+  };
+  loadDropdowns();
+}, []);
 
   const handleRowClick = (appointment) => {
     setSelectedAppointment(appointment);
   };
 
-  const handleViewDocument = (e, appointment) => {
-    e.stopPropagation();
-     setSelectedAppointment(appointment); 
+ const handleViewDocument = async (e, appointment) => {
+  e.stopPropagation();
+  
+  // ✅ Agar already document data hai toh preview dikhao
+  if (appointment.documentData || appointment.appointmentOrderFileData) {
+    setSelectedAppointment(appointment);
     setShowDocumentActions(true);
-    if (appointment.appointmentOrderFileData) {
-      setDocumentPreview({
-        data: appointment.appointmentOrderFileData,
-        name: appointment.appointmentOrderFileName
-      });
-    } else {
-      toast.info('No Document', 'No document has been uploaded for this appointment');
+    setDocumentPreview({
+      data: appointment.documentData || appointment.appointmentOrderFileData,
+      name: appointment.documentName || appointment.appointmentOrderFileName
+    });
+    return;
+  }
+  
+  // ✅ Agar document name hai toh API se fetch karo
+  if (appointment.documentName) {
+    setSelectedAppointment(appointment);
+    setShowDocumentActions(true);
+    setDocLoading(true);
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/appointments/${appointment.id}/document`,
+        { headers: { Authorization: `Bearer ${getAuthToken()}` }, responseType: 'blob' }
+      );
+      const blobUrl = URL.createObjectURL(res.data);
+      setDocumentPreview({ data: blobUrl, name: appointment.documentName });
+    } catch (err) {
+      console.error('Document fetch error:', err);
+      toast.error('Error', 'Failed to load document');
+    } finally {
+      setDocLoading(false);
     }
-  };
+    return;
+  }
+  
+  toast.info('No Document', 'No document has been uploaded for this appointment');
+};
 
   const filteredAppointments = appointments.filter(apt => {
     const search = searchTerm.toLowerCase();
@@ -139,16 +562,32 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
   const startIndex = page * rowsPerPage;
   const currentAppointments = filteredAppointments.slice(startIndex, startIndex + rowsPerPage);
 
-  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-    const search = employeeSearchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
-  });
+  const filteredEmployees = employees.filter(emp => {
+  const search = employeeSearchTerm.toLowerCase();
+  return emp.name?.toLowerCase().includes(search) || 
+         emp.code?.toLowerCase().includes(search) ||
+         emp.email?.toLowerCase().includes(search);
+});
 
-  const handleEmployeeSelect = (employee) => {
-    setSelectedEmployee(employee);
-    setEmployeeSearchTerm(employee.name);
-    setShowEmployeeDropdown(false);
-  };
+ const handleEmployeeSelect = (employee) => {
+  setSelectedEmployee(employee);
+  setEmployeeSearchTerm(employee.name);
+  setShowEmployeeDropdown(false);
+
+  // ✅ naam se match karke ID nikaalo
+  const matchedDept = departmentsList.find(d => norm(d.name) === norm(employee.department));
+  const matchedDesig = designationsList.find(d => norm(d.name) === norm(employee.designation));
+
+  setFormData(prev => ({
+    ...prev,
+    employeeId: employee.id,
+    employeeCode: employee.code || '',
+    initialDepartmentId: matchedDept?.id || '',
+    initialDepartmentName: matchedDept?.name || employee.department || '',
+    initialDesignationId: matchedDesig?.id || '',
+    initialDesignationName: matchedDesig?.name || employee.designation || '',
+  }));
+};
 
   const getPaginationRange = () => {
     const delta = 2;
@@ -192,6 +631,40 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
     }
   };
 
+  // ============================================
+  // ✅ NAME+ID PAIR HANDLERS — every dropdown sets both Id and Name together
+  // ============================================
+  const handleDeptSelect = (value) => {
+    const selected = departmentsList.find(d => String(d.id) === String(value));
+    setFormData(prev => ({ ...prev, initialDepartmentId: value, initialDepartmentName: selected?.name || '' }));
+    if (touched.initialDepartmentId) validateField('initialDepartmentId', value);
+  };
+  const handleDesigSelect = (value) => {
+    const selected = designationsList.find(d => String(d.id) === String(value));
+    setFormData(prev => ({ ...prev, initialDesignationId: value, initialDesignationName: selected?.name || '' }));
+    if (touched.initialDesignationId) validateField('initialDesignationId', value);
+  };
+  const handleBranchSelect = (value) => {
+    const selected = branchesList.find(b => String(b.id) === String(value));
+    setFormData(prev => ({ ...prev, initialBranchId: value, initialBranchName: selected?.name || '' }));
+    if (touched.initialBranchId) validateField('initialBranchId', value);
+  };
+  const handleAuthoritySelect = (value) => {
+    const selected = appointmentAuthoritiesList.find(a => String(a.id) === String(value));
+    setFormData(prev => ({ ...prev, appointmentAuthorityId: value, appointmentAuthorityName: selected?.name || '' }));
+    if (touched.appointmentAuthorityId) validateField('appointmentAuthorityId', value);
+  };
+  const handleAptTypeSelect = (value) => {
+    const selected = appointmentTypesList.find(t => String(t.id) === String(value));
+    setFormData(prev => ({ ...prev, appointmentTypeId: value, appointmentTypeName: selected?.name || '' }));
+    if (touched.appointmentTypeId) validateField('appointmentTypeId', value);
+  };
+  const handleEmpTypeSelect = (value) => {
+    const selected = employmentTypesList.find(t => String(t.id) === String(value));
+    setFormData(prev => ({ ...prev, employmentTypeId: value, employmentTypeName: selected?.name || '' }));
+    if (touched.employmentTypeId) validateField('employmentTypeId', value);
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -222,12 +695,12 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
       }
     }
     else if (field === 'appointmentDate' && !value) error = 'Appointment Date is required';
-    else if (field === 'appointmentAuthority' && !value) error = 'Appointment Authority is required';
-    else if (field === 'appointmentType' && !value) error = 'Appointment Type is required';
-    else if (field === 'employmentType' && !value) error = 'Employment Type is required';
-    else if (field === 'initialDesignation' && !value) error = 'Initial Designation is required';
-    else if (field === 'initialDepartment' && !value) error = 'Initial Department is required';
-    else if (field === 'initialBranch' && !value) error = 'Initial Branch is required';
+    else if (field === 'appointmentAuthorityId' && !value) error = 'Appointment Authority is required';
+    else if (field === 'appointmentTypeId' && !value) error = 'Appointment Type is required';
+    else if (field === 'employmentTypeId' && !value) error = 'Employment Type is required';
+    else if (field === 'initialDesignationId' && !value) error = 'Initial Designation is required';
+    else if (field === 'initialDepartmentId' && !value) error = 'Initial Department is required';
+    else if (field === 'initialBranchId' && !value) error = 'Initial Branch is required';
     else if (field === 'joiningDate') {
       if (!value) error = 'Joining Date is required';
       else {
@@ -264,9 +737,9 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
 
   const validateForm = () => {
     const fieldsToValidate = [
-      'appointmentOrderNo', 'appointmentDate', 'appointmentAuthority',
-      'appointmentType', 'employmentType', 'initialDesignation',
-      'initialDepartment', 'initialBranch', 'joiningDate'
+      'appointmentOrderNo', 'appointmentDate', 'appointmentAuthorityId',
+      'appointmentTypeId', 'employmentTypeId', 'initialDesignationId',
+      'initialDepartmentId', 'initialBranchId', 'joiningDate'
     ];
     
     const newErrors = {};
@@ -302,101 +775,149 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
     return Object.keys(newErrors).length === 0;
   };
 
- const handleSubmit = (e) => {
+ const handleSubmit = async (e) => {
   e.preventDefault();
   if (!validateForm()) {
     toast.warning('Validation Error', 'Please fix the highlighted fields');
     return;
   }
-  
-  // Get employee data
-  const empData = selectedEmployee || null;
-  
-  const appointmentData = {
-    ...formData,
-    employeeId: empData?.id || null,
-    employeeName: empData?.name || null,
-    employeeCode: empData?.code || null,  
-    employeeDepartment: empData?.department || null, 
-    employeeDesignation: empData?.designation || null, 
-    id: editingAppointment ? editingAppointment.id : Date.now(),
-    createdAt: editingAppointment ? editingAppointment.createdAt : new Date().toISOString()
-  };
-  
-  if (editingAppointment) {
-    const updated = appointments.map(apt =>
-      apt.id === editingAppointment.id
-        ? { ...appointmentData, id: apt.id, createdAt: apt.createdAt }
-        : apt
-    );
-    setAppointments(updated);
-    toast.success('Success', 'Appointment updated successfully');
-    setEditingAppointment(null);
-  } else {
-    const newAppointment = {
-      id: Date.now(),
-      ...appointmentData,
-      createdAt: new Date().toISOString()
-    };
-    setAppointments([newAppointment, ...appointments]);
-    toast.success('Success', 'Appointment added successfully');
+  if (!selectedEmployee && !formData.employeeId) {
+    toast.warning('Validation Error', 'Please select an employee');
+    return;
   }
-  resetForm();
-  setShowForm(false);
-  setPage(0);
+
+  setSubmitting(true);
+  try {
+    let res;
+
+    if (editingAppointment) {
+      // ✅ UPDATE — sirf wahi fields jo backend accept karta hai
+      // fallback: agar Id khali reh gaya ho kisi wajah se, Name se dobara lookup karo
+      const updatePayload = {
+        appointmentOrderNumber: formData.appointmentOrderNo,
+        appointmentDate: formData.appointmentDate,
+        appointmentTypeId: Number(formData.appointmentTypeId || getAptTypeIdByName(formData.appointmentTypeName)),
+        employmentTypeId: Number(formData.employmentTypeId || getEmpTypeIdByName(formData.employmentTypeName)),
+        joiningDate: formData.joiningDate,
+        probationPeriodMonths: Number(formData.probationPeriod) || 0,
+        remarks: formData.remarks || '',
+      };
+      console.log("📤 UPDATE payload:", updatePayload);
+      res = await axios.put(
+        `${BASE_URL}/api/appointments/${editingAppointment.id}/update`,
+        updatePayload,
+        getAxiosConfig()
+      );
+    } else {
+      // ✅ CREATE — poora payload with IDs (with name-based fallback)
+      const createPayload = {
+        employeeId: selectedEmployee?.id || Number(formData.employeeId) || 0,
+        appointmentOrderNumber: formData.appointmentOrderNo,
+        appointmentDate: formData.appointmentDate,
+        appointmentAuthorityId: Number(formData.appointmentAuthorityId || getAuthorityIdByName(formData.appointmentAuthorityName)),
+        appointmentTypeId: Number(formData.appointmentTypeId || getAptTypeIdByName(formData.appointmentTypeName)),
+        employmentTypeId: Number(formData.employmentTypeId || getEmpTypeIdByName(formData.employmentTypeName)),
+        initialDesignationId: Number(formData.initialDesignationId || getDesigIdByName(formData.initialDesignationName)),
+        initialDepartmentId: Number(formData.initialDepartmentId || getDeptIdByName(formData.initialDepartmentName)),
+        initialBranchId: Number(formData.initialBranchId || getBranchIdByName(formData.initialBranchName)),
+        joiningDate: formData.joiningDate,
+        probationPeriodMonths: Number(formData.probationPeriod) || 0,
+        remarks: formData.remarks || '',
+      };
+      console.log("📤 CREATE payload:", createPayload);
+      res = await axios.post(
+        `${BASE_URL}/api/appointments/create`,
+        createPayload,
+        getAxiosConfig()
+      );
+    }
+
+    if (res.status === 200 || res.status === 201) {
+      toast.success('Success', editingAppointment ? 'Appointment updated' : 'Appointment created');
+      resetForm();
+      setShowForm(false);
+      await fetchAppointments();
+      if (onSuccess) onSuccess();
+    }
+  } catch (err) {
+    console.error('Submit error:', err);
+    console.error('Backend message:', err.response?.data);
+    toast.error('Error', err.response?.data?.message || 'Failed to save');
+  } finally {
+    setSubmitting(false);
+  }
 };
 
-  const handleEdit = (appointment) => {
-    if (appointment.status === 'Inactive') {
-      return;
-    }
-    
-    const emp = DUMMY_EMPLOYEES.find(e => e.id === appointment.employeeId);
-    setSelectedEmployee(emp || null);  
-    setEditingAppointment(appointment);
-    setFormData({
-      appointmentOrderNo: appointment.appointmentOrderNo,
-      appointmentDate: appointment.appointmentDate,
-      appointmentAuthority: appointment.appointmentAuthority,
-      appointmentType: appointment.appointmentType,
-      employmentType: appointment.employmentType,
-      initialDesignation: appointment.initialDesignation,
-      initialDepartment: appointment.initialDepartment,
-      initialBranch: appointment.initialBranch,
-      joiningDate: appointment.joiningDate,
-      probationPeriod: appointment.probationPeriod || '6',
-      confirmationDueDate: appointment.confirmationDueDate || '',
-      appointmentOrderFile: null,
-      appointmentOrderFileData: appointment.appointmentOrderFileData,
-      appointmentOrderFileName: appointment.appointmentOrderFileName
-    });
-    setEmployeeSearchTerm(emp?.name || '');
-    setShowForm(true);
-  };
+// ✅ handleEdit — sets both Name (from record, always trustworthy) and Id (looked up)
+const handleEdit = (appointment) => {
+  if (appointment.status === 'Inactive') return;
 
-  const resetForm = () => {
-    setFormData({
-      appointmentOrderNo: '',
-      appointmentDate: '',
-      appointmentAuthority: '',
-      appointmentType: 'Permanent',
-      employmentType: 'Full-Time',
-      initialDesignation: '',
-      initialDepartment: '',
-      initialBranch: '',
-      joiningDate: '',
-      probationPeriod: '6',
-      confirmationDueDate: '',
-      appointmentOrderFile: null,
-      appointmentOrderFileData: null,
-      appointmentOrderFileName: null
-    });
-    setErrors({});
-    setTouched({});
-    setEditingAppointment(null);
-    setSelectedEmployee(null);      
-    setEmployeeSearchTerm('');   
-  };
+  const emp = employees.find(e => String(e.id) === String(appointment.employeeId));
+
+  setSelectedEmployee(emp || null);
+  setEditingAppointment(appointment);
+  setFormData({
+    employeeId: appointment.employeeId,
+    employeeCode: emp?.code || appointment.employeeCode || '',
+    appointmentOrderNo: appointment.appointmentOrderNo,
+    appointmentDate: appointment.appointmentDate,
+
+    appointmentAuthorityName: appointment.appointmentAuthority || '',
+    appointmentAuthorityId: getAuthorityIdByName(appointment.appointmentAuthority),
+
+    appointmentTypeName: appointment.appointmentType || '',
+    appointmentTypeId: getAptTypeIdByName(appointment.appointmentType),
+
+    employmentTypeName: appointment.employmentType || '',
+    employmentTypeId: getEmpTypeIdByName(appointment.employmentType),
+
+    initialDesignationName: appointment.initialDesignation || '',
+    initialDesignationId: getDesigIdByName(appointment.initialDesignation),
+
+    initialDepartmentName: appointment.initialDepartment || '',
+    initialDepartmentId: getDeptIdByName(appointment.initialDepartment),
+
+    initialBranchName: appointment.initialBranch || '',
+    initialBranchId: getBranchIdByName(appointment.initialBranch),
+
+    joiningDate: appointment.joiningDate,
+    probationPeriod: appointment.probationPeriod || '6',
+    confirmationDueDate: appointment.confirmationDueDate || '',
+    remarks: appointment.remarks || '',
+  });
+  setEmployeeSearchTerm(emp?.name || appointment.employeeName || '');
+  setShowForm(true);
+};
+
+ const resetForm = () => {
+  setFormData({
+    employeeId: '',
+    employeeCode: '',
+    appointmentOrderNo: '',
+    appointmentDate: '',
+    appointmentAuthorityId: '',
+    appointmentAuthorityName: '',
+    appointmentTypeId: '',
+    appointmentTypeName: '',
+    employmentTypeId: '',
+    employmentTypeName: '',
+    initialDesignationId: '',
+    initialDesignationName: '',
+    initialDepartmentId: '',
+    initialDepartmentName: '',
+    initialBranchId: '',
+    initialBranchName: '',
+    joiningDate: '',
+    probationPeriod: '6',
+    confirmationDueDate: '',
+    remarks: '',
+  });
+  setErrors({});
+  setTouched({});
+  setEditingAppointment(null);
+  setSelectedEmployee(null);
+  setEmployeeSearchTerm('');
+};
 
   const handleCancelForm = () => {
     resetForm();
@@ -419,31 +940,61 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
     setShowStatusModal(true);
   };
 
-  const confirmStatusChange = () => {
-    const { id, newStatus } = statusAction;
-
-    const updatedAppointments = appointments.map((apt) =>
-      apt.id === id
-        ? {
-            ...apt,
-            status: newStatus
-          }
-        : apt
+ const confirmStatusChange = async () => {
+  const { id, newStatus, name } = statusAction;
+  setLoading(true);
+  try {
+    // ✅ Status Update API
+    const isActive = newStatus === 'Active';
+    await axios.put(
+      `${BASE_URL}/api/appointments/${id}/status?active=${isActive}`,
+      null,
+      getAxiosConfig()
     );
-
-    setAppointments(updatedAppointments);
-
+    toast.success('Status Updated', `${name} is now ${newStatus}`);
+    await fetchAppointments();
+  } catch (err) {
+    console.error('Status change error:', err);
+    toast.error('Error', err.response?.data?.message || 'Failed to change status');
+  } finally {
+    setLoading(false);
     setShowStatusModal(false);
+    setStatusAction({ id: null, name: "", newStatus: "" });
+  }
+};
 
-    toast.success(
-      "Status Updated",
-      `${statusAction.name} is now ${newStatus}`
+ const handleGenerateLetter = async (appointment) => {
+  if (!ensureToken()) return;
+  setLoading(true);
+  try {
+    const res = await axios.get(
+      `${BASE_URL}/api/appointments/${appointment.id}/document`,
+      { headers: { Authorization: `Bearer ${getAuthToken()}` }, responseType: 'blob' }
     );
-  };
 
-   const handleGenerateLetter = (appointment) => {
-    console.log('Generate clicked for:', appointment.appointmentOrderNo);
-  };
+    // ✅ Check: agar backend error JSON blob bhej raha hai (404/500), usko pehle pakdo
+    if (res.data.type && res.data.type.includes('application/json')) {
+      const text = await res.data.text();
+      const errJson = JSON.parse(text);
+      throw new Error(errJson.message || 'Document not found on server');
+    }
+
+    const blobUrl = window.URL.createObjectURL(res.data);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = appointment.documentName || `Appointment_Letter_${appointment.appointmentOrderNo}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+    toast.success('Success', 'Appointment letter downloaded successfully');
+  } catch (err) {
+    console.error('Generate letter FULL error:', err.response?.status, err.response?.data, err.message);
+    toast.error('Error', err.response?.data?.message || err.message || 'Failed to generate letter');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="cert-root">
@@ -542,35 +1093,70 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                   </div>
                 </div>
 
-                <div className="cert-field-compact">
-                  <label>Employee Code</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
-                </div>
+               <div className="cert-field-compact">
+  <label>Employee Code</label>
+  <input 
+    type="text" 
+    className="form-control bg-light" 
+    value={selectedEmployee?.code || formData.employeeCode || ''} 
+    readOnly 
+    placeholder="Auto-populated"
+    style={{ fontSize: '14px', padding: '6px 12px' }}
+  />
+</div>
 
-                <div className="cert-field-compact">
-                  <label>Department</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
-                </div>
-  <div className={`cert-field-compact ${touched.initialDepartment && errors.initialDepartment ? 'has-error' : ''}`}>
-                  <label className="required">Initial Department</label>
-                  <select value={formData.initialDepartment} onChange={(e) => handleChange('initialDepartment', e.target.value)}>
-                    <option value="">Select Department</option>
-                    {departments.map(dept => <option key={dept.id} value={dept.name}>{dept.name}</option>)}
-                  </select>
-                  <FieldError msg={errors.initialDepartment} />
-                </div>
-                <div className="cert-field-compact">
-                  <label>Designation</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
-                </div>
- <div className={`cert-field-compact ${touched.initialDesignation && errors.initialDesignation ? 'has-error' : ''}`}>
-                  <label className="required">Initial Designation</label>
-                  <select value={formData.initialDesignation} onChange={(e) => handleChange('initialDesignation', e.target.value)} onBlur={() => handleBlur('initialDesignation')}>
-                    <option value="">Select Designation</option>
-                    {designations.map(des => <option key={des.id} value={des.name}>{des.name}</option>)}
-                  </select>
-                  <FieldError msg={errors.initialDesignation} />
-                </div>
+               <div className="cert-field-compact">
+  <label>Department</label>
+  <input 
+    type="text" 
+    className="form-control bg-light" 
+    value={selectedEmployee?.department || formData.initialDepartmentName || ''} 
+    readOnly 
+    placeholder="Auto-populated"
+    style={{ fontSize: '14px', padding: '6px 12px' }}
+  />
+</div>
+  <div className={`cert-field-compact ${touched.initialDepartmentId && errors.initialDepartmentId ? 'has-error' : ''}`}>
+  <label className="required">Initial Department</label>
+ <select 
+  value={formData.initialDepartmentId} 
+  onChange={(e) => handleDeptSelect(e.target.value)}
+  onBlur={() => handleBlur('initialDepartmentId')}
+>
+  <option value="">Select Department</option>
+  {departmentsList.map((dept) => (
+    <option key={dept.id} value={dept.id}>{dept.name}</option>
+  ))}
+</select>
+  {loadingDepartments && <small>Loading...</small>}
+  <FieldError msg={errors.initialDepartmentId} />
+</div>
+              <div className="cert-field-compact">
+  <label>Designation</label>
+  <input 
+    type="text" 
+    className="form-control bg-light" 
+    value={selectedEmployee?.designation || formData.initialDesignationName || ''} 
+    readOnly 
+    placeholder="Auto-populated"
+    style={{ fontSize: '14px', padding: '6px 12px' }}
+  />
+</div>
+<div className={`cert-field-compact ${touched.initialDesignationId && errors.initialDesignationId ? 'has-error' : ''}`}>
+  <label className="required">Initial Designation</label>
+  <select 
+    value={formData.initialDesignationId} 
+    onChange={(e) => handleDesigSelect(e.target.value)}
+    onBlur={() => handleBlur('initialDesignationId')}
+  >
+    <option value="">Select Designation</option>
+    {designationsList.map((des) => (
+      <option key={des.id} value={des.id}>{des.name}</option>
+    ))}
+  </select>
+  {loadingDesignations && <small>Loading...</small>}
+  <FieldError msg={errors.initialDesignationId} />
+</div>
                 <div className={`cert-field-compact ${touched.appointmentOrderNo && errors.appointmentOrderNo ? 'has-error' : ''}`}>
                   <label className="required">Appointment Order Number</label>
                   <input type="text" placeholder="e.g., ARI/APP/2024/001" value={formData.appointmentOrderNo} onChange={(e) => handleChange('appointmentOrderNo', e.target.value)} onBlur={() => handleBlur('appointmentOrderNo')} />
@@ -583,43 +1169,71 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                   <FieldError msg={errors.appointmentDate} />
                 </div>
                 
-                <div className={`cert-field-compact ${touched.appointmentAuthority && errors.appointmentAuthority ? 'has-error' : ''}`}>
-                  <label className="required">Appointment Authority</label>
-                  <select value={formData.appointmentAuthority} onChange={(e) => handleChange('appointmentAuthority', e.target.value)} onBlur={() => handleBlur('appointmentAuthority')}>
-                    <option value="">Select Authority</option>
-                    {appointmentAuthorities.map(auth => <option key={auth.value} value={auth.value}>{auth.label}</option>)}
-                  </select>
-                  <FieldError msg={errors.appointmentAuthority} />
-                </div>
+            <div className={`cert-field-compact ${touched.appointmentAuthorityId && errors.appointmentAuthorityId ? 'has-error' : ''}`}>
+  <label className="required">Appointment Authority</label>
+  <select 
+    value={formData.appointmentAuthorityId} 
+    onChange={(e) => handleAuthoritySelect(e.target.value)}
+    onBlur={() => handleBlur('appointmentAuthorityId')}
+  >
+    <option value="">Select Authority</option>
+    {appointmentAuthoritiesList.map((auth) => (
+      <option key={auth.id} value={auth.id}>
+        {auth.name} {auth.designation ? `(${auth.designation})` : ''}
+      </option>
+    ))}
+  </select>
+  {loadingAuthorities && <small>Loading...</small>}
+  <FieldError msg={errors.appointmentAuthorityId} />
+</div>
+         <div className={`cert-field-compact ${touched.appointmentTypeId && errors.appointmentTypeId ? 'has-error' : ''}`}>
+  <label className="required">Appointment Type</label>
+  <select 
+    value={formData.appointmentTypeId} 
+    onChange={(e) => handleAptTypeSelect(e.target.value)}
+    onBlur={() => handleBlur('appointmentTypeId')}
+  >
+    <option value="">Select Appointment Type</option>
+    {appointmentTypesList.map((type) => (
+      <option key={type.id} value={type.id}>{type.name}</option>
+    ))}
+  </select>
+  {loadingAppointmentTypes && <small>Loading...</small>}
+  <FieldError msg={errors.appointmentTypeId} />
+</div>
+
+          <div className={`cert-field-compact ${touched.employmentTypeId && errors.employmentTypeId ? 'has-error' : ''}`}>
+  <label className="required">Employment Type</label>
+  <select 
+    value={formData.employmentTypeId} 
+    onChange={(e) => handleEmpTypeSelect(e.target.value)}
+    onBlur={() => handleBlur('employmentTypeId')}
+  >
+    <option value="">Select Employment Type</option>
+    {employmentTypesList.map((type) => (
+      <option key={type.id} value={type.id}>{type.name}</option>
+    ))}
+  </select>
+  {loadingEmploymentTypes && <small>Loading...</small>}
+  <FieldError msg={errors.employmentTypeId} />
+</div>
                 
-                <div className={`cert-field-compact ${touched.appointmentType && errors.appointmentType ? 'has-error' : ''}`}>
-                  <label className="required">Appointment Type</label>
-                  <select value={formData.appointmentType} onChange={(e) => handleChange('appointmentType', e.target.value)}>
-                    {appointmentTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
-                  </select>
-                  <FieldError msg={errors.appointmentType} />
-                </div>
-                
-                <div className={`cert-field-compact ${touched.employmentType && errors.employmentType ? 'has-error' : ''}`}>
-                  <label className="required">Employment Type</label>
-                  <select value={formData.employmentType} onChange={(e) => handleChange('employmentType', e.target.value)}>
-                    {employmentTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
-                  </select>
-                  <FieldError msg={errors.employmentType} />
-                </div>
-                
-              
-                
-                <div className={`cert-field-compact ${touched.initialBranch && errors.initialBranch ? 'has-error' : ''}`}>
-                  <label className="required">Initial Branch</label>
-                  <select value={formData.initialBranch} onChange={(e) => handleChange('initialBranch', e.target.value)}>
-                    <option value="">Select Branch</option>
-                    {branches.map(branch => <option key={branch.id} value={branch.name}>{branch.name}</option>)}
-                  </select>
-                  <FieldError msg={errors.initialBranch} />
-                </div>
-                
-                <div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
+            <div className={`cert-field-compact ${touched.initialBranchId && errors.initialBranchId ? 'has-error' : ''}`}>
+  <label className="required">Initial Branch</label>
+  <select 
+    value={formData.initialBranchId} 
+    onChange={(e) => handleBranchSelect(e.target.value)}
+    onBlur={() => handleBlur('initialBranchId')}
+  >
+    <option value="">Select Branch</option>
+    {branchesList.map((branch) => (
+      <option key={branch.id} value={branch.id}>{branch.name}</option>
+    ))}
+  </select>
+  {loadingBranches && <small>Loading...</small>}
+  <FieldError msg={errors.initialBranchId} />
+</div>
+ <div className={`cert-field-compact ${touched.joiningDate && errors.joiningDate ? 'has-error' : ''}`}>
                   <label className="required">Joining Date</label>
                   <input type="date" value={formData.joiningDate} onChange={(e) => handleChange('joiningDate', e.target.value)} onBlur={() => handleBlur('joiningDate')} />
                   <FieldError msg={errors.joiningDate} />
@@ -636,22 +1250,6 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                   <input type="text" className="bg-light" value={formatDate(formData.confirmationDueDate)} readOnly />
                   <small>Auto-calculated</small>
                 </div>
-                
-                {/* <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
-                  <label>Appointment Order Upload</label>
-                  <div className="border rounded p-3 text-center bg-light">
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="appointment-order-upload" />
-                    <label htmlFor="appointment-order-upload" className="btn btn-outline-primary btn-sm">
-                      <FaUpload size={12} /> Choose File
-                    </label>
-                    {formData.appointmentOrderFileName && (
-                      <div className="mt-2 text-primary">
-                        {formData.appointmentOrderFileName.endsWith('.pdf') ? <FaFilePdf /> : <FaFileImage />} {formData.appointmentOrderFileName}
-                      </div>
-                    )}
-                    <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
-                  </div>
-                </div> */}
               </div>
             </div>
             
@@ -701,23 +1299,6 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                   </span>
                 </div>
               </div>
-              {/* <button 
-                onClick={handleBackToList}
-                style={{
-                  background: 'rgba(255,255,255,0.15)',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  color: 'white',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <FaArrowLeft size={12} /> Back
-              </button> */}
             </div>
           </div>
 
@@ -744,14 +1325,14 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                   fontSize: '20px',
                   fontWeight: '700'
                 }}>
-                  {DUMMY_EMPLOYEES.find(e => e.id === selectedAppointment.employeeId)?.name?.charAt(0) || '?'}
+    {getEmployeeName(selectedAppointment).charAt(0) || '?'}
                 </div>
                 <div>
                   <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', margin: '0 0 2px 0' }}>
-                    {DUMMY_EMPLOYEES.find(e => e.id === selectedAppointment.employeeId)?.name || 'Unknown'}
+      {getEmployeeName(selectedAppointment)}
                   </h3>
                   <span style={{ fontSize: '13px', color: '#64748b' }}>
-                    {DUMMY_EMPLOYEES.find(e => e.id === selectedAppointment.employeeId)?.code || ''} • {selectedAppointment.initialDesignation}
+      {getEmployeeCode(selectedAppointment)} • {getDesignationLabel(selectedAppointment.initialDesignation)}
                   </span>
                 </div>
               </div>
@@ -928,7 +1509,8 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Employee</th>  
+                     <th>Employee</th>  
+                    <th>Employee code</th>  
                     <th>Order No.</th>
                     <th>Appointment Date</th>
                     <th>Appointment Authority</th>
@@ -954,12 +1536,9 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                         className="cert-table-row-hover"
                       >
                         <td className="text-center">{startIndex + idx + 1}</td>
-                        <td>                        
-<td>
-  {DUMMY_EMPLOYEES.find(e => e.id === apt.employeeId)?.name || 
-   apt.employeeName || 
-   'Unknown'}
-</td>                        </td>
+                        <td>{getEmployeeName(apt)}</td>
+                        <td>{getEmployeeCode(apt)}</td>
+
                         <td><strong>{apt.appointmentOrderNo}</strong></td>
                         <td>{formatDate(apt.appointmentDate)}</td>
                         <td>{apt.appointmentAuthority}</td>
@@ -993,11 +1572,11 @@ const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) =>
                             style={{ cursor: "pointer" }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleStatusToggle(
-                                apt.id,
-                                DUMMY_EMPLOYEES.find(e => e.id === apt.employeeId)?.name || "",
-                                apt.status || "Active"
-                              );
+                             handleStatusToggle(
+  apt.id,
+  getEmployeeName(apt),
+  apt.status || "Active"
+)
                             }}
                           >
                             <div
