@@ -57,6 +57,12 @@ import SourceMaster from './Masters/Recruitment/SourceMaster';
 import InterviewType from './Masters/Recruitment/InterviewType';
 import InterviewRound from './Masters/Recruitment/InterviewRound';
 import CandidateStatus from './Masters/Recruitment/CandidateStatus';
+import RejectionReason from './Masters/Recruitment/RejectionReason';
+import OfferStatus from './Masters/Recruitment/OfferStatus';
+import SkillMaster from './Masters/Recruitment/SkillMaster';
+import NoticePeriod from './Masters/Recruitment/NoticePeriod';
+import InterviewPanel from './Masters/Recruitment/InterviewPanel';
+import JobLocation from './Masters/Recruitment/JobLocation';
 import { ToastContainer } from './components/Toast';
 import { STORAGE_KEYS } from './config/api.config';
 import ApprovedLeaves from './Leave/ApproveRejectLeave';
@@ -197,8 +203,12 @@ function App() {
           <Route path="InterviewType" element={<InterviewType user={currentUser}/>}/>
           <Route path="InterviewRound" element={<InterviewRound user={currentUser}/>}/>
          <Route path="CandidateStatus" element={<CandidateStatus user={currentUser}/>}/>
-
-
+         <Route path="RejectionReason" element={<RejectionReason user={currentUser}/>}/>
+         <Route path="OfferStatus" element={<OfferStatus user={currentUser}/>}/>
+         <Route path="NoticePeriod" element={<NoticePeriod user={currentUser}/>}/>
+         <Route path="SkillMaster" element={<SkillMaster user={currentUser}/>}/>
+         <Route path="InterviewPanel" element={<InterviewPanel user={currentUser}/>}/>
+          <Route path="JobLocation" element={<JobLocation user={currentUser}/>}/>
         </Route>
       </Routes>
     </Router>
