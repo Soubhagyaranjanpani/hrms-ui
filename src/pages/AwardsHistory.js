@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaTrophy, FaCalendarAlt, FaBuilding, 
@@ -19,18 +20,21 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [editingAward, setEditingAward] = useState(null);
   const [selectedAward, setSelectedAward] = useState(null); // For inline detail view
   const [documentPreview, setDocumentPreview] = useState(null); // For document preview modal
-  const [formData, setFormData] = useState({
-    awardName: '',
-    awardDate: '',
-    awardType: 'Performance',
-    issuedBy: '',
-    description: '',
-    certificateFile: null,
-    certificateFileData: null,
-    certificateFileName: null,
-    employeeId: '',
-    employeeName: ''
-  });
+  const [formRows, setFormRows] = useState([
+    {
+      id: Date.now(),
+      awardName: '',
+      awardDate: '',
+      awardType: 'Performance',
+      issuedBy: '',
+      description: '',
+      certificateFile: null,
+      certificateFileData: null,
+      certificateFileName: null,
+      employeeId: '',
+      employeeName: ''
+    }
+  ]);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,13 +45,15 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(4);
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
-   const [showStatusModal, setShowStatusModal] = useState(false);
-      const [statusAction, setStatusAction] = useState({
-        id: null,
-        name: "",
-        newStatus: ""
-      });
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusAction, setStatusAction] = useState({
+    id: null,
+    name: "",
+    newStatus: ""
+  });
   const [showDocumentActions, setShowDocumentActions] = useState(false);
+  const [rowErrors, setRowErrors] = useState({});
+  
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
     { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
@@ -69,8 +75,8 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   // Handle document view
   const handleViewDocument = (e, award) => {
     e.stopPropagation(); 
-     setSelectedAward(award); 
-      setShowDocumentActions(true);
+    setSelectedAward(award); 
+    setShowDocumentActions(true);
     if (award.certificateFileData) {
       setDocumentPreview({
         data: award.certificateFileData,
@@ -118,15 +124,23 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const startIndex = page * rowsPerPage;
   const currentAwards = filteredAwards.slice(startIndex, startIndex + rowsPerPage);
 
-  const handleEmployeeSelect = (employee) => {
-    setSelectedEmployee(employee);
-    setFormData(prev => ({
-      ...prev,
-      employeeId: employee.id,
-      employeeName: employee.name
-    }));
+  const handleEmployeeSelect = (rowId, employee) => {
+    setFormRows(prev => prev.map(row => 
+      row.id === rowId ? {
+        ...row,
+        employeeId: employee.id,
+        employeeName: employee.name
+      } : row
+    ));
     setEmployeeSearchTerm(employee.name);
     setShowEmployeeDropdown(false);
+    
+    // Clear error for this row
+    if (rowErrors[rowId]) {
+      const newErrors = { ...rowErrors };
+      delete newErrors[rowId];
+      setRowErrors(newErrors);
+    }
   };
 
   const getPaginationRange = () => {
@@ -145,14 +159,23 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const handleChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
-    if (touched[field]) {
-      validateField(field, value);
+  const handleRowChange = (rowId, field, value) => {
+    setFormRows(prev => prev.map(row => 
+      row.id === rowId ? { ...row, [field]: value } : row
+    ));
+    
+    // Clear error for this field
+    if (rowErrors[rowId] && rowErrors[rowId][field]) {
+      const newErrors = { ...rowErrors };
+      delete newErrors[rowId][field];
+      if (Object.keys(newErrors[rowId] || {}).length === 0) {
+        delete newErrors[rowId];
+      }
+      setRowErrors(newErrors);
     }
   };
 
-  const handleFileChange = (e) => {
+  const handleRowFileChange = (rowId, e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -161,105 +184,32 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData({
-          ...formData,
-          certificateFile: file,
-          certificateFileData: reader.result,
-          certificateFileName: file.name
-        });
+        setFormRows(prev => prev.map(row => 
+          row.id === rowId ? {
+            ...row,
+            certificateFile: file,
+            certificateFileData: reader.result,
+            certificateFileName: file.name
+          } : row
+        ));
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const validateField = (field, value) => {
-    let error = '';
-    
-    if (field === 'awardName' && !value) error = 'Award Name is required';
-    else if (field === 'awardDate' && !value) error = 'Award Date is required';
-    else if (field === 'awardType' && !value) error = 'Award Type is required';
-    else if (field === 'issuedBy' && !value) error = 'Issued By is required';
-    else if (field === 'employeeId' && !value) error = 'Employee is required';
-    
-    setErrors(prev => ({ ...prev, [field]: error }));
-    return error === '';
+  const validateRow = (row) => {
+    const errors = {};
+    if (!row.awardName) errors.awardName = 'Award Name is required';
+    if (!row.awardDate) errors.awardDate = 'Award Date is required';
+    if (!row.awardType) errors.awardType = 'Award Type is required';
+    if (!row.issuedBy) errors.issuedBy = 'Issued By is required';
+    if (!row.employeeId) errors.employeeId = 'Employee is required';
+    return errors;
   };
 
-  const handleBlur = (field) => {
-    setTouched(prev => ({ ...prev, [field]: true }));
-    validateField(field, formData[field]);
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.awardName) newErrors.awardName = 'Award Name is required';
-    if (!formData.awardDate) newErrors.awardDate = 'Award Date is required';
-    if (!formData.awardType) newErrors.awardType = 'Award Type is required';
-    if (!formData.issuedBy) newErrors.issuedBy = 'Issued By is required';
-    if (!formData.employeeId) newErrors.employeeId = 'Employee is required';
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      toast.warning('Validation Error', 'Please fix the highlighted fields');
-      return;
-    }
-    
-    const awardData = {
-      ...formData,
-      id: editingAward ? editingAward.id : Date.now(),
-      createdAt: editingAward ? editingAward.createdAt : new Date().toISOString()
-    };
-    
-    if (editingAward) {
-      const updated = awards.map(a =>
-        a.id === editingAward.id ? awardData : a
-      );
-      setAwards(updated);
-      toast.success('Success', 'Award updated successfully');
-      setEditingAward(null);
-    } else {
-      setAwards([awardData, ...awards]);
-      toast.success('Success', 'Award added successfully');
-    }
-    resetForm();
-    setShowForm(false);
-    setPage(0);
-  };
-
- const handleEdit = (award) => {
-  if (award.status === 'Inactive') {
-    toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
-    return;
-  }
-  
-  const emp = DUMMY_EMPLOYEES.find(e => e.id === award.employeeId);
-  setSelectedEmployee(emp || null);  
-  setEditingAward(award);
-  setFormData({
-    awardName: award.awardName,
-    awardDate: award.awardDate,
-    awardType: award.awardType,
-    issuedBy: award.issuedBy,
-    description: award.description || '',
-    certificateFile: null,
-    certificateFileData: award.certificateFileData,
-    certificateFileName: award.certificateFileName,
-    employeeId: award.employeeId,
-    employeeName: award.employeeName
-  });
-  setEmployeeSearchTerm(emp?.name || '');
-  setShowForm(true);
-};
- 
-
-  const resetForm = () => {
-    setFormData({
+  const addRow = () => {
+    const newRow = {
+      id: Date.now() + Math.random(),
       awardName: '',
       awardDate: '',
       awardType: 'Performance',
@@ -270,12 +220,115 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       certificateFileName: null,
       employeeId: '',
       employeeName: ''
+    };
+    setFormRows([...formRows, newRow]);
+  };
+
+  const removeRow = (rowId) => {
+    if (formRows.length <= 1) {
+      toast.warning('Cannot Remove', 'At least one row is required');
+      return;
+    }
+    setFormRows(prev => prev.filter(row => row.id !== rowId));
+    // Remove errors for this row
+    const newErrors = { ...rowErrors };
+    delete newErrors[rowId];
+    setRowErrors(newErrors);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    // Validate all rows
+    let hasErrors = false;
+    const allErrors = {};
+    
+    formRows.forEach(row => {
+      const rowError = validateRow(row);
+      if (Object.keys(rowError).length > 0) {
+        allErrors[row.id] = rowError;
+        hasErrors = true;
+      }
     });
+    
+    if (hasErrors) {
+      setRowErrors(allErrors);
+      toast.warning('Validation Error', 'Please fix the highlighted fields in all rows');
+      return;
+    }
+    
+    // Process all rows
+    const newAwards = formRows.map(row => ({
+      id: Date.now() + Math.random() * 1000,
+      awardName: row.awardName,
+      awardDate: row.awardDate,
+      awardType: row.awardType,
+      issuedBy: row.issuedBy,
+      description: row.description || '',
+      certificateFileData: row.certificateFileData,
+      certificateFileName: row.certificateFileName,
+      employeeId: row.employeeId,
+      employeeName: row.employeeName,
+      createdAt: new Date().toISOString(),
+      status: 'Active'
+    }));
+    
+    setAwards([...newAwards, ...awards]);
+    toast.success('Success', `${newAwards.length} award(s) added successfully`);
+    resetForm();
+    setShowForm(false);
+    setPage(0);
+  };
+
+  const handleEdit = (award) => {
+    if (award.status === 'Inactive') {
+      toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
+      return;
+    }
+    
+    const emp = DUMMY_EMPLOYEES.find(e => e.id === award.employeeId);
+    setSelectedEmployee(emp || null);  
+    setEditingAward(award);
+    
+    // Set form with single row for editing
+    setFormRows([{
+      id: Date.now(),
+      awardName: award.awardName,
+      awardDate: award.awardDate,
+      awardType: award.awardType,
+      issuedBy: award.issuedBy,
+      description: award.description || '',
+      certificateFile: null,
+      certificateFileData: award.certificateFileData,
+      certificateFileName: award.certificateFileName,
+      employeeId: award.employeeId,
+      employeeName: award.employeeName
+    }]);
+    
+    setEmployeeSearchTerm(emp?.name || '');
+    setShowForm(true);
+  };
+
+  const resetForm = () => {
+    setFormRows([{
+      id: Date.now(),
+      awardName: '',
+      awardDate: '',
+      awardType: 'Performance',
+      issuedBy: '',
+      description: '',
+      certificateFile: null,
+      certificateFileData: null,
+      certificateFileName: null,
+      employeeId: '',
+      employeeName: ''
+    }]);
     setErrors({});
     setTouched({});
     setEditingAward(null);
     setSelectedEmployee(null);
     setEmployeeSearchTerm('');
+    setRowErrors({});
   };
 
   const handleCancelForm = () => {
@@ -287,6 +340,7 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     resetForm();
     setShowForm(false);
     setSelectedAward(null);
+    setShowDocumentActions(false);
   };
 
   // Calculate stats
@@ -317,39 +371,42 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   };
 
   const handleStatusToggle = (id, name, currentStatus) => {
-          const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-          setStatusAction({
-            id,
-            name,
-            newStatus
-          });
-          setShowStatusModal(true);
-        };
-    
-        const confirmStatusChange = () => {
-          const { id, newStatus } = statusAction;
-        
-          const updatedAward = awards.map((award) =>
-            award.id === id
-              ? {
-                  ...award,
-                  status: newStatus
-                }
-              : award
-          );
-        
-          setAwards(updatedAward);
-        
-          setShowStatusModal(false);
-        
-          toast.success(
-            "Status Updated",
-            `${statusAction.name} is now ${newStatus}`
-          );
-        };
+    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+    setStatusAction({
+      id,
+      name,
+      newStatus
+    });
+    setShowStatusModal(true);
+  };
 
-         const handleGenerateLetter = (award) => {
+  const confirmStatusChange = () => {
+    const { id, newStatus } = statusAction;
+  
+    const updatedAward = awards.map((award) =>
+      award.id === id
+        ? {
+            ...award,
+            status: newStatus
+          }
+        : award
+    );
+  
+    setAwards(updatedAward);
+    setShowStatusModal(false);
+    toast.success(
+      "Status Updated",
+      `${statusAction.name} is now ${newStatus}`
+    );
+  };
+
+  const handleGenerateLetter = (award) => {
     console.log('Generate clicked for:', award.awardOrderNo);
+  };
+
+  // Helper to get employee details
+  const getEmployeeDetails = (employeeId) => {
+    return DUMMY_EMPLOYEES.find(e => e.id === employeeId);
   };
 
   return (
@@ -361,12 +418,12 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
           <p className="cert-subtitle">Manage employee awards and recognitions</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!showForm && !selectedAward && (
+          {!showForm && !selectedAward && !showDocumentActions && (
             <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
               <FaPlus size={13} /> Add Award
             </button>
           )}
-          {(showForm || selectedAward) && (
+          {(showForm || selectedAward || showDocumentActions) && (
             <button 
               type="button" 
               className="cert-back-btn" 
@@ -376,7 +433,7 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
               <FaArrowLeft size={12} /> Back
             </button>
           )}
-          {!showForm && !selectedAward && onCancel && (
+          {!showForm && !selectedAward && !showDocumentActions && onCancel && (
             <button className="cert-cancel-btn" onClick={onCancel}>
               <FaTimes size={13} /> Cancel
             </button>
@@ -384,163 +441,232 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
         </div>
       </div>
 
-      {showForm ? (
-        <div className="cert-form-wrap mb-4">
-          <form onSubmit={handleSubmit} className="cert-form-compact">
-            <div className="cert-form-section-compact">
-              <div className="cert-section-label">Award Details</div>
-              <div className="cert-form-grid-3col">
-                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
-                  <label className="required">Employee Name</label>
-                   <div className="position-relative" style={{ maxWidth: '500px' }}>
-    <div className="input-group">
-      <input
-        type="text"
-        className="form-control"
-        placeholder="Type employee name to search..."
-        value={employeeSearchTerm}
-        onChange={(e) => {
-          setEmployeeSearchTerm(e.target.value);
-          setShowEmployeeDropdown(true);
-        }}
-        onFocus={() => {
-          if (employeeSearchTerm.length > 0) {
-            setShowEmployeeDropdown(true);
-          }
-        }}
-        style={{ fontSize: '14px', padding: '6px 12px' }}
-      />
-    </div>
-    
-    {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
-      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
-        <div className="card-body p-2">
-          {filteredEmployees.length > 0 ? (
-            filteredEmployees.map(emp => (
-              <div
-                key={emp.id}
-                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
-                style={{ cursor: 'pointer' }}
-                onClick={() => handleEmployeeSelect(emp)}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <div>
-                  <div className="fw-bold">{emp.name}</div>
-                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                </div>
-                <div>
-                  <span className="badge bg-light text-dark">{emp.designation}</span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-3 text-muted">
-              <small>No employees found</small>
-            </div>
-          )}
+     {showForm ? (
+  <div className="cert-form-wrap mb-4">
+    <form onSubmit={handleSubmit}>
+      <div className="cert-form-section-compact">
+        <div className="cert-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px',paddingLeft: '10px', paddingTop: '8px'  }}>
+          <span>Award Details {formRows.length > 1 && <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#6b7280' }}>({formRows.length} entries)</span>}</span>
         </div>
-      </div>
-    )}
-  </div>
-                </div>
-                
-                {/* Employee Code - Auto Populate */}
-                <div className="cert-field-compact">
-                  <label>Employee Code</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                
-                {/* Department - Auto Populate */}
-                <div className="cert-field-compact">
-                  <label>Department</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                
-                {/* Designation - Auto Populate */}
-                <div className="cert-field-compact">
-                  <label>Designation</label>
-                  <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
-                </div>
-                        
-                <div className={`cert-field-compact ${touched.awardName && errors.awardName ? 'has-error' : ''}`}>
-                  <label className="required">Award Name</label>
-                  <input type="text" placeholder="e.g., Best Employee of the Year" value={formData.awardName} onChange={(e) => handleChange('awardName', e.target.value)} onBlur={() => handleBlur('awardName')} />
-                  <FieldError msg={errors.awardName} />
-                </div>
-                
-                <div className={`cert-field-compact ${touched.awardDate && errors.awardDate ? 'has-error' : ''}`}>
-                  <label className="required">Award Date</label>
-                  <input type="date" value={formData.awardDate} onChange={(e) => handleChange('awardDate', e.target.value)} onBlur={() => handleBlur('awardDate')} />
-                  <FieldError msg={errors.awardDate} />
-                </div>
-                
-                <div className={`cert-field-compact ${touched.awardType && errors.awardType ? 'has-error' : ''}`}>
-                  <label className="required">Award Type</label>
-                  <select value={formData.awardType} onChange={(e) => handleChange('awardType', e.target.value)} onBlur={() => handleBlur('awardType')}>
-                    {awardTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
-                  </select>
-                  <FieldError msg={errors.awardType} />
-                </div>
-                
-                <div className={`cert-field-compact ${touched.issuedBy && errors.issuedBy ? 'has-error' : ''}`}>
-                  <label className="required">Issued By</label>
-                  <select value={formData.issuedBy} onChange={(e) => handleChange('issuedBy', e.target.value)} onBlur={() => handleBlur('issuedBy')}>
-                    <option value="">Select Issued By</option>
-                    {issuedByOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                  </select>
-                  <FieldError msg={errors.issuedBy} />
-                </div>
-                
-                <div className="cert-field-compact" style={{ gridColumn: 'span 2' }}>
-                  <label>Description</label>
-                  <textarea rows="3" placeholder="Brief description of the award and achievement..." value={formData.description} onChange={(e) => handleChange('description', e.target.value)} />
-                </div>
-                
-                {/* <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
-                  <label>Award Certificate</label>
-                  <div className="border rounded p-3 text-center bg-light">
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="certificate-upload" />
-                    <label htmlFor="certificate-upload" className="btn btn-outline-primary btn-sm">
-                      <FaUpload size={12} /> Choose File
-                    </label>
-                    {formData.certificateFileName && (
-                      <div className="mt-2 text-primary">
-                        {formData.certificateFileName.endsWith('.pdf') ? <FaFilePdf /> : <FaFileImage />} {formData.certificateFileName}
+        
+        {/* Table-like form */}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e5e7eb' }}>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '160px' }}>Employee <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '120px' }}>Employee Code</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '120px' }}>Department</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '120px' }}>Designation</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '140px' }}>Award Name <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '110px' }}>Award Date <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '140px' }}>Award Type <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '140px' }}>Issued By <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '140px' }}>Description</th>
+                <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: '#374151', minWidth: '90px' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {formRows.map((row, index) => {
+                const employee = getEmployeeDetails(row.employeeId);
+                const rowError = rowErrors[row.id] || {};
+                return (
+                  <tr key={row.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          className={`form-control ${rowError.employeeId ? 'is-invalid' : ''}`}
+                          placeholder="Search employee..."
+                          value={employee?.name || ''}
+                          onChange={(e) => {
+                            setEmployeeSearchTerm(e.target.value);
+                            setShowEmployeeDropdown(true);
+                          }}
+                          onFocus={() => {
+                            if (employeeSearchTerm.length > 0) {
+                              setShowEmployeeDropdown(true);
+                            }
+                          }}
+                          style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                        />
+                        {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
+                          <div style={{ 
+                            position: 'absolute', 
+                            top: '100%', 
+                            left: 0, 
+                            right: 0, 
+                            background: 'white', 
+                            border: '1px solid #e5e7eb', 
+                            borderRadius: '6px', 
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)', 
+                            zIndex: 1000, 
+                            maxHeight: '180px', 
+                            overflow: 'auto',
+                            marginTop: '2px'
+                          }}>
+                            {filteredEmployees.length > 0 ? (
+                              filteredEmployees.map(emp => (
+                                <div
+                                  key={emp.id}
+                                  style={{ 
+                                    padding: '6px 10px', 
+                                    cursor: 'pointer',
+                                    borderBottom: '1px solid #f3f4f6',
+                                    fontSize: '12px'
+                                  }}
+                                  onClick={() => handleEmployeeSelect(row.id, emp)}
+                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                  <div style={{ fontWeight: 500 }}>{emp.name}</div>
+                                  <div style={{ fontSize: '10px', color: '#6b7280' }}>{emp.code} | {emp.department}</div>
+                                </div>
+                              ))
+                            ) : (
+                              <div style={{ padding: '8px', textAlign: 'center', color: '#6b7280', fontSize: '12px' }}>
+                                No employees found
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {rowError.employeeId && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.employeeId}</div>}
                       </div>
-                    )}
-                    <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
-                  </div>
-                </div> */}
-              </div>
-            </div>
-            
-            <div className="cert-form-actions">
-              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
-              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <FaSave size={12} /> {editingAward ? 'Update Award' : 'Save Award'}
-              </button>
-            </div>
-          </form>
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input type="text" className="form-control bg-light" value={employee?.code || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input type="text" className="form-control bg-light" value={employee?.department || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input type="text" className="form-control bg-light" value={employee?.designation || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input
+                        type="text"
+                        className={`form-control ${rowError.awardName ? 'is-invalid' : ''}`}
+                        placeholder="Award name"
+                        value={row.awardName}
+                        onChange={(e) => handleRowChange(row.id, 'awardName', e.target.value)}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                      />
+                      {rowError.awardName && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.awardName}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input
+                        type="date"
+                        className={`form-control ${rowError.awardDate ? 'is-invalid' : ''}`}
+                        value={row.awardDate}
+                        onChange={(e) => handleRowChange(row.id, 'awardDate', e.target.value)}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                      />
+                      {rowError.awardDate && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.awardDate}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <select
+                        className={`form-control ${rowError.awardType ? 'is-invalid' : ''}`}
+                        value={row.awardType}
+                        onChange={(e) => handleRowChange(row.id, 'awardType', e.target.value)}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                      >
+                        {awardTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
+                      </select>
+                      {rowError.awardType && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.awardType}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <select
+                        className={`form-control ${rowError.issuedBy ? 'is-invalid' : ''}`}
+                        value={row.issuedBy}
+                        onChange={(e) => handleRowChange(row.id, 'issuedBy', e.target.value)}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                      >
+                        <option value="">Select</option>
+                        {issuedByOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                      </select>
+                      {rowError.issuedBy && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.issuedBy}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Description"
+                        value={row.description}
+                        onChange={(e) => handleRowChange(row.id, 'description', e.target.value)}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                      />
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+                        {/* Add Row Button */}
+                        <button
+                          type="button"
+                          onClick={addRow}
+                          title="Add new row"
+                          style={{ 
+                            padding: '4px 8px', 
+                            background: '#9d174d', 
+                            border: 'none', 
+                            borderRadius: '4px', 
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <FaPlus size={11} />
+                        </button>
+                        
+                        {/* Delete Button */}
+                        <button
+                          type="button"
+                          className="cert-act cert-act--delete"
+                          onClick={() => removeRow(row.id)}
+                          title="Remove row"
+                          style={{ 
+                            padding: '4px 8px', 
+                            background: '#fee2e2', 
+                            border: 'none', 
+                            borderRadius: '4px', 
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          disabled={formRows.length <= 1}
+                        >
+                          <FaTrash size={11} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-         ) : showDocumentActions && selectedAward ? (
-                  <DocumentActions 
-                    title="Award Order Document"
-                    documentName={selectedAward.awardOrderFileName}
-                    documentData={selectedAward.awardOrderFileData}
-                    onGenerate={() => handleGenerateLetter(selectedAward)}
-                    onBack={handleBackToList}
-                    generateLabel="Generate Letter"
-                    themeColor="#9d174d"
-                  />
-           ) : selectedAward ? (
+         <div className="cert-form-actions" style={{ marginTop: '20px' }}>
+        <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+        <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', paddingRight: '15px' }}>
+          <FaSave size={12} /> {editingAward ? 'Update Award' : `Save ${formRows.length} Award(s)`}
+        </button>
+      </div>
+      </div>     
+     
+    </form>
+  </div>
+
+      ) : selectedAward ? (
         <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
           <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
             <div>
               <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'8px'}}><FaTrophy size={20}/><h2 style={{fontSize:'22px',fontWeight:700,margin:0}}>{selectedAward.awardName}</h2></div>
               <div style={{display:'flex',gap:'16px',alignItems:'center',fontSize:'13px',opacity:0.9}}><span><FaCalendarAlt/> {formatDate(selectedAward.createdAt)}</span><span style={{background:'rgba(255,255,255,0.2)',padding:'3px 12px',borderRadius:'20px',fontSize:'12px'}}>{selectedAward.awardType}</span></div>
             </div>
-            {/* <button onClick={handleBackToList} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',color:'white',padding:'8px 16px',borderRadius:'8px',cursor:'pointer',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px'}}><FaArrowLeft size={12}/> Back</button> */}
           </div>
           <div style={{padding:'32px'}}>
             <div style={{textAlign:'center',padding:'30px',background:'linear-gradient(135deg,#fef3c7,#fde68a)',borderRadius:'12px',marginBottom:'24px',border:'2px solid #f59e0b'}}>
@@ -597,7 +723,6 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
             </div>
           </div>
 
-        
           {/* Awards Table */}
           <div className="cert-table-card">
             <div className="cert-table-wrap">
@@ -624,87 +749,85 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                         style={{ cursor: 'pointer' }}
                         className="cert-table-row-hover"
                       >
-                      <td className="text-center">{startIndex + idx + 1}</td>
+                        <td className="text-center">{startIndex + idx + 1}</td>
                         <td>{DUMMY_EMPLOYEES.find(e => e.id === award.employeeId)?.name || 'Unknown'}</td>
                         <td><strong>{award.awardName}</strong></td>
                         <td>{formatDate(award.awardDate)}</td>
                         <td>{award.awardType}</td>
                         <td>{award.issuedBy}</td>
                         <td>{award.description ? (award.description.length > 30 ? award.description.substring(0, 30) + '...' : award.description) : '—'}</td>
-                       
-                             <td>
-  <div
-    className="d-flex align-items-center gap-1"
-    style={{ cursor: "pointer" }}
-    onClick={(e) => {
-      e.stopPropagation();
-      handleStatusToggle(
-        award.id,
-        DUMMY_EMPLOYEES.find(e => e.id === award.employeeId)?.name || "",
-        award.status || "Active"
-      );
-    }}
-  >
-    <div
-      style={{
-        width: "28px",
-        height: "16px",
-        borderRadius: "50px",
-        backgroundColor:
-          (award.status || "Active") === "Active"
-            ? "#9d174d"
-            : "#d1d5db",
-        position: "relative",
-        transition: ".2s"
-      }}
-    >
-      <div
-        style={{
-          width: "12px",
-          height: "12px",
-          borderRadius: "50%",
-          background: "#fff",
-          position: "absolute",
-          top: "2px",
-          left:
-            (award.status || "Active") === "Active"
-              ? "14px"
-              : "2px",
-          transition: ".2s"
-        }}
-      />
-    </div>
-
-    <span
-      style={{
-        fontSize: "11px",
-        fontWeight: 500,
-        color:
-          (award.status || "Active") === "Active"
-            ? "#9d174d"
-            : "#94a3b8"
-      }}
-    >
-      {award.status || "Active"}
-    </span>
-  </div>
-</td>
                         <td>
-  <div className="cert-actions" onClick={(e) => e.stopPropagation()}>
-    <button 
-      className="cert-act cert-act--edit" 
-      onClick={() => handleEdit(award)} 
-      title={award.status === 'Inactive' ? 'Cannot edit inactive record' : 'Edit'}
-      disabled={award.status === 'Inactive'}
-      style={{ 
-        opacity: award.status === 'Inactive' ? 0.5 : 1,
-        cursor: award.status === 'Inactive' ? 'not-allowed' : 'pointer'
-      }}
-    >
-      <FaEdit size={12} />
-    </button>
-  </div>
-</td>
+                          <div
+                            className="d-flex align-items-center gap-1"
+                            style={{ cursor: "pointer" }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStatusToggle(
+                                award.id,
+                                DUMMY_EMPLOYEES.find(e => e.id === award.employeeId)?.name || "",
+                                award.status || "Active"
+                              );
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "28px",
+                                height: "16px",
+                                borderRadius: "50px",
+                                backgroundColor:
+                                  (award.status || "Active") === "Active"
+                                    ? "#9d174d"
+                                    : "#d1d5db",
+                                position: "relative",
+                                transition: ".2s"
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "12px",
+                                  height: "12px",
+                                  borderRadius: "50%",
+                                  background: "#fff",
+                                  position: "absolute",
+                                  top: "2px",
+                                  left:
+                                    (award.status || "Active") === "Active"
+                                      ? "14px"
+                                      : "2px",
+                                  transition: ".2s"
+                                }}
+                              />
+                            </div>
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 500,
+                                color:
+                                  (award.status || "Active") === "Active"
+                                    ? "#9d174d"
+                                    : "#94a3b8"
+                              }}
+                            >
+                              {award.status || "Active"}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="cert-actions" onClick={(e) => e.stopPropagation()}>
+                            <button 
+                              className="cert-act cert-act--edit" 
+                              onClick={() => handleEdit(award)} 
+                              title={award.status === 'Inactive' ? 'Cannot edit inactive record' : 'Edit'}
+                              disabled={award.status === 'Inactive'}
+                              style={{ 
+                                opacity: award.status === 'Inactive' ? 0.5 : 1,
+                                cursor: award.status === 'Inactive' ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              <FaEdit size={12} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   ) : (
@@ -714,9 +837,8 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
               </table>
             </div>
 
-           
-          {/* Pagination */}
- <div className="cert-table-footer">
+            {/* Pagination */}
+            <div className="cert-table-footer">
               <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
                 Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
               </div>
@@ -768,57 +890,57 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
           </div>
         </>
       )}
-           {showStatusModal && (
-  <div
-    className="emp-modal-overlay"
-    onClick={() => setShowStatusModal(false)}
-  >
-    <div
-      className="emp-modal"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="emp-modal-icon">
-        {statusAction.newStatus === "Active" ? "✅" : "⛔"}
-      </div>
-
-      <h3 className="emp-modal-title">
-        Confirm Status Change
-      </h3>
-
-      <p className="emp-modal-body">
-        Are you sure you want to{" "}
-        <strong>
-          {statusAction.newStatus === "Active"
-            ? "activate"
-            : "deactivate"}
-        </strong>{" "}
-        <strong>{statusAction.name}</strong>?
-      </p>
-
-      <p className="emp-modal-warn">
-        {statusAction.newStatus === "Inactive"
-          ? "Inactive records cannot be edited until reactivated."
-          : "This record will become active again."}
-      </p>
-
-      <div className="emp-modal-actions">
-        <button
-          className="emp-modal-cancel"
+      {showStatusModal && (
+        <div
+          className="emp-modal-overlay"
           onClick={() => setShowStatusModal(false)}
         >
-          Cancel
-        </button>
+          <div
+            className="emp-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="emp-modal-icon">
+              {statusAction.newStatus === "Active" ? "✅" : "⛔"}
+            </div>
 
-        <button
-          className="emp-modal-confirm"
-          onClick={confirmStatusChange}
-        >
-          Confirm
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+            <h3 className="emp-modal-title">
+              Confirm Status Change
+            </h3>
+
+            <p className="emp-modal-body">
+              Are you sure you want to{" "}
+              <strong>
+                {statusAction.newStatus === "Active"
+                  ? "activate"
+                  : "deactivate"}
+              </strong>{" "}
+              <strong>{statusAction.name}</strong>?
+            </p>
+
+            <p className="emp-modal-warn">
+              {statusAction.newStatus === "Inactive"
+                ? "Inactive records cannot be edited until reactivated."
+                : "This record will become active again."}
+            </p>
+
+            <div className="emp-modal-actions">
+              <button
+                className="emp-modal-cancel"
+                onClick={() => setShowStatusModal(false)}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="emp-modal-confirm"
+                onClick={confirmStatusChange}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Document Preview Modal */}
       {documentPreview && (
@@ -937,11 +1059,16 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
         </div>
       )}
 
-      {/* Add CSS for row hover effect */}
       <style jsx>{`
         .cert-table-row-hover:hover {
           background-color: #f9fafb;
           transition: background-color 0.2s ease;
+        }
+        .is-invalid {
+          border-color: #ef4444 !important;
+        }
+        .is-invalid:focus {
+          box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
         }
       `}</style>
     </div>

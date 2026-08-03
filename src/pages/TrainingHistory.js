@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   FaSave, FaTimes, FaChalkboardTeacher, FaCalendarAlt, FaBuilding, 
@@ -5,6 +6,7 @@ import {
   FaFileAlt, FaSearch, FaUserTie, FaEye, FaDownload, FaClock, FaCertificate, FaArrowLeft
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import DocumentActions from './DocumentsAction';
 
 const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [trainings, setTrainings] = useState(initialData?.trainings || [
@@ -16,21 +18,24 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   ]);
   
   const [editingTraining, setEditingTraining] = useState(null);
-  const [selectedTraining, setSelectedTraining] = useState(null); // For inline detail view
-  const [documentPreview, setDocumentPreview] = useState(null); // For document preview modal
-  const [formData, setFormData] = useState({
-    trainingName: '',
-    trainingProvider: '',
-    startDate: '',
-    endDate: '',
-    certificationReceived: 'No',
-    trainingHours: '',
-    certificateFile: null,
-    certificateFileData: null,
-    certificateFileName: null,
-    employeeId: '',
-    employeeName: ''
-  });
+  const [selectedTraining, setSelectedTraining] = useState(null);
+  const [documentPreview, setDocumentPreview] = useState(null);
+  const [formRows, setFormRows] = useState([
+    {
+      id: Date.now(),
+      trainingName: '',
+      trainingProvider: '',
+      startDate: '',
+      endDate: '',
+      certificationReceived: 'No',
+      trainingHours: '',
+      certificateFile: null,
+      certificateFileData: null,
+      certificateFileName: null,
+      employeeId: '',
+      employeeName: ''
+    }
+  ]);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,15 +47,15 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [showForm, setShowForm] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(4);
-   const [showStatusModal, setShowStatusModal] = useState(false);
-      const [statusAction, setStatusAction] = useState({
-        id: null,
-        name: "",
-        newStatus: ""
-      });
-
-   // Employee Search State
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusAction, setStatusAction] = useState({
+    id: null,
+    name: "",
+    newStatus: ""
+  });
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [showDocumentActions, setShowDocumentActions] = useState(false);
+  const [rowErrors, setRowErrors] = useState({});
   
   const DUMMY_EMPLOYEES = [
     { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
@@ -65,14 +70,14 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
   });
 
-  // Handle row click for detail view
   const handleRowClick = (training) => {
     setSelectedTraining(training);
   };
 
-  // Handle document view
   const handleViewDocument = (e, training) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation(); 
+    setSelectedTraining(training); 
+    setShowDocumentActions(true);
     if (training.certificateFileData) {
       setDocumentPreview({
         data: training.certificateFileData,
@@ -89,7 +94,6 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     { value: 'Pending', label: 'Pending' }
   ];
 
-  // Filter trainings by search
   const filteredTrainings = trainings.filter(training => {
     const search = searchTerm.toLowerCase();
     return training.trainingName.toLowerCase().includes(search) ||
@@ -97,22 +101,28 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
            training.employeeName.toLowerCase().includes(search);
   });
 
-  // Pagination
   const totalItems = filteredTrainings.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
-const currentTrainings = filteredTrainings.slice(startIndex, startIndex + rowsPerPage);
+  const currentTrainings = filteredTrainings.slice(startIndex, startIndex + rowsPerPage);
   
-const handleEmployeeSelect = (employee) => {
-  setSelectedEmployee(employee);
-  setFormData(prev => ({
-    ...prev,
-    employeeId: employee.id,
-    employeeName: employee.name
-  }));
-  setEmployeeSearchTerm(employee.name);
-  setShowEmployeeDropdown(false);
-};
+  const handleEmployeeSelect = (rowId, employee) => {
+    setFormRows(prev => prev.map(row => 
+      row.id === rowId ? {
+        ...row,
+        employeeId: employee.id,
+        employeeName: employee.name
+      } : row
+    ));
+    setEmployeeSearchTerm(employee.name);
+    setShowEmployeeDropdown(false);
+    
+    if (rowErrors[rowId]) {
+      const newErrors = { ...rowErrors };
+      delete newErrors[rowId];
+      setRowErrors(newErrors);
+    }
+  };
 
   const getPaginationRange = () => {
     const delta = 2;
@@ -140,14 +150,22 @@ const handleEmployeeSelect = (employee) => {
     return `${diffDays} days`;
   };
 
-  const handleChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
-    if (touched[field]) {
-      validateField(field, value);
+  const handleRowChange = (rowId, field, value) => {
+    setFormRows(prev => prev.map(row => 
+      row.id === rowId ? { ...row, [field]: value } : row
+    ));
+    
+    if (rowErrors[rowId] && rowErrors[rowId][field]) {
+      const newErrors = { ...rowErrors };
+      delete newErrors[rowId][field];
+      if (Object.keys(newErrors[rowId] || {}).length === 0) {
+        delete newErrors[rowId];
+      }
+      setRowErrors(newErrors);
     }
   };
 
-  const handleFileChange = (e) => {
+  const handleRowFileChange = (rowId, e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -156,87 +174,103 @@ const handleEmployeeSelect = (employee) => {
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData({
-          ...formData,
-          certificateFile: file,
-          certificateFileData: reader.result,
-          certificateFileName: file.name
-        });
+        setFormRows(prev => prev.map(row => 
+          row.id === rowId ? {
+            ...row,
+            certificateFile: file,
+            certificateFileData: reader.result,
+            certificateFileName: file.name
+          } : row
+        ));
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const validateField = (field, value) => {
-    let error = '';
-    
-    if (field === 'trainingName' && !value) error = 'Training Name is required';
-    else if (field === 'trainingProvider' && !value) error = 'Training Provider is required';
-    else if (field === 'startDate' && !value) error = 'Start Date is required';
-    else if (field === 'endDate') {
-      if (!value) error = 'End Date is required';
-      else if (formData.startDate && new Date(value) < new Date(formData.startDate)) {
-        error = 'End Date must be after Start Date';
-      }
+  const validateRow = (row) => {
+    const errors = {};
+    if (!row.trainingName) errors.trainingName = 'Training Name is required';
+    if (!row.trainingProvider) errors.trainingProvider = 'Training Provider is required';
+    if (!row.startDate) errors.startDate = 'Start Date is required';
+    if (!row.endDate) {
+      errors.endDate = 'End Date is required';
+    } else if (row.startDate && new Date(row.endDate) < new Date(row.startDate)) {
+      errors.endDate = 'End Date must be after Start Date';
     }
-    else if (field === 'trainingHours' && !value) error = 'Training Hours is required';
-    else if (field === 'certificationReceived' && !value) error = 'Certification Received is required';
-    else if (field === 'employeeId' && !value) error = 'Employee is required';
-    
-    setErrors(prev => ({ ...prev, [field]: error }));
-    return error === '';
+    if (!row.trainingHours) errors.trainingHours = 'Training Hours is required';
+    if (!row.certificationReceived) errors.certificationReceived = 'Certification Received is required';
+    if (!row.employeeId) errors.employeeId = 'Employee is required';
+    return errors;
   };
 
-  const handleBlur = (field) => {
-    setTouched(prev => ({ ...prev, [field]: true }));
-    validateField(field, formData[field]);
+  const addRow = () => {
+    const newRow = {
+      id: Date.now() + Math.random(),
+      trainingName: '',
+      trainingProvider: '',
+      startDate: '',
+      endDate: '',
+      certificationReceived: 'No',
+      trainingHours: '',
+      certificateFile: null,
+      certificateFileData: null,
+      certificateFileName: null,
+      employeeId: '',
+      employeeName: ''
+    };
+    setFormRows([...formRows, newRow]);
   };
 
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.trainingName) newErrors.trainingName = 'Training Name is required';
-    if (!formData.trainingProvider) newErrors.trainingProvider = 'Training Provider is required';
-    if (!formData.startDate) newErrors.startDate = 'Start Date is required';
-    if (!formData.endDate) {
-      newErrors.endDate = 'End Date is required';
-    } else if (formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
-      newErrors.endDate = 'End Date must be after Start Date';
+  const removeRow = (rowId) => {
+    if (formRows.length <= 1) {
+      toast.warning('Cannot Remove', 'At least one row is required');
+      return;
     }
-    if (!formData.trainingHours) newErrors.trainingHours = 'Training Hours is required';
-    if (!formData.certificationReceived) newErrors.certificationReceived = 'Certification Received is required';
-    if (!formData.employeeId) newErrors.employeeId = 'Employee is required';
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setFormRows(prev => prev.filter(row => row.id !== rowId));
+    const newErrors = { ...rowErrors };
+    delete newErrors[rowId];
+    setRowErrors(newErrors);
   };
 
- 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!validateForm()) {
-      toast.warning('Validation Error', 'Please fix the highlighted fields');
+    
+    let hasErrors = false;
+    const allErrors = {};
+    
+    formRows.forEach(row => {
+      const rowError = validateRow(row);
+      if (Object.keys(rowError).length > 0) {
+        allErrors[row.id] = rowError;
+        hasErrors = true;
+      }
+    });
+    
+    if (hasErrors) {
+      setRowErrors(allErrors);
+      toast.warning('Validation Error', 'Please fix the highlighted fields in all rows');
       return;
     }
     
-    const trainingData = {
-      ...formData,
-      id: editingTraining ? editingTraining.id : Date.now(),
-      duration: calculateDuration(formData.startDate, formData.endDate),
-      createdAt: editingTraining ? editingTraining.createdAt : new Date().toISOString()
-    };
+    const newTrainings = formRows.map(row => ({
+      id: Date.now() + Math.random() * 1000,
+      trainingName: row.trainingName,
+      trainingProvider: row.trainingProvider,
+      startDate: row.startDate,
+      endDate: row.endDate,
+      certificationReceived: row.certificationReceived,
+      trainingHours: row.trainingHours,
+      duration: calculateDuration(row.startDate, row.endDate),
+      certificateFileData: row.certificateFileData,
+      certificateFileName: row.certificateFileName,
+      employeeId: row.employeeId,
+      employeeName: row.employeeName,
+      createdAt: new Date().toISOString(),
+      status: 'Active'
+    }));
     
-    if (editingTraining) {
-      const updated = trainings.map(t =>
-        t.id === editingTraining.id ? trainingData : t
-      );
-      setTrainings(updated);
-      toast.success('Success', 'Training updated successfully');
-      setEditingTraining(null);
-    } else {
-      setTrainings([trainingData, ...trainings]);
-      toast.success('Success', 'Training added successfully');
-    }
+    setTrainings([...newTrainings, ...trainings]);
+    toast.success('Success', `${newTrainings.length} training(s) added successfully`);
     resetForm();
     setShowForm(false);
     setPage(0);
@@ -251,7 +285,9 @@ const handleEmployeeSelect = (employee) => {
     const emp = DUMMY_EMPLOYEES.find(e => e.id === training.employeeId);
     setSelectedEmployee(emp || null);
     setEditingTraining(training);
-    setFormData({
+    
+    setFormRows([{
+      id: Date.now(),
       trainingName: training.trainingName,
       trainingProvider: training.trainingProvider,
       startDate: training.startDate,
@@ -263,20 +299,15 @@ const handleEmployeeSelect = (employee) => {
       certificateFileName: training.certificateFileName,
       employeeId: training.employeeId,
       employeeName: training.employeeName
-    });
+    }]);
+    
     setEmployeeSearchTerm(emp?.name || '');
     setShowForm(true);
   };
 
-  const handleView = (training) => {
-    setViewingTraining(training);
-    setShowViewModal(true);
-  };
-
- 
-
   const resetForm = () => {
-    setFormData({
+    setFormRows([{
+      id: Date.now(),
       trainingName: '',
       trainingProvider: '',
       startDate: '',
@@ -288,12 +319,13 @@ const handleEmployeeSelect = (employee) => {
       certificateFileName: null,
       employeeId: '',
       employeeName: ''
-    });
+    }]);
     setErrors({});
     setTouched({});
     setEditingTraining(null);
     setSelectedEmployee(null);
     setEmployeeSearchTerm('');
+    setRowErrors({});
   };
 
   const handleCancelForm = () => {
@@ -305,14 +337,13 @@ const handleEmployeeSelect = (employee) => {
     resetForm();
     setShowForm(false);
     setSelectedTraining(null);
+    setShowDocumentActions(false);
   };
 
-  // Calculate stats
   const totalTrainings = trainings.length;
   const certifiedTrainings = trainings.filter(t => t.certificationReceived === 'Yes').length;
   const totalHours = trainings.reduce((sum, t) => sum + (parseInt(t.trainingHours) || 0), 0);
 
-  // Get certification status color
   const getCertificationColor = (status) => {
     switch(status) {
       case 'Yes': return { bg: '#d1fae5', color: '#065f46', icon: '✅' };
@@ -322,53 +353,58 @@ const handleEmployeeSelect = (employee) => {
     }
   };
 
-   const handleStatusToggle = (id, name, currentStatus) => {
-      const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-      setStatusAction({
-        id,
-        name,
-        newStatus
-      });
-      setShowStatusModal(true);
-    };
+  const handleStatusToggle = (id, name, currentStatus) => {
+    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+    setStatusAction({
+      id,
+      name,
+      newStatus
+    });
+    setShowStatusModal(true);
+  };
 
-    const confirmStatusChange = () => {
-      const { id, newStatus } = statusAction;
-    
-      const updatedTrainings = trainings.map((training) =>
-        training.id === id
-          ? {
-              ...training,
-              status: newStatus
-            }
-          : training
-      );
-    
-      setTrainings(updatedTrainings);
-    
-      setShowStatusModal(false);
-    
-      toast.success(
-        "Status Updated",
-        `${statusAction.name} is now ${newStatus}`
-      );
-    };
+  const confirmStatusChange = () => {
+    const { id, newStatus } = statusAction;
+  
+    const updatedTrainings = trainings.map((training) =>
+      training.id === id
+        ? {
+            ...training,
+            status: newStatus
+          }
+        : training
+    );
+  
+    setTrainings(updatedTrainings);
+    setShowStatusModal(false);
+    toast.success(
+      "Status Updated",
+      `${statusAction.name} is now ${newStatus}`
+    );
+  };
+
+  const handleGenerateLetter = (training) => {
+    console.log('Generate clicked for:', training.trainingCertificateFileName);
+  };
+
+  const getEmployeeDetails = (employeeId) => {
+    return DUMMY_EMPLOYEES.find(e => e.id === employeeId);
+  };
 
   return (
     <div className="cert-root">
-      {/* Header */}
       <div className="cert-header">
         <div>
           <h1 className="cert-title">Training History</h1>
           <p className="cert-subtitle">Manage employee training records</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!showForm && !selectedTraining && (
+          {!showForm && !selectedTraining && !showDocumentActions && (
             <button className="cert-add-btn" onClick={() => { resetForm(); setShowForm(true); }}>
               <FaPlus size={13} /> Add Training
             </button>
           )}
-          {(showForm || selectedTraining) && (
+          {(showForm || selectedTraining || showDocumentActions) && (
             <button 
               type="button" 
               className="cert-back-btn" 
@@ -378,7 +414,7 @@ const handleEmployeeSelect = (employee) => {
               <FaArrowLeft size={12} /> Back
             </button>
           )}
-          {!showForm && !selectedTraining && onCancel && (
+          {!showForm && !selectedTraining && !showDocumentActions && onCancel && (
             <button className="cert-cancel-btn" onClick={onCancel}>
               <FaTimes size={13} /> Cancel
             </button>
@@ -386,157 +422,244 @@ const handleEmployeeSelect = (employee) => {
         </div>
       </div>
 
-      {showForm ? (
-        <div className="cert-form-wrap mb-4">
-  <form onSubmit={handleSubmit} className="cert-form-compact">
-    <div className="cert-form-section-compact">
-      <div className="cert-section-label">Training Details</div>
-      <div className="cert-form-grid-3col">   
-        <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
-          <label className="required">Employee Name</label>
-          <div className="position-relative" style={{ maxWidth: '500px' }}>
-    <div className="input-group">
-      <input
-        type="text"
-        className="form-control"
-        placeholder="Type employee name to search..."
-        value={employeeSearchTerm}
-        onChange={(e) => {
-          setEmployeeSearchTerm(e.target.value);
-          setShowEmployeeDropdown(true);
-        }}
-        onFocus={() => {
-          if (employeeSearchTerm.length > 0) {
-            setShowEmployeeDropdown(true);
-          }
-        }}
-        style={{ fontSize: '14px', padding: '6px 12px' }}
-      />
-    </div>
-    
-    {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
-      <div className="card position-absolute top-100 start-0 end-0 mt-1 shadow-lg" style={{ zIndex: 1000, maxHeight: '250px', overflow: 'auto' }}>
-        <div className="card-body p-2">
-          {filteredEmployees.length > 0 ? (
-            filteredEmployees.map(emp => (
-              <div
-                key={emp.id}
-                className="d-flex justify-content-between align-items-center p-2 rounded cursor-pointer hover-bg-light"
-                style={{ cursor: 'pointer' }}
-                onClick={() => handleEmployeeSelect(emp)}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <div>
-                  <div className="fw-bold">{emp.name}</div>
-                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                </div>
-                <div>
-                  <span className="badge bg-light text-dark">{emp.designation}</span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-3 text-muted">
-              <small>No employees found</small>
-            </div>
-          )}
+     {showForm ? (
+  <div className="cert-form-wrap mb-4">
+    <form onSubmit={handleSubmit}>
+      <div className="cert-form-section-compact">
+        <div className="cert-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px',paddingLeft: '10px',paddingTop: '8px' }}>
+          <span>Training Details {formRows.length > 1 && <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#6b7280' }}>({formRows.length} entries)</span>}</span>
         </div>
+        
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e5e7eb' }}>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '160px' }}>Employee <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '120px' }}>Employee Code</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '120px' }}>Department</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '120px' }}>Designation</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '140px' }}>Training Name <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '130px' }}>Provider <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '110px' }}>Start Date <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '110px' }}>End Date <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '90px' }}>Hours <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#374151', minWidth: '120px' }}>Certification <span style={{ color: '#ef4444' }}>*</span></th>
+                <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: '#374151', minWidth: '100px' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {formRows.map((row, index) => {
+                const employee = getEmployeeDetails(row.employeeId);
+                const rowError = rowErrors[row.id] || {};
+                return (
+                  <tr key={row.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          className={`form-control ${rowError.employeeId ? 'is-invalid' : ''}`}
+                          placeholder="Search employee..."
+                          value={employee?.name || ''}
+                          onChange={(e) => {
+                            setEmployeeSearchTerm(e.target.value);
+                            setShowEmployeeDropdown(true);
+                          }}
+                          onFocus={() => {
+                            if (employeeSearchTerm.length > 0) {
+                              setShowEmployeeDropdown(true);
+                            }
+                          }}
+                          style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                        />
+                        {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
+                          <div style={{ 
+                            position: 'absolute', 
+                            top: '100%', 
+                            left: 0, 
+                            right: 0, 
+                            background: 'white', 
+                            border: '1px solid #e5e7eb', 
+                            borderRadius: '6px', 
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)', 
+                            zIndex: 1000, 
+                            maxHeight: '180px', 
+                            overflow: 'auto',
+                            marginTop: '2px'
+                          }}>
+                            {filteredEmployees.length > 0 ? (
+                              filteredEmployees.map(emp => (
+                                <div
+                                  key={emp.id}
+                                  style={{ 
+                                    padding: '6px 10px', 
+                                    cursor: 'pointer',
+                                    borderBottom: '1px solid #f3f4f6',
+                                    fontSize: '12px'
+                                  }}
+                                  onClick={() => handleEmployeeSelect(row.id, emp)}
+                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                  <div style={{ fontWeight: 500 }}>{emp.name}</div>
+                                  <div style={{ fontSize: '10px', color: '#6b7280' }}>{emp.code} | {emp.department}</div>
+                                </div>
+                              ))
+                            ) : (
+                              <div style={{ padding: '8px', textAlign: 'center', color: '#6b7280', fontSize: '12px' }}>
+                                No employees found
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {rowError.employeeId && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.employeeId}</div>}
+                      </div>
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input type="text" className="form-control bg-light" value={employee?.code || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input type="text" className="form-control bg-light" value={employee?.department || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input type="text" className="form-control bg-light" value={employee?.designation || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input
+                        type="text"
+                        className={`form-control ${rowError.trainingName ? 'is-invalid' : ''}`}
+                        placeholder="Training name"
+                        value={row.trainingName}
+                        onChange={(e) => handleRowChange(row.id, 'trainingName', e.target.value)}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                      />
+                      {rowError.trainingName && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.trainingName}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input
+                        type="text"
+                        className={`form-control ${rowError.trainingProvider ? 'is-invalid' : ''}`}
+                        placeholder="Provider"
+                        value={row.trainingProvider}
+                        onChange={(e) => handleRowChange(row.id, 'trainingProvider', e.target.value)}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                      />
+                      {rowError.trainingProvider && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.trainingProvider}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input
+                        type="date"
+                        className={`form-control ${rowError.startDate ? 'is-invalid' : ''}`}
+                        value={row.startDate}
+                        onChange={(e) => handleRowChange(row.id, 'startDate', e.target.value)}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                      />
+                      {rowError.startDate && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.startDate}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input
+                        type="date"
+                        className={`form-control ${rowError.endDate ? 'is-invalid' : ''}`}
+                        value={row.endDate}
+                        min={row.startDate}
+                        onChange={(e) => handleRowChange(row.id, 'endDate', e.target.value)}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                      />
+                      {rowError.endDate && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.endDate}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <input
+                        type="number"
+                        className={`form-control ${rowError.trainingHours ? 'is-invalid' : ''}`}
+                        placeholder="Hours"
+                        value={row.trainingHours}
+                        onChange={(e) => handleRowChange(row.id, 'trainingHours', e.target.value)}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                      />
+                      {rowError.trainingHours && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.trainingHours}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                      <select
+                        className={`form-control ${rowError.certificationReceived ? 'is-invalid' : ''}`}
+                        value={row.certificationReceived}
+                        onChange={(e) => handleRowChange(row.id, 'certificationReceived', e.target.value)}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                      >
+                        {certificationOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                      </select>
+                      {rowError.certificationReceived && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.certificationReceived}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px', verticalAlign: 'top', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+                        {/* Add Row Button */}
+                        <button
+                          type="button"
+                          onClick={addRow}
+                          title="Add new row"
+                          style={{ 
+                            padding: '4px 8px', 
+                            background: '#9d174d', 
+                            border: 'none', 
+                            borderRadius: '4px', 
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <FaPlus size={11} />
+                        </button>
+                        
+                        {/* Delete Button */}
+                        <button
+                          type="button"
+                          className="cert-act cert-act--delete"
+                          onClick={() => removeRow(row.id)}
+                          title="Remove row"
+                          style={{ 
+                            padding: '4px 8px', 
+                            background: '#fee2e2', 
+                            border: 'none', 
+                            borderRadius: '4px', 
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          disabled={formRows.length <= 1}
+                        >
+                          <FaTrash size={11} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="cert-form-actions" style={{ marginTop: '15px' }}>
+        <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
+        <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <FaSave size={12} /> {editingTraining ? 'Update Training' : `Save ${formRows.length} Training(s)`}
+        </button>
       </div>
-    )}
-  </div>
-        </div>
-        
-        {/* Employee Code - Auto Populate */}
-        <div className="cert-field-compact">
-          <label>Employee Code</label>
-          <input type="text" className="form-control bg-light" value={selectedEmployee?.code || ''} readOnly placeholder="Auto-populated" />
-        </div>
-        
-        {/* Department - Auto Populate */}
-        <div className="cert-field-compact">
-          <label>Department</label>
-          <input type="text" className="form-control bg-light" value={selectedEmployee?.department || ''} readOnly placeholder="Auto-populated" />
-        </div>
-        
-        {/* Designation - Auto Populate */}
-        <div className="cert-field-compact">
-          <label>Designation</label>
-          <input type="text" className="form-control bg-light" value={selectedEmployee?.designation || ''} readOnly placeholder="Auto-populated" />
-        </div>
-                   
-        <div className={`cert-field-compact ${touched.trainingName && errors.trainingName ? 'has-error' : ''}`}>
-          <label className="required">Training Name</label>
-          <input type="text" placeholder="e.g., Advanced React Development" value={formData.trainingName} onChange={(e) => handleChange('trainingName', e.target.value)} onBlur={() => handleBlur('trainingName')} />
-          <FieldError msg={errors.trainingName} />
-        </div>
-        
-        <div className={`cert-field-compact ${touched.trainingProvider && errors.trainingProvider ? 'has-error' : ''}`}>
-          <label className="required">Training Provider</label>
-          <input type="text" placeholder="e.g., Udemy, Coursera" value={formData.trainingProvider} onChange={(e) => handleChange('trainingProvider', e.target.value)} onBlur={() => handleBlur('trainingProvider')} />
-          <FieldError msg={errors.trainingProvider} />
-        </div>
-        
-        <div className={`cert-field-compact ${touched.startDate && errors.startDate ? 'has-error' : ''}`}>
-          <label className="required">Start Date</label>
-          <input type="date" value={formData.startDate} onChange={(e) => handleChange('startDate', e.target.value)} onBlur={() => handleBlur('startDate')} />
-          <FieldError msg={errors.startDate} />
-        </div>
-        
-        <div className={`cert-field-compact ${touched.endDate && errors.endDate ? 'has-error' : ''}`}>
-          <label className="required">End Date</label>
-          <input type="date" value={formData.endDate} min={formData.startDate} onChange={(e) => handleChange('endDate', e.target.value)} onBlur={() => handleBlur('endDate')} />
-          <FieldError msg={errors.endDate} />
-        </div>
-        
-        <div className={`cert-field-compact ${touched.trainingHours && errors.trainingHours ? 'has-error' : ''}`}>
-          <label className="required">Training Hours</label>
-          <input type="number" placeholder="e.g., 40" value={formData.trainingHours} onChange={(e) => handleChange('trainingHours', e.target.value)} onBlur={() => handleBlur('trainingHours')} />
-          <FieldError msg={errors.trainingHours} />
-        </div>
-        
-        <div className={`cert-field-compact ${touched.certificationReceived && errors.certificationReceived ? 'has-error' : ''}`}>
-          <label className="required">Certification Received</label>
-          <select value={formData.certificationReceived} onChange={(e) => handleChange('certificationReceived', e.target.value)} onBlur={() => handleBlur('certificationReceived')}>
-            {certificationOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-          </select>
-          <FieldError msg={errors.certificationReceived} />
-        </div>
-        
-        <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
-          <label>Certificate Upload</label>
-          <div className="border rounded p-3 text-center bg-light">
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="certificate-upload" />
-            <label htmlFor="certificate-upload" className="btn btn-outline-primary btn-sm">
-              <FaUpload size={12} /> Choose File
-            </label>
-            {formData.certificateFileName && (
-              <div className="mt-2 text-primary">
-                {formData.certificateFileName.endsWith('.pdf') ? <FaFilePdf /> : <FaFileImage />} {formData.certificateFileName}
-              </div>
-            )}
-            <small className="text-muted d-block mt-2">Supported: PDF, JPG, PNG (Max 5MB)</small>
-          </div>
-        </div>
       </div>
-    </div>
-    
-    <div className="cert-form-actions">
-      <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>Cancel</button>
-      <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-        <FaSave size={12} /> {editingTraining ? 'Update Training' : 'Save Training'}
-      </button>
-    </div>
-  </form>
-</div>
-            ) : selectedTraining ? (
+      
+      
+    </form>
+  </div> 
+        
+      ) : selectedTraining ? (
         <div style={{background:'white',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 20px rgba(0,0,0,0.08)'}}>
           <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
             <div>
               <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'8px'}}><FaChalkboardTeacher size={20}/><h2 style={{fontSize:'22px',fontWeight:700,margin:0}}>{selectedTraining.trainingName}</h2></div>
               <div style={{display:'flex',gap:'16px',alignItems:'center',fontSize:'13px',opacity:0.9}}><span><FaBuilding/> {selectedTraining.trainingProvider}</span><span style={{background:'rgba(255,255,255,0.2)',padding:'3px 12px',borderRadius:'20px',fontSize:'12px'}}>{selectedTraining.certificationReceived}</span></div>
             </div>
-            {/* <button onClick={handleBackToList} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',color:'white',padding:'8px 16px',borderRadius:'8px',cursor:'pointer',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px'}}><FaArrowLeft size={12}/> Back</button> */}
           </div>
           <div style={{padding:'32px'}}>
             <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',marginBottom:'24px',border:'1px solid #e2e8f0',display:'flex',alignItems:'center',gap:'16px'}}>
@@ -567,7 +690,6 @@ const handleEmployeeSelect = (employee) => {
         </div>
       ) : (
         <>
-          {/* Search Bar */}
           <div className="emp-search-bar">
             <div className="emp-search-wrap">
               <FaSearch className="emp-search-icon" size={12} />
@@ -586,15 +708,13 @@ const handleEmployeeSelect = (employee) => {
             </div>
           </div>
 
- 
-          {/* Trainings Table */}
           <div className="cert-table-card">
             <div className="cert-table-wrap">
               <table className="cert-table">
                 <thead>
                   <tr>
                     <th>#</th>
-                     <th>Employee</th>
+                    <th>Employee</th>
                     <th>Training Name</th>                  
                     <th>Provider</th>
                     <th>Start Date</th>
@@ -614,11 +734,9 @@ const handleEmployeeSelect = (employee) => {
                         style={{ cursor: 'pointer' }}
                         className="cert-table-row-hover"
                       >
-                     <td className="text-center">{startIndex + idx + 1}</td>
-
-                         <td>{DUMMY_EMPLOYEES.find(e => e.id === training.employeeId)?.name || training.employeeName}</td>
+                        <td className="text-center">{startIndex + idx + 1}</td>
+                        <td>{DUMMY_EMPLOYEES.find(e => e.id === training.employeeId)?.name || training.employeeName}</td>
                         <td><strong>{training.trainingName}</strong></td>
-                       
                         <td>{training.trainingProvider}</td>
                         <td>{formatDate(training.startDate)}</td>
                         <td>{formatDate(training.endDate)}</td>
@@ -631,64 +749,62 @@ const handleEmployeeSelect = (employee) => {
                             {training.certificationReceived}
                           </span>
                         </td>
-                     
-                                <td>
-  <div
-    className="d-flex align-items-center gap-1"
-    style={{ cursor: "pointer" }}
-    onClick={(e) => {
-      e.stopPropagation();
-      handleStatusToggle(
-        training.id,
-        DUMMY_EMPLOYEES.find(e => e.id === training.employeeId)?.name || "",
-        training.status || "Active"
-      );
-    }}
-  >
-    <div
-      style={{
-        width: "28px",
-        height: "16px",
-        borderRadius: "50px",
-        backgroundColor:
-          (training.status || "Active") === "Active"
-            ? "#9d174d"
-            : "#d1d5db",
-        position: "relative",
-        transition: ".2s"
-      }}
-    >
-      <div
-        style={{
-          width: "12px",
-          height: "12px",
-          borderRadius: "50%",
-          background: "#fff",
-          position: "absolute",
-          top: "2px",
-          left:
-            (training.status || "Active") === "Active"
-              ? "14px"
-              : "2px",
-          transition: ".2s"
-        }}
-      />
-    </div>
-
-    <span
-      style={{
-        fontSize: "11px",
-        fontWeight: 500,
-        color:
-          (training.status || "Active") === "Active"
-            ? "#9d174d"
-            : "#94a3b8"
-      }}
-    >
-      {training.status || "Active"}
-    </span>
-  </div>
-</td>
+                        <td>
+                          <div
+                            className="d-flex align-items-center gap-1"
+                            style={{ cursor: "pointer" }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStatusToggle(
+                                training.id,
+                                DUMMY_EMPLOYEES.find(e => e.id === training.employeeId)?.name || "",
+                                training.status || "Active"
+                              );
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "28px",
+                                height: "16px",
+                                borderRadius: "50px",
+                                backgroundColor:
+                                  (training.status || "Active") === "Active"
+                                    ? "#9d174d"
+                                    : "#d1d5db",
+                                position: "relative",
+                                transition: ".2s"
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "12px",
+                                  height: "12px",
+                                  borderRadius: "50%",
+                                  background: "#fff",
+                                  position: "absolute",
+                                  top: "2px",
+                                  left:
+                                    (training.status || "Active") === "Active"
+                                      ? "14px"
+                                      : "2px",
+                                  transition: ".2s"
+                                }}
+                              />
+                            </div>
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 500,
+                                color:
+                                  (training.status || "Active") === "Active"
+                                    ? "#9d174d"
+                                    : "#94a3b8"
+                              }}
+                            >
+                              {training.status || "Active"}
+                            </span>
+                          </div>
+                        </td>
                         <td className="text-center">
                           <div className="cert-actions" onClick={(e) => e.stopPropagation()}>
                             <button 
@@ -714,9 +830,7 @@ const handleEmployeeSelect = (employee) => {
               </table>
             </div>
 
-            
-            {/* Pagination */}
- <div className="cert-table-footer">
+            <div className="cert-table-footer">
               <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
                 Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
               </div>
@@ -766,63 +880,61 @@ const handleEmployeeSelect = (employee) => {
               )}
             </div>
           </div>
-
-        
         </>
       )}
-          {showStatusModal && (
-  <div
-    className="emp-modal-overlay"
-    onClick={() => setShowStatusModal(false)}
-  >
-    <div
-      className="emp-modal"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="emp-modal-icon">
-        {statusAction.newStatus === "Active" ? "✅" : "⛔"}
-      </div>
-
-      <h3 className="emp-modal-title">
-        Confirm Status Change
-      </h3>
-
-      <p className="emp-modal-body">
-        Are you sure you want to{" "}
-        <strong>
-          {statusAction.newStatus === "Active"
-            ? "activate"
-            : "deactivate"}
-        </strong>{" "}
-        <strong>{statusAction.name}</strong>?
-      </p>
-
-      <p className="emp-modal-warn">
-        {statusAction.newStatus === "Inactive"
-          ? "Inactive records cannot be edited until reactivated."
-          : "This record will become active again."}
-      </p>
-
-      <div className="emp-modal-actions">
-        <button
-          className="emp-modal-cancel"
+      
+      {showStatusModal && (
+        <div
+          className="emp-modal-overlay"
           onClick={() => setShowStatusModal(false)}
         >
-          Cancel
-        </button>
+          <div
+            className="emp-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="emp-modal-icon">
+              {statusAction.newStatus === "Active" ? "✅" : "⛔"}
+            </div>
 
-        <button
-          className="emp-modal-confirm"
-          onClick={confirmStatusChange}
-        >
-          Confirm
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+            <h3 className="emp-modal-title">
+              Confirm Status Change
+            </h3>
 
-      {/* Document Preview Modal */}
+            <p className="emp-modal-body">
+              Are you sure you want to{" "}
+              <strong>
+                {statusAction.newStatus === "Active"
+                  ? "activate"
+                  : "deactivate"}
+              </strong>{" "}
+              <strong>{statusAction.name}</strong>?
+            </p>
+
+            <p className="emp-modal-warn">
+              {statusAction.newStatus === "Inactive"
+                ? "Inactive records cannot be edited until reactivated."
+                : "This record will become active again."}
+            </p>
+
+            <div className="emp-modal-actions">
+              <button
+                className="emp-modal-cancel"
+                onClick={() => setShowStatusModal(false)}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="emp-modal-confirm"
+                onClick={confirmStatusChange}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {documentPreview && (
         <div
           className="emp-modal-overlay"
@@ -939,11 +1051,16 @@ const handleEmployeeSelect = (employee) => {
         </div>
       )}
 
-      {/* Add CSS for row hover effect */}
       <style jsx>{`
         .cert-table-row-hover:hover {
           background-color: #f9fafb;
           transition: background-color 0.2s ease;
+        }
+        .is-invalid {
+          border-color: #ef4444 !important;
+        }
+        .is-invalid:focus {
+          box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
         }
       `}</style>
     </div>
