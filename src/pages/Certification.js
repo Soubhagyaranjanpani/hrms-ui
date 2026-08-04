@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  FaSearch, FaEdit, FaTrash, FaPlus, FaTimes, FaMinus,
-  FaArrowLeft, FaSave, FaExclamationCircle, FaClock, FaCheckCircle, FaFileAlt, FaEye, FaUpload, FaFilePdf, FaFileImage
+  FaSearch, FaPlus, FaTimes, FaSave, FaTrash, FaEdit,
+  FaExclamationCircle, FaClock, FaCheckCircle, FaFileAlt,
+  FaUser, FaEnvelope, FaBuilding, FaUserCheck, FaArrowLeft,
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
-/* ─── Dummy Data ─── */
 const DUMMY_EMPLOYEES = [
   { id: 1, name: 'John Doe', email: 'john@example.com', department: 'IT', designation: 'Software Engineer' },
   { id: 2, name: 'Jane Smith', email: 'jane@example.com', department: 'HR', designation: 'HR Manager' },
@@ -26,8 +27,6 @@ const DUMMY_CERTIFICATIONS = [
     expiryDate: '2026-01-14',
     reminderDays: 30,
     notes: 'Professional certification',
-    certificateFileData: 'https://images.credly.com/images/0e284c3f-5164-4b21-8660-0d84737941bc/aws-certified-solutions-architect-associate.png',
-    certificateFileName: 'AWS_Certificate.png'
   },
   {
     id: 2,
@@ -40,8 +39,6 @@ const DUMMY_CERTIFICATIONS = [
     expiryDate: '2026-03-19',
     reminderDays: 45,
     notes: 'Fundamentals certification',
-    certificateFileData: null,
-    certificateFileName: null
   },
   {
     id: 3,
@@ -54,1085 +51,999 @@ const DUMMY_CERTIFICATIONS = [
     expiryDate: '2025-06-09',
     reminderDays: 30,
     notes: '',
-    certificateFileData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-    certificateFileName: 'CSM_Certificate.png'
   },
-  {
-    id: 4,
-    employeeId: 2,
-    employeeName: 'Jane Smith',
-    certificationName: 'PMP Certification',
-    issuedBy: 'PMI',
-    certificateNumber: 'PMP-22222',
-    issueDate: '2022-01-10',
-    expiryDate: '2025-01-09',
-    reminderDays: 60,
-    notes: 'Project Management Professional',
-    certificateFileData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-    certificateFileName: 'PMP_Certificate.png'
-  },
-  {
-    id: 5,
-    employeeId: 3,
-    employeeName: 'Mike Johnson',
-    certificationName: 'CISSP',
-    issuedBy: 'ISC2',
-    certificateNumber: 'CISSP-44444',
-    issueDate: '2023-11-15',
-    expiryDate: '2026-11-14',
-    reminderDays: 90,
-    notes: 'Security certification',
-    certificateFileData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-    certificateFileName: 'CISSP_Certificate.png'
-  },
-  {
-    id: 6,
-    employeeId: 1,
-    employeeName: 'John Doe',
-    certificationName: 'Google Cloud Professional',
-    issuedBy: 'Google',
-    certificateNumber: 'GCP-33333',
-    issueDate: '2024-05-01',
-    expiryDate: '2026-04-30',
-    reminderDays: 30,
-    notes: '',
-    certificateFileData: null,
-    certificateFileName: null
-  }
 ];
 
-const FieldError = ({ msg }) =>
-  msg ? (
-    <span className="field-err">
-      <FaExclamationCircle size={10} /> {msg}
-    </span>
-  ) : null;
-
-const Certifications = ({ user, employeeId: propEmployeeId }) => {
-  const [view, setView] = useState('list');
-  const [editMode, setEditMode] = useState(false);
-  const [selectedCertification, setSelectedCertification] = useState(null);
-  const [allCertifications, setAllCertifications] = useState(DUMMY_CERTIFICATIONS);
-  const [employees, setEmployees] = useState(
-  DUMMY_EMPLOYEES.map(emp => ({
-    ...emp,
-    status: emp.status || "Active"
-  }))
-);
-  const [nextId, setNextId] = useState(7);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [employeeFilter, setEmployeeFilter] = useState(propEmployeeId || '');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage] = useState(4);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [certToDelete, setCertToDelete] = useState(null);
-  const [showRenewalModal, setShowRenewalModal] = useState(false);
-  const [renewalData, setRenewalData] = useState(null);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [certToView, setCertToView] = useState(null);
-  
-  // Employee Certificate Page State
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [statusAction, setStatusAction] = useState({
-    id: null,
-    name: "",
-    newStatus: ""
-  });
-const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
-  const [formData, setFormData] = useState({
-    employeeId: '',
-     employeeName: '',
-    certificationName: '',
-    issuedBy: '',
-    certificateNumber: '',
-    issueDate: '',
-    expiryDate: '',
-    reminderDays: '30',
-    notes: '',
-    certificateFile: null,
-    certificateFileData: null,
-    certificateFileName: null
-  });
-  const [errors, setErrors] = useState({});
-  const [touched, setTouched] = useState({});
-
-  const getCertStatus = (expiryDate) => {
-    if (!expiryDate) return { label: 'Never Expires', type: 'never', icon: FaCheckCircle, color: '#10b981' };
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-    if (daysUntilExpiry < 0) return { label: 'Expired', type: 'expired', icon: FaExclamationCircle, color: '#ef4444' };
-    if (daysUntilExpiry <= 30) return { label: 'Expiring Soon', type: 'expiring', icon: FaClock, color: '#f59e0b' };
-    return { label: 'Active', type: 'active', icon: FaCheckCircle, color: '#10b981' };
-  };
-
-  const getEmployeeCertificates = (employeeId) => {
-    return allCertifications.filter(cert => cert.employeeId === employeeId);
-  };
-
-  // Open Employee Certificate Page
-  const openEmployeeCertPage = (employee) => {
-    setSelectedEmployee(employee);
-    setView('employeeCerts');
-    setShowAddForm(false);
-    resetForm();
-  };
-
-  // Go back to list
-  const goBackToList = () => {
-    setView('list');
-    setSelectedEmployee(null);
-    setShowAddForm(false);
-    resetForm();
-  };
-
-  const handleChange = (field, value) => {
-    const updated = { ...formData, [field]: value };
-    setFormData(updated);
-    if (touched[field]) {
-      let error = '';
-      if (field === 'issueDate' && !value) error = 'This field is required';
-      if (field === 'certificationName' && !value) error = 'This field is required';
-      if (field === 'issuedBy' && !value) error = 'This field is required';
-      setErrors(prev => ({ ...prev, [field]: error }));
-    }
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData({ 
-          ...formData, 
-          certificateFile: file,
-          certificateFileData: reader.result,
-          certificateFileName: file.name
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleBlur = (field) => {
-    setTouched(prev => ({ ...prev, [field]: true }));
-    let error = '';
-    if (field === 'issueDate' && !formData[field]) error = 'This field is required';
-    if (field === 'certificationName' && !formData[field]) error = 'This field is required';
-    if (field === 'issuedBy' && !formData[field]) error = 'This field is required';
-    setErrors(prev => ({ ...prev, [field]: error }));
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.certificationName) newErrors.certificationName = 'This field is required';
-    if (!formData.issuedBy) newErrors.issuedBy = 'This field is required';
-    if (!formData.issueDate) newErrors.issueDate = 'This field is required';
-    if (!propEmployeeId && !formData.employeeId) newErrors.employeeId = 'This field is required';
-    if (formData.issueDate && formData.expiryDate) {
-      if (new Date(formData.expiryDate) <= new Date(formData.issueDate)) {
-        newErrors.expiryDate = 'Expiry date must be after issue date';
-      }
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      toast.warning('Validation Error', 'Please fix the highlighted fields');
-      return;
-    }
-    
-    const employeeName = employees.find(e => e.id === parseInt(formData.employeeId))?.name || '';
-    
-    if (editMode) {
-      const updatedCerts = allCertifications.map(cert =>
-        cert.id === selectedCertification.id
-          ? {
-              ...cert,
-              employeeId: parseInt(formData.employeeId),
-              employeeName: employeeName,
-              certificationName: formData.certificationName,
-              issuedBy: formData.issuedBy,
-              certificateNumber: formData.certificateNumber,
-              issueDate: formData.issueDate,
-              expiryDate: formData.expiryDate || null,
-              reminderDays: parseInt(formData.reminderDays),
-              notes: formData.notes,
-              certificateFileData: formData.certificateFileData || cert.certificateFileData,
-              certificateFileName: formData.certificateFileName || cert.certificateFileName
-            }
-          : cert
-      );
-      setAllCertifications(updatedCerts);
-      toast.success('Success', 'Certification updated successfully');
-    } else {
-      const newCert = {
-        id: nextId,
-        employeeId: parseInt(formData.employeeId),
-        employeeName: employeeName,
-        certificationName: formData.certificationName,
-        issuedBy: formData.issuedBy,
-        certificateNumber: formData.certificateNumber || '',
-        issueDate: formData.issueDate,
-        expiryDate: formData.expiryDate || null,
-        reminderDays: parseInt(formData.reminderDays) || 30,
-        notes: formData.notes || '',
-        certificateFileData: formData.certificateFileData || null,
-        certificateFileName: formData.certificateFileName || null
-      };
-      setAllCertifications([...allCertifications, newCert]);
-      setNextId(nextId + 1);
-      toast.success('Success', 'Certification added successfully');
-    }
-    resetForm();
-    setShowAddForm(false);
-  };
-
-  const handleRenewal = () => {
-    if (!renewalData) return;
-    const updatedCerts = allCertifications.map(cert =>
-      cert.id === renewalData.id
-        ? {
-            ...cert,
-            issueDate: renewalData.newIssueDate,
-            expiryDate: renewalData.newExpiryDate || null,
-            certificateNumber: renewalData.newCertificateNumber || cert.certificateNumber
-          }
-        : cert
+const CertStatusBadge = ({ expiryDate }) => {
+  if (!expiryDate) {
+    return (
+      <span style={{ background: '#d1fae5', color: '#065f46', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <FaCheckCircle size={10} /> Never Expires
+      </span>
     );
-    setAllCertifications(updatedCerts);
-    toast.success('Success', 'Certification renewed successfully');
-    setShowRenewalModal(false);
-    setRenewalData(null);
-  };
-
-
-  const handleEdit = (cert) => {
-    setSelectedCertification(cert);
-    setFormData({
-      employeeId: cert.employeeId || '',
-      certificationName: cert.certificationName || '',
-      issuedBy: cert.issuedBy || '',
-      certificateNumber: cert.certificateNumber || '',
-      issueDate: cert.issueDate?.split('T')[0] || '',
-      expiryDate: cert.expiryDate?.split('T')[0] || '',
-      reminderDays: cert.reminderDays?.toString() || '30',
-      notes: cert.notes || '',
-      certificateFile: null,
-      certificateFileData: cert.certificateFileData,
-      certificateFileName: cert.certificateFileName
-    });
-    setErrors({});
-    setTouched({});
-    setEditMode(true);
-    setShowAddForm(true);
-  };
-
-  const openRenewalModal = (cert) => {
-    setRenewalData({
-      id: cert.id,
-      certificationName: cert.certificationName,
-issueDate: '',
-      newExpiryDate: '',
-      newCertificateNumber: ''
-    });
-    setShowRenewalModal(true);
-  };
-
+  }
+  const today = new Date();
+  const expiry = new Date(expiryDate);
+  const days = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
   
+  if (days < 0) {
+    return <span style={{ background: '#fee2e2', color: '#991b1b', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}><FaExclamationCircle size={10} /> Expired</span>;
+  }
+  if (days <= 30) {
+    return <span style={{ background: '#fef3c7', color: '#92400e', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}><FaClock size={10} /> Expiring Soon</span>;
+  }
+  return <span style={{ background: '#d1fae5', color: '#065f46', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}><FaCheckCircle size={10} /> Active</span>;
+};
 
-  const resetForm = () => {
-    setFormData({
-      employeeId: selectedEmployee?.id || propEmployeeId || '',
-     employeeName: selectedEmployee?.name || '', 
+export default function Certifications() {
+  const [certifications, setCertifications] = useState(DUMMY_CERTIFICATIONS);
+  const [employees, setEmployees] = useState(DUMMY_EMPLOYEES);
+  const [nextId, setNextId] = useState(4);
+
+  // ── Pagination States ──
+  const [currentPage, setCurrentPage] = useState(0);
+  const [rowsPerPage] = useState(5);
+
+  // ── Form Rows States ──
+  const [formRows, setFormRows] = useState([
+    {
+      id: Date.now(),
+      employeeId: '',
+      employeeName: '',
       certificationName: '',
       issuedBy: '',
       certificateNumber: '',
-issueDate: '',
+      issueDate: '',
       expiryDate: '',
-      reminderDays: '30',
-      notes: '',
-      certificateFile: null,
-      certificateFileData: null,
-      certificateFileName: null
+      reminderDays: 30,
+      notes: ''
+    }
+  ]);
+  
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingRowId, setEditingRowId] = useState(null);
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [rowErrors, setRowErrors] = useState({});
+
+  const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowEmployeeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // ── Row Handlers ──
+  const handleRowChange = (rowId, field, value) => {
+    setFormRows(prev => prev.map(row => 
+      row.id === rowId ? { ...row, [field]: value } : row
+    ));
+    
+    if (rowErrors[rowId] && rowErrors[rowId][field]) {
+      const newErrors = { ...rowErrors };
+      delete newErrors[rowId][field];
+      if (Object.keys(newErrors[rowId] || {}).length === 0) {
+        delete newErrors[rowId];
+      }
+      setRowErrors(newErrors);
+    }
+  };
+
+  const handleEmployeeSelect = (rowId, employee) => {
+    setFormRows(prev => prev.map(row => 
+      row.id === rowId ? {
+        ...row,
+        employeeId: employee.id,
+        employeeName: employee.name
+      } : row
+    ));
+    setEmployeeSearchTerm(employee.name);
+    setShowEmployeeDropdown(false);
+    
+    if (rowErrors[rowId]) {
+      const newErrors = { ...rowErrors };
+      delete newErrors[rowId];
+      setRowErrors(newErrors);
+    }
+  };
+
+  const addRow = () => {
+    const newRow = {
+      id: Date.now() + Math.random(),
+      employeeId: '',
+      employeeName: '',
+      certificationName: '',
+      issuedBy: '',
+      certificateNumber: '',
+      issueDate: '',
+      expiryDate: '',
+      reminderDays: 30,
+      notes: ''
+    };
+    setFormRows([...formRows, newRow]);
+  };
+
+  const removeRow = (rowId) => {
+    if (formRows.length <= 1) {
+      toast.warning('Cannot Remove', 'At least one row is required');
+      return;
+    }
+    setFormRows(prev => prev.filter(row => row.id !== rowId));
+    const newErrors = { ...rowErrors };
+    delete newErrors[rowId];
+    setRowErrors(newErrors);
+  };
+
+  const validateRow = (row) => {
+    const errors = {};
+    if (!row.employeeId) errors.employeeId = 'Employee required';
+    if (!row.certificationName) errors.certificationName = 'Certification required';
+    if (!row.issuedBy) errors.issuedBy = 'Issued By required';
+    if (!row.issueDate) errors.issueDate = 'Issue Date required';
+    if (row.expiryDate && new Date(row.expiryDate) <= new Date(row.issueDate)) {
+      errors.expiryDate = 'Expiry must be after Issue Date';
+    }
+    return errors;
+  };
+
+  const handleAddOrUpdate = () => {
+    let hasErrors = false;
+    const allErrors = {};
+    
+    formRows.forEach(row => {
+      const rowError = validateRow(row);
+      if (Object.keys(rowError).length > 0) {
+        allErrors[row.id] = rowError;
+        hasErrors = true;
+      }
     });
-    setErrors({});
-    setTouched({});
-    setEditMode(false);
-    setSelectedCertification(null);
+    
+    if (hasErrors) {
+      setRowErrors(allErrors);
+      toast.warning('Validation Error', 'Please fix the highlighted fields');
+      return;
+    }
+
+    if (isEditMode && editingRowId) {
+      const updated = formRows.map(row => 
+        row.id === editingRowId ? { ...row } : row
+      );
+      // Update single row in certifications
+      const updatedCert = certifications.map(cert => 
+        cert.id === editingRowId ? { ...cert, ...updated[0] } : cert
+      );
+      setCertifications(updatedCert);
+      toast.success('Updated', 'Certificate updated successfully');
+      resetForm();
+      return;
+    }
+
+    const newCertifications = formRows.map(row => ({
+      id: nextId + Math.random() * 1000,
+      employeeId: row.employeeId,
+      employeeName: row.employeeName,
+      certificationName: row.certificationName,
+      issuedBy: row.issuedBy,
+      certificateNumber: row.certificateNumber || '',
+      issueDate: row.issueDate,
+      expiryDate: row.expiryDate || '',
+      reminderDays: row.reminderDays || 30,
+      notes: row.notes || ''
+    }));
+
+    setCertifications([...newCertifications, ...certifications]);
+    setNextId(nextId + newCertifications.length);
+    toast.success('Success', `${newCertifications.length} certificate(s) added successfully`);
+    resetForm();
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm('Are you sure you want to delete this certificate?')) {
+      const updated = certifications.filter(cert => cert.id !== id);
+      setCertifications(updated);
+      toast.info('Deleted', 'Certificate removed successfully');
+      if (currentPage > 0 && updated.length <= currentPage * rowsPerPage) {
+        setCurrentPage(currentPage - 1);
+      }
+    }
+  };
+
+  
+const handleTableRowClick = (row) => {
+  setFormRows([{
+    id: Date.now(),
+    employeeId: row.employeeId,
+    employeeName: row.employeeName,
+    certificationName: row.certificationName,
+    issuedBy: row.issuedBy,
+    certificateNumber: row.certificateNumber || '',
+    issueDate: row.issueDate,
+    expiryDate: row.expiryDate || '',
+    reminderDays: row.reminderDays || 30,
+    notes: row.notes || ''
+  }]);
+  setEmployeeSearchTerm(row.employeeName);
+  setIsEditMode(true);
+  setEditingRowId(row.id);
+  
+};
+
+  const resetForm = () => {
+    setFormRows([{
+      id: Date.now(),
+      employeeId: '',
+      employeeName: '',
+      certificationName: '',
+      issuedBy: '',
+      certificateNumber: '',
+      issueDate: '',
+      expiryDate: '',
+      reminderDays: 30,
+      notes: ''
+    }]);
+    setEmployeeSearchTerm('');
+    setIsEditMode(false);
+    setEditingRowId(null);
+    setShowForm(false);
+    setShowEmployeeDropdown(false);
+    setRowErrors({});
   };
 
   const formatDate = (d) => {
-    if (!d) return 'Never Expires';
-    return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
   };
+
+  const toggleForm = () => {
+    if (showForm) {
+      resetForm();
+    } else {
+      setShowForm(true);
+      setFormRows([{
+        id: Date.now(),
+        employeeId: '',
+        employeeName: '',
+        certificationName: '',
+        issuedBy: '',
+        certificateNumber: '',
+        issueDate: '',
+        expiryDate: '',
+        reminderDays: 30,
+        notes: ''
+      }]);
+      setEmployeeSearchTerm('');
+      setIsEditMode(false);
+      setEditingRowId(null);
+      setShowEmployeeDropdown(false);
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 100);
+    }
+  };
+
+  const filteredEmployees = employees.filter(emp => {
+    const search = employeeSearchTerm.toLowerCase().trim();
+    if (!search) return true;
+    return (
+      emp.name.toLowerCase().includes(search) ||
+      emp.email.toLowerCase().includes(search) ||
+      emp.department.toLowerCase().includes(search)
+    );
+  });
+
+  const getEmployeeDetails = (employeeId) => {
+    return employees.find(e => e.id === employeeId);
+  };
+
+  // ── Pagination Logic ──
+  const totalItems = certifications.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = currentPage * rowsPerPage;
+  const currentCertifications = certifications.slice(startIndex, startIndex + rowsPerPage);
 
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
-    const left = Math.max(0, page - delta);
-    const right = Math.min(totalPages - 1, page + delta);
-    if (left > 0) { 
-      range.push(0); 
-      if (left > 1) range.push('...'); 
-    }
+    const left = Math.max(0, currentPage - delta);
+    const right = Math.min(totalPages - 1, currentPage + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
     for (let i = left; i <= right; i++) range.push(i);
-    if (right < totalPages - 1) { 
-      if (right < totalPages - 2) range.push('...'); 
-      range.push(totalPages - 1); 
-    }
+    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
     return range;
   };
 
-const filteredEmployees = employees.filter(emp => {
-      if (employeeFilter && emp.id !== parseInt(employeeFilter)) return false;
-    const search = searchTerm.toLowerCase();
-    if (search && !emp.name.toLowerCase().includes(search) && !emp.email.toLowerCase().includes(search)) return false;
-    return true;
-  });
-
-  const totalItems = filteredEmployees.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage);
-  const startIndex = page * rowsPerPage;
-  const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
-
-  const handleStatusToggle = (id, name, currentStatus) => {
-  const newStatus = currentStatus === "Active" ? "Inactive" : "Active";
-
-  setStatusAction({
-    id,
-    name,
-    newStatus
-  });
-
-  setShowStatusModal(true);
-};
-
-const confirmStatusChange = () => {
-  const { id, newStatus } = statusAction;
-
-  const updatedEmployees = employees.map(emp =>
-    emp.id === id
-      ? {
-          ...emp,
-          status: newStatus
-        }
-      : emp
-  );
-
-  setEmployees(updatedEmployees);
- 
-  setShowStatusModal(false);
-
-  toast.success(
-    "Status Updated",
-    `${statusAction.name} is now ${newStatus}`
-  );
-};
-
- // Render Employee Certificates Page
-const renderEmployeeCertPage = () => {
-  if (!selectedEmployee) return null;
-  const empCerts = getEmployeeCertificates(selectedEmployee.id);
-
-
   return (
-    <div>
-      <div className="cert-header" style={{ marginBottom: '24px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button 
-              onClick={goBackToList}
-              style={{ 
-                background: 'none', 
-                border: 'none', 
-                cursor: 'pointer', 
-                fontSize: '16px', 
-                color: '#6b7280',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                borderRadius: '6px',
-                background: '#f3f4f6',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => e.target.style.background = '#e5e7eb'}
-              onMouseLeave={(e) => e.target.style.background = '#f3f4f6'}
-            >
-              <FaArrowLeft size={14} /> Back
-            </button>
-            <div>
-              <h1 className="cert-title" style={{ margin: 0 }}>{selectedEmployee.name}'s Certificates</h1>
-              <p className="cert-subtitle" style={{ margin: '4px 0 0 0' }}>
-                {selectedEmployee.department} • {selectedEmployee.designation} • {empCerts.length} Certificates
-              </p>
-            </div>
+    <div style={{ padding: '22px 24px', background: '#f8fafc', minHeight: '100vh' }}>
+      <style>{`
+        .cert-input { 
+          padding: 6px 10px; 
+          border: 1.5px solid #e2e8f0; 
+          border-radius: 6px; 
+          font-size: 13px; 
+          outline: none; 
+          transition: all .2s; 
+          width: 100%; 
+          min-height: 32px; 
+          background: white;
+          font-family: inherit;
+        }
+        .cert-input:focus { 
+          border-color: #9d174d; 
+          box-shadow: 0 0 0 3px rgba(157,23,77,.10); 
+        }
+        .cert-input::placeholder { 
+          color: #94a3b8; 
+        }
+        .cert-btn { 
+          padding: 6px 16px; 
+          border-radius: 6px; 
+          border: none; 
+          cursor: pointer; 
+          font-size: 13px; 
+          font-weight: 600; 
+          transition: all .2s; 
+          font-family: inherit;
+        }
+        .cert-btn-success { 
+          background: #9d174d; 
+          color: white; 
+        }
+        .cert-btn-success:hover { 
+          background: #7a0e3a; 
+        }
+        .cert-btn-danger { 
+          background: #dc2626; 
+          color: white; 
+        }
+        .cert-btn-danger:hover { 
+          background: #b91c1c; 
+        }
+        .cert-btn-warning { 
+          background: #f59e0b; 
+          color: white; 
+        }
+        .cert-btn-warning:hover { 
+          background: #d97706; 
+        }
+        .cert-btn-cancel { 
+          background: #e2e8f0; 
+          color: #374151; 
+        }
+        .cert-btn-cancel:hover { 
+          background: #cbd5e1; 
+        }
+        .cert-row:hover td { 
+          background: #f8fafc !important; 
+          cursor: pointer; 
+        }
+        .is-invalid {
+          border-color: #ef4444 !important;
+        }
+        .is-invalid:focus {
+          box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
+        }
+        
+        .employee-search-wrapper {
+          padding: 12px 16px;
+          background: #f8fafc;
+          border-bottom: 1px solid #e2e8f0;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .employee-search-wrapper .search-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #9d174d;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+        }
+        .employee-search-wrapper .search-container {
+          position: relative;
+          flex: 1;
+          min-width: 200px;
+          max-width: 400px;
+        }
+        .employee-search-wrapper .search-container .search-icon {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #94a3b8;
+          font-size: 13px;
+          pointer-events: none;
+          z-index: 2;
+        }
+        .employee-search-wrapper .search-container .cert-input {
+          padding-left: 32px;
+          background: white;
+        }
+        .employee-search-wrapper .search-container .cert-input:focus {
+          border-color: #9d174d;
+        }
+        .employee-search-wrapper .selected-employee-display {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 14px;
+          background: #fdf2f8;
+          border: 1.5px solid #9d174d;
+          border-radius: 6px;
+          font-size: 13px;
+          font-weight: 500;
+          color: #9d174d;
+        }
+        .employee-search-wrapper .selected-employee-display .emp-code {
+          font-size: 11px;
+          color: #64748b;
+          font-weight: 400;
+        }
+        
+        .cert-dropdown {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          background: white;
+          border: 1.5px solid #9d174d;
+          border-radius: 8px;
+          max-height: 220px;
+          overflow-y: auto;
+          z-index: 9999;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+          padding: 4px 0;
+          min-width: 100%;
+        }
+        .cert-dropdown::-webkit-scrollbar {
+          width: 4px;
+        }
+        .cert-dropdown::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 4px;
+        }
+        .cert-dropdown::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .cert-dropdown-item {
+          padding: 10px 14px;
+          cursor: pointer;
+          border-bottom: 1px solid #f1f5f9;
+          font-size: 13px;
+          transition: all .2s;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .cert-dropdown-item:hover {
+          background: #fdf2f8;
+        }
+        .cert-dropdown-item:last-child {
+          border-bottom: none;
+        }
+        .cert-dropdown-item .emp-info {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          flex: 1;
+        }
+        .cert-dropdown-item .emp-name {
+          font-weight: 600;
+          color: #0f172a;
+        }
+        .cert-dropdown-item .emp-email {
+          font-size: 11px;
+          color: #94a3b8;
+        }
+        .cert-dropdown-item .emp-detail {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-shrink: 0;
+        }
+        .cert-dropdown-item .emp-dept {
+          font-size: 11px;
+          color: #64748b;
+          background: #f1f5f9;
+          padding: 2px 10px;
+          border-radius: 12px;
+          font-weight: 500;
+        }
+        .cert-dropdown-item .emp-designation {
+          font-size: 11px;
+          color: #94a3b8;
+        }
+        .cert-dropdown-empty {
+          padding: 16px 14px;
+          color: #64748b;
+          text-align: center;
+          font-size: 13px;
+        }
+        
+        .form-table td {
+          padding: 6px 8px !important;
+          vertical-align: middle;
+        }
+        
+        .cert-table {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 900px;
+          font-size: 13px;
+        }
+        .cert-table th {
+          padding: 10px 16px;
+          text-align: left;
+          font-size: 11px;
+          font-weight: 700;
+          color: #9d174d;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          background: #faf5f7;
+          border-bottom: 1.5px solid #e2e8f0;
+        }
+        .cert-table td {
+          padding: 11px 16px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .cert-table .cert-row:hover td {
+          background: #faf5f7 !important;
+          cursor: pointer;
+        }
+        
+        .cert-pagination {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 20px;
+          border-top: 1px solid #e2e8f0;
+          background: #faf5f7;
+          border-radius: 0 0 16px 16px;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+        .cert-pagination .info {
+          font-size: 13px;
+          color: #6b7280;
+          font-weight: 500;
+          padding: 10px 10px;
+        }
+        .cert-pagination .page-group {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          padding: 6px 10px;
+        }
+        .cert-pagination .page-btn {
+          padding: 6px 12px;
+          border: 1px solid #e5e7eb;
+          background: white;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          transition: all .2s;
+          color: #374151;
+        }
+        .cert-pagination .page-btn:hover:not(:disabled) {
+          background: #fdf2f8;
+          border-color: #9d174d;
+        }
+        .cert-pagination .page-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        .cert-pagination .page-num {
+          padding: 6px 10px;
+          border: 1px solid #e5e7eb;
+          background: white;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          min-width: 34px;
+          text-align: center;
+          transition: all .2s;
+          color: #374151;
+        }
+        .cert-pagination .page-num:hover:not(.active) {
+          background: #fdf2f8;
+          border-color: #9d174d;
+        }
+        .cert-pagination .page-num.active {
+          background: #9d174d;
+          color: white;
+          border-color: #9d174d;
+          font-weight: 600;
+        }
+        .cert-pagination .page-dots {
+          padding: 6px 4px;
+          color: #6b7280;
+          font-size: 14px;
+        }
+      `}</style>
+
+      {/* ── HEADER ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 46, height: 46, background: 'linear-gradient(135deg,#9d174d,#be185d)', borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 21 }}>
+            <FaFileAlt />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: '#1e293b' }}>Certification Management</h1>
+            <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
+              {certifications.length} certificates
+            </p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!showAddForm && (
-            <button 
-              className="cert-add-btn" 
-              onClick={() => { 
-                resetForm(); 
-                setFormData(prev => ({ ...prev, employeeId: selectedEmployee.id }));
-                setEditMode(false);
-                setShowAddForm(true); 
-              }}
-            >
+        
+        <div style={{ display: 'flex', gap: 10 }}>
+          {!showForm && (
+            <button className="cert-btn cert-btn-success" onClick={toggleForm} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '8px 18px' }}>
               <FaPlus size={13} /> Add Certificate
             </button>
           )}
-          <button 
-            onClick={goBackToList}
-            style={{ 
-              padding: '8px 16px',
-              background: 'transparent',
-              color: '#6b7280',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-            onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
-            onMouseLeave={(e) => e.target.style.background = 'transparent'}
-          >
-            Back
-          </button>
+          {showForm && (
+            <button className="cert-btn cert-btn-cancel" onClick={toggleForm} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '8px 18px' }}>
+              <FaArrowLeft size={13} /> Back to list
+            </button>
+          )}
         </div>
       </div>
 
-      {showAddForm && (
-        <div style={{ background: '#f9fafb', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #e5e7eb' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>
-              {editMode ? 'Edit Certificate' : 'Add New Certificate'}
+      {/* ── FORM SECTION WITH MULTIPLE ROWS ── */}
+      {showForm && (
+        <div style={{ background: 'white', border: '1px solid #9d174d', borderRadius: 16, overflow: 'hidden', marginBottom: 24 }}>
+          <div style={{ padding: '12px 20px', background: '#faf5f7', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#1e293b' }}>
+              {isEditMode ? 'Edit Certificate' : 'Add New Certificate(s)'}
+              {!isEditMode && formRows.length > 1 && <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#6b7280', marginLeft: '8px' }}>({formRows.length} entries)</span>}
             </h4>
+            {!isEditMode && (
+              <button 
+                type="button" 
+                onClick={addRow}
+                style={{ 
+                  padding: '4px 12px', 
+                  background: '#9d174d', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '4px', 
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <FaPlus size={11} /> Add Row
+              </button>
+            )}
+          </div>
+          
+          {/* ── FORM ROWS TABLE ── */}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900, fontSize: '13px' }}>
+              <thead>
+                <tr style={{ background: '#faf5f7', borderBottom: '1.5px solid #e2e8f0' }}>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#9d174d', textTransform: 'uppercase', minWidth: '140px' }}>
+                    Employee <span style={{ color: '#ef4444' }}>*</span>
+                  </th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#9d174d', textTransform: 'uppercase', minWidth: '130px' }}>
+                    Certification <span style={{ color: '#ef4444' }}>*</span>
+                  </th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#9d174d', textTransform: 'uppercase', minWidth: '120px' }}>
+                    Issued By <span style={{ color: '#ef4444' }}>*</span>
+                  </th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#9d174d', textTransform: 'uppercase', minWidth: '100px' }}>
+                    Cert No.
+                  </th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#9d174d', textTransform: 'uppercase', minWidth: '100px' }}>
+                    Issue Date <span style={{ color: '#ef4444' }}>*</span>
+                  </th>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#9d174d', textTransform: 'uppercase', minWidth: '100px' }}>
+                    Expiry Date
+                  </th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: '#9d174d', textTransform: 'uppercase', width: '70px' }}>
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {formRows.map((row) => {
+                  const employee = getEmployeeDetails(row.employeeId);
+                  const rowError = rowErrors[row.id] || {};
+                  return (
+                    <tr key={row.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      {/* Employee */}
+                      <td style={{ padding: '6px 8px', verticalAlign: 'top' }}>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type="text"
+                            className={`cert-input ${rowError.employeeId ? 'is-invalid' : ''}`}
+                            placeholder="Search employee..."
+                            value={employee?.name || row.employeeName || ''}
+                            onChange={(e) => {
+                              setEmployeeSearchTerm(e.target.value);
+                              setShowEmployeeDropdown(true);
+                            }}
+                            onFocus={() => {
+                              if (employeeSearchTerm.length > 0) {
+                                setShowEmployeeDropdown(true);
+                              }
+                            }}
+                            style={{ fontSize: '12px', padding: '4px 8px' }}
+                          />
+                          {showEmployeeDropdown && employeeSearchTerm.length > 0 && (
+                            <div style={{ 
+                              position: 'absolute', 
+                              top: '100%', 
+                              left: 0, 
+                              right: 0, 
+                              background: 'white', 
+                              border: '1px solid #e5e7eb', 
+                              borderRadius: '6px', 
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.15)', 
+                              zIndex: 1000, 
+                              maxHeight: '180px', 
+                              overflow: 'auto',
+                              marginTop: '2px'
+                            }}>
+                              {filteredEmployees.length > 0 ? (
+                                filteredEmployees.map(emp => (
+                                  <div
+                                    key={emp.id}
+                                    style={{ 
+                                      padding: '6px 10px', 
+                                      cursor: 'pointer',
+                                      borderBottom: '1px solid #f3f4f6',
+                                      fontSize: '12px'
+                                    }}
+                                    onClick={() => handleEmployeeSelect(row.id, emp)}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                  >
+                                    <div style={{ fontWeight: 500 }}>{emp.name}</div>
+                                    <div style={{ fontSize: '10px', color: '#6b7280' }}>{emp.code} | {emp.department}</div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div style={{ padding: '8px', textAlign: 'center', color: '#6b7280', fontSize: '12px' }}>
+                                  No employees found
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {rowError.employeeId && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.employeeId}</div>}
+                        </div>
+                      </td>
+                      
+                      {/* Certification Name */}
+                      <td style={{ padding: '6px 8px', verticalAlign: 'top' }}>
+                        <input
+                          type="text"
+                          className={`cert-input ${rowError.certificationName ? 'is-invalid' : ''}`}
+                          placeholder="Certification name"
+                          value={row.certificationName}
+                          onChange={(e) => handleRowChange(row.id, 'certificationName', e.target.value)}
+                          style={{ fontSize: '12px', padding: '4px 8px' }}
+                        />
+                        {rowError.certificationName && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.certificationName}</div>}
+                      </td>
+                      
+                      {/* Issued By */}
+                      <td style={{ padding: '6px 8px', verticalAlign: 'top' }}>
+                        <input
+                          type="text"
+                          className={`cert-input ${rowError.issuedBy ? 'is-invalid' : ''}`}
+                          placeholder="Issuing authority"
+                          value={row.issuedBy}
+                          onChange={(e) => handleRowChange(row.id, 'issuedBy', e.target.value)}
+                          style={{ fontSize: '12px', padding: '4px 8px' }}
+                        />
+                        {rowError.issuedBy && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.issuedBy}</div>}
+                      </td>
+                      
+                      {/* Certificate Number */}
+                      <td style={{ padding: '6px 8px', verticalAlign: 'top' }}>
+                        <input
+                          type="text"
+                          className="cert-input"
+                          placeholder="Optional"
+                          value={row.certificateNumber}
+                          onChange={(e) => handleRowChange(row.id, 'certificateNumber', e.target.value)}
+                          style={{ fontSize: '12px', padding: '4px 8px' }}
+                        />
+                      </td>
+                      
+                      {/* Issue Date */}
+                      <td style={{ padding: '6px 8px', verticalAlign: 'top' }}>
+                        <input
+                          type="date"
+                          className={`cert-input ${rowError.issueDate ? 'is-invalid' : ''}`}
+                          value={row.issueDate}
+                          onChange={(e) => handleRowChange(row.id, 'issueDate', e.target.value)}
+                          style={{ fontSize: '12px', padding: '4px 8px' }}
+                        />
+                        {rowError.issueDate && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.issueDate}</div>}
+                      </td>
+                      
+                      {/* Expiry Date */}
+                      <td style={{ padding: '6px 8px', verticalAlign: 'top' }}>
+                        <input
+                          type="date"
+                          className={`cert-input ${rowError.expiryDate ? 'is-invalid' : ''}`}
+                          value={row.expiryDate}
+                          min={row.issueDate || undefined}
+                          onChange={(e) => handleRowChange(row.id, 'expiryDate', e.target.value)}
+                          style={{ fontSize: '12px', padding: '4px 8px' }}
+                        />
+                        {rowError.expiryDate && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.expiryDate}</div>}
+                      </td>
+                      
+                      {/* Actions */}
+                      <td style={{ padding: '6px 8px', verticalAlign: 'top', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                          {!isEditMode && (
+                            <button
+                              type="button"
+                              onClick={() => removeRow(row.id)}
+                              title="Remove row"
+                              disabled={formRows.length <= 1}
+                              style={{ 
+                                padding: '4px 8px', 
+                                background: formRows.length <= 1 ? '#f3f4f6' : '#fee2e2', 
+                                border: 'none', 
+                                borderRadius: '4px', 
+                                color: formRows.length <= 1 ? '#9ca3af' : '#dc2626',
+                                cursor: formRows.length <= 1 ? 'not-allowed' : 'pointer',
+                                fontSize: '12px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              <FaTrash size={11} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── FORM ACTIONS ── */}
+          <div style={{ padding: '12px 20px', background: '#faf5f7', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <button type="button" className="cert-btn cert-btn-cancel" onClick={resetForm} style={{ padding: '6px 16px' }}>
+              Cancel
+            </button>
             <button 
-              onClick={() => { setShowAddForm(false); resetForm(); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '16px' }}
+              className="cert-btn cert-btn-success" 
+              onClick={handleAddOrUpdate}
+              style={{ padding: '6px 20px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
-              <FaTimes size={16} />
+              <FaSave size={12} /> 
+              {isEditMode ? 'Update' : `Save ${formRows.length} Certificate(s)`}
             </button>
           </div>
-          <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div className={`cert-field-compact ${touched.certificationName && errors.certificationName ? 'has-error' : ''}`}>
-                <label className="required" style={{ fontSize: '13px' }}>Certification Name</label>
-                <input type="text" placeholder="e.g., AWS Certified Solutions Architect" value={formData.certificationName} onChange={(e) => handleChange('certificationName', e.target.value)} onBlur={() => handleBlur('certificationName')} />
-                <FieldError msg={errors.certificationName} />
-              </div>
-              <div className={`cert-field-compact ${touched.issuedBy && errors.issuedBy ? 'has-error' : ''}`}>
-                <label className="required" style={{ fontSize: '13px' }}>Issuing Authority</label>
-                <input type="text" placeholder="e.g., Amazon Web Services" value={formData.issuedBy} onChange={(e) => handleChange('issuedBy', e.target.value)} onBlur={() => handleBlur('issuedBy')} />
-                <FieldError msg={errors.issuedBy} />
-              </div>
-              <div className="cert-field-compact">
-                <label style={{ fontSize: '13px' }}>Certificate Number</label>
-                <input type="text" placeholder="e.g., AWS-12345" value={formData.certificateNumber} onChange={(e) => handleChange('certificateNumber', e.target.value)} />
-              </div>
-              <div className={`cert-field-compact ${touched.issueDate && errors.issueDate ? 'has-error' : ''}`}>
-                <label className="required" style={{ fontSize: '13px' }}>Issue Date</label>
-                <input type="date" value={formData.issueDate} onChange={(e) => handleChange('issueDate', e.target.value)} onBlur={() => handleBlur('issueDate')} />
-                <FieldError msg={errors.issueDate} />
-              </div>
-              <div className="cert-field-compact">
-                <label style={{ fontSize: '13px' }}>Expiry Date</label>
-                <input type="date" value={formData.expiryDate} min={formData.issueDate || undefined} onChange={(e) => handleChange('expiryDate', e.target.value)} />
-                <FieldError msg={errors.expiryDate} />
-              </div>
-              <div className="cert-field-compact">
-                <label style={{ fontSize: '13px' }}>Reminder Days</label>
-                <input type="number" placeholder="30" value={formData.reminderDays} min="0" max="365" onChange={(e) => handleChange('reminderDays', e.target.value)} />
-              </div>
-              {/* <div className="cert-field-compact" style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontSize: '13px' }}>Upload Certificate (Optional)</label>
-                <div style={{ border: '1px dashed #ccc', borderRadius: '6px', padding: '12px', textAlign: 'center', background: 'white' }}>
-                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} id="page-cert-upload" />
-                  <label htmlFor="page-cert-upload" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: '#4f46e5', color: 'white', borderRadius: '6px', fontSize: '13px' }}>
-                    <FaUpload size={12} /> Choose File
-                  </label>
-                  {formData.certificateFileName && (
-                    <span style={{ marginLeft: '8px', fontSize: '13px', color: '#10b981' }}>{formData.certificateFileName}</span>
-                  )}
-                </div>
-              </div> */}
-              <div className="cert-field-compact" style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontSize: '13px' }}>Notes</label>
-                <textarea rows={2} placeholder="Additional information..." value={formData.notes} onChange={(e) => handleChange('notes', e.target.value)} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
-              <button type="button" onClick={() => { setShowAddForm(false); resetForm(); }} style={{ padding: '8px 20px', border: '1px solid #d1d5db', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>
-                Cancel
-              </button>
-              <button type="submit" style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <FaSave size={12} /> {editMode ? 'Update' : 'Add'} Certificate
-              </button>
-            </div>
-          </form>
         </div>
       )}
 
-      {!showAddForm && (
-        <div className="cert-table-card">
-          <div className="cert-table-wrap">
+      {/* ── SAVED CERTIFICATES TABLE ── */}
+      {!showForm && (
+        <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden' }}>
+         
+          <div style={{ overflowX: 'auto' }}>
             <table className="cert-table">
               <thead>
                 <tr>
                   <th style={{ width: 40 }}>#</th>
-                  <th>Certification Name</th>
+                  <th>Employee</th>
+                  <th>Certification</th>
                   <th>Issued By</th>
-                  <th>Cert. No.</th>
                   <th>Issue Date</th>
                   <th>Expiry Date</th>
                   <th>Status</th>
-                  <th style={{ width: 160 }}>Actions</th>
+                  <th style={{ width: 80, textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {empCerts.length > 0 ? (
-                  empCerts.map((cert, idx) => {
-                    const status = getCertStatus(cert.expiryDate);
-                    const StatusIcon = status.icon;
-                    return (
-                      <tr key={cert.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        <td style={{ textAlign: 'center' }}>{idx + 1}</td>
-                        <td>
-                          <strong>{cert.certificationName}</strong>
-                          {cert.notes && <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>{cert.notes}</div>}
-                        </td>
-                        <td>{cert.issuedBy}</td>
-                        <td>{cert.certificateNumber || '—'}</td>
-                        <td>{formatDate(cert.issueDate)}</td>
-                        <td>{formatDate(cert.expiryDate)}</td>
-                        <td>
-                          <span className={`cert-status-badge cert-status--${status.type}`}>
-                            <StatusIcon size={10} /> {status.label}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                            {cert.expiryDate && new Date(cert.expiryDate) > new Date() && (
-                              <button onClick={() => openRenewalModal(cert)} title="Renew" style={{ background: '#f59e0b', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer' }}>
-                                <FaClock size={12} />
-                              </button>
-                            )}
-                            <button onClick={() => { handleEdit(cert); }} title="Edit" style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer' }}>
-                              <FaEdit size={12} />
-                            </button>
-                           
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
+                {currentCertifications.length > 0 ? (
+                  currentCertifications.map((cert, idx) => (
+                    <tr key={cert.id} className="cert-row">
+                      <td style={{ fontWeight: 600, color: '#9d174d' }}>{startIndex + idx + 1}</td>
+                      <td>{cert.employeeName}</td>
+                      <td>
+                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{cert.certificationName}</div>
+                        {cert.notes && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{cert.notes}</div>}
+                      </td>
+                      <td>{cert.issuedBy}</td>
+                      <td>{formatDate(cert.issueDate)}</td>
+                      <td>{formatDate(cert.expiryDate)}</td>
+                      <td>
+                        <CertStatusBadge expiryDate={cert.expiryDate} />
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                          <button 
+                            onClick={(e) => { e.stopPropagation();    setShowForm(true);   handleTableRowClick(cert); }}
+                            style={{ width: 28, height: 28, background: '#fef3c7', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#92400e', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            title="Edit"
+                          >
+                            <FaEdit size={11} />
+                          </button>
+                         
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 ) : (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-                      <FaFileAlt size={40} style={{ display: 'block', margin: '0 auto 12px', opacity: 0.5 }} />
-                      <p style={{ fontSize: '16px', fontWeight: '500', color: '#374151' }}>No certificates found</p>
-                      <p style={{ fontSize: '14px' }}>Click "Add Certificate" to add a new certification</p>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+                      <FaFileAlt style={{ fontSize: 36, opacity: .3, marginBottom: 14 }} />
+                      <h4 style={{ fontSize: 17, fontWeight: 700, color: '#475569', marginBottom: 6 }}>No certificates saved yet</h4>
+                      <p style={{ fontSize: 13 }}>Click "Add Certificate" to get started</p>
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
-  return (
-    <div className="cert-root">
-      {view === 'employeeCerts' ? (
-        renderEmployeeCertPage()
-      ) : view !== 'list' ? (
-        <>
-          <div className="cert-header">
-            <div>
-              <h1 className="cert-title">{editMode ? 'Edit Certification' : 'Add Certification'}</h1>
-              <p className="cert-subtitle">{editMode ? 'Update certification details' : 'Enter new certification information'}</p>
-            </div>
-            <button className="cert-back-btn" onClick={() => { setView('list'); resetForm(); }}>
-              <FaArrowLeft size={12} /> Back to List
-            </button>
-          </div>
-          <div className="cert-form-wrap">
-            <form onSubmit={handleSubmit} className="cert-form-compact">
-              <div className="cert-form-section-compact">
-                <div className="cert-section-label">Certification Details</div>
-                <div className="cert-form-grid-3col">
-                {!propEmployeeId && (
-  <div className={`cert-field-compact ${touched.employeeId && errors.employeeId ? 'has-error' : ''}`} style={{ position: 'relative' }}>
-    <label className="required">Employee</label>
-    <input 
-      type="text" 
-      placeholder="Type employee name to search..." 
-      value={formData.employeeName || ''} 
-      onChange={(e) => {
-        setFormData(prev => ({ ...prev, employeeName: e.target.value, employeeId: '' }));
-        setShowEmployeeDropdown(true);
-      }}
-      autoComplete="off"
-      style={{ width: '100%', padding: '8px 12px', fontSize: '14px', border: '1px solid #d1d5db', borderRadius: '6px' }}
-    />
-    {showEmployeeDropdown && formData.employeeName && formData.employeeName.length > 0 && (
-      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '200px', overflow: 'auto', background: 'white', border: '1px solid #d1d5db', borderRadius: '0 0 6px 6px', zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-        {DUMMY_EMPLOYEES.filter(emp => emp.name.toLowerCase().includes(formData.employeeName.toLowerCase())).map(emp => (
-          <div key={emp.id} onMouseDown={(e) => { e.preventDefault(); setFormData(prev => ({ ...prev, employeeId: emp.id, employeeName: emp.name })); setErrors(prev => ({ ...prev, employeeId: '' })); setShowEmployeeDropdown(false); }}
-            style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6', fontSize: '13px' }}>
-            <strong>{emp.name}</strong><span style={{ color: '#666', marginLeft: '8px', fontSize: '12px' }}>{emp.department} • {emp.designation}</span>
-          </div>
-        ))}
-      </div>
-    )}
-    <FieldError msg={errors.employeeId} />
-  </div>
-)}
-                  
-                  <div className={`cert-field-compact ${touched.certificationName && errors.certificationName ? 'has-error' : ''}`}>
-                    <label className="required">Certification Name</label>
-                    <input type="text" placeholder="e.g., AWS Certified Solutions Architect" value={formData.certificationName} onChange={(e) => handleChange('certificationName', e.target.value)} onBlur={() => handleBlur('certificationName')} />
-                    <FieldError msg={errors.certificationName} />
-                  </div>
-                  
-                  <div className={`cert-field-compact ${touched.issuedBy && errors.issuedBy ? 'has-error' : ''}`}>
-                    <label className="required">Issuing Authority</label>
-                    <input type="text" placeholder="e.g., Amazon Web Services" value={formData.issuedBy} onChange={(e) => handleChange('issuedBy', e.target.value)} onBlur={() => handleBlur('issuedBy')} />
-                    <FieldError msg={errors.issuedBy} />
-                  </div>
-                  
-                  <div className="cert-field-compact">
-                    <label>Certificate Number</label>
-                    <input type="text" placeholder="Optional reference number" value={formData.certificateNumber} onChange={(e) => handleChange('certificateNumber', e.target.value)} />
-                  </div>
-                  
-                  <div className={`cert-field-compact ${touched.issueDate && errors.issueDate ? 'has-error' : ''}`}>
-                    <label className="required">Issue Date</label>
-                    <input type="date" value={formData.issueDate} onChange={(e) => handleChange('issueDate', e.target.value)} onBlur={() => handleBlur('issueDate')} />
-                    <FieldError msg={errors.issueDate} />
-                  </div>
-                  
-                  <div className="cert-field-compact">
-                    <label>Expiry Date</label>
-                    <input type="date" value={formData.expiryDate} min={formData.issueDate || undefined} onChange={(e) => handleChange('expiryDate', e.target.value)} />
-                    <FieldError msg={errors.expiryDate} />
-                  </div>
-                  
-                  <div className="cert-field-compact">
-                    <label>Reminder (days before expiry)</label>
-                    <input type="number" placeholder="30" value={formData.reminderDays} min="0" max="365" onChange={(e) => handleChange('reminderDays', e.target.value)} />
-                    <small style={{ fontSize: '11px', color: '#666' }}>Email notifications sent before expiry</small>
-                  </div>
-                  
-                
-                </div>
-              </div>
-              
-              <div className="cert-divider" />
-              
-              <div className="cert-form-section-compact">
-                <div className="cert-section-label">Additional Information</div>
-                <div className={`cert-field-compact`} style={{ gridColumn: 'span 3' }}>
-                  <label>Notes</label>
-                  <textarea rows={3} placeholder="Any additional information about this certification..." value={formData.notes} onChange={(e) => handleChange('notes', e.target.value)} />
-                </div>
-              </div>
-              
-              <div className="cert-form-actions">
-                <button type="button" className="cert-cancel-btn" onClick={() => { setView('list'); resetForm(); }}>Cancel</button>
-                <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <FaSave size={12} /> {editMode ? 'Update Certification' : 'Add Certification'}
+
+          {/* ── PAGINATION ── */}
+          {totalPages > 0 && (
+            <div className="cert-pagination">
+              <span className="info">
+                Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} certificates
+              </span>
+              <div className="page-group">
+                <button 
+                  className="page-btn" 
+                  disabled={currentPage === 0} 
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                >
+                  ← Prev
+                </button>
+                {getPaginationRange().map((pg, i) =>
+                  pg === '...' ? (
+                    <span key={i} className="page-dots">…</span>
+                  ) : (
+                    <button 
+                      key={pg} 
+                      className={`page-num ${pg === currentPage ? 'active' : ''}`} 
+                      onClick={() => setCurrentPage(pg)}
+                    >
+                      {pg + 1}
+                    </button>
+                  )
+                )}
+                <button 
+                  className="page-btn" 
+                  disabled={currentPage + 1 >= totalPages} 
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                >
+                  Next →
                 </button>
               </div>
-            </form>
-          </div>
-        </>
-      ) : (
-        // List View
-        <>
-          <div className="cert-header">
-            <div>
-              <h1 className="cert-title">Certification Management</h1>
-              <p className="cert-subtitle">Manage employee certifications and track expiry</p>
             </div>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button className="cert-add-btn" onClick={() => { resetForm(); setView('form'); }}>
-                <FaPlus size={13} /> Add Certification
-              </button>
-            </div>
-          </div>
-
-        
-<div className="cert-search-bar" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-  <div className="cert-search-wrap" style={{ 
-    flex: 1, 
-    minWidth: '200px', 
-    maxWidth: '350px',
-    display: 'flex',
-    alignItems: 'center',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    padding: '4px 10px',
-    background: 'white',
-    height: '36px'
-  }}>
-    <FaSearch size={14} style={{ color: '#9ca3af', marginRight: '8px' }} />
-    <input
-      type="text"
-      placeholder="Search by employee name or email..."
-      value={searchTerm}
-      onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
-      style={{ 
-        flex: 1,
-        padding: '6px 0', 
-        fontSize: '13px',
-        border: 'none',
-        outline: 'none',
-        background: 'transparent',
-        minWidth: '0',
-        height: '100%'
-      }}
-    />
-    {searchTerm && (
-      <button 
-        onClick={() => setSearchTerm('')}
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: '#9ca3af',
-          padding: '0 4px',
-          marginLeft: '4px'
-        }}
-      >
-        <FaTimes size={11} />
-      </button>
-    )}
-  </div>
-  <div style={{ 
-    width: '200px',
-    minWidth: '150px',
-    height: '36px'
-  }}>
-    <select 
-      value={employeeFilter} 
-      onChange={(e) => { setEmployeeFilter(e.target.value); setPage(0); }}
-      style={{ 
-        width: '100%', 
-        height: '100%',
-        padding: '0 10px', 
-        fontSize: '13px',
-        borderRadius: '6px',
-        border: '1px solid #d1d5db',
-        background: 'white',
-        outline: 'none'
-      }}
-    >
-      <option value="">All Departments</option>
-      <option value="1">IT</option>
-      <option value="2">HR</option>
-      <option value="3">Sales</option>
-      <option value="4">Finance</option>
-    </select>
-  </div>
-</div>
-          <div className="cert-table-card">
-            <div className="cert-table-wrap" style={{ borderBottom: 'none' }}>
-              <table className="cert-table">
-                <thead>
-                  <tr>
-                    <th>Employee</th>
-                    <th>Department</th>
-                    <th>Designation</th>
-                    <th>Total Certs</th>
-                    <th>Status</th>
-                    <th style={{ width: 100 }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentEmployees.length > 0 ? currentEmployees.map((emp) => {
-                    const empCerts = getEmployeeCertificates(emp.id);
-                    const activeCount = empCerts.filter(c => getCertStatus(c.expiryDate).type === 'active').length;
-                    const expiringCount = empCerts.filter(c => getCertStatus(c.expiryDate).type === 'expiring').length;
-                    const expiredCount = empCerts.filter(c => getCertStatus(c.expiryDate).type === 'expired').length;
-                    
-                    let statusText = '';
-                    let statusColor = {};
-                    if (empCerts.length === 0) {
-                      statusText = 'No Certificates';
-                      statusColor = { background: '#f3f4f6', color: '#6b7280' };
-                    } else if (expiringCount > 0) {
-                      statusText = `${expiringCount} Expiring Soon`;
-                      statusColor = { background: '#fed7aa', color: '#9a3412' };
-                    } else if (expiredCount > 0) {
-                      statusText = `${expiredCount} Expired`;
-                      statusColor = { background: '#fee2e2', color: '#991b1b' };
-                    } else {
-                      statusText = `${activeCount} Active`;
-                      statusColor = { background: '#d1fae5', color: '#065f46' };
-                    }
-
-                    return (                   
-<tr 
-  key={emp.id} 
-  className="cert-row" 
-  style={{ 
-    cursor: emp.status === 'Inactive' ? 'not-allowed' : 'pointer',
-    opacity: emp.status === 'Inactive' ? 0.6 : 1,
-    background: emp.status === 'Inactive' ? '#f9fafb' : 'transparent'
-  }} 
-  onClick={() => {
-    if (emp.status === 'Inactive') {
-      toast.warning('Cannot View', 'This employee is inactive. Please activate to view certificates.');
-      return;
-    }
-    openEmployeeCertPage(emp);
-  }}
->
-  <td>
-    <div>
-      <strong>{emp.name}</strong>
-      <div style={{ fontSize: '11px', color: '#666' }}>{emp.email}</div>
-    </div>
-  </td>
-  <td>{emp.department}</td>
-  <td>{emp.designation}</td>
-  <td>{empCerts.length}</td>
-  <td>
-    <div
-      className="d-flex align-items-center gap-1"
-      style={{ cursor: "pointer" }}
-      onClick={(e) => {
-        e.stopPropagation();
-        handleStatusToggle(emp.id, emp.name, emp.status || "Active");
-      }}
-    >
-      <div
-        style={{
-          width: "28px",
-          height: "16px",
-          borderRadius: "50px",
-          backgroundColor:
-            (emp.status || "Active") === "Active"
-              ? "#9d174d"
-              : "#d1d5db",
-          position: "relative",
-          transition: ".2s"
-        }}
-      >
-        <div
-          style={{
-            width: "12px",
-            height: "12px",
-            borderRadius: "50%",
-            background: "#fff",
-            position: "absolute",
-            top: "2px",
-            left:
-              (emp.status || "Active") === "Active"
-                ? "14px"
-                : "2px",
-            transition: ".2s"
-          }}
-        />
-      </div>
-      <span
-        style={{
-          fontSize: "11px",
-          fontWeight: 500,
-          color:
-            (emp.status || "Active") === "Active"
-              ? "#9d174d"
-              : "#94a3b8"
-        }}
-      >
-        {emp.status || "Active"}
-      </span>
-    </div>
-  </td>
-  <td>
-    <button 
-      className="cert-act cert-act--add"
-      onClick={(e) => { 
-        e.stopPropagation(); 
-        if (emp.status === 'Inactive') {
-          toast.warning('Cannot Add', 'This employee is inactive. Please activate to add certificates.');
-          return;
-        }
-        openEmployeeCertPage(emp); 
-      }}
-      title={emp.status === 'Inactive' ? 'Cannot add certificates to inactive employee' : 'Add Certificates'}
-      disabled={emp.status === 'Inactive'}
-      style={{ 
-        background: emp.status === 'Inactive' ? '#9ca3af' : '#10b981',
-        color: 'white', 
-        border: 'none', 
-        padding: '6px 12px', 
-        borderRadius: '6px', 
-        cursor: emp.status === 'Inactive' ? 'not-allowed' : 'pointer',
-        opacity: emp.status === 'Inactive' ? 0.5 : 1,
-        fontSize: '12px'
-      }}
-    >
-      <FaPlus size={12} /> Add
-    </button>
-  </td>
-</tr>
-                    );
-                  }) : (
-                    <tr>
-                      <td colSpan="6" className="cert-empty">
-                        <div className="cert-empty-inner">
-                          <span className="cert-empty-icon">📜</span>
-                          <p>No employees found</p>
-                          <small>Try a different search</small>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="cert-table-footer">
-              <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
-                Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
-              </div>
-              
-              {totalPages > 0 && (
-                <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <button 
-                    className="cert-page-btn" 
-                    disabled={page === 0} 
-                    onClick={() => setPage(page - 1)}
-                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-                  >
-                    ← Prev
-                  </button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === '...' ? (
-                      <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
-                    ) : (
-                      <button 
-                        key={pg} 
-                        className={`cert-page-num ${pg === page ? 'active' : ''}`} 
-                        onClick={() => setPage(pg)}
-                        style={{ 
-                          padding: '6px 10px', 
-                          border: '1px solid #e5e7eb', 
-                          background: pg === page ? '#9d174d' : 'white', 
-                          color: pg === page ? 'white' : '#374151',
-                          borderRadius: '6px', 
-                          cursor: 'pointer', 
-                          fontSize: '12px',
-                          minWidth: '34px'
-                        }}
-                      >
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button 
-                    className="cert-page-btn" 
-                    disabled={page + 1 >= totalPages} 
-                    onClick={() => setPage(page + 1)}
-                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-                  >
-                    Next →
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-     
-      {/* Renewal Modal */}
-      {showRenewalModal && renewalData && (
-        <div className="cert-modal-overlay" onClick={() => setShowRenewalModal(false)}>
-          <div className="cert-modal cert-renewal-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="cert-modal-icon" style={{ background: '#fef3c7', color: '#d97706' }}><FaClock size={18} /></div>
-            <h3 className="cert-modal-title">Renew Certification</h3>
-            <p className="cert-modal-body">Renewing: <strong>{renewalData.certificationName}</strong></p>
-            <div style={{ display: 'grid', gap: '16px', marginBottom: '20px' }}>
-              <div className="cert-field-compact"><label className="required">New Issue Date</label><input type="date" value={renewalData.newIssueDate} onChange={(e) => setRenewalData({ ...renewalData, newIssueDate: e.target.value })} /></div>
-              <div className="cert-field-compact"><label>New Expiry Date</label><input type="date" value={renewalData.newExpiryDate} min={renewalData.newIssueDate} onChange={(e) => setRenewalData({ ...renewalData, newExpiryDate: e.target.value })} /></div>
-              <div className="cert-field-compact"><label>New Certificate Number (Optional)</label><input type="text" value={renewalData.newCertificateNumber} onChange={(e) => setRenewalData({ ...renewalData, newCertificateNumber: e.target.value })} /></div>
-            </div>
-            <div className="cert-modal-actions">
-              <button className="cert-modal-cancel" onClick={() => setShowRenewalModal(false)}>Cancel</button>
-              <button className="cert-modal-confirm renew" onClick={handleRenewal}>Confirm Renewal</button>
-            </div>
-          </div>
+          )}
         </div>
       )}
-  {showStatusModal && (
-  <div
-    className="emp-modal-overlay"
-    onClick={() => setShowStatusModal(false)}
-  >
-    <div
-      className="emp-modal"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="emp-modal-icon">
-        {statusAction.newStatus === "Active" ? "✅" : "⛔"}
-      </div>
-
-      <h3 className="emp-modal-title">
-        Confirm Status Change
-      </h3>
-
-      <p className="emp-modal-body">
-        Are you sure you want to{" "}
-        <strong>
-          {statusAction.newStatus === "Active"
-            ? "activate"
-            : "deactivate"}
-        </strong>{" "}
-        <strong>{statusAction.name}</strong>?
-      </p>
-
-      <p className="emp-modal-warn">
-        {statusAction.newStatus === "Inactive"
-          ? "Inactive records cannot be edited until reactivated."
-          : "This record will become active again."}
-      </p>
-
-      <div className="emp-modal-actions">
-        <button
-          className="emp-modal-cancel"
-          onClick={() => setShowStatusModal(false)}
-        >
-          Cancel
-        </button>
-
-        <button
-          className="emp-modal-confirm"
-          onClick={confirmStatusChange}
-        >
-          Confirm
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-     
     </div>
   );
-};
-
-export default Certifications;
+}
