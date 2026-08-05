@@ -7,20 +7,59 @@ import {
   FaChalkboardTeacher, FaClock, FaSave, FaArrowLeft,
   FaChevronDown, FaUpload, FaEye, FaFilter, FaBuilding,
   FaUserTie, FaBriefcase, FaCheckCircle, FaCalendarAlt,
-  FaUser
+  FaUser, FaArrowRight
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onCancel }) => {
-  const [documents, setDocuments] = useState([
-    { id: 1, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order.pdf', fileType: 'pdf', fileSize: '1.2 MB', date: '2020-01-15', uploadedBy: 'HR Admin', uploadedOn: '2020-01-15', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Software Engineer' },
-    { id: 2, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2021-03-01', uploadedBy: 'HR Manager', uploadedOn: '2021-03-01', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Software Engineer' },
-    { id: 3, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2022-06-01', uploadedBy: 'HR Admin', uploadedOn: '2022-06-01', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'HR Manager' },
-    { id: 4, category: 'salaryRevision', title: 'Salary Revision', fileName: 'Salary_Revision.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2023-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2023-01-01', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Senior Developer' },
-    { id: 5, category: 'training', title: 'Training Certificate', fileName: 'Training_Certificate.jpg', fileType: 'jpg', fileSize: '2.1 MB', date: '2021-08-10', uploadedBy: 'Employee', uploadedOn: '2021-08-15', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Sales Manager' },
-    { id: 6, category: 'award', title: 'Award Certificate', fileName: 'Award_Certificate.pdf', fileType: 'pdf', fileSize: '1.5 MB', date: '2022-01-20', uploadedBy: 'CEO Office', uploadedOn: '2022-01-20', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Accountant' }
-  ]);
+ const [documents, setDocuments] = useState([
+  // ─── JOHN DOE (Employee 1) ──────────────────────────────
+  { id: 1, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order.pdf', fileType: 'pdf', fileSize: '1.2 MB', date: '2020-01-15', uploadedBy: 'HR Admin', uploadedOn: '2020-01-15', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Software Engineer' },
+  { id: 2, category: 'confirmation', title: 'Confirmation Letter', fileName: 'Confirmation_Letter.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2020-07-15', uploadedBy: 'HR Manager', uploadedOn: '2020-07-15', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Software Engineer' },
+  { id: 3, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2021-03-01', uploadedBy: 'HR Manager', uploadedOn: '2021-03-01', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
+  { id: 4, category: 'salaryRevision', title: 'Salary Slip - Jan 2024', fileName: 'Salary_Slip_Jan2024.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2024-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2024-01-01', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
+  { id: 5, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order_John.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2023-06-01', uploadedBy: 'HR Admin', uploadedOn: '2023-06-01', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
+  { id: 6, category: 'award', title: 'Best Employee Award 2023', fileName: 'Best_Employee_Award.pdf', fileType: 'pdf', fileSize: '1.5 MB', date: '2023-12-20', uploadedBy: 'CEO Office', uploadedOn: '2023-12-20', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
+  { id: 7, category: 'training', title: 'AWS Certification', fileName: 'AWS_Certification.pdf', fileType: 'pdf', fileSize: '2.1 MB', date: '2023-08-10', uploadedBy: 'Employee', uploadedOn: '2023-08-15', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
+{ id: 8, category: 'retirement', title: 'Retirement Document', fileName: 'Retirement_John.pdf', fileType: 'pdf', fileSize: '1.0 MB', date: '2024-12-31', uploadedBy: 'HR Admin', uploadedOn: '2024-12-31', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
 
+  // ─── JANE SMITH (Employee 2) ──────────────────────────────
+  { id: 9, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order_Jane.pdf', fileType: 'pdf', fileSize: '1.1 MB', date: '2019-03-10', uploadedBy: 'HR Admin', uploadedOn: '2019-03-10', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'HR Manager' },
+  { id: 10, category: 'confirmation', title: 'Confirmation Letter', fileName: 'Confirmation_Letter_Jane.pdf', fileType: 'pdf', fileSize: '756 KB', date: '2019-09-10', uploadedBy: 'HR Manager', uploadedOn: '2019-09-10', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'HR Manager' },
+  { id: 11, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order_Jane.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2021-06-01', uploadedBy: 'HR Manager', uploadedOn: '2021-06-01', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'Senior HR Manager' },
+  { id: 12, category: 'salaryRevision', title: 'Salary Slip - Jan 2024', fileName: 'Salary_Slip_Jane_Jan2024.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2024-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2024-01-01', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'Senior HR Manager' },
+  { id: 13, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order_Jane.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2022-06-01', uploadedBy: 'HR Admin', uploadedOn: '2022-06-01', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'Senior HR Manager' },
+  { id: 14, category: 'award', title: 'HR Excellence Award', fileName: 'HR_Excellence_Award.pdf', fileType: 'pdf', fileSize: '1.3 MB', date: '2022-12-15', uploadedBy: 'CEO Office', uploadedOn: '2022-12-15', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'Senior HR Manager' },
+  { id: 15, category: 'training', title: 'Leadership Training', fileName: 'Leadership_Training.pdf', fileType: 'pdf', fileSize: '1.8 MB', date: '2023-05-20', uploadedBy: 'Employee', uploadedOn: '2023-05-25', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'Senior HR Manager' },
+
+  // ─── MIKE JOHNSON (Employee 3) ────────────────────────────
+  { id: 16, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order_Mike.pdf', fileType: 'pdf', fileSize: '1.2 MB', date: '2020-08-20', uploadedBy: 'HR Admin', uploadedOn: '2020-08-20', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Senior Developer' },
+  { id: 17, category: 'confirmation', title: 'Confirmation Letter', fileName: 'Confirmation_Letter_Mike.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2021-02-20', uploadedBy: 'HR Manager', uploadedOn: '2021-02-20', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Senior Developer' },
+  { id: 18, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order_Mike.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2022-09-01', uploadedBy: 'HR Manager', uploadedOn: '2022-09-01', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Tech Lead' },
+  { id: 19, category: 'salaryRevision', title: 'Salary Slip - Jan 2024', fileName: 'Salary_Slip_Mike_Jan2024.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2024-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2024-01-01', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Tech Lead' },
+  { id: 20, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order_Mike.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2023-03-01', uploadedBy: 'HR Admin', uploadedOn: '2023-03-01', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Tech Lead' },
+  { id: 21, category: 'award', title: 'Innovation Award', fileName: 'Innovation_Award.pdf', fileType: 'pdf', fileSize: '1.2 MB', date: '2023-10-10', uploadedBy: 'CEO Office', uploadedOn: '2023-10-10', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Tech Lead' },
+  { id: 22, category: 'training', title: 'Python Certification', fileName: 'Python_Certification.pdf', fileType: 'pdf', fileSize: '2.0 MB', date: '2023-07-15', uploadedBy: 'Employee', uploadedOn: '2023-07-20', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Tech Lead' },
+
+  // ─── SARAH WILLIAMS (Employee 4) ──────────────────────────
+  { id: 23, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order_Sarah.pdf', fileType: 'pdf', fileSize: '1.0 MB', date: '2021-01-05', uploadedBy: 'HR Admin', uploadedOn: '2021-01-05', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Sales Manager' },
+  { id: 24, category: 'confirmation', title: 'Confirmation Letter', fileName: 'Confirmation_Letter_Sarah.pdf', fileType: 'pdf', fileSize: '756 KB', date: '2021-07-05', uploadedBy: 'HR Manager', uploadedOn: '2021-07-05', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Sales Manager' },
+  { id: 25, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order_Sarah.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2023-01-01', uploadedBy: 'HR Manager', uploadedOn: '2023-01-01', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Senior Sales Manager' },
+  { id: 26, category: 'salaryRevision', title: 'Salary Slip - Jan 2024', fileName: 'Salary_Slip_Sarah_Jan2024.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2024-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2024-01-01', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Senior Sales Manager' },
+  { id: 27, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order_Sarah.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2022-12-01', uploadedBy: 'HR Admin', uploadedOn: '2022-12-01', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Senior Sales Manager' },
+  { id: 28, category: 'award', title: 'Best Sales Award 2023', fileName: 'Best_Sales_Award.pdf', fileType: 'pdf', fileSize: '1.4 MB', date: '2023-12-20', uploadedBy: 'CEO Office', uploadedOn: '2023-12-20', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Senior Sales Manager' },
+  { id: 29, category: 'training', title: 'Sales Training Certificate', fileName: 'Sales_Training.pdf', fileType: 'pdf', fileSize: '1.6 MB', date: '2023-04-10', uploadedBy: 'Employee', uploadedOn: '2023-04-15', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Senior Sales Manager' },
+
+  // ─── DAVID BROWN (Employee 5) ─────────────────────────────
+  { id: 30, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order_David.pdf', fileType: 'pdf', fileSize: '1.1 MB', date: '2018-11-15', uploadedBy: 'HR Admin', uploadedOn: '2018-11-15', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Accountant' },
+  { id: 31, category: 'confirmation', title: 'Confirmation Letter', fileName: 'Confirmation_Letter_David.pdf', fileType: 'pdf', fileSize: '756 KB', date: '2019-05-15', uploadedBy: 'HR Manager', uploadedOn: '2019-05-15', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Accountant' },
+  { id: 32, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order_David.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2022-04-01', uploadedBy: 'HR Manager', uploadedOn: '2022-04-01', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
+  { id: 33, category: 'salaryRevision', title: 'Salary Slip - Jan 2024', fileName: 'Salary_Slip_David_Jan2024.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2024-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2024-01-01', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
+  { id: 34, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order_David.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2021-06-01', uploadedBy: 'HR Admin', uploadedOn: '2021-06-01', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
+  { id: 35, category: 'award', title: 'Best Employee Award', fileName: 'Award_Certificate.pdf', fileType: 'pdf', fileSize: '1.5 MB', date: '2022-01-20', uploadedBy: 'CEO Office', uploadedOn: '2022-01-20', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
+  { id: 36, category: 'training', title: 'Financial Analysis Certificate', fileName: 'Financial_Analysis.pdf', fileType: 'pdf', fileSize: '1.9 MB', date: '2023-09-01', uploadedBy: 'Employee', uploadedOn: '2023-09-05', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
+  { id: 37, category: 'retirement', title: 'Retirement Document', fileName: 'Retirement_David.pdf', fileType: 'pdf', fileSize: '1.0 MB', date: '2024-12-31', uploadedBy: 'HR Admin', uploadedOn: '2024-12-31', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
+]);
   // Search and Filter States 
   const [searchTerm, setSearchTerm] = useState('');
   const [employeeNameSearch, setEmployeeNameSearch] = useState('');
@@ -39,9 +78,11 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
   
-  // View Modal State
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [viewingDoc, setViewingDoc] = useState(null);
+  // ─── View Page State ────────────────────────────────────
+  const [showViewPage, setShowViewPage] = useState(false);
+  const [viewingEmployee, setViewingEmployee] = useState(null);
+  const [viewingEmployeeDocs, setViewingEmployeeDocs] = useState([]);
+  const [selectedDocForPreview, setSelectedDocForPreview] = useState(null);
 
   // Refs
   const employeeInputRef = useRef(null);
@@ -75,6 +116,7 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
 
   const documentCategories = [
     { id: 'appointment', label: 'Appointment Orders', icon: <FaFileAlt />, color: '#4f46e5', bg: '#e0e7ff' },
+    { id: 'confirmation', label: 'Confirmation Letters', icon: <FaCheckCircle />, color: '#16a34a', bg: '#dcfce7' },
     { id: 'promotion', label: 'Promotion Orders', icon: <FaChartLine />, color: '#f59e0b', bg: '#fed7aa' },
     { id: 'transfer', label: 'Transfer Orders', icon: <FaExchangeAlt />, color: '#06b6d4', bg: '#cffafe' },
     { id: 'salaryRevision', label: 'Salary Revision', icon: <FaRupeeSign />, color: '#ec489a', bg: '#fce7f3' },
@@ -88,12 +130,12 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
   const branches = ['all', ...new Set(documents.map(doc => doc.branch))];
   const designations = ['all', ...new Set(documents.map(doc => doc.designation))];
 
-  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => 
-    emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
-    emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-    emp.department.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-    emp.designation.toLowerCase().includes(employeeSearchTerm.toLowerCase())
-  );
+ const filteredDummyEmployees = DUMMY_EMPLOYEES.filter(emp => 
+  emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
+  emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+  emp.department.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+  emp.designation.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+);
 
   // Get unique employee names from documents for the employee name input
   const uniqueEmployeeNames = [...new Set(documents.map(doc => doc.employeeName))];
@@ -155,11 +197,66 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
     return docs;
   };
 
-  const filteredDocs = getFilteredDocuments();
-  const totalItems = filteredDocs.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage);
-  const startIndex = page * rowsPerPage;
-  const currentDocs = filteredDocs.slice(startIndex, startIndex + rowsPerPage);
+  // ─── Get Unique Employees from Documents ──────────────────
+const getUniqueEmployees = () => {
+  const uniqueEmployees = [];
+  const seenNames = new Set();
+  
+  documents.forEach(doc => {
+    if (!seenNames.has(doc.employeeName)) {
+      seenNames.add(doc.employeeName);
+      uniqueEmployees.push({
+        id: doc.employeeId,
+        name: doc.employeeName,
+        department: doc.department,
+        branch: doc.branch,
+        designation: doc.designation,
+        documentCount: documents.filter(d => d.employeeName === doc.employeeName).length
+      });
+    }
+  });
+  
+  return uniqueEmployees;
+};
+
+// ─── Filter Employees ──────────────────────────────────────
+const getFilteredEmployees = () => {
+  let employees = getUniqueEmployees();
+  
+  // Search by keyword
+  if (searchTerm.trim()) {
+    const search = searchTerm.toLowerCase();
+    employees = employees.filter(emp =>
+      emp.name.toLowerCase().includes(search) ||
+      emp.department?.toLowerCase().includes(search) ||
+      emp.branch?.toLowerCase().includes(search) ||
+      emp.designation?.toLowerCase().includes(search)
+    );
+  }
+  
+  // Filter by department
+  if (selectedDepartment !== 'all') {
+    employees = employees.filter(emp => emp.department === selectedDepartment);
+  }
+  
+  // Filter by branch
+  if (selectedBranch !== 'all') {
+    employees = employees.filter(emp => emp.branch === selectedBranch);
+  }
+  
+  // Filter by designation
+  if (selectedDesignation !== 'all') {
+    employees = employees.filter(emp => emp.designation === selectedDesignation);
+  }
+  
+  return employees;
+};
+  
+const filteredEmployees = getFilteredEmployees();
+const totalItems = filteredEmployees.length;
+const totalPages = Math.ceil(totalItems / rowsPerPage);
+const startIndex = page * rowsPerPage;
+const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
 
   const getPaginationRange = () => {
     const delta = 2;
@@ -197,16 +294,17 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
   };
 
   const handleSearch = () => {
-    setHasSearched(true);
-    setPage(0);
-    if (!searchTerm && !employeeNameSearch && !selectedEmployee && activeCategory === 'all' && 
-        selectedDepartment === 'all' && selectedBranch === 'all' && selectedDesignation === 'all' &&
-        !fromDate && !toDate) {
-      toast.info('Showing All', 'Displaying all documents');
-    } else {
-      toast.success('Search Complete', `Found ${filteredDocs.length} documents`);
-    }
-  };
+  setHasSearched(true);
+  setPage(0);
+  if (!searchTerm && !employeeNameSearch && !selectedEmployee && activeCategory === 'all' && 
+      selectedDepartment === 'all' && selectedBranch === 'all' && selectedDesignation === 'all' &&
+      !fromDate && !toDate) {
+    toast.info('Showing All', 'Displaying all documents');
+  } else {
+    const employees = getFilteredEmployees();
+    toast.success('Search Complete', `Found ${employees.length} employees`);
+  }
+};
 
   const handleReset = () => {
     setSearchTerm('');
@@ -224,14 +322,39 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
     toast.info('Reset', 'Search filters cleared');
   };
 
-  const handleDownload = (doc) => {
-    toast.info('Download', `Downloading ${doc.fileName}`);
+ const handleDownload = (doc) => {
+  // Simulate download
+  toast.success('Download Started', `Downloading ${doc.fileName}`);
+ };
+
+  // ─── View Employee Documents ─────────────────────────────
+  const handleViewEmployee = (employeeName) => {
+    const employee = DUMMY_EMPLOYEES.find(emp => emp.name === employeeName);
+    if (employee) {
+      const docs = documents.filter(doc => doc.employeeName === employeeName);
+      setViewingEmployee(employee);
+      setViewingEmployeeDocs(docs);
+      // Set first document as selected for preview
+      if (docs.length > 0) {
+        setSelectedDocForPreview(docs[0]);
+      }
+      setShowViewPage(true);
+    } else {
+      toast.warning('Not Found', 'Employee details not found');
+    }
   };
 
-  const handleView = (doc) => {
-    setViewingDoc(doc);
-    setShowViewModal(true);
+  const handleBackToList = () => {
+    setShowViewPage(false);
+    setViewingEmployee(null);
+    setViewingEmployeeDocs([]);
+    setSelectedDocForPreview(null);
   };
+
+  const handleSelectDocumentForPreview = (doc) => {
+  setSelectedDocForPreview(doc);
+  toast.info('Document Selected', `Viewing ${doc.title}`);
+};
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
@@ -259,6 +382,183 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
     name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
   );
 
+  // ─── View Page Styles ────────────────────────────────────
+  const viewPageStyles = {
+    container: { padding: '24px 28px', background: '#f8fafc', minHeight: '100vh' },
+    card: { background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+    header: { padding: '20px 24px', background: 'linear-gradient(135deg, #9d174d, #7a0e3a)', color: 'white' },
+    table: { width: '100%', borderCollapse: 'collapse', fontSize: '13px' },
+    th: { padding: '12px 16px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
+    td: { padding: '10px 16px', borderBottom: '1px solid #f1f5f9' },
+    badge: { padding: '4px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' },
+    btnPrimary: { padding: '8px 20px', background: '#9d174d', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' },
+    btnSecondary: { padding: '8px 20px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' },
+    btnInfo: { padding: '6px 12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' },
+    btnSuccess: { padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' },
+    emptyState: { textAlign: 'center', padding: '60px 20px', color: '#94a3b8' },
+    previewBox: { textAlign: 'center', padding: '40px 20px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' },
+  };
+
+  // ─── RENDER VIEW PAGE ────────────────────────────────────
+  if (showViewPage && viewingEmployee) {
+    const category = selectedDocForPreview ? getCategoryInfo(selectedDocForPreview.category) : null;
+    
+    return (
+      <div style={viewPageStyles.container}>
+        {/* Back Button */}
+       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+  <button style={viewPageStyles.btnSecondary} onClick={handleBackToList}>
+    <FaArrowLeft size={13} /> Back to List
+  </button>
+</div>
+        {/* Employee Details Card */}
+        <div style={viewPageStyles.card}>
+          <div style={viewPageStyles.header}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '700' }}>
+                {viewingEmployee.name.charAt(0)}
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '700' }}>{viewingEmployee.name}</h2>
+                <p style={{ margin: '4px 0 0 0', opacity: 0.8, fontSize: '14px' }}>
+                  {viewingEmployee.code} • {viewingEmployee.department} • {viewingEmployee.designation}
+                </p>
+              </div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.15)', padding: '8px 16px', borderRadius: '8px' }}>
+              <span style={{ fontSize: '13px' }}>
+                <FaFileAlt style={{ marginRight: '6px' }} />
+                Total Documents: {viewingEmployeeDocs.length}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── Document Preview Section ────────────────────── */}
+{selectedDocForPreview && (
+  <div style={{ ...viewPageStyles.card, marginTop: '20px' }}>
+    <div style={{ padding: '16px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#0f172a' }}>Document Preview</h3>
+      <span style={{ fontSize: '12px', color: '#94a3b8' }}>Preview</span>
+    </div>
+    <div style={{ padding: '20px 24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
+        <div>
+          <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Employee</span>
+          <div style={{ fontWeight: '500', fontSize: '14px', color: '#0f172a' }}>{selectedDocForPreview.employeeName}</div>
+        </div>
+        <div>
+          <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Department</span>
+          <div style={{ fontWeight: '500',fontSize: '14px', color: '#0f172a' }}>{selectedDocForPreview.department || '—'}</div>
+        </div>
+        <div>
+          <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Branch</span>
+          <div style={{ fontWeight: '500', fontSize: '14px', color: '#0f172a' }}>{selectedDocForPreview.branch || '—'}</div>
+        </div>
+        <div>
+          <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Designation</span>
+          <div style={{ fontWeight: '500', fontSize: '14px', color: '#0f172a' }}>{selectedDocForPreview.designation || '—'}</div>
+        </div>
+        <div>
+          <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Date</span>
+          <div style={{ fontWeight: '500', fontSize: '14px', color: '#0f172a' }}>{formatDate(selectedDocForPreview.date)}</div>
+        </div>
+        <div>
+          <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Uploaded By</span>
+          <div style={{ fontWeight: '500', fontSize: '14px', color: '#0f172a' }}>{selectedDocForPreview.uploadedBy}</div>
+        </div>
+      </div>
+      <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '12px 0 16px' }} />
+      {/* ─── All Documents Table ──────────────────────────── */}
+      <div style={{ ...viewPageStyles.card, marginTop: '20px' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid #e2e8f0' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#0f172a' }}>All Documents</h3>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={viewPageStyles.table}>
+            <thead>
+              <tr>
+                <th style={viewPageStyles.th}>#</th>
+                <th style={viewPageStyles.th}>Document Type</th>
+                <th style={viewPageStyles.th}>Title</th>
+                <th style={viewPageStyles.th}>Date</th>
+                <th style={{ ...viewPageStyles.th, textAlign: 'center', width: '160px' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {viewingEmployeeDocs.length > 0 ? (
+                viewingEmployeeDocs.map((doc, idx) => {
+                  const cat = getCategoryInfo(doc.category);
+                  return (
+                    <tr key={doc.id}>
+                      <td style={{ ...viewPageStyles.td, color: '#94a3b8', fontSize: '12px', textAlign: 'center' }}>{idx + 1}</td>
+                      <td style={viewPageStyles.td}>
+                        <span style={{ ...viewPageStyles.badge, backgroundColor: cat.bg, color: cat.color }}>
+                          {cat.icon} {cat.label}
+                        </span>
+                      </td>
+                      <td style={{ ...viewPageStyles.td, fontWeight: '500', color: '#0f172a' }}>{doc.title}</td>
+                      <td style={viewPageStyles.td}>{formatDate(doc.date)}</td>
+                      <td style={{ ...viewPageStyles.td, textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                         <button
+  style={{
+    ...viewPageStyles.btnInfo,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  }}
+  onClick={() => handleSelectDocumentForPreview(doc)}
+  title="View Document"
+  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+>
+  <FaEye size={12} /> View
+</button>
+                         <button
+  style={{
+    ...viewPageStyles.btnSuccess,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  }}
+  onClick={() => handleDownload(doc)}
+  title="Download"
+  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+>
+  <FaDownload size={12} /> Download
+</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="5">
+                    <div style={viewPageStyles.emptyState}>
+                      <FaFileAlt size={48} style={{ color: '#cbd5e1', marginBottom: '16px' }} />
+                      <div style={{ fontSize: '16px', fontWeight: '500', color: '#475569' }}>No documents found for this employee</div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+        <button style={viewPageStyles.btnSecondary} onClick={handleBackToList}>Close</button>
+      </div>
+    </div>
+  </div>
+)}
+
+       
+      </div>
+    );
+  }
+
+  // ─── MAIN LIST PAGE ──────────────────────────────────────
   return (
     <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100vh' }}>
       <style>{`
@@ -442,53 +742,6 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
           color: white;
           border-color: #9d174d;
         }
-        .service-doc-modal {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(15, 23, 42, 0.6);
-          backdrop-filter: blur(4px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1050;
-          padding: 20px;
-        }
-        .service-doc-modal-content {
-          background: white;
-          border-radius: 16px;
-          width: 95%;
-          max-width: 900px;
-          max-height: 90vh;
-          display: flex;
-          flex-direction: column;
-          box-shadow: 0 25px 50px rgba(0,0,0,0.25);
-          overflow: hidden;
-        }
-        .service-doc-modal-header {
-          padding: 16px 24px;
-          background: linear-gradient(135deg, #9d174d, #9d174d);
-          color: white;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          flex-shrink: 0;
-        }
-        .service-doc-modal-body {
-          padding: 20px 24px;
-          overflow-y: auto;
-          flex: 1;
-        }
-        .service-doc-modal-footer {
-          padding: 12px 24px;
-          border-top: 1px solid #e2e8f0;
-          display: flex;
-          justify-content: flex-end;
-          gap: 10px;
-          flex-shrink: 0;
-        }
         .search-container {
           display: grid;
           grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr auto;
@@ -631,14 +884,10 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
       </div>
 
       <div className="search-container">
-      
-        {/* Branch Filter */}
-        
         <div>
           <div style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a', marginBottom: '16px' }}>
-                      <FaFilter style={{ marginRight: '8px' }} /> Filters
-                    </div>
-                    
+            <FaFilter style={{ marginRight: '8px' }} /> Filters
+          </div>
           <label className="search-label">
             <FaBriefcase size={11} style={{ marginRight: '4px' }} /> Branch
           </label>
@@ -663,7 +912,6 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
           </div>
         </div>
 
-        {/* Department Filter */}
         <div>
           <label className="search-label">
             <FaBuilding size={11} style={{ marginRight: '4px' }} /> Department
@@ -689,7 +937,6 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
           </div>
         </div>
 
-        {/* Designation Filter */}
         <div>
           <label className="search-label">
             <FaUserTie size={11} style={{ marginRight: '4px' }} /> Designation
@@ -715,7 +962,6 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
           </div>
         </div>
 
- {/* Search Input */}
         <div>
           <label className="search-label">
             <FaSearch size={11} style={{ marginRight: '4px' }} /> Employee Name
@@ -735,7 +981,6 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
           />
         </div>
 
-        {/* From Date */}
         <div>
           <label className="search-label">
             <FaCalendarAlt size={11} style={{ marginRight: '4px' }} /> From Date
@@ -754,7 +999,6 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
           />
         </div>
 
-        {/* To Date */}
         <div>
           <label className="search-label">
             <FaCalendarAlt size={11} style={{ marginRight: '4px' }} /> To Date
@@ -774,12 +1018,10 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
           />
         </div>
 
-        {/* Search & Reset Buttons */}
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="service-doc-btn service-doc-btn-primary" onClick={handleSearch}>
             <FaSearch size={14} /> Search
           </button>
-         
         </div>
       </div>
 
@@ -848,50 +1090,45 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
                   <th>Department</th>
                   <th>Branch</th>
                   <th>Designation</th>
-                  <th>Category</th>
-                  <th>Date</th>
-                  <th style={{ width: '120px', textAlign: 'center' }}>Actions</th>
+                 <th>Documents</th>
+                  <th style={{ width: '140px', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                {currentDocs.length > 0 ? (
-                  currentDocs.map((doc, idx) => {
-                    const category = getCategoryInfo(doc.category);
-                    return (
-                      <tr key={doc.id}>
-                        <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>{startIndex + idx + 1}</td>
-                        <td style={{ fontWeight: '600', color: '#0f172a' }}>{doc.employeeName}</td>
-                        <td>
-                          <span style={{ padding: '2px 10px', background: '#dbeafe', borderRadius: '12px', fontSize: '11px', color: '#2563eb' }}>
-                            {doc.department || '—'}
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{ padding: '2px 10px', background: '#d1fae5', borderRadius: '12px', fontSize: '11px', color: '#059669' }}>
-                            {doc.branch || '—'}
-                          </span>
-                        </td>
-                        <td style={{ color: '#334155' }}>{doc.designation || '—'}</td>
-                        <td>
-                          <span className="service-doc-badge" style={{ backgroundColor: category.bg, color: category.color }}>
-                            {category.icon} {category.label}
-                          </span>
-                        </td>
-                        <td style={{ color: '#334155' }}>{formatDate(doc.date)}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                            <button
-                              style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6366f1' }}
-                              onClick={() => handleView(doc)}
-                              title="View"
-                            >
-                              <FaEye size={12} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
+             <tbody>
+  {currentEmployees.length > 0 ? (
+    currentEmployees.map((emp, idx) => (
+      <tr key={emp.id}>
+        <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>{startIndex + idx + 1}</td>
+        <td style={{ fontWeight: '600', color: '#0f172a' }}>{emp.name}</td>
+        <td>
+          <span style={{ padding: '2px 10px', background: '#dbeafe', borderRadius: '12px', fontSize: '11px', color: '#2563eb' }}>
+            {emp.department || '—'}
+          </span>
+        </td>
+        <td>
+          <span style={{ padding: '2px 10px', background: '#d1fae5', borderRadius: '12px', fontSize: '11px', color: '#059669' }}>
+            {emp.branch || '—'}
+          </span>
+        </td>
+        <td style={{ color: '#334155' }}>{emp.designation || '—'}</td>
+        <td>
+          <span style={{ padding: '2px 10px', background: '#fce7f3', borderRadius: '12px', fontSize: '11px', color: '#9d174d' }}>
+            {emp.documentCount} Documents
+          </span>
+        </td>
+        <td>
+          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+            <button
+              style={{ padding: '6px 12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+              onClick={() => handleViewEmployee(emp.name)}
+              title="View All Documents"
+            >
+              <FaEye size={12} /> View
+            </button>
+          </div>
+        </td>
+      </tr>
+    ))
                 ) : (
                   <tr>
                     <td colSpan="8">
@@ -927,72 +1164,6 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
         </div>
       ) : (
         <></>
-      )}
-
-      {/* VIEW MODAL */}
-      {showViewModal && viewingDoc && (
-        <div className="service-doc-modal">
-          <div className="service-doc-modal-content">
-            <div className="service-doc-modal-header">
-              <h5 style={{ margin: 0, fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <FaFileAlt /> Document Preview
-              </h5>
-              <button onClick={() => setShowViewModal(false)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', width: '36px', height: '36px', borderRadius: '8px', cursor: 'pointer', color: 'white', fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-            </div>
-            <div className="service-doc-modal-body">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Employee</span>
-                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.employeeName}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Department</span>
-                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.department || '—'}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Branch</span>
-                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.branch || '—'}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Designation</span>
-                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.designation || '—'}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Category</span>
-                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.title}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Date</span>
-                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{formatDate(viewingDoc.date)}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>File Name</span>
-                  <div style={{ fontWeight: '500', color: '#0f172a', fontFamily: 'monospace', fontSize: '12px' }}>{viewingDoc.fileName}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>File Size</span>
-                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.fileSize}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '600' }}>Uploaded By</span>
-                  <div style={{ fontWeight: '500', color: '#0f172a' }}>{viewingDoc.uploadedBy}</div>
-                </div>
-              </div>
-              <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '12px 0 16px' }} />
-              <div style={{ textAlign: 'center', padding: '40px 20px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <FaFileAlt size={64} style={{ color: '#6366f1', marginBottom: '12px' }} />
-                <p style={{ color: '#64748b' }}>Document preview available in full version</p>
-                <p style={{ fontSize: '12px', color: '#94a3b8' }}>{viewingDoc.fileName}</p>
-              </div>
-            </div>
-            <div className="service-doc-modal-footer">
-              <button className="service-doc-btn service-doc-btn-secondary" onClick={() => setShowViewModal(false)}>Close</button>
-              <button className="service-doc-btn service-doc-btn-primary" onClick={() => handleDownload(viewingDoc)}>
-                <FaDownload size={13} /> Download
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
