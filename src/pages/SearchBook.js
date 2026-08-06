@@ -154,7 +154,7 @@ const ServiceBookSearch = ({ user, onCancel }) => {
     branch: 'Noida',
     department: 'Finance', 
     designation: 'Accountant', 
-    status: 'Terminated', 
+    status: 'Active', 
     joiningDate: '2022-01-10', 
     retirementDate: null, 
     photo: null,
@@ -208,7 +208,7 @@ const ServiceBookSearch = ({ user, onCancel }) => {
 const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  // ✅ Branch list
   const departments = ['IT', 'HR', 'Finance', 'Sales', 'Marketing', 'Operations'];
   const designations = ['Software Engineer', 'Senior Developer', 'Tech Lead', 'HR Manager', 'Sales Manager', 'Accountant', 'Marketing Manager', 'Operations Manager', 'Product Manager'];
-  const statuses = ['Active', 'Retired', 'Terminated'];
+  const statuses = ['Active', 'Retired'];
 
   const hasActiveFilters = Object.values(filters).some(val => val !== '');
 
