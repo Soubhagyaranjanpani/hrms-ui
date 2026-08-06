@@ -526,6 +526,8 @@ const handleExperienceChange = (field, value) => {
         joiningDate: formData.joiningDate,
         roleId: parseInt(formData.roleId),
         departmentId: parseInt(formData.departmentId),
+         designation: formData.designation,  
+    
         branchId: parseInt(formData.branchId),
         gradeId: formData.gradeId ? parseInt(formData.gradeId) : null,
         address: formData.address.trim(),
@@ -770,6 +772,7 @@ setExperience({ company: '', position: '', years: '', months: '' });
                     <th style={{ width: 44 }}>#</th>
                     <th>Employee</th>
                     <th>Department</th>
+                     <th>Designation</th>
                     <th>Role</th>
                     <th>Branch</th>
                     <th>Joined</th>
@@ -798,6 +801,11 @@ setExperience({ company: '', position: '', years: '', months: '' });
                         <td>
                           {emp.departmentName
                             ? <span className="emp-pill emp-pill--indigo">{emp.departmentName}</span>
+                            : <span className="emp-dash">—</span>}
+                        </td>
+                                                <td>
+                          {emp.designation
+                            ? <span className="emp-pill emp-pill--teal">{emp.designation}</span>
                             : <span className="emp-dash">—</span>}
                         </td>
                         <td>
@@ -994,7 +1002,25 @@ setExperience({ company: '', position: '', years: '', months: '' });
                   </select>
                   <FieldError msg={errors.departmentId} />
                 </div>
-
+                               {/* --- DESIGNATION DROPDOWN (Hardcoded) START --- */}
+                <div className={`emp-field-compact ${isFieldErr('designation') ? 'has-error' : ''} ${isFieldOk('designation') ? 'has-ok' : ''}`}>
+                  <label>Designation</label>
+                  <select
+                    value={formData.designation || ''}
+                    onChange={(e) => handleChange('designation', e.target.value)}
+                    onBlur={() => handleBlur('designation')}
+                  >
+                    <option value="">Select designation</option>
+                    <option value="Software Engineer">Software Engineer</option>
+                    <option value="Senior Developer">Senior Developer</option>
+                    <option value="Project Manager">Project Manager</option>
+                    <option value="HR Executive">HR Executive</option>
+                    <option value="Accountant">Accountant</option>
+                    <option value="System Admin">System Admin</option>
+                  </select>
+                  <FieldError msg={errors.designation} />
+                </div>
+                
                 <div className={`emp-field-compact ${isFieldErr('roleId') ? 'has-error' : ''} ${isFieldOk('roleId') ? 'has-ok' : ''}`}>
                   <label className="required">Role</label>
                   <select
