@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   FaSave, FaTimes, FaUser, FaIdCard, FaBuilding, FaBriefcase, 
   FaBook, FaCheckCircle, FaSearch, FaEdit, FaTrash, FaPlus, 
-  FaArrowLeft, FaArrowRight, FaChevronDown, FaExclamationCircle
+  FaArrowLeft, FaArrowRight, FaChevronDown, FaExclamationCircle,FaUpload
 } from 'react-icons/fa';
 import axios from 'axios';
 import { toast } from '../components/Toast';
@@ -76,7 +76,10 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
   const [serviceBooks, setServiceBooks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
+// Bulk Upload Modal State
+const [showBulkPage, setShowBulkPage] = useState(false);  
+const [bulkFile, setBulkFile] = useState(null);
+const [bulkUploading, setBulkUploading] = useState(false);
   // Form States
   const [formData, setFormData] = useState({
     employeeId: '',
@@ -276,6 +279,141 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
       setLoading(false);
     }
   }, []);
+
+  // ✅ BULK UPLOAD HANDLER - YEH FUNCTION ADD KAREIN
+const handleBulkUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // Validate file type
+  if (!file.name.endsWith('.csv')) {
+    toast.error('Invalid File', 'Please upload a CSV file');
+    e.target.value = '';
+    return;
+  }
+
+  // Read file
+  const reader = new FileReader();
+  reader.onload = async (event) => {
+    try {
+      const text = event.target.result;
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        toast.warning('Empty File', 'CSV file must have header and at least one record');
+        e.target.value = '';
+        return;
+      }
+
+      // Parse header
+      const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+      
+      // Expected columns: employeeCode, employeeName
+      const codeIndex = header.findIndex(h => h.includes('code') || h.includes('empcode'));
+      const nameIndex = header.findIndex(h => h.includes('name') || h.includes('empname'));
+
+      if (codeIndex === -1 || nameIndex === -1) {
+        toast.error('Invalid Format', 'CSV must have "employeeCode" and "employeeName" columns');
+        e.target.value = '';
+        return;
+      }
+
+      // Parse data rows
+      const records = [];
+      let errorCount = 0;
+      
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim());
+        const code = cols[codeIndex] || '';
+        const name = cols[nameIndex] || '';
+        
+        if (!code || !name) {
+          errorCount++;
+          continue;
+        }
+
+        // Find employee by code in DUMMY_EMPLOYEES
+        const employee = DUMMY_EMPLOYEES.find(emp => 
+          emp.code.toLowerCase() === code.toLowerCase()
+        );
+
+        if (!employee) {
+          errorCount++;
+          continue;
+        }
+
+        records.push({
+          employeeId: employee.id,
+          employeeName: employee.name,
+          employeeCode: employee.code,
+          department: employee.department,
+          designation: employee.designation,
+          serviceBookNumber: generateServiceBookNumber()
+        });
+      }
+
+      if (records.length === 0) {
+        toast.error('No Valid Records', 'No valid employee records found in CSV. Check employee codes.');
+        e.target.value = '';
+        return;
+      }
+
+      // Show confirmation
+      if (window.confirm(`Found ${records.length} valid records. ${errorCount} invalid entries skipped. Continue?`)) {
+        await submitBulkRecords(records);
+      }
+
+    } catch (err) {
+      console.error('Bulk Upload Error:', err);
+      toast.error('Error', 'Failed to parse CSV file');
+    }
+    e.target.value = '';
+  };
+
+  reader.readAsText(file);
+};
+
+// ✅ SUBMIT BULK RECORDS - YEH FUNCTION ADD KAREIN
+const submitBulkRecords = async (records) => {
+  if (!ensureToken()) return;
+  setSubmitting(true);
+  
+  try {
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const record of records) {
+      try {
+        await axiosInstance.post('/service-books/create', {
+          employeeId: record.employeeId,
+          employeeName: record.employeeName,
+          employeeCode: record.employeeCode,
+          department: record.department,
+          designation: record.designation,
+          serviceBookNumber: record.serviceBookNumber,
+          isActive: true
+        });
+        successCount++;
+      } catch (err) {
+        console.error('Failed to create for:', record.employeeName, err);
+        failCount++;
+      }
+    }
+
+    toast.success('Bulk Upload Complete', 
+      `${successCount} service books created successfully${failCount > 0 ? `, ${failCount} failed` : ''}`
+    );
+    
+    await fetchServiceBooks();
+    setPage(0);
+    
+  } catch (err) {
+    console.error('Bulk Submit Error:', err);
+    toast.error('Error', 'Bulk upload failed');
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   // Initial fetch
   useEffect(() => {
@@ -538,6 +676,117 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
   if (loading && serviceBooks.length === 0 && !showForm) {
     return <LoadingSpinner message="Loading service books..." />;
   }
+
+  // ✅ BULK PROCESS FUNCTION - YEH ADD KAREIN
+const handleBulkProcess = async () => {
+  if (!bulkFile) {
+    toast.warning('No File', 'Please select a CSV file first');
+    return;
+  }
+
+  if (!ensureToken()) return;
+  setBulkUploading(true);
+
+  const reader = new FileReader();
+  reader.onload = async (event) => {
+    try {
+      const text = event.target.result;
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        toast.warning('Empty File', 'CSV must have header and at least one record');
+        setBulkUploading(false);
+        return;
+      }
+
+      // Parse header
+      const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const codeIndex = header.findIndex(h => h.includes('code') || h.includes('empcode'));
+      const nameIndex = header.findIndex(h => h.includes('name') || h.includes('empname'));
+
+      if (codeIndex === -1 || nameIndex === -1) {
+        toast.error('Invalid Format', 'CSV must have "employeeCode" and "employeeName" columns');
+        setBulkUploading(false);
+        return;
+      }
+
+      // Parse records
+      const records = [];
+      let errorCount = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim());
+        const code = cols[codeIndex] || '';
+        const name = cols[nameIndex] || '';
+
+        if (!code || !name) {
+          errorCount++;
+          continue;
+        }
+
+        const employee = DUMMY_EMPLOYEES.find(emp => 
+          emp.code.toLowerCase() === code.toLowerCase()
+        );
+
+        if (!employee) {
+          errorCount++;
+          continue;
+        }
+
+        records.push({
+          employeeId: employee.id,
+          employeeName: employee.name,
+          employeeCode: employee.code,
+          department: employee.department,
+          designation: employee.designation,
+          serviceBookNumber: generateServiceBookNumber()
+        });
+      }
+
+      if (records.length === 0) {
+        toast.error('No Valid Records', 'No valid employee records found. Check employee codes.');
+        setBulkUploading(false);
+        return;
+      }
+
+      // Submit records
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const record of records) {
+        try {
+          await axiosInstance.post('/service-books/create', {
+            employeeId: record.employeeId,
+            employeeName: record.employeeName,
+            employeeCode: record.employeeCode,
+            department: record.department,
+            designation: record.designation,
+            serviceBookNumber: record.serviceBookNumber,
+            isActive: true
+          });
+          successCount++;
+        } catch (err) {
+          failCount++;
+        }
+      }
+
+      toast.success('Bulk Upload Complete', 
+        `${successCount} created${failCount > 0 ? `, ${failCount} failed` : ''}`
+      );
+
+      await fetchServiceBooks();
+setShowBulkPage(false);
+      setBulkFile(null);
+
+    } catch (err) {
+      toast.error('Error', 'Failed to process CSV');
+    } finally {
+      setBulkUploading(false);
+    }
+  };
+
+  reader.readAsText(bulkFile);
+};
 
   return (
     <div className="emp-root">
@@ -1088,35 +1337,182 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
       `}</style>
 
       {/* Header */}
-      <div className="cert-header">
-        <div>
-          <h1 className="cert-title">Service Book Management</h1>
-          <p className="cert-subtitle">{totalItems} total service books</p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!showForm && (
-            <button 
-              className="cert-add-btn" 
-              onClick={() => { 
-                resetForm(); 
-                setShowForm(true); 
-              }}
-            >
-              <FaPlus size={13} /> Add Service Book
-            </button>
-          )}
-          {showForm && (
-            <button 
-              type="button" 
-              className="cert-back-btn" 
-              onClick={handleBackToList}
-            >
-              <FaArrowLeft size={12} /> Back
-            </button>
-          )}
+    <div className="cert-header">
+  <div>
+    <h1 className="cert-title">Service Book Management</h1>
+    <p className="cert-subtitle">{totalItems} total service books</p>
+  </div>
+  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+    {!showForm && (
+      <>
+      <button 
+  className="cert-add-btn" 
+  onClick={() => { 
+    resetForm(); 
+    setShowForm(true); 
+  }}
+  style={{ boxShadow: 'none' }} 
+>
+  <FaPlus size={13} /> Add Service Book
+</button>
+
+<button 
+  className="cert-add-btn" 
+  style={{ background: '#0d9488', boxShadow: 'none' }}   
+  onClick={() => setShowBulkPage(true)}  
+>
+  <FaUpload size={13} /> Bulk Upload
+</button>
+        
+        <input
+          id="bulkFileInput"
+          type="file"
+          accept=".csv"
+          style={{ display: 'none' }}
+          onChange={handleBulkUpload}
+        />
+      </>
+    )}
+    
+    {showForm && (
+      <button 
+        type="button" 
+        className="cert-back-btn" 
+        onClick={handleBackToList}
+      >
+        <FaArrowLeft size={12} /> Back
+      </button>
+    )}
+  </div>
+</div>
+         
+{/* BULK UPLOAD PAGE - */}
+{showBulkPage && (
+  <div className="cert-form-wrap" style={{ marginTop: '20px' }}>
+    {/* Header */}
+    <div style={{ 
+      display: 'flex', 
+      justifyContent: 'space-between', 
+      alignItems: 'center',
+      marginBottom: '24px',
+      paddingBottom: '16px',
+      borderBottom: '2px solid #f1f5f9'
+    }}>
+      <div>
+        <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+          <FaUpload size={18} style={{ color: '#0d9488', marginRight: '10px' }} />
+          Bulk Upload  Service Books
+        </h2>
+        <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
+          Upload multiple service books via CSV file
+        </p>
+      </div>
+      <button 
+        type="button" 
+        className="cert-back-btn" 
+        onClick={() => { setShowBulkPage(false); setBulkFile(null); }}
+      >
+        <FaArrowLeft size={12} /> Back
+      </button>
+    </div>
+
+    {/* CSV Format Info */}
+    <div style={{ 
+      background: '#f8fafc', 
+      borderRadius: '12px', 
+      padding: '20px 24px', 
+      marginBottom: '24px',
+      border: '1px solid #e2e8f0'
+    }}>
+      <div style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a', marginBottom: '8px' }}>
+        📄 CSV File Format
+      </div>
+      <div style={{ fontSize: '14px', color: '#475569' }}>
+        <div><strong>Format:</strong> employeeCode, employeeName</div>
+        <div><strong>Example:</strong> EMP001, Rahul Sharma</div>
+        <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>
+          Note: Employee code must exist in system
         </div>
       </div>
+    </div>
 
+    {/* File Upload Section */}
+    <div style={{ marginBottom: '24px' }}>
+      <label style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a', display: 'block', marginBottom: '8px' }}>
+        Select CSV File
+      </label>
+      <div style={{ 
+        border: '2px dashed #e2e8f0', 
+        borderRadius: '12px', 
+        padding: '32px',
+        textAlign: 'center',
+        background: '#fafbfc'
+      }}>
+        <input
+          type="file"
+          accept=".csv"
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file) {
+              setBulkFile(file);
+              toast.info('File Selected', file.name);
+            }
+          }}
+          style={{ display: 'none' }}
+          id="bulkCsvInput"
+        />
+        <label htmlFor="bulkCsvInput" style={{ cursor: 'pointer' }}>
+          <div style={{ 
+            padding: '12px 24px', 
+            border: '1px solid #e2e8f0', 
+            borderRadius: '8px', 
+            background: 'white',
+            display: 'inline-block',
+            fontSize: '14px',
+            color: '#475569',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0d9488'; e.currentTarget.style.background = '#f0fdfa'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = 'white'; }}
+          >
+            {bulkFile ? `📎 ${bulkFile.name}` : 'Choose File'}
+          </div>
+        </label>
+        <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '12px' }}>
+          {bulkFile ? `File size: ${(bulkFile.size / 1024).toFixed(1)} KB` : 'Upload a CSV file with employee codes and names'}
+        </div>
+      </div>
+    </div>
+
+    {/* Action Buttons */}
+    <div style={{ 
+      display: 'flex', 
+      gap: '12px', 
+      justifyContent: 'flex-end',
+      paddingTop: '16px',
+      borderTop: '1px solid #e2e8f0'
+    }}>
+      <button 
+        className="cert-cancel-btn" 
+        onClick={() => { setShowBulkPage(false); setBulkFile(null); }}
+      >
+        Cancel
+      </button>
+      <button 
+        className="cert-add-btn" 
+        style={{ background: '#0d9488', boxShadow: '0 4px 12px rgba(13,148,136,0.3)' }}
+        onClick={handleBulkProcess}
+        disabled={!bulkFile || bulkUploading}
+      >
+        {bulkUploading ? (
+          <><span className="emp-spinner" /> Processing...</>
+        ) : (
+          <><FaUpload size={13} /> Upload & Process</>
+        )}
+      </button>
+    </div>
+  </div>
+)}
       {showForm ? (
         // Form View
         <div className="cert-form-wrap">
@@ -1202,8 +1598,10 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
             </div>
           </form>
         </div>
-      ) : (
+      ) : !showBulkPage &&(
+        
         // List View
+        
         <>
           {/* Search Bar */}
           <div className="emp-search-bar">
@@ -1387,6 +1785,7 @@ const CreateServiceBook = ({ employeeId: propEmployeeId, onSuccess, onCancel }) 
           </div>
         </div>
       )}
+    
     </div>
   );
 };
