@@ -12,8 +12,10 @@ import {
   FaChevronLeft, FaChevronRight, FaDotCircle, FaUserGraduate,
   FaSpinner, FaMapMarkerAlt,FaClipboardList 
 } from 'react-icons/fa';
+import axios from 'axios';
 import { toast } from '../components/Toast';
 import LoadingSpinner from "../components/LoadingSpinner";
+import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
 
 const useDebounce = (value, delay) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -22,7 +24,7 @@ const useDebounce = (value, delay) => {
     return () => clearTimeout(handler);
   }, [value, delay]);
   return debouncedValue;
-};
+}; 
 
 const ServiceBookTimeline = ({ employeeId, onCancel }) => {
   // ============================================
@@ -41,7 +43,11 @@ const ServiceBookTimeline = ({ employeeId, onCancel }) => {
   const [view, setView] = useState('table');
   const [activeTab, setActiveTab] = useState('timeline');
   const [showAllEmployees, setShowAllEmployees] = useState(false);
-  
+  // ─── Dropdown States ──────────────────────────────────────────
+const [branchList, setBranchList] = useState([]);
+const [departmentList, setDepartmentList] = useState([]);
+const [designationList, setDesignationList] = useState([]);
+const [loadingDropdowns, setLoadingDropdowns] = useState(false);
   const [filters, setFilters] = useState({
     employeeName: '',
     employeeCode: '',
@@ -56,7 +62,7 @@ const ServiceBookTimeline = ({ employeeId, onCancel }) => {
   });
   
   const [page, setPage] = useState(0);
-  const [rowsPerPage] = useState(20);
+  const [rowsPerPage] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -68,95 +74,22 @@ const ServiceBookTimeline = ({ employeeId, onCancel }) => {
     searchTime: '0ms'
   });
 
-  // ============================================
-  // DUMMY DATA
-  // ============================================
-  const DUMMY_EMPLOYEES = [
-    { id: 1, code: 'EMP001', name: 'John Doe', department: 'IT', designation: 'Software Engineer', joiningDate: '2023-02-15', status: 'Active', email: 'john.doe@company.com', phone: '+91 98765 43210', dob: '1998-06-20', gender: 'Male', experience: '2 Years', location: 'Noida', branch: 'Noida', grade: 'L1' },
-    { id: 2, code: 'EMP002', name: 'Jane Smith', department: 'HR', designation: 'HR Manager', joiningDate: '2019-06-10', status: 'Active', email: 'jane.smith@company.com', phone: '+91 98765 43211', dob: '1988-08-22', gender: 'Female', experience: '8 Years', location: 'Mumbai', branch: 'Mumbai', grade: 'L4' },
-    { id: 3, code: 'EMP003', name: 'Mike Johnson', department: 'IT', designation: 'Senior Developer', joiningDate: '2020-08-01', status: 'Active', email: 'mike.johnson@company.com', phone: '+91 98765 43212', dob: '1992-11-30', gender: 'Male', experience: '5 Years', location: 'Bangalore', branch: 'Bangalore', grade: 'L3' },
-    { id: 4, code: 'EMP004', name: 'Sarah Williams', department: 'Sales', designation: 'Sales Manager', joiningDate: '2018-03-15', status: 'Active', email: 'sarah.williams@company.com', phone: '+91 98765 43213', dob: '1990-07-18', gender: 'Female', experience: '7 Years', location: 'Delhi', branch: 'Delhi', grade: 'L4' },
-    { id: 5, code: 'EMP005', name: 'Ashish Sinha', department: 'IT', designation: 'Senior Business Analyst', joiningDate: '2020-04-01', status: 'Active', email: 'ashish.sinha@company.com', phone: '+91 98765 43210', dob: '1990-05-15', gender: 'Male', experience: '5 Years', location: 'Noida', branch: 'Noida', grade: 'L3' },
-    { id: 6, code: 'EMP006', name: 'Priya Sharma', department: 'HR', designation: 'HR Manager', joiningDate: '2019-06-10', status: 'Active', email: 'priya.sharma@company.com', phone: '+91 98765 43211', dob: '1988-08-22', gender: 'Female', experience: '8 Years', location: 'Mumbai', branch: 'Mumbai', grade: 'L4' },
-    { id: 7, code: 'EMP007', name: 'Rahul Verma', department: 'IT', designation: 'Tech Lead', joiningDate: '2018-03-20', status: 'Active', email: 'rahul.verma@company.com', phone: '+91 98765 43212', dob: '1992-11-30', gender: 'Male', experience: '7 Years', location: 'Bangalore', branch: 'Bangalore', grade: 'L4' },
-    { id: 8, code: 'EMP008', name: 'Sneha Patel', department: 'Sales', designation: 'Sales Manager', joiningDate: '2010-08-01', status: 'Inactive', email: 'sneha.patel@company.com', phone: '+91 98765 43213', dob: '1985-03-10', gender: 'Female', experience: '15 Years', location: 'Delhi', branch: 'Delhi', grade: 'L5' },
-    { id: 9, code: 'EMP009', name: 'Vikram Singh', department: 'Finance', designation: 'Senior Accountant', joiningDate: '2016-01-10', status: 'Active', email: 'vikram.singh@company.com', phone: '+91 98765 43214', dob: '1995-07-25', gender: 'Male', experience: '9 Years', location: 'Pune', branch: 'Pune', grade: 'L3' },
-    { id: 10, code: 'EMP010', name: 'Ananya Reddy', department: 'Marketing', designation: 'Marketing Manager', joiningDate: '2021-09-15', status: 'Active', email: 'ananya.reddy@company.com', phone: '+91 98765 43215', dob: '1993-12-01', gender: 'Female', experience: '4 Years', location: 'Hyderabad', branch: 'Hyderabad', grade: 'L4' },
-    { id: 11, code: 'EMP011', name: 'Arjun Nair', department: 'IT', designation: 'DevOps Engineer', joiningDate: '2022-01-20', status: 'Active', email: 'arjun.nair@company.com', phone: '+91 98765 43216', dob: '1991-09-12', gender: 'Male', experience: '3 Years', location: 'Chennai', branch: 'Chennai', grade: 'L2' },
-    { id: 12, code: 'EMP012', name: 'Meera Iyer', department: 'HR', designation: 'HR Executive', joiningDate: '2020-11-01', status: 'Inactive', email: 'meera.iyer@company.com', phone: '+91 98765 43217', dob: '1994-04-18', gender: 'Female', experience: '5 Years', location: 'Kolkata', branch: 'Kolkata', grade: 'L2' }
-  ];
-
-  const DUMMY_EVENTS = {
-    1: [
-      { id: 1, type: 'appointment', title: 'Appointment as Business Analyst', description: 'Appointed as Business Analyst in IT department', date: '2020-04-01', referenceNo: 'APP-2020-001', sourceModule: 'HRMS', approvedBy: 'Rajesh Kumar', remarks: 'Joined as per offer letter' },
-      { id: 2, type: 'confirmation', title: 'Probation Confirmation', description: 'Probation period completed successfully', date: '2020-10-15', referenceNo: 'CONF-2020-010', sourceModule: 'HRMS', approvedBy: 'Amit Sharma', remarks: 'Performance satisfactory' },
-      { id: 3, type: 'promotion', title: 'Promotion to Senior Business Analyst', description: 'Promoted from Business Analyst to Senior Business Analyst', date: '2022-04-01', referenceNo: 'PRO-2022-005', sourceModule: 'HRMS', approvedBy: 'Director IT', remarks: 'Based on annual appraisal' },
-      { id: 4, type: 'training', title: 'SAP Functional Training', description: 'Completed SAP Functional Training Program', date: '2022-07-10', referenceNo: 'TRN-2022-012', sourceModule: 'Training', approvedBy: 'L&D Head', remarks: 'Certified with A grade' },
-      { id: 5, type: 'transfer', title: 'Transfer to Noida Branch', description: 'Transferred from Mumbai to Noida branch', date: '2023-01-01', referenceNo: 'TRF-2023-003', sourceModule: 'HRMS', approvedBy: 'VP Operations', remarks: 'On request transfer' },
-      { id: 6, type: 'payRevision', title: 'Annual Salary Revision', description: 'Performance-based salary increment of 15%', date: '2024-04-01', referenceNo: 'PAY-2024-008', sourceModule: 'Payroll', approvedBy: 'Finance Head', remarks: 'Exceeds expectations rating' },
-      { id: 7, type: 'award', title: 'Employee Excellence Award', description: 'Received Employee Excellence Award for outstanding performance', date: '2024-08-15', referenceNo: 'AWD-2024-003', sourceModule: 'HRMS', approvedBy: 'CEO', remarks: 'Annual award ceremony' },
-      { id: 8, type: 'retirement', title: 'Superannuation Retirement', description: 'Retirement after 18 years of dedicated service', date: '2038-04-01', referenceNo: 'RET-2038-001', sourceModule: 'HRMS', approvedBy: 'Board', remarks: 'With full benefits' }
-    ],
-    2: [
-      { id: 9, type: 'appointment', title: 'Appointment as HR Executive', description: 'Appointed as HR Executive in HR department', date: '2019-06-10', referenceNo: 'APP-2019-015', sourceModule: 'HRMS', approvedBy: 'HR Director', remarks: 'Campus recruitment' },
-      { id: 10, type: 'confirmation', title: 'Probation Confirmation', description: 'Probation period completed successfully', date: '2019-12-10', referenceNo: 'CONF-2019-025', sourceModule: 'HRMS', approvedBy: 'HR Head', remarks: 'All KPIs met' },
-      { id: 11, type: 'promotion', title: 'Promotion to HR Manager', description: 'Promoted from HR Executive to HR Manager', date: '2021-03-15', referenceNo: 'PRO-2021-012', sourceModule: 'HRMS', approvedBy: 'VP HR', remarks: 'Exceptional leadership' },
-      { id: 12, type: 'training', title: 'Leadership Development Program', description: 'Completed Advanced Leadership Program', date: '2022-05-20', referenceNo: 'TRN-2022-008', sourceModule: 'Training', approvedBy: 'L&D Head', remarks: 'IIM Ahmedabad' },
-      { id: 13, type: 'award', title: 'Best HR Manager Award', description: 'Received Best HR Manager Award for 2022', date: '2022-12-15', referenceNo: 'AWD-2022-005', sourceModule: 'HRMS', approvedBy: 'CEO', remarks: 'Excellence in HR practices' }
-    ],
-    3: [
-      { id: 14, type: 'appointment', title: 'Appointment as Software Engineer', description: 'Appointed as Software Engineer in IT department', date: '2018-03-20', referenceNo: 'APP-2018-042', sourceModule: 'HRMS', approvedBy: 'CTO', remarks: 'Lateral hire' },
-      { id: 15, type: 'confirmation', title: 'Probation Confirmation', description: 'Probation period completed successfully', date: '2018-09-20', referenceNo: 'CONF-2018-056', sourceModule: 'HRMS', approvedBy: 'Project Manager', remarks: 'Good technical skills' },
-      { id: 16, type: 'promotion', title: 'Promotion to Senior Developer', description: 'Promoted from Software Engineer to Senior Developer', date: '2020-06-01', referenceNo: 'PRO-2020-018', sourceModule: 'HRMS', approvedBy: 'Tech Head', remarks: 'Outstanding contribution' },
-      { id: 17, type: 'promotion', title: 'Promotion to Tech Lead', description: 'Promoted to Tech Lead - Team Management role', date: '2022-10-15', referenceNo: 'PRO-2022-025', sourceModule: 'HRMS', approvedBy: 'CTO', remarks: 'Leadership potential' },
-      { id: 18, type: 'training', title: 'AWS Cloud Architecture', description: 'Completed AWS Cloud Architecture Certification', date: '2021-11-20', referenceNo: 'TRN-2021-030', sourceModule: 'Training', approvedBy: 'L&D', remarks: 'AWS Certified Solutions Architect' }
-    ],
-    4: [
-      { id: 19, type: 'appointment', title: 'Appointment as Sales Executive', description: 'Appointed as Sales Executive in Sales department', date: '2010-08-01', referenceNo: 'APP-2010-008', sourceModule: 'HRMS', approvedBy: 'Sales Head', remarks: 'Experienced hire' },
-      { id: 20, type: 'promotion', title: 'Promotion to Sales Manager', description: 'Promoted from Sales Executive to Sales Manager', date: '2015-03-01', referenceNo: 'PRO-2015-012', sourceModule: 'HRMS', approvedBy: 'VP Sales', remarks: 'Consistent top performer' },
-      { id: 21, type: 'award', title: 'Top Performer Award', description: 'Received Top Performer Award for 2019', date: '2019-12-20', referenceNo: 'AWD-2019-005', sourceModule: 'HRMS', approvedBy: 'CEO', remarks: 'Highest revenue generated' },
-      { id: 22, type: 'retirement', title: 'Voluntary Retirement', description: 'Voluntary retirement after 14 years of service', date: '2024-03-15', referenceNo: 'RET-2024-002', sourceModule: 'HRMS', approvedBy: 'Board', remarks: 'Personal reasons' }
-    ],
-    5: [
-      { id: 23, type: 'appointment', title: 'Appointment as Accountant', description: 'Appointed as Accountant in Finance department', date: '2016-01-10', referenceNo: 'APP-2016-003', sourceModule: 'HRMS', approvedBy: 'CFO', remarks: 'CA qualified' },
-      { id: 24, type: 'confirmation', title: 'Probation Confirmation', description: 'Probation period completed successfully', date: '2016-07-10', referenceNo: 'CONF-2016-008', sourceModule: 'HRMS', approvedBy: 'Finance Head', remarks: 'Good analytical skills' },
-      { id: 25, type: 'promotion', title: 'Promotion to Senior Accountant', description: 'Promoted from Accountant to Senior Accountant', date: '2020-06-15', referenceNo: 'PRO-2020-012', sourceModule: 'HRMS', approvedBy: 'CFO', remarks: 'Exceeding expectations' },
-      { id: 26, type: 'award', title: 'Best Financial Analyst', description: 'Received Best Financial Analyst Award for 2021', date: '2021-12-20', referenceNo: 'AWD-2021-007', sourceModule: 'HRMS', approvedBy: 'CEO', remarks: 'Cost saving initiatives' }
-    ],
-    6: [
-      { id: 27, type: 'appointment', title: 'Appointment as Marketing Executive', description: 'Appointed as Marketing Executive in Marketing department', date: '2021-09-15', referenceNo: 'APP-2021-025', sourceModule: 'HRMS', approvedBy: 'CMO', remarks: 'MBA from IIM' },
-      { id: 28, type: 'confirmation', title: 'Probation Confirmation', description: 'Probation period completed successfully', date: '2022-03-15', referenceNo: 'CONF-2022-018', sourceModule: 'HRMS', approvedBy: 'Marketing Head', remarks: 'Creative approach' },
-      { id: 29, type: 'promotion', title: 'Promotion to Marketing Manager', description: 'Promoted from Marketing Executive to Marketing Manager', date: '2023-09-15', referenceNo: 'PRO-2023-015', sourceModule: 'HRMS', approvedBy: 'CMO', remarks: 'Outstanding campaigns' }
-    ],
-    7: [
-      { id: 30, type: 'appointment', title: 'Appointment as DevOps Engineer', description: 'Appointed as DevOps Engineer in IT department', date: '2022-01-20', referenceNo: 'APP-2022-005', sourceModule: 'HRMS', approvedBy: 'CTO', remarks: 'AWS & Kubernetes expert' },
-      { id: 31, type: 'confirmation', title: 'Probation Confirmation', description: 'Probation period completed successfully', date: '2022-07-20', referenceNo: 'CONF-2022-022', sourceModule: 'HRMS', approvedBy: 'Tech Lead', remarks: 'Quick learner' }
-    ],
-    8: [
-      { id: 32, type: 'appointment', title: 'Appointment as HR Executive', description: 'Appointed as HR Executive in HR department', date: '2020-11-01', referenceNo: 'APP-2020-035', sourceModule: 'HRMS', approvedBy: 'HR Head', remarks: 'MBA HR' },
-      { id: 33, type: 'confirmation', title: 'Probation Confirmation', description: 'Probation period completed successfully', date: '2021-05-01', referenceNo: 'CONF-2021-012', sourceModule: 'HRMS', approvedBy: 'HR Manager', remarks: 'Good interpersonal skills' },
-      { id: 34, type: 'retirement', title: 'Voluntary Retirement', description: 'Voluntary retirement due to personal reasons', date: '2024-01-15', referenceNo: 'RET-2024-001', sourceModule: 'HRMS', approvedBy: 'Board', remarks: 'Relocation abroad' }
-    ]
-  };
-
-  const eventTypes = [
-    { value: 'all', label: 'All Events', color: '#6b7280', bg: '#f3f4f6' },
-    { value: 'appointment', label: 'Appointment', icon: <FaUserPlus size={14} />, color: '#4f46e5', bg: '#e0e7ff' },
-    { value: 'confirmation', label: 'Confirmation', icon: <FaUserCheck size={14} />, color: '#10b981', bg: '#d1fae5' },
-    { value: 'promotion', label: 'Promotion', icon: <FaArrowUp size={14} />, color: '#f59e0b', bg: '#fed7aa' },
-    { value: 'transfer', label: 'Transfer', icon: <FaExchangeAlt size={14} />, color: '#06b6d4', bg: '#cffafe' },
-    { value: 'training', label: 'Training', icon: <FaGraduationCap size={14} />, color: '#8b5cf6', bg: '#ede9fe' },
-    { value: 'award', label: 'Award', icon: <FaTrophy size={14} />, color: '#ef4444', bg: '#fee2e2' },
-    { value: 'payRevision', label: 'Pay Revision', icon: <FaRupeeSign size={14} />, color: '#ec489a', bg: '#fce7f3' },
-    { value: 'disciplinary', label: 'Disciplinary', icon: <FaGavel size={14} />, color: '#dc2626', bg: '#fecaca' },
-    { value: 'retirement', label: 'Retirement', icon: <FaClock size={14} />, color: '#64748b', bg: '#f1f5f9' }
-  ];
-
   const departments = ['IT', 'HR', 'Finance', 'Sales', 'Marketing', 'Operations'];
   const designations = ['Software Engineer', 'Senior Developer', 'Tech Lead', 'HR Manager', 'Sales Manager', 'Accountant', 'Marketing Manager', 'Operations Manager', 'Product Manager', 'Senior Business Analyst', 'DevOps Engineer', 'HR Executive'];
   const statuses = ['Active', 'Inactive'];
   const branches = ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Pune', 'Hyderabad', 'Noida', 'Ahmedabad', 'Jaipur'];
-
+const eventTypes = [
+  { value: 'all', label: 'All Events', color: '#6b7280', bg: '#f3f4f6' },
+  { value: 'appointment', label: 'Appointment', icon: <FaUserPlus size={14} />, color: '#4f46e5', bg: '#e0e7ff' },
+  { value: 'confirmation', label: 'Confirmation', icon: <FaUserCheck size={14} />, color: '#10b981', bg: '#d1fae5' },
+  { value: 'promotion', label: 'Promotion', icon: <FaArrowUp size={14} />, color: '#f59e0b', bg: '#fed7aa' },
+  { value: 'transfer', label: 'Transfer', icon: <FaExchangeAlt size={14} />, color: '#06b6d4', bg: '#cffafe' },
+  { value: 'training', label: 'Training', icon: <FaGraduationCap size={14} />, color: '#8b5cf6', bg: '#ede9fe' },
+  { value: 'award', label: 'Award', icon: <FaTrophy size={14} />, color: '#ef4444', bg: '#fee2e2' },
+  { value: 'payRevision', label: 'Pay Revision', icon: <FaRupeeSign size={14} />, color: '#ec489a', bg: '#fce7f3' },
+  { value: 'disciplinary', label: 'Disciplinary', icon: <FaGavel size={14} />, color: '#dc2626', bg: '#fecaca' },
+  { value: 'retirement', label: 'Retirement', icon: <FaClock size={14} />, color: '#64748b', bg: '#f1f5f9' }
+];
   // ============================================
   // DEBOUNCE VALUES
   // ============================================
@@ -167,79 +100,335 @@ const ServiceBookTimeline = ({ employeeId, onCancel }) => {
   // ============================================
   // FETCH DATA
   // ============================================
-  const fetchEmployees = useCallback(async (pageNum = 0) => {
-    setSearchLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 400));
-      let filtered = [...DUMMY_EMPLOYEES];
-      
-      if (debouncedSearchTerm) {
-        const search = debouncedSearchTerm.toLowerCase();
-        filtered = filtered.filter(emp => 
-          emp.name.toLowerCase().includes(search) || 
-          emp.code.toLowerCase().includes(search) ||
-          emp.department.toLowerCase().includes(search) ||
-          emp.designation.toLowerCase().includes(search)
-        );
-      }
-      if (debouncedEmployeeCode) {
-        filtered = filtered.filter(emp => 
-          emp.code.toLowerCase().includes(debouncedEmployeeCode.toLowerCase())
-        );
-      }
-      if (debouncedEmployeeName) {
-        filtered = filtered.filter(emp => 
-          emp.name.toLowerCase().includes(debouncedEmployeeName.toLowerCase())
-        );
-      }
-      if (filters.department) {
-        filtered = filtered.filter(emp => 
-          emp.department.toLowerCase() === filters.department.toLowerCase()
-        );
-      }
-      if (filters.designation) {
-        filtered = filtered.filter(emp => 
-          emp.designation.toLowerCase() === filters.designation.toLowerCase()
-        );
-      }
-      if (filters.branch) {
-        filtered = filtered.filter(emp => 
-          (emp.location?.toLowerCase() === filters.branch.toLowerCase() ||
-           emp.branch?.toLowerCase() === filters.branch.toLowerCase())
-        );
-      }
-      if (filters.status) {
-        filtered = filtered.filter(emp => 
-          emp.status.toLowerCase() === filters.status.toLowerCase()
-        );
-      }
-      
-      const start = pageNum * rowsPerPage;
-      const paginatedResults = filtered.slice(start, start + rowsPerPage);
-      
-      setSearchResults(paginatedResults);
-      setTotalItems(filtered.length);
-      setTotalPages(Math.ceil(filtered.length / rowsPerPage));
-      setHasSearched(true);
-      setSearchStats({
-        totalEmployees: filtered.length,
-        filteredCount: paginatedResults.length,
-        searchTime: `${Math.round(Math.random() * 50 + 10)}ms`
-      });
-    } catch (error) {
-      toast.error('Error', 'Failed to fetch employees');
-    } finally {
-      setSearchLoading(false);
-    }
-  }, [debouncedSearchTerm, debouncedEmployeeCode, debouncedEmployeeName, filters]);
 
-  useEffect(() => setEmployees(DUMMY_EMPLOYEES), []);
+  // ─── FETCH TIMELINE ──────────────────────────────────────────
+
+  // ─── Auth helpers ──────────────────────────────────────────
+const getAuthToken = () => localStorage.getItem(STORAGE_KEYS?.JWT_TOKEN || 'jwtToken');
+
+const getAxiosConfig = () => ({
+  headers: {
+    Authorization: `Bearer ${getAuthToken()}`,
+    'Content-Type': 'application/json',
+  },
+});
+
+const ensureToken = () => {
+  const token = getAuthToken();
+  if (!token) {
+    toast.error('Authentication Required', 'Please login to continue');
+    return false;
+  }
+  return true;
+};
+
+// ─── FETCH BRANCHES ──────────────────────────────────────────
+const fetchBranches = useCallback(async () => {
+  if (!ensureToken()) return;
+  try {
+    const res = await axios.get(`${BASE_URL}/branches/list?flag=0`, getAxiosConfig());
+    console.log("📥 Branches Response:", res.data);
+    
+    let data = [];
+    if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map(item => ({
+      id: item.id,
+      name: item.name || item.branchName || ''
+    }));
+    setBranchList(mapped);
+  } catch (err) {
+    console.error('Fetch branches error:', err);
+    setBranchList([]);
+  }
+}, []);
+
+// ─── FETCH DEPARTMENTS ──────────────────────────────────────────
+const fetchDepartments = useCallback(async () => {
+  if (!ensureToken()) return;
+  try {
+    const res = await axios.get(`${BASE_URL}/departments/list?flag=0`, getAxiosConfig());
+    console.log("📥 Departments Response:", res.data);
+    
+    let data = [];
+    if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map(item => ({
+      id: item.id,
+      name: item.name || item.departmentName || ''
+    }));
+    setDepartmentList(mapped);
+  } catch (err) {
+    console.error('Fetch departments error:', err);
+    setDepartmentList([]);
+  }
+}, []);
+
+// ─── FETCH DESIGNATIONS ──────────────────────────────────────────
+const fetchDesignations = useCallback(async () => {
+  if (!ensureToken()) return;
+  try {
+    const res = await axios.get(`${BASE_URL}/api/designations/list?flag=0`, getAxiosConfig());
+    console.log("📥 Designations Response:", res.data);
+    
+    let data = [];
+    if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map(item => ({
+      id: item.id,
+      name: item.name || item.designationName || ''
+    }));
+    setDesignationList(mapped);
+  } catch (err) {
+    console.error('Fetch designations error:', err);
+    setDesignationList([]);
+  }
+}, []);
+
+const fetchTimeline = useCallback(async (employeeId) => {
+  if (!ensureToken()) return;
+  setLoading(true);
+  try {
+    const res = await axios.get(
+      `${BASE_URL}/api/service-books/employees/${employeeId}/timeline`,
+      getAxiosConfig()
+    );
+
+    console.log("📥 Timeline Response:", res.data);
+
+    let eventsData = [];
+    
+    if (res.data?.status === 200) {
+      if (res.data.response?.content) {
+        eventsData = res.data.response.content;
+      } else if (Array.isArray(res.data.response)) {
+        eventsData = res.data.response;
+      }
+    } else if (res.data?.content) {
+      eventsData = res.data.content;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      eventsData = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      eventsData = res.data;
+    }
+
+    console.log("📊 Events Data:", eventsData);
+
+    const mappedEvents = eventsData.map((item) => ({
+      id: item.id,
+      type: item.type || item.eventType || 'appointment',
+      title: item.title || item.eventName || 'Event',
+      description: item.description || item.remarks || '',
+      date: item.date || item.eventDate || '',
+      referenceNo: item.referenceNo || item.orderNo || '',
+      sourceModule: item.sourceModule || item.module || 'HRMS',
+      approvedBy: item.approvedBy || item.approver || '',
+      remarks: item.remarks || item.note || '',
+      department: item.department || '',
+      designation: item.designation || ''
+    }));
+
+    console.log("✅ Mapped Timeline Events:", mappedEvents);
+    
+    setTimelineEvents(mappedEvents);
+    setFilteredEvents(mappedEvents);
+
+  } catch (err) {
+    console.error('❌ Timeline fetch error:', err);
+    toast.error('Error', err.response?.data?.message || 'Failed to fetch timeline');
+    setTimelineEvents([]);
+    setFilteredEvents([]);
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+// ─── FETCH EMPLOYEES ──────────────────────────────────────────
+const fetchEmployees = useCallback(async (pageNum = 0) => {
+  if (!ensureToken()) return;
+  setSearchLoading(true);
+  try {
+    const params = {
+      page: pageNum,
+      size: rowsPerPage,
+    };
+    
+    if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+    if (filters.employeeCode) params.employeeCode = filters.employeeCode;
+    if (filters.employeeName) params.employeeName = filters.employeeName;
+    if (filters.department) params.department = filters.department;
+    if (filters.designation) params.designation = filters.designation;
+    if (filters.branch) params.branch = filters.branch;
+    if (filters.status) params.status = filters.status;
+
+    const res = await axios.get(
+      `${BASE_URL}/api/employees`,
+      { ...getAxiosConfig(), params }
+    );
+
+    console.log("📥 Employees Response:", res.data);
+
+    let employeesData = [];
+    let totalElements = 0;
+    let totalPagesData = 0;
+
+    if (res.data?.status === 200) {
+      if (res.data.response?.content) {
+        employeesData = res.data.response.content;
+        totalElements = res.data.response.totalElements || 0;
+        totalPagesData = res.data.response.totalPages || 0;
+      } else if (Array.isArray(res.data.response)) {
+        employeesData = res.data.response;
+        totalElements = employeesData.length;
+        totalPagesData = Math.ceil(totalElements / rowsPerPage);
+      }
+    } else if (res.data?.content) {
+      employeesData = res.data.content;
+      totalElements = res.data.totalElements || 0;
+      totalPagesData = res.data.totalPages || 0;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      employeesData = res.data.data;
+      totalElements = employeesData.length;
+      totalPagesData = Math.ceil(totalElements / rowsPerPage);
+    } else if (Array.isArray(res.data)) {
+      employeesData = res.data;
+      totalElements = employeesData.length;
+      totalPagesData = Math.ceil(totalElements / rowsPerPage);
+    }
+
+    const mappedEmployees = employeesData.map((item) => ({
+      id: item.id || item.employeeId,
+      code: item.employeeCode || item.code || '',
+      name: item.employeeName || item.name || 'Unknown',
+      department: item.departmentName || item.department || '',
+      designation: item.designation || item.designationName || '',
+      joiningDate: item.joiningDate || item.dateOfJoining || '',
+      status: item.isActive ? 'Active' : 'Inactive',
+      email: item.email || '',
+      phone: item.phone || '',
+      dob: item.dob || '',
+      gender: item.gender || '',
+      experience: item.experience || '',
+      location: item.location || '',
+      branch: item.branch || item.branchName || '',
+      grade: item.grade || ''
+    }));
+
+    setSearchResults(mappedEmployees);
+    setTotalItems(totalElements);
+    setTotalPages(totalPagesData);
+    setHasSearched(true);
+    setSearchStats({
+      totalEmployees: totalElements,
+      filteredCount: mappedEmployees.length,
+      searchTime: `${Math.round(Math.random() * 50 + 10)}ms`
+    });
+
+  } catch (err) {
+    console.error('Fetch employees error:', err);
+    toast.error('Error', err.response?.data?.message || 'Failed to fetch employees');
+    setSearchResults([]);
+    setTotalItems(0);
+    setTotalPages(0);
+  } finally {
+    setSearchLoading(false);
+  }
+}, [debouncedSearchTerm, debouncedEmployeeCode, debouncedEmployeeName, filters, rowsPerPage]);
+
+  // const fetchEmployees = useCallback(async (pageNum = 0) => {
+  //   setSearchLoading(true);
+  //   try {
+  //     await new Promise(resolve => setTimeout(resolve, 400));
+  //     let filtered = [...DUMMY_EMPLOYEES];
+      
+  //     if (debouncedSearchTerm) {
+  //       const search = debouncedSearchTerm.toLowerCase();
+  //       filtered = filtered.filter(emp => 
+  //         emp.name.toLowerCase().includes(search) || 
+  //         emp.code.toLowerCase().includes(search) ||
+  //         emp.department.toLowerCase().includes(search) ||
+  //         emp.designation.toLowerCase().includes(search)
+  //       );
+  //     }
+  //     if (debouncedEmployeeCode) {
+  //       filtered = filtered.filter(emp => 
+  //         emp.code.toLowerCase().includes(debouncedEmployeeCode.toLowerCase())
+  //       );
+  //     }
+  //     if (debouncedEmployeeName) {
+  //       filtered = filtered.filter(emp => 
+  //         emp.name.toLowerCase().includes(debouncedEmployeeName.toLowerCase())
+  //       );
+  //     }
+  //     if (filters.department) {
+  //       filtered = filtered.filter(emp => 
+  //         emp.department.toLowerCase() === filters.department.toLowerCase()
+  //       );
+  //     }
+  //     if (filters.designation) {
+  //       filtered = filtered.filter(emp => 
+  //         emp.designation.toLowerCase() === filters.designation.toLowerCase()
+  //       );
+  //     }
+  //     if (filters.branch) {
+  //       filtered = filtered.filter(emp => 
+  //         (emp.location?.toLowerCase() === filters.branch.toLowerCase() ||
+  //          emp.branch?.toLowerCase() === filters.branch.toLowerCase())
+  //       );
+  //     }
+  //     if (filters.status) {
+  //       filtered = filtered.filter(emp => 
+  //         emp.status.toLowerCase() === filters.status.toLowerCase()
+  //       );
+  //     }
+      
+  //     const start = pageNum * rowsPerPage;
+  //     const paginatedResults = filtered.slice(start, start + rowsPerPage);
+      
+  //     setSearchResults(paginatedResults);
+  //     setTotalItems(filtered.length);
+  //     setTotalPages(Math.ceil(filtered.length / rowsPerPage));
+  //     setHasSearched(true);
+  //     setSearchStats({
+  //       totalEmployees: filtered.length,
+  //       filteredCount: paginatedResults.length,
+  //       searchTime: `${Math.round(Math.random() * 50 + 10)}ms`
+  //     });
+  //   } catch (error) {
+  //     toast.error('Error', 'Failed to fetch employees');
+  //   } finally {
+  //     setSearchLoading(false);
+  //   }
+  // }, [debouncedSearchTerm, debouncedEmployeeCode, debouncedEmployeeName, filters]);
+useEffect(() => {
+  fetchBranches();
+  fetchDepartments();
+  fetchDesignations();
+}, [fetchBranches, fetchDepartments, fetchDesignations]);
 
   useEffect(() => {
     const hasFilters = debouncedSearchTerm || debouncedEmployeeCode || debouncedEmployeeName || 
                        filters.department || filters.designation || filters.branch || filters.status;
     if (hasFilters || showAllEmployees) {
-      fetchEmployees(0);
+      fetchEmployees(page);
       setPage(0);
     } else {
       setSearchResults([]);
@@ -292,18 +481,19 @@ const ServiceBookTimeline = ({ employeeId, onCancel }) => {
     setPage(0);
   };
 
-  const handleEmployeeClick = (employee) => {
-    setSelectedEmployee(employee);
-    setTimelineEvents(DUMMY_EVENTS[employee.id] || []);
-    setFilteredEvents(DUMMY_EVENTS[employee.id] || []);
-    setShowDetails(true);
-    setFilters({
-      employeeName: '', employeeCode: '', department: '', designation: '', branch: '',
-      status: '', dateFrom: '', dateTo: '', eventType: 'all', search: ''
-    });
-    setPage(0);
-    setTimeout(() => setAnimateTimeline(true), 100);
-  };
+ const handleEmployeeClick = async (employee) => {
+  setSelectedEmployee(employee);
+  setShowDetails(true);
+  
+  await fetchTimeline(employee.id);
+  
+  setFilters({
+    employeeName: '', employeeCode: '', department: '', designation: '', branch: '',
+    status: '', dateFrom: '', dateTo: '', eventType: 'all', search: ''
+  });
+  setPage(0);
+  setTimeout(() => setAnimateTimeline(true), 100);
+};
 
   const handleBackToList = () => {
     setShowDetails(false);
@@ -313,7 +503,9 @@ const ServiceBookTimeline = ({ employeeId, onCancel }) => {
     setAnimateTimeline(false);
   };
 
-  const handleFilterChange = (field, value) => setFilters(prev => ({ ...prev, [field]: value }));
+  const handleFilterChange = (field, value) => {setFilters(prev => ({ ...prev, [field]: value }));
+   setPage(0);
+};
 
   const handleClearFilters = () => {
     setFilters({
@@ -527,32 +719,49 @@ const ServiceBookTimeline = ({ employeeId, onCancel }) => {
                 <input type="text" className="filter-input" placeholder="Enter name..." value={filters.employeeName} onChange={(e) => handleFilterChange('employeeName', e.target.value)} />
               </div>
               
-              {/* Department */}
-              <div>
-                <label className="filter-label">Department</label>
-                <select className="filter-input" value={filters.department} onChange={(e) => handleFilterChange('department', e.target.value)}>
-                  <option value="">All Departments</option>
-                  {departments.map(dept => <option key={dept} value={dept}>{dept}</option>)}
-                </select>
-              </div>
-              
-              {/* Designation */}
-              <div>
-                <label className="filter-label">Designation</label>
-                <select className="filter-input" value={filters.designation} onChange={(e) => handleFilterChange('designation', e.target.value)}>
-                  <option value="">All Designations</option>
-                  {designations.map(desg => <option key={desg} value={desg}>{desg}</option>)}
-                </select>
-              </div>
-
-              {/* Branch */}
-              <div>
-                <label className="filter-label">Branch</label>
-                <select className="filter-input" value={filters.branch} onChange={(e) => handleFilterChange('branch', e.target.value)}>
-                  <option value="">All Branches</option>
-                  {branches.map(branch => <option key={branch} value={branch}>{branch}</option>)}
-                </select>
-              </div>
+            
+             {/* Branch Filter */}
+<div>
+  <label className="filter-label">Branch</label>
+  <select 
+    className="filter-input" 
+    value={filters.branch} 
+    onChange={(e) => handleFilterChange('branch', e.target.value)}
+  >
+    <option value="">All Branches</option>
+    {branchList.map(branch => (
+      <option key={branch.id} value={branch.name}>{branch.name}</option>
+    ))}
+  </select>
+</div>
+{/* Department Filter */}
+<div>
+  <label className="filter-label">Department</label>
+  <select 
+    className="filter-input" 
+    value={filters.department} 
+    onChange={(e) => handleFilterChange('department', e.target.value)}
+  >
+    <option value="">All Departments</option>
+    {departmentList.map(dept => (
+      <option key={dept.id} value={dept.name}>{dept.name}</option>
+    ))}
+  </select>
+</div>
+{/* Designation Filter */}
+<div>
+  <label className="filter-label">Designation</label>
+  <select 
+    className="filter-input" 
+    value={filters.designation} 
+    onChange={(e) => handleFilterChange('designation', e.target.value)}
+  >
+    <option value="">All Designations</option>
+    {designationList.map(desg => (
+      <option key={desg.id} value={desg.name}>{desg.name}</option>
+    ))}
+  </select>
+</div>
 
               {/* Search Input */}
               <div>
@@ -610,10 +819,9 @@ const ServiceBookTimeline = ({ employeeId, onCancel }) => {
                           <tr style={styles.tableHeader}>
                             <th style={styles.tableHeaderCell}>#</th>
                             <th style={styles.tableHeaderCell}>Employee</th>
-                            <th style={styles.tableHeaderCell}>Code</th>
+                            <th style={styles.tableHeaderCell}>Branch</th>
                             <th style={styles.tableHeaderCell}>Department</th>
                             <th style={styles.tableHeaderCell}>Designation</th>
-                            <th style={styles.tableHeaderCell}>Branch</th>
                             <th style={styles.tableHeaderCell}>Joining Date</th>
                             <th style={styles.tableHeaderCell}>Status</th>
                             <th style={{ ...styles.tableHeaderCell, textAlign: 'center' }}>Action</th>
@@ -642,9 +850,15 @@ const ServiceBookTimeline = ({ employeeId, onCancel }) => {
                                   </div>
                                 </div>
                               </td>
-                              <td style={styles.tableCell}>
+                              {/* <td style={styles.tableCell}>
                                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '13px', color: '#475569' }}>
                                   {highlightText(emp.code, filters.employeeCode)}
+                                </span> */}
+                              {/* </td> */}
+                              <td style={styles.tableCell}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: '#475569' }}>
+                                  <FaMapMarkerAlt size={11} color="#9d174d" />
+                                  {emp.branch || emp.location || 'N/A'}
                                 </span>
                               </td>
                               <td style={styles.tableCell}>
@@ -657,12 +871,7 @@ const ServiceBookTimeline = ({ employeeId, onCancel }) => {
                                   {highlightText(emp.designation, filters.designation)}
                                 </span>
                               </td>
-                              <td style={styles.tableCell}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: '#475569' }}>
-                                  <FaMapMarkerAlt size={11} color="#9d174d" />
-                                  {emp.branch || emp.location || 'N/A'}
-                                </span>
-                              </td>
+                              
                               <td style={{ ...styles.tableCell, fontFamily: "'JetBrains Mono', monospace", fontSize: '13px' }}>
                                 {formatDate(emp.joiningDate)}
                               </td>
