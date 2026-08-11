@@ -73,6 +73,9 @@ import HolidayManagement from './Leave/HolidayManagement';
 import StartPerformanceReview from './Task/StartPerformanceReview';
 import Skills from './Masters/Skills';
 import LeaveTypes from './Masters/Leave';
+import DeviceManagement from './pages/DeviceManagement';
+import DeviceConfiguration from './pages/DeviceConfiguration';
+import MapDevice from './pages/MapDevice';
 import { BiCurrentLocation } from 'react-icons/bi';
 
 
@@ -209,6 +212,9 @@ function App() {
          <Route path="SkillMaster" element={<SkillMaster user={currentUser}/>}/>
          <Route path="InterviewPanel" element={<InterviewPanel user={currentUser}/>}/>
           <Route path="JobLocation" element={<JobLocation user={currentUser}/>}/>
+          <Route path="DeviceManagement" element={<DeviceManagement user={currentUser}/>}/>
+          <Route path="DeviceConfiguration" element={<DeviceConfiguration user={currentUser}/>}/>
+          <Route path="MapDevice" element={<MapDevice user={currentUser}/>}/>
         </Route>
       </Routes>
     </Router>

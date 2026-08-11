@@ -9,7 +9,8 @@ import {
   FaAward,
   FaDochub,
   FaBook,
-  FaTrailer
+  FaTrailer, FaSync, 
+  FaMapMarker
 } from 'react-icons/fa';
 import { BsChevronDown, BsChevronRight } from 'react-icons/bs';
 import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
@@ -79,9 +80,20 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/attendance-summary', icon: <FaChartPie />, label: 'Attendance Summary', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/attendance', icon: <FaCalendarCheck />, label: 'Mark Attendance', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy', roles: ['Admin', 'Hr'] },
-
-  ];
-
+    
+{
+  icon: <FaCog />,
+  label: 'Biometric Integration',
+  roles: ['Admin', 'Hr'],
+  isSubMenu: true,
+  children: [
+    { path: '/devicemanagement', icon: <FaCog />, label: 'Device Management', roles: ['Admin', 'Hr'] },
+    { path: '/deviceconfiguration', icon: <FaClock />, label: 'Device Configuration', roles: ['Admin', 'Hr'] },
+    { path: '/MapDevice', icon: <FaMapMarker />, label: 'Map Device', roles: ['Admin', 'Hr'] },
+  ]
+},
+];
+ 
   // Leave section items with role restrictions
   const leaveItems = [
     { path: '/LeaveDashboard', icon: <FaChartLine />, label: 'Leave Dashboard', roles: ['Admin', 'Hr', 'Manager'] },
@@ -407,7 +419,7 @@ const masterItems = [
         )}
 
         {/* Attendance Section - Separate from Employee */}
-        {hasAnyVisibleItems(attendanceItems) && !sidebarCollapsed && (
+        {/* {hasAnyVisibleItems(attendanceItems) && !sidebarCollapsed && (
           <li style={{ margin: '16px 10px 8px 10px' }}>
             <div
               onClick={toggleAttendance}
@@ -441,10 +453,10 @@ const masterItems = [
               {attendanceOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
             </div>
           </li>
-        )}
+        )} */}
 
         {/* Attendance Items */}
-        {(attendanceOpen || sidebarCollapsed) && (
+        {/* {(attendanceOpen || sidebarCollapsed) && (
           <>
             {attendanceItems.map((item, index) => (
               hasAccess(item.roles) && (
@@ -478,8 +490,164 @@ const masterItems = [
               )
             ))}
           </>
-        )}
+        )} */}
 
+{/* Attendance Section - Separate from Employee */}
+{hasAnyVisibleItems(attendanceItems) && !sidebarCollapsed && (
+  <li style={{ margin: '16px 10px 8px 10px' }}>
+    <div
+      onClick={toggleAttendance}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '8px 10px',
+        color: 'var(--sidebar-heading)',
+        fontSize: '11px',
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+        cursor: 'pointer',
+        borderRadius: '8px',
+        transition: 'all 0.2s ease',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.color = 'var(--sidebar-text-active)';
+        e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.color = 'var(--sidebar-heading)';
+        e.currentTarget.style.background = 'transparent';
+      }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <FaClock size={12} />
+        <span>ATTENDANCE</span>
+      </span>
+      {attendanceOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
+    </div>
+  </li>
+)}
+
+{/* Attendance Items - Master ki tarah */}
+{(attendanceOpen || sidebarCollapsed) && (
+  <>
+    {attendanceItems.map((item, index) => {
+      if (item.children) {
+        return hasAccess(item.roles) && (
+          <li key={`attendance-${index}`} style={{ margin: '3px 10px' }}>
+            <div
+              onClick={() => {
+                const key = `attendance-${index}`;
+                setSubMenuOpen(prev => ({
+                  ...prev,
+                  [key]: !prev[key]
+                }));
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 14px',
+                paddingLeft: '38px',
+                color: 'var(--sidebar-text)',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = 'var(--sidebar-text-active)';
+                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = 'var(--sidebar-text)';
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {item.icon}
+                <span>{item.label}</span>
+              </span>
+              {subMenuOpen[`attendance-${index}`] ? (
+                <BsChevronDown size={10} />
+              ) : (
+                <BsChevronRight size={10} />
+              )}
+            </div>
+            
+            {/* Sub-Menu Items */}
+            {subMenuOpen[`attendance-${index}`] && (
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {item.children.map((child, childIdx) => (
+                  hasAccess(child.roles) && (
+                    <li key={`attendance-child-${childIdx}`} style={{ margin: '2px 0' }}>
+                      <NavLink
+                        to={child.path}
+                        title={sidebarCollapsed ? child.label : ''}
+                        style={({ isActive }) => ({
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '8px 14px',
+                          paddingLeft: '54px',
+                          color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                          textDecoration: 'none',
+                          borderRadius: '8px',
+                          transition: 'all 0.2s ease',
+                          background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                          borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                          fontSize: '13px',
+                          fontWeight: isActive ? 500 : 400,
+                          whiteSpace: 'nowrap',
+                          cursor: 'pointer',
+                        })}
+                      >
+                        {child.icon}
+                        <span>{child.label}</span>
+                      </NavLink>
+                    </li>
+                  )
+                ))}
+              </ul>
+            )}
+          </li>
+        );
+      }
+      
+      return hasAccess(item.roles) && (
+        <li key={`attendance-${index}`} style={{ margin: '3px 10px' }}>
+          <NavLink
+            to={item.path}
+            title={sidebarCollapsed ? item.label : ''}
+            style={({ isActive }) => ({
+              display: 'flex',
+              alignItems: 'center',
+              gap: sidebarCollapsed ? '0' : '12px',
+              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+              padding: sidebarCollapsed ? '11px' : '11px 14px',
+              paddingLeft: sidebarCollapsed ? '11px' : '38px',
+              color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+              textDecoration: 'none',
+              borderRadius: '10px',
+              transition: 'all 0.2s ease',
+              background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+              borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+              fontSize: '14px',
+              fontWeight: isActive ? 600 : 400,
+              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+            })}
+          >
+            <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+            {!sidebarCollapsed && <span>{item.label}</span>}
+          </NavLink>
+        </li>
+      );
+    })}
+  </>
+)}
         {/* Task Management Section */}
         {hasAnyVisibleItems(tasksItems) && !sidebarCollapsed && (
           <li style={{ margin: '16px 10px 8px 10px' }}>
