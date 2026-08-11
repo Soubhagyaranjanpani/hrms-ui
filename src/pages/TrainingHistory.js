@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FaSave, FaTimes, FaChalkboardTeacher, FaCalendarAlt, FaBuilding, 
   FaUpload, FaFilePdf, FaFileImage, FaEdit, FaTrash, FaPlus,
@@ -7,19 +7,19 @@ import {
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import DocumentActions from './DocumentsAction';
+import axios from 'axios';
+import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
 
 const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
-  const [trainings, setTrainings] = useState(initialData?.trainings || [
-    { id: 1, trainingName: 'Advanced React Development', trainingProvider: 'Udemy', startDate: '2024-01-15', endDate: '2024-02-15', certificationReceived: 'Yes', trainingHours: '40', duration: '32 days', createdAt: '2024-01-15T10:30:00Z', employeeName: 'John Doe', employeeId: 1, certificateFileName: 'react_certificate.pdf', certificateFileData: null },
-    { id: 2, trainingName: 'Leadership Program', trainingProvider: 'Harvard Business School', startDate: '2024-03-01', endDate: '2024-03-10', certificationReceived: 'Yes', trainingHours: '30', duration: '10 days', createdAt: '2024-03-01T11:45:00Z', employeeName: 'Jane Smith', employeeId: 2 },
-    { id: 3, trainingName: 'Cloud Architecture', trainingProvider: 'AWS', startDate: '2024-05-10', endDate: '2024-06-10', certificationReceived: 'Pending', trainingHours: '50', duration: '32 days', createdAt: '2024-05-10T09:15:00Z', employeeName: 'Mike Johnson', employeeId: 3, certificateFileName: 'aws_cert.pdf', certificateFileData: null },
-    { id: 4, trainingName: 'Sales Fundamentals', trainingProvider: 'Salesforce', startDate: '2024-07-05', endDate: '2024-07-20', certificationReceived: 'Yes', trainingHours: '25', duration: '16 days', createdAt: '2024-07-05T14:20:00Z', employeeName: 'Sarah Williams', employeeId: 4 },
-    { id: 5, trainingName: 'Accounting Software', trainingProvider: 'Tally', startDate: '2024-09-12', endDate: '2024-09-30', certificationReceived: 'No', trainingHours: '35', duration: '19 days', createdAt: '2024-09-12T10:00:00Z', employeeName: 'David Brown', employeeId: 5 }
-  ]);
-  
+  const [trainings, setTrainings] = useState([]);
+  const [loading, setLoading] = useState(false);
+const [totalElements, setTotalElements] = useState(0);
+const [employees, setEmployees] = useState([]);
+const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [editingTraining, setEditingTraining] = useState(null);
   const [selectedTraining, setSelectedTraining] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
+  const [docLoading, setDocLoading] = useState(false);
   const [formRows, setFormRows] = useState([
     {
       id: Date.now(),
@@ -56,37 +56,215 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [showDocumentActions, setShowDocumentActions] = useState(false);
   const [rowErrors, setRowErrors] = useState({});
-  
-  const DUMMY_EMPLOYEES = [
-    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
-    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
-  ];
+  const [submitting, setSubmitting] = useState(false); 
+const [totalPages, setTotalPages] = useState(0);    
+ 
 
-  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-    const search = employeeSearchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
-  });
+  // ─── Auth helpers ──────────────────────────────────────────
+const getAuthToken = () => localStorage.getItem(STORAGE_KEYS?.JWT_TOKEN || 'jwtToken');
+
+const getAxiosConfig = () => ({
+  headers: {
+    Authorization: `Bearer ${getAuthToken()}`,
+    'Content-Type': 'application/json',
+  },
+});
+
+const ensureToken = () => {
+  const token = getAuthToken();
+  if (!token) {
+    toast.error('Authentication Required', 'Please login to continue');
+    return false;
+  }
+  return true;
+};
+
+const fetchEmployees = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoadingEmployees(true);
+  try {
+    const res = await axios.get(`${BASE_URL}/api/employees`, { 
+      ...getAxiosConfig(), 
+      params: { size: 1000, page: 0 } 
+    });
+    if (res.data?.status === 200) {
+      let employeesData = Array.isArray(res.data.response)
+        ? res.data.response
+        : (res.data.response?.content || res.data.response?.data || []);
+      
+      const mappedEmployees = employeesData.map(emp => ({
+        id: emp.id || emp.employeeId,
+        name: emp.name || emp.employeeName || '',
+        employeeCode: emp.code || emp.employeeCode || '',
+        departmentName: emp.department || emp.departmentName || '',
+        designationName: emp.designation || emp.designationName || '',
+        email: emp.email || '',
+        ...emp
+      }));
+      
+      setEmployees(mappedEmployees);
+      console.log("✅ Employees loaded:", mappedEmployees);
+    } else {
+      setEmployees([]);
+    }
+  } catch (err) {
+    console.error('Fetch employees error:', err);
+    toast.error('Error', err.response?.data?.message || 'Failed to fetch employees');
+    setEmployees([]);
+  } finally {
+    setLoadingEmployees(false);
+  }
+}, []);
+
+// ─── FETCH TRAININGS FROM API ──────────────────────────────────────
+const fetchTrainings = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoading(true);
+  try {
+    const params = {
+      page: page,
+      size: rowsPerPage,
+    };
+    if (searchTerm) params.search = searchTerm;
+    if (employeeId) params.employeeId = employeeId;
+
+    const res = await axios.get(
+      `${BASE_URL}/api/trainings`,
+      { ...getAxiosConfig(), params }
+    );
+
+    console.log("📥 Trainings Response:", res.data);
+
+    let trainingsData = [];
+    let totalPagesData = 0;
+    let totalElementsData = 0;
+
+    if (res.data?.status === 200) {
+      if (res.data.response?.content) {
+        trainingsData = res.data.response.content;
+        totalPagesData = res.data.response.totalPages || 0;
+        totalElementsData = res.data.response.totalElements || 0;
+      } else if (Array.isArray(res.data.response)) {
+        trainingsData = res.data.response;
+        totalPagesData = Math.ceil(trainingsData.length / rowsPerPage);
+        totalElementsData = trainingsData.length;
+      }
+    } else if (res.data?.content) {
+      trainingsData = res.data.content;
+      totalPagesData = res.data.totalPages || 0;
+      totalElementsData = res.data.totalElements || 0;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      trainingsData = res.data.data;
+      totalPagesData = Math.ceil(trainingsData.length / rowsPerPage);
+      totalElementsData = trainingsData.length;
+    } else if (Array.isArray(res.data)) {
+      trainingsData = res.data;
+      totalPagesData = Math.ceil(trainingsData.length / rowsPerPage);
+      totalElementsData = trainingsData.length;
+    }
+
+ const mappedTrainings = trainingsData.map((item) => {
+  // ✅ Find employee from employees array
+  const emp = employees.find(e => e.id === item.employeeId);
+  
+  return {
+    id: item.id,
+    employeeId: item.employeeId,
+    employee: item.employeeName || item.employee || emp?.name || 'Unknown',
+    employeeCode: emp?.employeeCode || emp?.code || item.employeeCode || '', 
+    departmentName: emp?.departmentName || emp?.department || item.departmentName || '',
+    designationName: emp?.designationName || emp?.designation || item.designationName || '',
+    trainingName: item.trainingName || '',
+    provider: item.provider || '',
+    startDate: item.startDate || '',
+    endDate: item.endDate || '',
+    certification: item.certification || '',
+    hours: item.hours || '',
+    trainingProvider: item.provider || '',
+    certificationReceived: item.certification || '',
+    trainingHours: item.hours || '',
+    description: item.description || '',
+    status: item.isActive ? 'Active' : 'Inactive',
+    createdAt: item.createdAt || new Date().toISOString(),
+    certificateFileName: item.documentName || item.certificateFileName || null,
+    certificateFileData: item.certificateFileData || null,
+    documentPath: item.documentPath || null,
+    hasDocument: !!(item.documentName || item.certificateFileName),
+  };
+});
+
+    console.log("✅ Mapped Trainings:", mappedTrainings);
+    setTrainings(mappedTrainings);
+    setTotalPages(totalPagesData);
+    setTotalElements(totalElementsData);
+
+  } catch (err) {
+    console.error('Fetch trainings error:', err);
+    toast.error('Error', err.response?.data?.message || 'Failed to load trainings');
+    setTrainings([]);
+  } finally {
+    setLoading(false);
+  }
+}, [page, rowsPerPage, searchTerm, employeeId,employees]);
+
+useEffect(() => {
+  const loadData = async () => {
+    await fetchEmployees();
+    await fetchTrainings();
+  };
+  loadData();
+}, [page, searchTerm]);
+
+ const filteredEmployees = employees.filter(emp => {
+  const search = (employeeSearchTerm || '').toLowerCase();
+  return (emp.name || '').toLowerCase().includes(search) || 
+         (emp.employeeCode || '').toLowerCase().includes(search) ||
+         (emp.departmentName || '').toLowerCase().includes(search) ||
+         (emp.designationName || '').toLowerCase().includes(search);
+});
 
   const handleRowClick = (training) => {
     setSelectedTraining(training);
   };
 
-  const handleViewDocument = (e, training) => {
-    e.stopPropagation(); 
-    setSelectedTraining(training); 
-    setShowDocumentActions(true);
-    if (training.certificateFileData) {
+ const handleViewDocument = async (e, training) => {
+  e.stopPropagation(); 
+  setSelectedTraining(training);
+  
+  if (training.certificateFileData) {
+    setDocumentPreview({
+      data: training.certificateFileData,
+      name: training.certificateFileName || 'certificate.pdf'
+    });
+    return;
+  }
+  
+  if (training.hasDocument || training.documentPath) {
+    setDocLoading(true);
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/trainings/${training.id}/document`,
+        {
+          headers: { Authorization: `Bearer ${getAuthToken()}` },
+          responseType: 'blob',
+        }
+      );
+      const blobUrl = URL.createObjectURL(res.data);
       setDocumentPreview({
-        data: training.certificateFileData,
-        name: training.certificateFileName
+        data: blobUrl,
+        name: training.certificateFileName || `training_${training.id}.pdf`
       });
-    } else {
-      toast.info('No Document', 'No certificate has been uploaded for this training');
+      toast.success('Success', 'Document loaded successfully');
+    } catch (err) {
+      console.error('Document fetch error:', err);
+      toast.error('Error', 'Failed to load document');
+    } finally {
+      setDocLoading(false);
     }
-  };
+  } else {
+    toast.info('No Document', 'No certificate has been uploaded for this training');
+  }
+};
 
   const certificationOptions = [
     { value: 'Yes', label: 'Yes' },
@@ -102,27 +280,32 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   });
 
   const totalItems = filteredTrainings.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
   const currentTrainings = filteredTrainings.slice(startIndex, startIndex + rowsPerPage);
   
-  const handleEmployeeSelect = (rowId, employee) => {
-    setFormRows(prev => prev.map(row => 
-      row.id === rowId ? {
-        ...row,
-        employeeId: employee.id,
-        employeeName: employee.name
-      } : row
-    ));
-    setEmployeeSearchTerm(employee.name);
-    setShowEmployeeDropdown(false);
-    
-    if (rowErrors[rowId]) {
-      const newErrors = { ...rowErrors };
-      delete newErrors[rowId];
-      setRowErrors(newErrors);
-    }
-  };
+ const handleEmployeeSelect = (rowId, employee) => {
+  console.log("✅ Selected Employee:", employee);
+  
+  setFormRows(prev => prev.map(row => 
+    row.id === rowId ? {
+      ...row,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      employeeCode: employee.employeeCode || employee.code || '',
+      departmentName: employee.departmentName || employee.department || '',
+      designationName: employee.designationName || employee.designation || ''
+    } : row
+  ));
+  setSelectedEmployee(employee);
+  setEmployeeSearchTerm(employee.name);
+  setShowEmployeeDropdown(false);
+  
+  if (rowErrors[rowId]) {
+    const newErrors = { ...rowErrors };
+    delete newErrors[rowId];
+    setRowErrors(newErrors);
+  }
+};
 
   const getPaginationRange = () => {
     const delta = 2;
@@ -216,7 +399,10 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       certificateFileData: null,
       certificateFileName: null,
       employeeId: '',
-      employeeName: ''
+      employeeName: '',
+        employeeCode: '',      
+    departmentName: '',    
+    designationName: ''
     };
     setFormRows([...formRows, newRow]);
   };
@@ -232,78 +418,180 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     setRowErrors(newErrors);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    let hasErrors = false;
-    const allErrors = {};
-    
-    formRows.forEach(row => {
-      const rowError = validateRow(row);
-      if (Object.keys(rowError).length > 0) {
-        allErrors[row.id] = rowError;
-        hasErrors = true;
-      }
-    });
-    
-    if (hasErrors) {
-      setRowErrors(allErrors);
-      toast.warning('Validation Error', 'Please fix the highlighted fields in all rows');
-      return;
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!ensureToken()) return;
+  
+  // Validate all rows
+  let hasErrors = false;
+  const allErrors = {};
+  
+  formRows.forEach(row => {
+    const rowError = validateRow(row);
+    if (Object.keys(rowError).length > 0) {
+      allErrors[row.id] = rowError;
+      hasErrors = true;
     }
-    
-    const newTrainings = formRows.map(row => ({
-      id: Date.now() + Math.random() * 1000,
-      trainingName: row.trainingName,
-      trainingProvider: row.trainingProvider,
-      startDate: row.startDate,
-      endDate: row.endDate,
-      certificationReceived: row.certificationReceived,
-      trainingHours: row.trainingHours,
-      duration: calculateDuration(row.startDate, row.endDate),
-      certificateFileData: row.certificateFileData,
-      certificateFileName: row.certificateFileName,
-      employeeId: row.employeeId,
-      employeeName: row.employeeName,
-      createdAt: new Date().toISOString(),
-      status: 'Active'
-    }));
-    
-    setTrainings([...newTrainings, ...trainings]);
-    toast.success('Success', `${newTrainings.length} training(s) added successfully`);
+  });
+  
+  if (hasErrors) {
+    setRowErrors(allErrors);
+    toast.warning('Validation Error', 'Please fix the highlighted fields in all rows');
+    return;
+  }
+
+  if (!selectedEmployee && !formRows[0]?.employeeId) {
+    toast.warning('Validation Error', 'Please select an employee');
+    return;
+  }
+
+  setSubmitting(true);
+  try {
+    let res;
+    const empData = selectedEmployee || null;
+    const employeeId = empData?.id || Number(formRows[0]?.employeeId) || 0;
+
+    if (editingTraining) {
+      // ✅ UPDATE API
+     const payload = {
+  employeeId: employeeId,
+  trainingName: formRows[0]?.trainingName || '',
+  provider: formRows[0]?.trainingProvider || '',  // ✅ 'provider'
+  startDate: formRows[0]?.startDate || '',
+  endDate: formRows[0]?.endDate || '',
+  hours: Number(formRows[0]?.trainingHours) || 0,  // ✅ 'hours' as number
+  certification: formRows[0]?.certificationReceived || 'No',  // ✅ 'certification'
+  description: formRows[0]?.description || ''
+};
+      
+      console.log("📤 UPDATE payload:", payload);
+      res = await axios.put(
+        `${BASE_URL}/api/trainings/${editingTraining.id}/update`,
+        payload,
+        getAxiosConfig()
+      );
+
+      if (res.data?.status === 200 || res.data?.status === 201) {
+        toast.success('Success', 'Training updated successfully');
+        resetForm();
+        setShowForm(false);
+        setPage(0);
+        await fetchTrainings();
+        if (onSuccess) onSuccess();
+      } else {
+        throw new Error(res.data?.message || 'Update failed');
+      }
+      
+     } else {
+ const trainingsArray = formRows.map(row => ({
+  employeeId: Number(row.employeeId) || Number(employeeId) || 0,
+  trainingName: row.trainingName || '',
+  provider: row.trainingProvider || '',
+  startDate: row.startDate || '',
+  endDate: row.endDate || '',
+  hours: Number(row.trainingHours) || 0,
+  certification: row.certificationReceived || 'No',
+  description: row.description || '',
+  employeeCode: row.employeeCode || '',
+  departmentName: row.departmentName || '',
+  designationName: row.designationName || ''
+}));
+  
+  // ✅ WRAPPER - Backend expects { trainings: [...] }
+  const payload = {
+    trainings: trainingsArray
+  };
+  
+  console.log("📤 CREATE payload with wrapper:", JSON.stringify(payload, null, 2));
+  
+  res = await axios.post(
+    `${BASE_URL}/api/trainings/create`,
+    payload,
+    getAxiosConfig()
+  );
+  
+  if (res.data?.status === 200 || res.data?.status === 201) {
+    toast.success('Success', `${trainingsArray.length} Training(s) created successfully`);
     resetForm();
     setShowForm(false);
     setPage(0);
-  };
+    await fetchTrainings();
+    if (onSuccess) onSuccess();
+  } else {
+    throw new Error(res.data?.message || 'Create failed');
+  }
+}
 
-  const handleEdit = (training) => {
-    if (training.status === 'Inactive') {
-      toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
-      return;
-    }
-    
-    const emp = DUMMY_EMPLOYEES.find(e => e.id === training.employeeId);
-    setSelectedEmployee(emp || null);
-    setEditingTraining(training);
-    
-    setFormRows([{
-      id: Date.now(),
-      trainingName: training.trainingName,
-      trainingProvider: training.trainingProvider,
-      startDate: training.startDate,
-      endDate: training.endDate,
-      certificationReceived: training.certificationReceived,
-      trainingHours: training.trainingHours,
-      certificateFile: null,
-      certificateFileData: training.certificateFileData,
-      certificateFileName: training.certificateFileName,
-      employeeId: training.employeeId,
-      employeeName: training.employeeName
-    }]);
-    
-    setEmployeeSearchTerm(emp?.name || '');
-    setShowForm(true);
-  };
+  } catch (err) {
+    console.error('Submit error:', err);
+    toast.error('Error', err.response?.data?.message || err.message || 'Something went wrong');
+  } finally {
+    setSubmitting(false);
+  }
+};
+
+//   const handleEdit = (training) => {
+//   if (training.status === 'Inactive') {
+//     toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
+//     return;
+//   }
+  
+//   const emp = employees.find(e => e.id === training.employeeId);
+//   setSelectedEmployee(emp || null);
+//   setEditingTraining(training);
+  
+//   setFormRows([{
+//     id: Date.now(),
+//     trainingName: training.trainingName || '',
+//     trainingProvider: training.provider || training.trainingProvider || '',
+//     startDate: training.startDate || '',
+//     endDate: training.endDate || '',
+//     certificationReceived: training.certification || training.certificationReceived || 'No',
+//     trainingHours: training.hours || training.trainingHours || '',
+//     certificateFile: null,
+//     certificateFileData: training.certificateFileData || null,
+//     certificateFileName: training.certificateFileName || null,
+//     employeeId: training.employeeId || '',
+//     employeeName: emp?.name || training.employee || '',
+//     employeeCode: emp?.employeeCode || emp?.code || '',
+//     departmentName: emp?.departmentName || emp?.department || '',
+//     designationName: emp?.designationName || emp?.designation || ''
+//   }]);
+  
+//   setEmployeeSearchTerm(emp?.name || '');
+//   setShowForm(true);
+// };
+const handleEdit = (training) => {
+  if (training.status === 'Inactive') {
+    toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
+    return;
+  }
+  
+  const emp = employees.find(e => e.id === training.employeeId);
+  setSelectedEmployee(emp || null);
+  setEditingTraining(training);
+  
+  setFormRows([{
+    id: Date.now(),
+    trainingName: training.trainingName || '',
+    trainingProvider: training.provider || training.trainingProvider || '',
+    startDate: training.startDate || '',
+    endDate: training.endDate || '',
+    certificationReceived: training.certification || training.certificationReceived || 'No',
+    trainingHours: training.hours || training.trainingHours || '',
+    certificateFile: null,
+    certificateFileData: training.certificateFileData || null,
+    certificateFileName: training.certificateFileName || null,
+    employeeId: training.employeeId || '',
+    employeeName: emp?.name || training.employee || '',
+    employeeCode: emp?.employeeCode || emp?.code || training.employeeCode || '', 
+    departmentName: emp?.departmentName || emp?.department || training.departmentName || '',
+    designationName: emp?.designationName || emp?.designation || training.designationName || ''
+  }]);
+  
+  setEmployeeSearchTerm(emp?.name || '');
+  setShowForm(true);
+};
 
   const resetForm = () => {
     setFormRows([{
@@ -318,7 +606,10 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       certificateFileData: null,
       certificateFileName: null,
       employeeId: '',
-      employeeName: ''
+      employeeName: '',
+       employeeCode: '',      // ✅ ADD
+    departmentName: '',    // ✅ ADD
+    designationName: ''  
     }]);
     setErrors({});
     setTouched({});
@@ -363,33 +654,52 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     setShowStatusModal(true);
   };
 
-  const confirmStatusChange = () => {
-    const { id, newStatus } = statusAction;
+ const confirmStatusChange = async () => {
+  const { id, newStatus, name } = statusAction;
   
-    const updatedTrainings = trainings.map((training) =>
-      training.id === id
-        ? {
-            ...training,
-            status: newStatus
-          }
-        : training
+  if (!id) {
+    toast.error('Error', 'Invalid record ID');
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const isActive = newStatus === 'Active';
+    const res = await axios.put(
+      `${BASE_URL}/api/trainings/${id}/status?active=${isActive}`,
+      null,
+      getAxiosConfig()
     );
-  
-    setTrainings(updatedTrainings);
+    
+    if (res.status === 200) {
+      toast.success('Status Updated', `${name} is now ${newStatus}`);
+      await fetchTrainings();
+    }
+  } catch (err) {
+    console.error('Status change error:', err);
+    toast.error('Error', err.response?.data?.message || 'Failed to change status');
+  } finally {
+    setLoading(false);
     setShowStatusModal(false);
-    toast.success(
-      "Status Updated",
-      `${statusAction.name} is now ${newStatus}`
-    );
-  };
+    setStatusAction({ id: null, name: "", newStatus: "" });
+  }
+};
 
   const handleGenerateLetter = (training) => {
     console.log('Generate clicked for:', training.trainingCertificateFileName);
   };
 
   const getEmployeeDetails = (employeeId) => {
-    return DUMMY_EMPLOYEES.find(e => e.id === employeeId);
+  if (!employeeId) return null;
+  const emp = employees.find(e => e.id === employeeId);
+  if (!emp) return null;
+  return {
+    ...emp,
+    employeeCode: emp.employeeCode || emp.code || '',
+    departmentName: emp.departmentName || emp.department || '',
+    designationName: emp.designationName || emp.designation || ''
   };
+};
 
   return (
     <div className="cert-root">
@@ -500,8 +810,12 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
                                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                 >
-                                  <div style={{ fontWeight: 500 }}>{emp.name}</div>
-                                  <div style={{ fontSize: '10px', color: '#6b7280' }}>{emp.code} | {emp.department}</div>
+<div style={{ fontWeight: 500 }}>{emp.name}</div>
+<div style={{ fontSize: '10px', color: '#6b7280' }}>
+  {emp.employeeCode || 'N/A'}
+  {emp.departmentName ? ` | ${emp.departmentName}` : ''}
+  {emp.designationName ? ` | ${emp.designationName}` : ''}
+</div>
                                 </div>
                               ))
                             ) : (
@@ -514,15 +828,24 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                         {rowError.employeeId && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.employeeId}</div>}
                       </div>
                     </td>
-                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-                      <input type="text" className="form-control bg-light" value={employee?.code || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
-                    </td>
-                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-                      <input type="text" className="form-control bg-light" value={employee?.department || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
-                    </td>
-                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-                      <input type="text" className="form-control bg-light" value={employee?.designation || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
-                    </td>
+                   <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+  <input type="text" className="form-control bg-light" 
+    value={employee?.employeeCode || row.employeeCode || ''} 
+    readOnly placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+</td>
+                   <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+  <input type="text" className="form-control bg-light" 
+    value={employee?.departmentName || row.departmentName || ''} 
+    readOnly placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+</td>
+                  <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+  <input type="text" className="form-control bg-light" 
+    value={employee?.designationName || row.designationName || ''} 
+    readOnly placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+</td>
                     <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
                       <input
                         type="text"
@@ -663,9 +986,9 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
           </div>
           <div style={{padding:'32px'}}>
             <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',marginBottom:'24px',border:'1px solid #e2e8f0',display:'flex',alignItems:'center',gap:'16px'}}>
-              <div style={{width:'50px',height:'50px',borderRadius:'50%',background:'linear-gradient(135deg,#9d174d,#be185d)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'20px',fontWeight:700}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedTraining.employeeId)?.name?.charAt(0)||'?'}</div>
-              <div><h3 style={{fontSize:'16px',fontWeight:600,color:'#1e293b',margin:'0 0 2px 0'}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedTraining.employeeId)?.name||selectedTraining.employeeName}</h3><span style={{fontSize:'13px',color:'#64748b'}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedTraining.employeeId)?.code||''}</span></div>
-            </div>
+              <div style={{width:'50px',height:'50px',borderRadius:'50%',background:'linear-gradient(135deg,#9d174d,#be185d)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'20px',fontWeight:700}}>{employees.find(e=>e.id===selectedTraining.employeeId)?.name?.charAt(0)||'?'}</div>
+<div><h3 style={{fontSize:'16px',fontWeight:600,color:'#1e293b',margin:'0 0 2px 0'}}>{employees.find(e=>e.id===selectedTraining.employeeId)?.name||selectedTraining.employee}</h3><span style={{fontSize:'13px',color:'#64748b'}}>{employees.find(e=>e.id===selectedTraining.employeeId)?.employeeCode||''}</span></div>
+</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'16px',marginBottom:'28px'}}>
               <div style={{background:'#eef2ff',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaBuilding size={16} style={{color:'#4f46e5'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Training Provider</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedTraining.trainingProvider}</p></div>
               <div style={{background:'#fffbeb',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCertificate size={16} style={{color:'#f59e0b'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Certification</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:getCertificationColor(selectedTraining.certificationReceived).bg,color:getCertificationColor(selectedTraining.certificationReceived).color}}>{getCertificationColor(selectedTraining.certificationReceived).icon} {selectedTraining.certificationReceived}</span></div>
@@ -735,31 +1058,23 @@ const TrainingHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                         className="cert-table-row-hover"
                       >
                         <td className="text-center">{startIndex + idx + 1}</td>
-                        <td>{DUMMY_EMPLOYEES.find(e => e.id === training.employeeId)?.name || training.employeeName}</td>
-                        <td><strong>{training.trainingName}</strong></td>
-                        <td>{training.trainingProvider}</td>
-                        <td>{formatDate(training.startDate)}</td>
-                        <td>{formatDate(training.endDate)}</td>
-                        <td>{training.trainingHours} hrs</td>
-                        <td className="text-center">
-                          <span className="cert-status-badge" style={{ 
-                            background: training.certificationReceived === 'Yes' ? '#d1fae5' : training.certificationReceived === 'Pending' ? '#fed7aa' : '#f3f4f6',
-                            color: training.certificationReceived === 'Yes' ? '#065f46' : training.certificationReceived === 'Pending' ? '#9a3412' : '#6b7280'
-                          }}>
-                            {training.certificationReceived}
-                          </span>
-                        </td>
+<td>{employees.find(e => e.id === training.employeeId)?.name || training.employee || 'Unknown'}</td>                        <td><strong>{training.trainingName}</strong></td>
+                        <td>{training.provider || training.trainingProvider || '—'}</td>
+<td>{formatDate(training.startDate)}</td>
+<td>{formatDate(training.endDate)}</td>
+<td>{training.hours || training.trainingHours || '—'}</td>
+<td>{training.certification || training.certificationReceived || '—'}</td>
                         <td>
                           <div
                             className="d-flex align-items-center gap-1"
                             style={{ cursor: "pointer" }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleStatusToggle(
-                                training.id,
-                                DUMMY_EMPLOYEES.find(e => e.id === training.employeeId)?.name || "",
-                                training.status || "Active"
-                              );
+                             handleStatusToggle(
+  training.id,
+  employees.find(e => e.id === training.employeeId)?.name || "",
+  training.status || "Active"
+);
                             }}
                           >
                             <div
