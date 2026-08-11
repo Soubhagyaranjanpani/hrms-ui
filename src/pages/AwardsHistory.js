@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useCallback } from 'react';
 import { 
   FaSave, FaTimes, FaTrophy, FaCalendarAlt, FaBuilding, 
   FaUpload, FaFilePdf, FaFileImage, FaEdit, FaTrash, FaPlus,
@@ -7,16 +7,12 @@ import {
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import DocumentActions from './DocumentsAction';
+import axios from 'axios';
+import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
 
 const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
-  const [awards, setAwards] = useState(initialData?.awards || [
-    { id: 1, awardName: 'Star Performer of the Year', awardDate: '2024-01-15', awardType: 'Star Performer', issuedBy: 'CEO Office', description: 'Exceptional performance throughout the year', createdAt: '2024-01-15T10:30:00Z', employeeName: 'John Doe', employeeId: 1, certificateFileName: 'star_performer.pdf', certificateFileData: null },
-    { id: 2, awardName: 'Innovation Award', awardDate: '2024-03-20', awardType: 'Innovation', issuedBy: 'HR Department', description: 'Outstanding innovation in process improvement', createdAt: '2024-03-20T11:45:00Z', employeeName: 'Jane Smith', employeeId: 2 },
-    { id: 3, awardName: 'Employee of the Month', awardDate: '2024-05-10', awardType: 'Employee of Month', issuedBy: 'Department Head', description: 'Consistent performance', createdAt: '2024-05-10T09:15:00Z', employeeName: 'Mike Johnson', employeeId: 3, certificateFileName: 'employee_month.jpg', certificateFileData: null },
-    { id: 4, awardName: 'Leadership Excellence', awardDate: '2024-07-05', awardType: 'Leadership', issuedBy: 'Managing Director', description: 'Excellent leadership skills', createdAt: '2024-07-05T14:20:00Z', employeeName: 'Sarah Williams', employeeId: 4 },
-    { id: 5, awardName: 'Customer Service Star', awardDate: '2024-09-12', awardType: 'Customer Service', issuedBy: 'CEO Office', description: 'Outstanding customer service', createdAt: '2024-09-12T10:00:00Z', employeeName: 'David Brown', employeeId: 5, certificateFileName: 'service_star.pdf', certificateFileData: null }
-  ]);
-  
+  const [awards, setAwards] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
   const [editingAward, setEditingAward] = useState(null);
   const [selectedAward, setSelectedAward] = useState(null); // For inline detail view
   const [documentPreview, setDocumentPreview] = useState(null); // For document preview modal
@@ -25,8 +21,8 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       id: Date.now(),
       awardName: '',
       awardDate: '',
-      awardType: 'Performance',
-      issuedBy: '',
+     awardTypeId: '',
+issuedById: '',
       description: '',
       certificateFile: null,
       certificateFileData: null,
@@ -51,109 +47,339 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     name: "",
     newStatus: ""
   });
+  const [employees, setEmployees] = useState([]);
+const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [showDocumentActions, setShowDocumentActions] = useState(false);
   const [rowErrors, setRowErrors] = useState({});
-  
-  const DUMMY_EMPLOYEES = [
-    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', designation: 'Software Engineer' },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager' },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager' },
-    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant' }
-  ];
-
-  const filteredEmployees = DUMMY_EMPLOYEES.filter(emp => {
-    const search = employeeSearchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
-  });
+  const [awardTypesList, setAwardTypesList] = useState([]);
+const [loadingAwardTypes, setLoadingAwardTypes] = useState(false);
+const [issuedByList, setIssuedByList] = useState([]);
+const [loadingIssuedBy, setLoadingIssuedBy] = useState(false);
+ const [docLoading, setDocLoading] = useState(false);
+const [loading, setLoading] = useState(false);
+const [totalPages, setTotalPages] = useState(0);
+const [totalElements, setTotalElements] = useState(0);
+ 
+// ─── LOOKUP FUNCTIONS ──────────────────────────────────────────────
+const getAwardTypeIdByName = (name) => awardTypesList.find(at => at.label === name)?.id || null;
+const getIssuedByIdByName = (name) => issuedByList.find(ib => ib.label === name)?.id || null;
 
   // Handle row click for detail view
   const handleRowClick = (award) => {
     setSelectedAward(award);
   };
 
-  // Handle document view
-  const handleViewDocument = (e, award) => {
-    e.stopPropagation(); 
-    setSelectedAward(award); 
-    setShowDocumentActions(true);
-    if (award.certificateFileData) {
-      setDocumentPreview({
-        data: award.certificateFileData,
-        name: award.certificateFileName
-      });
+  // ─── Auth helpers ──────────────────────────────────────────
+const getAuthToken = () => localStorage.getItem(STORAGE_KEYS?.JWT_TOKEN || 'jwtToken');
+
+const getAxiosConfig = () => ({
+  headers: {
+    Authorization: `Bearer ${getAuthToken()}`,
+    'Content-Type': 'application/json',
+  },
+});
+
+const ensureToken = () => {
+  const token = getAuthToken();
+  if (!token) {
+    toast.error('Authentication Required', 'Please login to continue');
+    return false;
+  }
+  return true;
+};
+
+const getEmployeeName = (employeeId) => {
+  const emp = employees.find(e => e.id === employeeId);
+  return emp?.name || 'Unknown';
+};
+
+const fetchEmployees = useCallback(async () => {
+  if (!ensureToken()) return;
+  try {
+    const res = await axios.get(`${BASE_URL}/api/employees`, { 
+      ...getAxiosConfig(), 
+      params: { size: 1000, page: 0 } 
+    });
+    if (res.data?.status === 200) {
+      let employeesData = Array.isArray(res.data.response)
+        ? res.data.response
+        : (res.data.response?.content || res.data.response?.data || []);
+        
+      // ✅ Map to ensure consistent field names
+      const mappedEmployees = employeesData.map(emp => ({
+        id: emp.id || emp.employeeId,
+        name: emp.name || emp.employeeName || '',
+       employeeCode: emp.code || emp.employeeCode || '',  // ✅ 'code' pehle
+  departmentName: emp.department || emp.departmentName || '',  // ✅ 'department' pehle
+  designationName: emp.designation || emp.designationName || '',  //
+        email: emp.email || '',
+        // Keep original data too
+        ...emp
+      }));
+        
+      setEmployees(mappedEmployees);
     } else {
-      toast.info('No Document', 'No certificate has been uploaded for this award');
+      setEmployees([]);
     }
-  };
+  } catch (err) {
+    console.error('Fetch employees error:', err);
+    toast.error('Error', err.response?.data?.message || 'Failed to fetch employees');
+    setEmployees([]);
+  }
+}, []);
 
-  const awardTypes = [
-    { value: 'Performance', label: 'Performance Award' },
-    { value: 'Innovation', label: 'Innovation Award' },
-    { value: 'Leadership', label: 'Leadership Award' },
-    { value: 'Teamwork', label: 'Teamwork Award' },
-    { value: 'Customer Service', label: 'Customer Service Award' },
-    { value: 'Long Service', label: 'Long Service Award' },
-    { value: 'Spot Award', label: 'Spot Award' },
-    { value: 'Star Performer', label: 'Star Performer' },
-    { value: 'Employee of Month', label: 'Employee of the Month' },
-    { value: 'Employee of Year', label: 'Employee of the Year' }
-  ];
+// ─── FETCH AWARDS FROM API ──────────────────────────────────────
+const fetchAwards = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoading(true);
+  try {
+    const params = {
+      page: page,
+      size: rowsPerPage,
+    };
+    if (searchTerm) params.search = searchTerm;
+    if (employeeId) params.employeeId = employeeId;
 
-  const issuedByOptions = [
-    { value: 'CEO', label: 'CEO Office' },
-    { value: 'HR Department', label: 'HR Department' },
-    { value: 'Managing Director', label: 'Managing Director' },
-    { value: 'Department Head', label: 'Department Head' },
-    { value: 'Client', label: 'Client' },
-    { value: 'External Organization', label: 'External Organization' }
-  ];
+    const res = await axios.get(
+      `${BASE_URL}/api/awards`,
+      { ...getAxiosConfig(), params }
+    );
 
-  // Filter awards by search
-  const filteredAwards = awards.filter(award => {
-    const search = searchTerm.toLowerCase();
-    return award.awardName.toLowerCase().includes(search) ||
-           award.awardType.toLowerCase().includes(search) ||
-           award.issuedBy.toLowerCase().includes(search) ||
-           award.employeeName.toLowerCase().includes(search);
-  });
+    console.log("📥 Awards Response:", res.data);
+
+    let awardsData = [];
+    let totalPagesData = 0;
+    let totalElementsData = 0;
+
+    if (res.data?.status === 200) {
+      if (res.data.response?.content) {
+        awardsData = res.data.response.content;
+        totalPagesData = res.data.response.totalPages || 0;
+        totalElementsData = res.data.response.totalElements || 0;
+      } else if (Array.isArray(res.data.response)) {
+        awardsData = res.data.response;
+        totalPagesData = Math.ceil(awardsData.length / rowsPerPage);
+        totalElementsData = awardsData.length;
+      }
+    } else if (res.data?.content) {
+      awardsData = res.data.content;
+      totalPagesData = res.data.totalPages || 0;
+      totalElementsData = res.data.totalElements || 0;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      awardsData = res.data.data;
+      totalPagesData = Math.ceil(awardsData.length / rowsPerPage);
+      totalElementsData = awardsData.length;
+    } else if (Array.isArray(res.data)) {
+      awardsData = res.data;
+      totalPagesData = Math.ceil(awardsData.length / rowsPerPage);
+      totalElementsData = awardsData.length;
+    }
+
+    const mappedAwards = awardsData.map((item) => ({
+  id: item.id,
+  employeeId: item.employeeId,
+  employeeName: item.employeeName || 'Unknown',
+  employeeCode: item.employeeCode || '',
+  departmentName: item.departmentName || '',
+  designationName: item.designationName || '',
+  awardName: item.awardName || '',
+  awardDate: item.awardDate || '',
+  awardType: item.awardType?.name || item.awardType || '',  // ✅ ADD THIS - for display
+  awardTypeId: item.awardType?.id || item.awardTypeId || null,
+  issuedById: item.issuedById || item.issuedBy?.id || null,  // ✅ FIX
+  issuedByName: item.issuedByName || item.issuedBy?.name || '',  // ✅ ADD THIS - for display
+  description: item.description || '',
+  status: item.isActive ? 'Active' : 'Inactive',
+  createdAt: item.createdAt || new Date().toISOString(),
+   certificateFileName: item.documentName || item.certificateFileName || null,
+  certificateFileData: item.certificateFileData || null,
+  documentPath: item.documentPath || null,
+  hasDocument: !!(item.documentName || item.certificateFileName), 
+
+}));
+
+    console.log("✅ Mapped Awards:", mappedAwards);
+    setAwards(mappedAwards);
+    setTotalPages(totalPagesData);
+    setTotalElements(totalElementsData);
+
+  } catch (err) {
+    console.error('Fetch awards error:', err);
+    toast.error('Error', err.response?.data?.message || 'Failed to load awards');
+    setAwards([]);
+  } finally {
+    setLoading(false);
+  }
+}, [page, rowsPerPage, searchTerm, employeeId]);
+
+useEffect(() => {
+  fetchAwards();
+  fetchEmployees();
+}, [page, searchTerm, fetchAwards, fetchEmployees]);
+// ─── FETCH AWARD TYPES ──────────────────────────────────────────
+const fetchAwardTypes = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoadingAwardTypes(true);
+  try {
+    const res = await axios.get(`${BASE_URL}/api/award-types/list?flag=0`, getAxiosConfig());
+    console.log("📥 Award Types Response:", res.data);
+    
+    let data = [];
+    if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map(item => ({
+      id: item.id,
+      value: item.name || item.awardType || '',
+      label: item.name || item.awardType || ''
+    }));
+    setAwardTypesList(mapped);
+  } catch (err) {
+    console.error('Fetch award types error:', err);
+    setAwardTypesList([]);
+  } finally {
+    setLoadingAwardTypes(false);
+  }
+}, []);
+
+// ─── FETCH ISSUED BY (Employee Designation) ──────────────────────────
+const fetchIssuedBy = useCallback(async () => {
+  if (!ensureToken()) return;
+  setLoadingIssuedBy(true);
+  try {
+    const res = await axios.get(`${BASE_URL}/employee-designation?flag=0`, getAxiosConfig());
+    console.log("📥 Issued By Response:", res.data);
+    
+    let data = [];
+    if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map(item => ({
+      id: item.id,
+      value: item.employeeName || item.designationName || item.name || '',
+      label: item.employeeName || item.designationName || item.name || ''
+    }));
+    setIssuedByList(mapped);
+  } catch (err) {
+    console.error('Fetch issued by error:', err);
+    setIssuedByList([]);
+  } finally {
+    setLoadingIssuedBy(false);
+  }
+}, []);
+
+useEffect(() => {
+  fetchAwardTypes();
+  fetchIssuedBy();
+}, [fetchAwardTypes, fetchIssuedBy]);
+
+ const handleViewDocument = async (e, award) => {
+  e.stopPropagation(); 
+  setSelectedAward(award);
+  
+  // Check if document exists in award data
+  if (award.certificateFileData) {
+    setDocumentPreview({
+      data: award.certificateFileData,
+      name: award.certificateFileName || 'certificate.pdf'
+    });
+    return;
+  }
+  
+  // Fetch from API if not available
+  if (award.hasDocument || award.documentPath) {
+    setDocLoading(true);
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/awards/${award.id}/document`,
+        {
+          headers: { Authorization: `Bearer ${getAuthToken()}` },
+          responseType: 'blob',
+        }
+      );
+      const blobUrl = URL.createObjectURL(res.data);
+      setDocumentPreview({
+        data: blobUrl,
+        name: award.certificateFileName || `award_${award.id}.pdf`
+      });
+      toast.success('Success', 'Document loaded successfully');
+    } catch (err) {
+      console.error('Document fetch error:', err);
+      toast.error('Error', 'Failed to load document');
+    } finally {
+      setDocLoading(false);
+    }
+  } else {
+    toast.info('No Document', 'No certificate has been uploaded for this award');
+  }
+};
+ 
+
+ const filteredEmployees = employees.filter(emp => {
+  const search = (employeeSearchTerm || '').toLowerCase();
+  return (emp.name || emp.employeeName || '').toLowerCase().includes(search) || 
+         (emp.code || emp.employeeCode || '').toLowerCase().includes(search) ||
+         (emp.department || emp.departmentName || '').toLowerCase().includes(search) ||
+         (emp.designation || emp.designationName || '').toLowerCase().includes(search) ||
+         (emp.email || '').toLowerCase().includes(search);
+});
+
+const filteredAwards = awards.filter(award => {
+  const search = (searchTerm || '').toLowerCase();
+  return (award.awardName || '').toLowerCase().includes(search) ||
+         (award.awardType || '').toLowerCase().includes(search) ||
+         (award.issuedByName || '').toLowerCase().includes(search) ||
+         (award.employeeName || '').toLowerCase().includes(search);
+});
 
   // Pagination
-  const totalItems = filteredAwards.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage);
+ const totalItems = totalElements || filteredAwards.length;
+const totalPagesCount = totalPages || Math.ceil(filteredAwards.length / rowsPerPage);
   const startIndex = page * rowsPerPage;
   const currentAwards = filteredAwards.slice(startIndex, startIndex + rowsPerPage);
 
-  const handleEmployeeSelect = (rowId, employee) => {
-    setFormRows(prev => prev.map(row => 
-      row.id === rowId ? {
-        ...row,
-        employeeId: employee.id,
-        employeeName: employee.name
-      } : row
-    ));
-    setEmployeeSearchTerm(employee.name);
-    setShowEmployeeDropdown(false);
-    
-    // Clear error for this row
-    if (rowErrors[rowId]) {
-      const newErrors = { ...rowErrors };
-      delete newErrors[rowId];
-      setRowErrors(newErrors);
-    }
-  };
+ const handleEmployeeSelect = (rowId, employee) => {
+  setFormRows(prev => prev.map(row => 
+    row.id === rowId ? {
+      ...row,
+      employeeId: employee.id,
+      employeeName: employee.name || employee.employeeName,
+      employeeCode: employee.code || employee.employeeCode || '',  // ✅ 'code' pehle
+      departmentName: employee.department || employee.departmentName || '',  // ✅ 'department' pehle
+      designationName: employee.designation || employee.designationName || ''  // ✅ 'designation' pehle
+    } : row
+  ));
+  setSelectedEmployee(employee); 
+  setEmployeeSearchTerm(employee.name || employee.employeeName);
+  setShowEmployeeDropdown(false);
+  
+  if (rowErrors[rowId]) {
+    const newErrors = { ...rowErrors };
+    delete newErrors[rowId];
+    setRowErrors(newErrors);
+  }
+};
 
-  const getPaginationRange = () => {
-    const delta = 2;
-    const range = [];
-    const left = Math.max(0, page - delta);
-    const right = Math.min(totalPages - 1, page + delta);
-    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
-    for (let i = left; i <= right; i++) range.push(i);
-    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
-    return range;
-  };
-
+ const getPaginationRange = () => { 
+  const delta = 2;
+  const range = [];
+  const left = Math.max(0, page - delta);
+  const right = Math.min(totalPagesCount - 1, page + delta);
+  if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+  for (let i = left; i <= right; i++) range.push(i);
+  if (right < totalPagesCount - 1) { if (right < totalPagesCount - 2) range.push('...'); range.push(totalPagesCount - 1); }
+  return range;
+};
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -201,8 +427,8 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     const errors = {};
     if (!row.awardName) errors.awardName = 'Award Name is required';
     if (!row.awardDate) errors.awardDate = 'Award Date is required';
-    if (!row.awardType) errors.awardType = 'Award Type is required';
-    if (!row.issuedBy) errors.issuedBy = 'Issued By is required';
+   if (!row.awardTypeId) errors.awardTypeId = 'Award Type is required';
+if (!row.issuedById) errors.issuedById = 'Issued By is required';
     if (!row.employeeId) errors.employeeId = 'Employee is required';
     return errors;
   };
@@ -212,14 +438,17 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
       id: Date.now() + Math.random(),
       awardName: '',
       awardDate: '',
-      awardType: 'Performance',
-      issuedBy: '',
+     awardTypeId: '',    
+    issuedById: '',
       description: '',
       certificateFile: null,
       certificateFileData: null,
       certificateFileName: null,
       employeeId: '',
-      employeeName: ''
+      employeeName: '',
+      employeeCode: '',      // ✅ ADD
+    departmentName: '',    // ✅ ADD
+    designationName: '' 
     };
     setFormRows([...formRows, newRow]);
   };
@@ -236,92 +465,194 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     setRowErrors(newErrors);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    // Validate all rows
-    let hasErrors = false;
-    const allErrors = {};
-    
-    formRows.forEach(row => {
-      const rowError = validateRow(row);
-      if (Object.keys(rowError).length > 0) {
-        allErrors[row.id] = rowError;
-        hasErrors = true;
-      }
-    });
-    
-    if (hasErrors) {
-      setRowErrors(allErrors);
-      toast.warning('Validation Error', 'Please fix the highlighted fields in all rows');
-      return;
+// ─── CREATE & UPDATE API ──────────────────────────────────────
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!ensureToken()) return;
+  
+  // Validate all rows
+  let hasErrors = false;
+  const allErrors = {};
+  
+  formRows.forEach(row => {
+    const rowError = validateRow(row);
+    if (Object.keys(rowError).length > 0) {
+      allErrors[row.id] = rowError;
+      hasErrors = true;
     }
-    
-    // Process all rows
-    const newAwards = formRows.map(row => ({
-      id: Date.now() + Math.random() * 1000,
-      awardName: row.awardName,
-      awardDate: row.awardDate,
-      awardType: row.awardType,
-      issuedBy: row.issuedBy,
-      description: row.description || '',
-      certificateFileData: row.certificateFileData,
-      certificateFileName: row.certificateFileName,
-      employeeId: row.employeeId,
-      employeeName: row.employeeName,
-      createdAt: new Date().toISOString(),
-      status: 'Active'
-    }));
-    
-    setAwards([...newAwards, ...awards]);
-    toast.success('Success', `${newAwards.length} award(s) added successfully`);
-    resetForm();
-    setShowForm(false);
-    setPage(0);
-  };
+  });
+  
+  if (hasErrors) {
+    setRowErrors(allErrors);
+    toast.warning('Validation Error', 'Please fix the highlighted fields in all rows');
+    return;
+  }
 
-  const handleEdit = (award) => {
-    if (award.status === 'Inactive') {
-      toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
-      return;
+  // Check if employee selected
+  if (!selectedEmployee && !formRows[0]?.employeeId) {
+    toast.warning('Validation Error', 'Please select an employee');
+    return;
+  }
+
+  setSubmitting(true);
+  try {
+    let res;
+    
+    // Get employee details from the first row
+    const empData = selectedEmployee || null;
+    const employeeId = empData?.id || Number(formRows[0]?.employeeId) || 0;
+
+    if (editingAward) {
+      const payload = {
+        employeeId: employeeId,
+        awardName: formRows[0]?.awardName || '',
+        awardDate: formRows[0]?.awardDate || '',
+      awardTypeId: Number(formRows[0]?.awardTypeId) || 0,  // Changed from awardType
+  issuedById: Number(formRows[0]?.issuedById) || 0,    
+        description: formRows[0]?.description || ''
+      };
+      
+      console.log("📤 UPDATE payload:", payload);
+      
+      res = await axios.put(
+        `${BASE_URL}/api/awards/${editingAward.id}/update`,
+        payload,
+        getAxiosConfig()
+      );
+
+      if (res.data?.status === 200 || res.data?.status === 201) {
+        toast.success('Success', 'Award updated successfully');
+        resetForm();
+        setShowForm(false);
+        setPage(0);
+        await fetchAwards();
+        if (onSuccess) onSuccess();
+      } else {
+        throw new Error(res.data?.message || 'Update failed');
+      }
+      
+    } else {
+      // ✅ CREATE API - Multiple rows
+      const createPayloads = formRows.map(row => ({
+        employeeId: row.employeeId || employeeId || 0,
+        awardName: row.awardName || '',
+        awardDate: row.awardDate || '',
+       awardTypeId: Number(row.awardTypeId) || 0,  // Changed from awardType
+  issuedById: Number(row.issuedById) || 0, 
+        description: row.description || ''
+      }));
+      
+      console.log("📤 CREATE payloads:", createPayloads);
+      
+      // Send one by one
+      let successCount = 0;
+      for (const payload of createPayloads) {
+        res = await axios.post(
+          `${BASE_URL}/api/awards/create`,
+          payload,
+          getAxiosConfig()
+        );
+        if (res.data?.status === 200 || res.data?.status === 201) {
+          successCount++;
+        }
+      }
+      
+      if (successCount === createPayloads.length) {
+        toast.success('Success', `${successCount} Award(s) created successfully`);
+        resetForm();
+        setShowForm(false);
+        setPage(0);
+        await fetchAwards();
+        if (onSuccess) onSuccess();
+      } else {
+        throw new Error('Some awards failed to create');
+      }
     }
-    
-    const emp = DUMMY_EMPLOYEES.find(e => e.id === award.employeeId);
-    setSelectedEmployee(emp || null);  
-    setEditingAward(award);
-    
-    // Set form with single row for editing
-    setFormRows([{
-      id: Date.now(),
-      awardName: award.awardName,
-      awardDate: award.awardDate,
-      awardType: award.awardType,
-      issuedBy: award.issuedBy,
-      description: award.description || '',
-      certificateFile: null,
-      certificateFileData: award.certificateFileData,
-      certificateFileName: award.certificateFileName,
-      employeeId: award.employeeId,
-      employeeName: award.employeeName
-    }]);
-    
-    setEmployeeSearchTerm(emp?.name || '');
-    setShowForm(true);
-  };
+
+  } catch (err) {
+    console.error('Submit error:', err);
+    toast.error('Error', err.response?.data?.message || err.message || 'Something went wrong');
+  } finally {
+    setSubmitting(false);
+  }
+};
+
+//   const handleEdit = (award) => {
+//   if (award.status === 'Inactive') {
+//     toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
+//     return;
+//   }
+  
+// const emp = employees.find(e => e.id === award.employeeId);
+//   setSelectedEmployee(emp || null);  
+//   setEditingAward(award);
+  
+//   // Set form with single row for editing
+//  setFormRows([{
+//     id: Date.now(),
+//     awardName: award.awardName || '',
+//     awardDate: award.awardDate || '',
+//     awardTypeId: award.awardTypeId || '',  
+//     issuedById: award.issuedById || '', 
+//     description: award.description || '',
+//     certificateFile: null,
+//     certificateFileData: award.certificateFileData || null,
+//     certificateFileName: award.certificateFileName || null,
+//     employeeId: award.employeeId || '',
+//     employeeName: emp?.name || award.employeeName || '' 
+//   }]);
+
+//   setEmployeeSearchTerm(emp?.name || '');
+//   setShowForm(true);
+// };
+const handleEdit = (award) => {
+  if (award.status === 'Inactive') {
+    toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
+    return;
+  }
+  
+  const emp = employees.find(e => e.id === award.employeeId);
+  setSelectedEmployee(emp || null);  
+  setEditingAward(award);
+  
+  // ✅ EMPLOYEE DATA KO PROPERLY SET KAREIN
+  setFormRows([{
+    id: Date.now(),
+    awardName: award.awardName || '',
+    awardDate: award.awardDate || '',
+    awardTypeId: award.awardTypeId || '',  
+    issuedById: award.issuedById || '', 
+    description: award.description || '',
+    certificateFile: null,
+    certificateFileData: award.certificateFileData || null,
+    certificateFileName: award.certificateFileName || null,
+    employeeId: award.employeeId || '',
+    employeeName: emp?.name || emp?.employeeName || award.employeeName || '',
+    employeeCode: emp?.code || emp?.employeeCode || award.employeeCode || '',  // ✅ ADD
+    departmentName: emp?.department || emp?.departmentName || award.departmentName || '',  // ✅ ADD
+    designationName: emp?.designation || emp?.designationName || award.designationName || ''  // ✅ ADD
+  }]);
+
+  setEmployeeSearchTerm(emp?.name || emp?.employeeName || '');
+  setShowForm(true);
+};
 
   const resetForm = () => {
     setFormRows([{
       id: Date.now(),
       awardName: '',
       awardDate: '',
-      awardType: 'Performance',
-      issuedBy: '',
+      awardTypeId: '',    
+    issuedById: '',  
       description: '',
       certificateFile: null,
       certificateFileData: null,
       certificateFileName: null,
       employeeId: '',
-      employeeName: ''
+      employeeName: '',
+       employeeCode: '',      // ✅ ADD
+    departmentName: '',    // ✅ ADD
+    designationName: ''    
     }]);
     setErrors({});
     setTouched({});
@@ -380,34 +711,116 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
     setShowStatusModal(true);
   };
 
-  const confirmStatusChange = () => {
-    const { id, newStatus } = statusAction;
+ // ─── STATUS API ──────────────────────────────────────────────
+const confirmStatusChange = async () => {
+  const { id, newStatus, name } = statusAction;
   
-    const updatedAward = awards.map((award) =>
-      award.id === id
-        ? {
-            ...award,
-            status: newStatus
-          }
-        : award
+  if (!id) {
+    toast.error('Error', 'Invalid record ID');
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const isActive = newStatus === 'Active';
+    const res = await axios.put(
+      `${BASE_URL}/api/awards/${id}/status?active=${isActive}`,
+      null,
+      getAxiosConfig()
     );
-  
-    setAwards(updatedAward);
+    
+    if (res.status === 200) {
+      toast.success('Status Updated', `${name} is now ${newStatus}`);
+      await fetchAwards();
+    }
+  } catch (err) {
+    console.error('Status change error:', err);
+    toast.error('Error', err.response?.data?.message || 'Failed to change status');
+  } finally {
+    setLoading(false);
     setShowStatusModal(false);
-    toast.success(
-      "Status Updated",
-      `${statusAction.name} is now ${newStatus}`
+    setStatusAction({ id: null, name: "", newStatus: "" });
+  }
+};
+
+// ─── FETCH AWARD DOCUMENT ──────────────────────────────────────────
+const fetchAwardDocument = useCallback(async (awardId) => {
+  if (!ensureToken()) return;
+  setDocLoading(true);
+  try {
+    const res = await axios.get(
+      `${BASE_URL}/api/awards/${awardId}/document`,
+      {
+        headers: { Authorization: `Bearer ${getAuthToken()}` },
+        responseType: 'blob',
+      }
     );
-  };
+    const blobUrl = URL.createObjectURL(res.data);
+    return blobUrl;
+  } catch (err) {
+    console.error('Document fetch error:', err);
+    toast.error('Error', 'Failed to load document');
+    return null;
+  } finally {
+    setDocLoading(false);
+  }
+}, []);
 
-  const handleGenerateLetter = (award) => {
-    console.log('Generate clicked for:', award.awardOrderNo);
-  };
+ const handleGenerateLetter = (award) => {
+  console.log('Generate clicked for:', award.awardName);
+  toast.info('Generate Certificate', `Generating award certificate for ${award.awardName}`);
+  // Call API for PDF generation
+  generateAwardPDF(award.id);
+};
 
-  // Helper to get employee details
-  const getEmployeeDetails = (employeeId) => {
-    return DUMMY_EMPLOYEES.find(e => e.id === employeeId);
+ const getEmployeeDetails = (employeeId) => {
+  if (!employeeId) return null;
+  const emp = employees.find(e => e.id === employeeId);
+  if (!emp) return null;
+  return {
+    ...emp,
+    employeeCode: emp.code || emp.employeeCode || '',
+    departmentName: emp.department || emp.departmentName || '',
+    designationName: emp.designation || emp.designationName || ''
   };
+};
+
+// ─── GENERATE AWARD PDF ──────────────────────────────────────────
+const generateAwardPDF = useCallback(async (awardId) => {
+  if (!ensureToken()) return;
+  setSubmitting(true);
+  try {
+    const res = await axios.post(
+      `${BASE_URL}/api/awards/${awardId}/generate-pdf`,
+      {},
+      {
+        headers: { 
+          Authorization: `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+        responseType: 'blob',
+      }
+    );
+    
+    // Download the generated PDF
+    const blob = new Blob([res.data], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `award_${awardId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast.success('Success', 'Certificate generated successfully');
+  } catch (err) {
+    console.error('Generate PDF error:', err);
+    toast.error('Error', err.response?.data?.message || 'Failed to generate certificate');
+  } finally {
+    setSubmitting(false);
+  }
+}, []);
 
   return (
     <div className="cert-root">
@@ -478,7 +891,7 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                           type="text"
                           className={`form-control ${rowError.employeeId ? 'is-invalid' : ''}`}
                           placeholder="Search employee..."
-                          value={employee?.name || ''}
+value={employee?.name || row.employeeName || ''} 
                           onChange={(e) => {
                             setEmployeeSearchTerm(e.target.value);
                             setShowEmployeeDropdown(true);
@@ -520,7 +933,14 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                 >
                                   <div style={{ fontWeight: 500 }}>{emp.name}</div>
-                                  <div style={{ fontSize: '10px', color: '#6b7280' }}>{emp.code} | {emp.department}</div>
+                                  <div style={{ fontSize: '10px', color: '#6b7280' }}>
+ <div style={{ fontWeight: 500 }}>{emp.name || emp.employeeName}</div>
+<div style={{ fontSize: '10px', color: '#6b7280' }}>
+  {emp.code || emp.employeeCode || 'N/A'}
+  {emp.department || emp.departmentName ? ` | ${emp.department || emp.departmentName}` : ''}
+  {emp.designation || emp.designationName ? ` | ${emp.designation || emp.designationName}` : ''}
+</div>
+                                  </div>
                                 </div>
                               ))
                             ) : (
@@ -533,15 +953,24 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                         {rowError.employeeId && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.employeeId}</div>}
                       </div>
                     </td>
-                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-                      <input type="text" className="form-control bg-light" value={employee?.code || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
-                    </td>
-                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-                      <input type="text" className="form-control bg-light" value={employee?.department || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
-                    </td>
-                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-                      <input type="text" className="form-control bg-light" value={employee?.designation || ''} readOnly placeholder="Auto" style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
-                    </td>
+                 <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+  <input type="text" className="form-control bg-light" 
+    value={employee?.code || employee?.employeeCode || row.employeeCode || ''} 
+    readOnly placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+</td>
+<td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+  <input type="text" className="form-control bg-light" 
+    value={employee?.department || employee?.departmentName || row.departmentName || ''} 
+    readOnly placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+</td>
+<td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+  <input type="text" className="form-control bg-light" 
+    value={employee?.designation || employee?.designationName || row.designationName || ''} 
+    readOnly placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+</td>
                     <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
                       <input
                         type="text"
@@ -563,28 +992,34 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                       />
                       {rowError.awardDate && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.awardDate}</div>}
                     </td>
+                   <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+  <select
+    className={`form-control ${rowError.awardTypeId ? 'is-invalid' : ''}`}
+    value={row.awardTypeId || ''}
+    onChange={(e) => handleRowChange(row.id, 'awardTypeId', e.target.value)}
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
+    disabled={loadingAwardTypes}
+  >
+    <option value="">Select Award Type</option>
+    {awardTypesList.map(type => (
+      <option key={type.id} value={type.id}>{type.label}</option>
+    ))}
+  </select>
+  {loadingAwardTypes && <small>Loading...</small>}
+  {rowError.awardTypeId && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.awardTypeId}</div>}
+</td>
                     <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-                      <select
-                        className={`form-control ${rowError.awardType ? 'is-invalid' : ''}`}
-                        value={row.awardType}
-                        onChange={(e) => handleRowChange(row.id, 'awardType', e.target.value)}
-                        style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
-                      >
-                        {awardTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
-                      </select>
-                      {rowError.awardType && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.awardType}</div>}
-                    </td>
-                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-                      <select
-                        className={`form-control ${rowError.issuedBy ? 'is-invalid' : ''}`}
-                        value={row.issuedBy}
-                        onChange={(e) => handleRowChange(row.id, 'issuedBy', e.target.value)}
+           <select
+                        className={`form-control ${rowError.issuedById ? 'is-invalid' : ''}`}
+                        value={row.issuedById}
+                        onChange={(e) => handleRowChange(row.id, 'issuedById', e.target.value)}
                         style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }}
                       >
                         <option value="">Select</option>
-                        {issuedByOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                      </select>
-                      {rowError.issuedBy && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.issuedBy}</div>}
+{issuedByList.map(item => (
+    <option key={item.id} value={item.id}>{item.label}</option> 
+  ))}                      </select>
+                      {rowError.issuedById && <div style={{ color: '#ef4444', fontSize: '10px', marginTop: '2px' }}>{rowError.issuedById}</div>}        
                     </td>
                     <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
                       <input
@@ -665,7 +1100,7 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
           <div style={{background:'linear-gradient(135deg,#9d174d,#be185d)',padding:'28px 32px',color:'white',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
             <div>
               <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'8px'}}><FaTrophy size={20}/><h2 style={{fontSize:'22px',fontWeight:700,margin:0}}>{selectedAward.awardName}</h2></div>
-              <div style={{display:'flex',gap:'16px',alignItems:'center',fontSize:'13px',opacity:0.9}}><span><FaCalendarAlt/> {formatDate(selectedAward.createdAt)}</span><span style={{background:'rgba(255,255,255,0.2)',padding:'3px 12px',borderRadius:'20px',fontSize:'12px'}}>{selectedAward.awardType}</span></div>
+              <div style={{display:'flex',gap:'16px',alignItems:'center',fontSize:'13px',opacity:0.9}}><span><FaCalendarAlt/> {formatDate(selectedAward.createdAt)}</span><span style={{background:'rgba(255,255,255,0.2)',padding:'3px 12px',borderRadius:'20px',fontSize:'12px'}}>{selectedAward.awardType || '—'}</span></div>
             </div>
           </div>
           <div style={{padding:'32px'}}>
@@ -675,12 +1110,15 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
               <span style={{display:'inline-block',padding:'6px 16px',borderRadius:'6px',fontSize:'14px',fontWeight:600,background:getAwardTypeColor(selectedAward.awardType).bg,color:getAwardTypeColor(selectedAward.awardType).color}}><FaAward style={{marginRight:'6px'}}/>{selectedAward.awardType}</span>
             </div>
             <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',marginBottom:'24px',border:'1px solid #e2e8f0',display:'flex',alignItems:'center',gap:'16px'}}>
-              <div style={{width:'50px',height:'50px',borderRadius:'50%',background:'linear-gradient(135deg,#9d174d,#be185d)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'20px',fontWeight:700}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedAward.employeeId)?.name?.charAt(0)||'?'}</div>
-              <div><h3 style={{fontSize:'16px',fontWeight:600,color:'#1e293b',margin:'0 0 2px 0'}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedAward.employeeId)?.name||selectedAward.employeeName}</h3><span style={{fontSize:'13px',color:'#64748b'}}>{DUMMY_EMPLOYEES.find(e=>e.id===selectedAward.employeeId)?.code||''}</span></div>
+              <div style={{width:'50px',height:'50px',borderRadius:'50%',background:'linear-gradient(135deg,#9d174d,#be185d)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'20px',fontWeight:700}}>{employees.find(e=>e.id===selectedAward.employeeId)?.name?.charAt(0)||'?'}
+</div>
+              <div><h3 style={{fontSize:'16px',fontWeight:600,color:'#1e293b',margin:'0 0 2px 0'}}>{employees.find(e=>e.id===selectedAward.employeeId)?.name||selectedAward.employeeName}
+</h3><span style={{fontSize:'13px',color:'#64748b'}}>{employees.find(e=>e.id===selectedAward.employeeId)?.code||''}
+</span></div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'16px',marginBottom:'28px'}}>
               <div style={{background:'#fffbeb',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaCalendarAlt size={16} style={{color:'#f59e0b'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Award Date</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{formatDate(selectedAward.awardDate)}</p></div>
-              <div style={{background:'#fdf2f8',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaBuilding size={16} style={{color:'#9d174d'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Issued By</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedAward.issuedBy}</p></div>
+              <div style={{background:'#fdf2f8',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaBuilding size={16} style={{color:'#9d174d'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Issued By</span></div><p style={{fontSize:'15px',fontWeight:600,color:'#1e293b',margin:0}}>{selectedAward.issuedByName || '—'}</p></div>
               <div style={{background:'#fff7ed',borderRadius:'10px',padding:'16px 18px',border:'1px solid #e2e8f0'}}><div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}><FaClock size={16} style={{color:'#ea580c'}}/><span style={{fontSize:'12px',color:'#64748b',fontWeight:500,textTransform:'uppercase'}}>Status</span></div><span style={{display:'inline-block',padding:'4px 12px',borderRadius:'6px',fontSize:'13px',fontWeight:600,background:selectedAward.status==='Active'?'#d1fae5':'#fee2e2',color:selectedAward.status==='Active'?'#065f46':'#991b1b'}}>{selectedAward.status||'Active'}</span></div>
             </div>
             <div style={{background:'#f8fafc',borderRadius:'12px',padding:'20px 24px',marginBottom:'24px',border:'1px solid #e2e8f0'}}><h4 style={{fontSize:'14px',fontWeight:600,color:'#1e293b',marginBottom:'12px'}}>Description</h4><p style={{fontSize:'15px',color:'#374151',margin:0,lineHeight:1.6}}>{selectedAward.description||'No description provided'}</p></div>
@@ -745,16 +1183,17 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                     currentAwards.map((award,idx) => (
                       <tr 
                         key={award.id}
-                        onClick={() => handleRowClick(award)}
+                        onClick={() => handleRowClick(award)} 
                         style={{ cursor: 'pointer' }}
                         className="cert-table-row-hover"
                       >
                         <td className="text-center">{startIndex + idx + 1}</td>
-                        <td>{DUMMY_EMPLOYEES.find(e => e.id === award.employeeId)?.name || 'Unknown'}</td>
+<td>{employees.find(e => e.id === award.employeeId)?.name || award.employeeName || 'Unknown'}</td>
+
                         <td><strong>{award.awardName}</strong></td>
                         <td>{formatDate(award.awardDate)}</td>
-                        <td>{award.awardType}</td>
-                        <td>{award.issuedBy}</td>
+<td>{award.awardType || '—'}</td>
+<td>{award.issuedByName || '—'}</td>
                         <td>{award.description ? (award.description.length > 30 ? award.description.substring(0, 30) + '...' : award.description) : '—'}</td>
                         <td>
                           <div
@@ -762,11 +1201,11 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
                             style={{ cursor: "pointer" }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleStatusToggle(
-                                award.id,
-                                DUMMY_EMPLOYEES.find(e => e.id === award.employeeId)?.name || "",
-                                award.status || "Active"
-                              );
+                          handleStatusToggle(
+  award.id,
+  getEmployeeName(award.employeeId),  // Changed
+  award.status || "Active"
+)
                             }}
                           >
                             <div
@@ -838,55 +1277,55 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
             </div>
 
             {/* Pagination */}
-            <div className="cert-table-footer">
-              <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
-                Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
-              </div>
-              
-              {totalPages > 0 && (
-                <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <button 
-                    className="cert-page-btn" 
-                    disabled={page === 0} 
-                    onClick={() => setPage(page - 1)}
-                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-                  >
-                    ← Prev
-                  </button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === '...' ? (
-                      <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
-                    ) : (
-                      <button 
-                        key={pg} 
-                        className={`cert-page-num ${pg === page ? 'active' : ''}`} 
-                        onClick={() => setPage(pg)}
-                        style={{ 
-                          padding: '6px 10px', 
-                          border: '1px solid #e5e7eb', 
-                          background: pg === page ? '#9d174d' : 'white', 
-                          color: pg === page ? 'white' : '#374151',
-                          borderRadius: '6px', 
-                          cursor: 'pointer', 
-                          fontSize: '12px',
-                          minWidth: '34px'
-                        }}
-                      >
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button 
-                    className="cert-page-btn" 
-                    disabled={page + 1 >= totalPages} 
-                    onClick={() => setPage(page + 1)}
-                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-                  >
-                    Next →
-                  </button>
-                </div>
-              )}
-            </div>
+        <div className="cert-table-footer">
+  <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
+    Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} awards
+  </div>
+  
+  {totalPagesCount > 0 && (
+    <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+      <button 
+        className="cert-page-btn" 
+        disabled={page === 0} 
+        onClick={() => setPage(page - 1)}
+        style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+      >
+        ← Prev
+      </button>
+      {getPaginationRange().map((pg, i) =>
+        pg === '...' ? (
+          <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
+        ) : (
+          <button 
+            key={pg} 
+            className={`cert-page-num ${pg === page ? 'active' : ''}`} 
+            onClick={() => setPage(pg)}
+            style={{ 
+              padding: '6px 10px', 
+              border: '1px solid #e5e7eb', 
+              background: pg === page ? '#9d174d' : 'white', 
+              color: pg === page ? 'white' : '#374151',
+              borderRadius: '6px', 
+              cursor: 'pointer', 
+              fontSize: '12px',
+              minWidth: '34px'
+            }}
+          >
+            {pg + 1}
+          </button>
+        )
+      )}
+      <button 
+        className="cert-page-btn" 
+        disabled={page + 1 >= totalPagesCount} 
+        onClick={() => setPage(page + 1)}
+        style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+      >
+        Next →
+      </button>
+    </div>
+  )}
+</div>
           </div>
         </>
       )}
