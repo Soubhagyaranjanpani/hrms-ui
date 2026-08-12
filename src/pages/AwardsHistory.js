@@ -14,8 +14,8 @@ const AwardsHistory = ({ employeeId, initialData, onSuccess, onCancel }) => {
   const [awards, setAwards] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [editingAward, setEditingAward] = useState(null);
-  const [selectedAward, setSelectedAward] = useState(null); // For inline detail view
-  const [documentPreview, setDocumentPreview] = useState(null); // For document preview modal
+  const [selectedAward, setSelectedAward] = useState(null); 
+  const [documentPreview, setDocumentPreview] = useState(null); 
   const [formRows, setFormRows] = useState([
     {
       id: Date.now(),
@@ -39,7 +39,7 @@ issuedById: '',
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [page, setPage] = useState(0);
-  const [rowsPerPage] = useState(4);
+  const [rowsPerPage] = useState(5);
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusAction, setStatusAction] = useState({
@@ -105,18 +105,20 @@ const fetchEmployees = useCallback(async () => {
         ? res.data.response
         : (res.data.response?.content || res.data.response?.data || []);
         
-      // ✅ Map to ensure consistent field names
+  
       const mappedEmployees = employeesData.map(emp => ({
         id: emp.id || emp.employeeId,
         name: emp.name || emp.employeeName || '',
-       employeeCode: emp.code || emp.employeeCode || '',  // ✅ 'code' pehle
-  departmentName: emp.department || emp.departmentName || '',  // ✅ 'department' pehle
-  designationName: emp.designation || emp.designationName || '',  //
+        employeeCode: emp.employeeCode || emp.code || `EMP${String(emp.id || emp.employeeId || '').padStart(4, '0')}`,
+        department: emp.department || emp.departmentName || '',
+        departmentName: emp.department || emp.departmentName || '',
+        designation: emp.designation || emp.designationName || '',
+        designationName: emp.designation || emp.designationName || '',
         email: emp.email || '',
-        // Keep original data too
         ...emp
       }));
         
+      console.log("✅ Mapped Employees:", mappedEmployees);
       setEmployees(mappedEmployees);
     } else {
       setEmployees([]);
@@ -216,13 +218,13 @@ useEffect(() => {
   fetchAwards();
   fetchEmployees();
 }, [page, searchTerm, fetchAwards, fetchEmployees]);
+
 // ─── FETCH AWARD TYPES ──────────────────────────────────────────
 const fetchAwardTypes = useCallback(async () => {
   if (!ensureToken()) return;
   setLoadingAwardTypes(true);
   try {
     const res = await axios.get(`${BASE_URL}/api/award-types/list?flag=0`, getAxiosConfig());
-    console.log("📥 Award Types Response:", res.data);
     
     let data = [];
     if (res.data?.status === 200 && Array.isArray(res.data.response)) {
@@ -349,17 +351,28 @@ const totalPagesCount = totalPages || Math.ceil(filteredAwards.length / rowsPerP
   const currentAwards = filteredAwards.slice(startIndex, startIndex + rowsPerPage);
 
  const handleEmployeeSelect = (rowId, employee) => {
+  console.log("✅ Selected Employee:", employee);
+  
+  const empCode = employee.code || employee.employeeCode || '';
+  const empDepartment = employee.department || employee.departmentName || '';
+  const empDesignation = employee.designation || employee.designationName || '';
+  
+  console.log("📌 Employee Code:", empCode);
+  console.log("📌 Department:", empDepartment);
+  console.log("📌 Designation:", empDesignation);
+  
   setFormRows(prev => prev.map(row => 
     row.id === rowId ? {
       ...row,
       employeeId: employee.id,
       employeeName: employee.name || employee.employeeName,
-      employeeCode: employee.code || employee.employeeCode || '',  // ✅ 'code' pehle
-      departmentName: employee.department || employee.departmentName || '',  // ✅ 'department' pehle
-      designationName: employee.designation || employee.designationName || ''  // ✅ 'designation' pehle
+      employeeCode: empCode,           
+      departmentName: empDepartment,   
+      designationName: empDesignation   
     } : row
   ));
-  setSelectedEmployee(employee); 
+  
+  setSelectedEmployee(employee);
   setEmployeeSearchTerm(employee.name || employee.employeeName);
   setShowEmployeeDropdown(false);
   
@@ -446,8 +459,8 @@ if (!row.issuedById) errors.issuedById = 'Issued By is required';
       certificateFileName: null,
       employeeId: '',
       employeeName: '',
-      employeeCode: '',      // ✅ ADD
-    departmentName: '',    // ✅ ADD
+      employeeCode: '',      
+    departmentName: '',    
     designationName: '' 
     };
     setFormRows([...formRows, newRow]);
@@ -507,7 +520,7 @@ const handleSubmit = async (e) => {
         employeeId: employeeId,
         awardName: formRows[0]?.awardName || '',
         awardDate: formRows[0]?.awardDate || '',
-      awardTypeId: Number(formRows[0]?.awardTypeId) || 0,  // Changed from awardType
+      awardTypeId: Number(formRows[0]?.awardTypeId) || 0,  
   issuedById: Number(formRows[0]?.issuedById) || 0,    
         description: formRows[0]?.description || ''
       };
@@ -537,7 +550,7 @@ const handleSubmit = async (e) => {
         employeeId: row.employeeId || employeeId || 0,
         awardName: row.awardName || '',
         awardDate: row.awardDate || '',
-       awardTypeId: Number(row.awardTypeId) || 0,  // Changed from awardType
+       awardTypeId: Number(row.awardTypeId) || 0,  
   issuedById: Number(row.issuedById) || 0, 
         description: row.description || ''
       }));
@@ -577,34 +590,6 @@ const handleSubmit = async (e) => {
   }
 };
 
-//   const handleEdit = (award) => {
-//   if (award.status === 'Inactive') {
-//     toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
-//     return;
-//   }
-  
-// const emp = employees.find(e => e.id === award.employeeId);
-//   setSelectedEmployee(emp || null);  
-//   setEditingAward(award);
-  
-//   // Set form with single row for editing
-//  setFormRows([{
-//     id: Date.now(),
-//     awardName: award.awardName || '',
-//     awardDate: award.awardDate || '',
-//     awardTypeId: award.awardTypeId || '',  
-//     issuedById: award.issuedById || '', 
-//     description: award.description || '',
-//     certificateFile: null,
-//     certificateFileData: award.certificateFileData || null,
-//     certificateFileName: award.certificateFileName || null,
-//     employeeId: award.employeeId || '',
-//     employeeName: emp?.name || award.employeeName || '' 
-//   }]);
-
-//   setEmployeeSearchTerm(emp?.name || '');
-//   setShowForm(true);
-// };
 const handleEdit = (award) => {
   if (award.status === 'Inactive') {
     toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
@@ -615,7 +600,6 @@ const handleEdit = (award) => {
   setSelectedEmployee(emp || null);  
   setEditingAward(award);
   
-  // ✅ EMPLOYEE DATA KO PROPERLY SET KAREIN
   setFormRows([{
     id: Date.now(),
     awardName: award.awardName || '',
@@ -628,9 +612,9 @@ const handleEdit = (award) => {
     certificateFileName: award.certificateFileName || null,
     employeeId: award.employeeId || '',
     employeeName: emp?.name || emp?.employeeName || award.employeeName || '',
-    employeeCode: emp?.code || emp?.employeeCode || award.employeeCode || '',  // ✅ ADD
-    departmentName: emp?.department || emp?.departmentName || award.departmentName || '',  // ✅ ADD
-    designationName: emp?.designation || emp?.designationName || award.designationName || ''  // ✅ ADD
+    employeeCode: emp?.code || emp?.employeeCode || award.employeeCode || '',  
+    departmentName: emp?.department || emp?.departmentName || award.departmentName || '', 
+    designationName: emp?.designation || emp?.designationName || award.designationName || ''  
   }]);
 
   setEmployeeSearchTerm(emp?.name || emp?.employeeName || '');
@@ -650,8 +634,8 @@ const handleEdit = (award) => {
       certificateFileName: null,
       employeeId: '',
       employeeName: '',
-       employeeCode: '',      // ✅ ADD
-    departmentName: '',    // ✅ ADD
+       employeeCode: '',      
+    departmentName: '',    
     designationName: ''    
     }]);
     setErrors({});
@@ -954,22 +938,34 @@ value={employee?.name || row.employeeName || ''}
                       </div>
                     </td>
                  <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-  <input type="text" className="form-control bg-light" 
-    value={employee?.code || employee?.employeeCode || row.employeeCode || ''} 
-    readOnly placeholder="Auto" 
-    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+  <input 
+    type="text" 
+    className="form-control bg-light" 
+    value={row.employeeCode || employee?.code || employee?.employeeCode || ''} 
+    readOnly 
+    placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} 
+  />
 </td>
 <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-  <input type="text" className="form-control bg-light" 
-    value={employee?.department || employee?.departmentName || row.departmentName || ''} 
-    readOnly placeholder="Auto" 
-    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+  <input 
+    type="text" 
+    className="form-control bg-light" 
+    value={row.departmentName || employee?.department || employee?.departmentName || ''} 
+    readOnly 
+    placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} 
+  />
 </td>
 <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-  <input type="text" className="form-control bg-light" 
-    value={employee?.designation || employee?.designationName || row.designationName || ''} 
-    readOnly placeholder="Auto" 
-    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+  <input 
+    type="text" 
+    className="form-control bg-light" 
+    value={row.designationName || employee?.designation || employee?.designationName || ''} 
+    readOnly 
+    placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} 
+  />
 </td>
                     <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
                       <input

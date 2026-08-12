@@ -33,7 +33,10 @@ const [loadingEmployees, setLoadingEmployees] = useState(false);
       certificateFileData: null,
       certificateFileName: null,
       employeeId: '',
-      employeeName: ''
+      employeeName: '',
+      employeeCode: '',    
+    departmentName: '',    
+    designationName: ''
     }
   ]);
   const [errors, setErrors] = useState({});
@@ -87,6 +90,9 @@ const fetchEmployees = useCallback(async () => {
       ...getAxiosConfig(), 
       params: { size: 1000, page: 0 } 
     });
+    
+    console.log("📥 Employees Response:", res.data);
+    
     if (res.data?.status === 200) {
       let employeesData = Array.isArray(res.data.response)
         ? res.data.response
@@ -95,15 +101,15 @@ const fetchEmployees = useCallback(async () => {
       const mappedEmployees = employeesData.map(emp => ({
         id: emp.id || emp.employeeId,
         name: emp.name || emp.employeeName || '',
-        employeeCode: emp.code || emp.employeeCode || '',
-        departmentName: emp.department || emp.departmentName || '',
-        designationName: emp.designation || emp.designationName || '',
+        employeeCode: emp.employeeCode || emp.code || `EMP${String(emp.id || emp.employeeId || '').padStart(4, '0')}`,  // ✅ Generate if missing
+        departmentName: emp.departmentName || emp.department || '',
+        designationName: emp.designationName || emp.designation || '',
         email: emp.email || '',
         ...emp
       }));
       
+      console.log("✅ Mapped Employees:", mappedEmployees);
       setEmployees(mappedEmployees);
-      console.log("✅ Employees loaded:", mappedEmployees);
     } else {
       setEmployees([]);
     }
@@ -115,8 +121,7 @@ const fetchEmployees = useCallback(async () => {
     setLoadingEmployees(false);
   }
 }, []);
-
-// ─── FETCH TRAININGS FROM API ──────────────────────────────────────
+// ─── FETCH TRAININGS ──────────────────────────────────────
 const fetchTrainings = useCallback(async () => {
   if (!ensureToken()) return;
   setLoading(true);
@@ -164,7 +169,6 @@ const fetchTrainings = useCallback(async () => {
     }
 
  const mappedTrainings = trainingsData.map((item) => {
-  // ✅ Find employee from employees array
   const emp = employees.find(e => e.id === item.employeeId);
   
   return {
@@ -283,19 +287,29 @@ useEffect(() => {
   const startIndex = page * rowsPerPage;
   const currentTrainings = filteredTrainings.slice(startIndex, startIndex + rowsPerPage);
   
- const handleEmployeeSelect = (rowId, employee) => {
+
+const handleEmployeeSelect = (rowId, employee) => {
   console.log("✅ Selected Employee:", employee);
+  
+  const empCode = employee.employeeCode || employee.code || '';
+  const empDepartment = employee.departmentName || employee.department || '';
+  const empDesignation = employee.designationName || employee.designation || '';
+  
+  console.log("📌 Employee Code:", empCode);
+  console.log("📌 Department:", empDepartment);
+  console.log("📌 Designation:", empDesignation);
   
   setFormRows(prev => prev.map(row => 
     row.id === rowId ? {
       ...row,
       employeeId: employee.id,
       employeeName: employee.name,
-      employeeCode: employee.employeeCode || employee.code || '',
-      departmentName: employee.departmentName || employee.department || '',
-      designationName: employee.designationName || employee.designation || ''
+      employeeCode: empCode,      
+      departmentName: empDepartment,   
+      designationName: empDesignation   
     } : row
   ));
+  
   setSelectedEmployee(employee);
   setEmployeeSearchTerm(employee.name);
   setShowEmployeeDropdown(false);
@@ -456,11 +470,11 @@ useEffect(() => {
      const payload = {
   employeeId: employeeId,
   trainingName: formRows[0]?.trainingName || '',
-  provider: formRows[0]?.trainingProvider || '',  // ✅ 'provider'
+  provider: formRows[0]?.trainingProvider || '',  
   startDate: formRows[0]?.startDate || '',
   endDate: formRows[0]?.endDate || '',
-  hours: Number(formRows[0]?.trainingHours) || 0,  // ✅ 'hours' as number
-  certification: formRows[0]?.certificationReceived || 'No',  // ✅ 'certification'
+  hours: Number(formRows[0]?.trainingHours) || 0, 
+  certification: formRows[0]?.certificationReceived || 'No',  
   description: formRows[0]?.description || ''
 };
       
@@ -497,7 +511,7 @@ useEffect(() => {
   designationName: row.designationName || ''
 }));
   
-  // ✅ WRAPPER - Backend expects { trainings: [...] }
+  
   const payload = {
     trainings: trainingsArray
   };
@@ -530,37 +544,6 @@ useEffect(() => {
   }
 };
 
-//   const handleEdit = (training) => {
-//   if (training.status === 'Inactive') {
-//     toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
-//     return;
-//   }
-  
-//   const emp = employees.find(e => e.id === training.employeeId);
-//   setSelectedEmployee(emp || null);
-//   setEditingTraining(training);
-  
-//   setFormRows([{
-//     id: Date.now(),
-//     trainingName: training.trainingName || '',
-//     trainingProvider: training.provider || training.trainingProvider || '',
-//     startDate: training.startDate || '',
-//     endDate: training.endDate || '',
-//     certificationReceived: training.certification || training.certificationReceived || 'No',
-//     trainingHours: training.hours || training.trainingHours || '',
-//     certificateFile: null,
-//     certificateFileData: training.certificateFileData || null,
-//     certificateFileName: training.certificateFileName || null,
-//     employeeId: training.employeeId || '',
-//     employeeName: emp?.name || training.employee || '',
-//     employeeCode: emp?.employeeCode || emp?.code || '',
-//     departmentName: emp?.departmentName || emp?.department || '',
-//     designationName: emp?.designationName || emp?.designation || ''
-//   }]);
-  
-//   setEmployeeSearchTerm(emp?.name || '');
-//   setShowForm(true);
-// };
 const handleEdit = (training) => {
   if (training.status === 'Inactive') {
     toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
@@ -607,8 +590,8 @@ const handleEdit = (training) => {
       certificateFileName: null,
       employeeId: '',
       employeeName: '',
-       employeeCode: '',      // ✅ ADD
-    departmentName: '',    // ✅ ADD
+       employeeCode: '',      
+    departmentName: '',
     designationName: ''  
     }]);
     setErrors({});
@@ -829,22 +812,35 @@ const handleEdit = (training) => {
                       </div>
                     </td>
                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-  <input type="text" className="form-control bg-light" 
-    value={employee?.employeeCode || row.employeeCode || ''} 
-    readOnly placeholder="Auto" 
-    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+  <input 
+    type="text" 
+    className="form-control bg-light" 
+    value={row.employeeCode || employee?.employeeCode || ''}  
+    readOnly 
+    placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} 
+  />
 </td>
+
                    <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-  <input type="text" className="form-control bg-light" 
-    value={employee?.departmentName || row.departmentName || ''} 
-    readOnly placeholder="Auto" 
-    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+  <input 
+    type="text" 
+    className="form-control bg-light" 
+    value={row.departmentName || employee?.departmentName || ''}  
+    readOnly 
+    placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} 
+  />
 </td>
                   <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
-  <input type="text" className="form-control bg-light" 
-    value={employee?.designationName || row.designationName || ''} 
-    readOnly placeholder="Auto" 
-    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} />
+  <input 
+    type="text" 
+    className="form-control bg-light" 
+    value={row.designationName || employee?.designationName || ''}
+    readOnly 
+    placeholder="Auto" 
+    style={{ fontSize: '12px', padding: '4px 8px', width: '100%' }} 
+  />
 </td>
                     <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
                       <input

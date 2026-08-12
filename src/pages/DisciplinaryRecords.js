@@ -100,43 +100,7 @@ const DisciplinaryRecords = ({ employeeId, initialData, onSuccess, onCancel }) =
     return found?.id || null;
   };
 
-  // Fetch Employees from API
-  // const fetchEmployees = useCallback(async () => {
-  //   const token = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
-  //   if (!token) return;
-
-  //   setLoadingEmployees(true);
-  //   try {
-  //     const res = await axios.get(
-  //       `${BASE_URL}/api/employees?page=0&size=1000`,
-  //       getAxiosConfig()
-  //     );
-
-  //     let employeesData = [];
-  //     if (res.data?.response?.content) {
-  //       employeesData = res.data.response.content;
-  //     } else if (res.data?.content) {
-  //       employeesData = res.data.content;
-  //     } else if (Array.isArray(res.data)) {
-  //       employeesData = res.data;
-  //     }
-
-  //     const mapped = employeesData.map((item) => ({
-  //       id: item.id,
-  //       name: item.name || item.employeeName || '',
-  //       code: item.employeeCode || item.code || '',
-  //       department: item.departmentName || item.department || '',
-  //       designation: item.designation || '',
-  //     }));
-
-  //     setEmployeesList(mapped);
-  //   } catch (err) {
-  //     console.error("❌ Fetch employees error:", err);
-  //     setEmployeesList([]);
-  //   } finally {
-  //     setLoadingEmployees(false);
-  //   }
-  // }, []);
+  
 const fetchEmployees = useCallback(async () => {
   const token = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
   if (!token) return;
@@ -171,34 +135,13 @@ const fetchEmployees = useCallback(async () => {
 
     const mapped = employeesData.map((item) => ({
       id: item.id || item.employeeId,
-
-      name:
-        item.name ||
-        item.employeeName ||
-        item.fullName ||
-        '',
-
-      code:
-        item.employeeCode ||
-        item.code ||
-        item.empCode ||
-        '',
-
-      department:
-        item.departmentName ||
-        item.department ||
-        item.department?.name ||
-        item.department?.departmentName ||
-        item.deptName ||
-        '',
-
-      designation:
-        item.designationName ||
-        item.designation ||
-        item.designation?.name ||
-        item.designation?.designationName ||
-        item.postName ||
-        ''
+      name: item.name || item.employeeName || item.fullName || '',
+      code: item.employeeCode || item.code || item.empCode || '',
+      employeeCode: item.employeeCode || item.code || item.empCode || `EMP${String(item.id || item.employeeId || '').padStart(4, '0')}`,
+      department: item.departmentName || item.department || item.department?.name || '',
+      departmentName: item.departmentName || item.department || item.department?.name || '',
+      designation: item.designationName || item.designation || item.designation?.name || '',
+      designationName: item.designationName || item.designation || item.designation?.name || ''
     }));
 
     console.log("✅ MAPPED EMPLOYEES:", mapped);
@@ -213,7 +156,7 @@ const fetchEmployees = useCallback(async () => {
   }
 }, []);
 
-  // Fetch Action Types
+
   const fetchActionTypes = useCallback(async () => {
     const token = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
     if (!token) return;
@@ -488,27 +431,31 @@ const fetchEmployees = useCallback(async () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleEmployeeSelect = (employee) => {
+ const handleEmployeeSelect = (employee) => {
   console.log("👤 SELECTED EMPLOYEE:", employee);
+
+  const empCode = employee.employeeCode || employee.code || '';
+  const empDepartment = employee.departmentName || employee.department || '';
+  const empDesignation = employee.designationName || employee.designation || '';
+  
+  console.log("📌 Employee Code:", empCode);
+  console.log("📌 Department:", empDepartment);
+  console.log("📌 Designation:", empDesignation);
 
   setSelectedEmployee(employee);
 
   setFormData(prev => ({
     ...prev,
-
     employeeId: employee.id || '',
     employeeName: employee.name || '',
-
-    // Auto populated fields
-    employeeCode: employee.code || '',
-    department: employee.department || '',
-    designation: employee.designation || ''
+    employeeCode: empCode,      
+    department: empDepartment,   
+    designation: empDesignation  
   }));
 
   setEmployeeSearchTerm(employee.name || '');
   setShowEmployeeDropdown(false);
 
-  // Clear employee validation error
   setErrors(prev => ({
     ...prev,
     employeeId: ''
@@ -519,6 +466,7 @@ const fetchEmployees = useCallback(async () => {
     employeeId: true
   }));
 };
+
   // Handle row click for detail view
   const handleRowClick = (record) => {
     setSelectedRecord(record);
@@ -637,7 +585,6 @@ const fetchEmployees = useCallback(async () => {
     }
   };
 
-  // ✅ Updated handleEdit - stores ALL employee details in formData (like PromotionHistory)
   const handleEdit = (record) => {
     if (record.status === 'Inactive') {
       toast.warning('Cannot Edit', 'This record is inactive and cannot be edited');
@@ -646,10 +593,8 @@ const fetchEmployees = useCallback(async () => {
     
     console.log("✏️ Editing Record:", record);
     
-    // ✅ Find the employee from the employeesList
     const emp = employeesList.find(e => e.id === record.employeeId);
     
-    // ✅ Set selected employee with all details
     setSelectedEmployee(emp || {
       id: record.employeeId,
       name: record.employee || record.employeeName || '',
@@ -660,7 +605,6 @@ const fetchEmployees = useCallback(async () => {
     
     setEditingRecord(record);
     
-    // ✅ Set ALL form data including employee details (like PromotionHistory)
     setFormData({
       caseNumber: record.caseNumber || '',
       incidentDate: record.incidentDate || '',
@@ -673,9 +617,9 @@ const fetchEmployees = useCallback(async () => {
       supportingDocumentsName: record.supportingDocumentsName || null,
       employeeId: record.employeeId || '',
       employeeName: record.employee || record.employeeName || '',
-      employeeCode: record.employeeCode || '',      // ✅ Set from record
-      department: record.department || '',          // ✅ Set from record
-      designation: record.designation || ''         // ✅ Set from record
+      employeeCode: record.employeeCode || '',      
+      department: record.department || '',         
+      designation: record.designation || ''        
     });
     
     // ✅ Set the employee search term to show the name
@@ -695,10 +639,7 @@ const fetchEmployees = useCallback(async () => {
       supportingDocumentsData: null,
       supportingDocumentsName: null,
       employeeId: '',
-      employeeName: '',
-      employeeCode: '',     // ✅ Add this
-      department: '',       // ✅ Add this
-      designation: ''       // ✅ Add this
+      designation: ''       
     });
     setErrors({});
     setTouched({});
@@ -980,42 +921,42 @@ const handleViewDocument = async (e, record) => {
                   </div>   
                 </div>
                 
-                {/* Employee Code - Auto Populate - using formData first (like PromotionHistory) */}
-                <div className="cert-field-compact">
-                  <label>Employee Code</label>
-                 <input
-  type="text"
-  className="form-control bg-light"
-  value={formData.employeeCode || selectedEmployee?.code || ''}
-  readOnly
-  placeholder="Auto-populated"
-/>
-                </div>
-
-                {/* Department - Auto Populate - using formData first (like PromotionHistory) */}
-                <div className="cert-field-compact">
-                  <label>Department</label>
-                 <input
-  type="text"
-  className="form-control bg-light"
-  value={formData.department || selectedEmployee?.department || ''}
-  readOnly
-  placeholder="Auto-populated"
-/>
-                </div>
-
-                {/* Designation - Auto Populate - using formData first (like PromotionHistory) */}
-                <div className="cert-field-compact">
-                  <label>Designation</label>
-                  <input
-  type="text"
-  className="form-control bg-light"
-  value={formData.designation || selectedEmployee?.designation || ''}
-  readOnly
-  placeholder="Auto-populated"
-/>
-                </div>
-
+                {/* Employee Code - Auto Populate  */}
+             <div className="cert-field-compact">
+  <label>Employee Code</label>
+  <input
+    type="text"
+    className="form-control bg-light"
+    value={formData.employeeCode || selectedEmployee?.employeeCode || selectedEmployee?.code || ''}
+    readOnly
+    placeholder="Auto-populated"
+    style={{ fontSize: '14px', padding: '6px 12px', background: '#f3f4f6' }}
+  />
+</div>
+                {/* Department - Auto Populate */}
+            <div className="cert-field-compact">
+  <label>Department</label>
+  <input
+    type="text"
+    className="form-control bg-light"
+    value={formData.department || selectedEmployee?.departmentName || selectedEmployee?.department || ''}
+    readOnly
+    placeholder="Auto-populated"
+    style={{ fontSize: '14px', padding: '6px 12px', background: '#f3f4f6' }}
+  />
+</div>
+                {/* Designation - Auto Populate  */}
+           <div className="cert-field-compact">
+  <label>Designation</label>
+  <input
+    type="text"
+    className="form-control bg-light"
+    value={formData.designation || selectedEmployee?.designationName || selectedEmployee?.designation || ''}
+    readOnly
+    placeholder="Auto-populated"
+    style={{ fontSize: '14px', padding: '6px 12px', background: '#f3f4f6' }}
+  />
+</div>
                 {/* Case Number */}
                 <div className={`cert-field-compact ${touched.caseNumber && errors.caseNumber ? 'has-error' : ''}`}>
                   <label className="required">Case Number</label>
