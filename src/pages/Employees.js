@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FaSearch, FaEdit, FaTrash, FaUserPlus, FaTimes,
@@ -18,8 +17,7 @@ const RULES = {
     maxLen: 50,
     pattern: /^[a-zA-Z\s'-]+$/,
     patternMsg: 'Only letters, spaces, hyphens and apostrophes allowed'
-  }, 
-  
+  },
   email: {
     required: true,
     maxLen: 100,
@@ -48,7 +46,9 @@ const RULES = {
   joiningDate: { required: false },
   bankAccount: { required: false, pattern: /^\d{9,18}$/, patternMsg: '9-18 digits only' },
   uan: { required: false, pattern: /^\d{12}$/, patternMsg: '12 digits required' },
-  pan: { required: false, pattern: /^[A-Z]{5}[0-9]{4}[A-Z]$/, patternMsg: 'Format: ABCDE1234F' }
+  pan: { required: false, pattern: /^[A-Z]{5}[0-9]{4}[A-Z]$/, patternMsg: 'Format: ABCDE1234F' },
+  /* NEW: Designation validation */
+  designationId: { required: true } // assuming it is required
 };
 
 const validate = (field, value, editMode = false) => {
@@ -69,7 +69,7 @@ const validate = (field, value, editMode = false) => {
 
 const validateAll = (formData, editMode) => {
   const errors = {};
-  const fields = ['name', 'email', 'phone', 'address', 'branchId', 'departmentId', 'roleId', 'gradeId', 'joiningDate', 'bankAccount', 'uan', 'pan'];
+  const fields = ['name', 'email', 'phone', 'address', 'branchId', 'departmentId', 'roleId', 'gradeId', 'joiningDate', 'bankAccount', 'uan', 'pan', 'designationId']; /* NEW */
   if (!editMode) fields.push('password');
   fields.forEach(f => {
     const err = validate(f, formData[f], editMode);
@@ -123,11 +123,11 @@ const Employees = ({ user }) => {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // New Family States (without add family member button)
+  // Family states (unchanged)
   const [marriedStatus, setMarriedStatus] = useState('');
   const [childrenCount, setChildrenCount] = useState(0);
   const [child1, setChild1] = useState('');
-const [child2, setChild2] = useState('');
+  const [child2, setChild2] = useState('');
   const [fatherName, setFatherName] = useState('');
   const [motherName, setMotherName] = useState('');
   
@@ -141,13 +141,74 @@ const [child2, setChild2] = useState('');
   });
   const [showNomineeForm, setShowNomineeForm] = useState(false);
   const [editingNomineeIndex, setEditingNomineeIndex] = useState(null);
-  
 
+  // Qualification & Experience (unchanged)
+  const [qualifications, setQualifications] = useState({
+    tenth: { board: '', percentage: '', year: '' },
+    twelfth: { board: '', percentage: '', year: '' },
+    graduation: { university: '', degree: '', cgpa: '', percentage: '', year: '' }
+  });
+  const [experience, setExperience] = useState({
+    company: '',
+    position: '',
+    years: '',
+    months: ''
+  });
+
+  // ─── NEW: Designations state ──────────────────────────────────────────
+  const [designations, setDesignations] = useState([]);
+  const [loadingDesignations, setLoadingDesignations] = useState(false);
+
+  // ─── NEW: Fetch designations from the API ────────────────────────────
+  const fetchDesignations = useCallback(async () => {
+    setLoadingDesignations(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/api/designations/list?flag=0`, axiosConfig);
+      console.log('Designation API response:', res.data); // debug
+
+      // Robust extraction of the array
+      let rawData = res.data;
+      let list = [];
+      if (Array.isArray(rawData)) {
+        list = rawData;
+      } else if (rawData && typeof rawData === 'object') {
+        if (Array.isArray(rawData.data)) list = rawData.data;
+        else if (Array.isArray(rawData.response)) list = rawData.response;
+        else if (Array.isArray(rawData.content)) list = rawData.content;
+        else {
+          const arrayProp = Object.values(rawData).find(Array.isArray);
+          if (arrayProp) list = arrayProp;
+        }
+      }
+
+      const mapped = list.map((item) => ({
+        id: item.id,
+        designationName: item.designationName || item.name || item.designation || String(item.id)
+      }));
+
+      setDesignations(mapped);
+      if (mapped.length === 0) {
+        toast.warning('No Designations', 'No designations found. Please check the API endpoint.');
+      }
+    } catch (err) {
+      console.error('Fetch designations error:', err);
+      toast.error(
+        'Designation Load Error',
+        err.response?.data?.message || err.message || 'Failed to load designations'
+      );
+      setDesignations([]);
+    } finally {
+      setLoadingDesignations(false);
+    }
+  }, []);
+
+  // ─── Form state – added designationId ────────────────────────────────
   const [formData, setFormData] = useState({
     name: '', email: '', password: '', phone: '',
     joiningDate: '', roleId: '', departmentId: '',
-    branchId: '', gradeId: '', address: '', profilePicture: '', bankAccount: '',
-    uan: '', pan: ''
+    branchId: '', gradeId: '', address: '', profilePicture: '',
+    bankAccount: '', uan: '', pan: '',
+    designationId: '' // NEW
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -161,35 +222,6 @@ const [child2, setChild2] = useState('');
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [loadingGrades, setLoadingGrades] = useState(false);
-
-  // Qualification States
-const [qualifications, setQualifications] = useState({
-  tenth: {
-    board: '',
-    percentage: '',
-    year: ''
-  },
-  twelfth: {
-    board: '',
-    percentage: '',
-    year: ''
-  },
-  graduation: {
-    university: '',
-    degree: '',
-    cgpa: '',
-    percentage: '',
-    year: ''
-  }
-});
-
-// Experience State
-const [experience, setExperience] = useState({
-  company: '',
-  position: '',
-  years: '',
-  months: ''
-});
 
   const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
   const axiosConfig = {
@@ -252,6 +284,7 @@ const [experience, setExperience] = useState({
     fetchRoles();
     fetchAllDepartments();
     fetchGrades();
+    fetchDesignations(); // NEW: fetch designations on mount
   }, []);
 
   const cleanName = (name) => {
@@ -306,7 +339,7 @@ const [experience, setExperience] = useState({
     setDepartments(allDepartments.filter(d => d.branchId === parseInt(branchId)));
   };
 
-  // Nominee functions
+  // Nominee functions (unchanged)
   const addOrUpdateNominee = () => {
     if (!nomineeFormData.name.trim()) {
       toast.warning('Validation', 'Please enter nominee name');
@@ -330,25 +363,6 @@ const [experience, setExperience] = useState({
     resetNomineeForm();
   };
 
-  // Handle Qualification Change
-const handleQualificationChange = (level, field, value) => {
-  setQualifications(prev => ({
-    ...prev,
-    [level]: {
-      ...prev[level],
-      [field]: value
-    }
-  }));
-};
-
-// Handle Experience Change
-const handleExperienceChange = (field, value) => {
-  setExperience(prev => ({
-    ...prev,
-    [field]: value
-  }));
-};
-
   const editNominee = (index) => {
     setEditingNomineeIndex(index);
     setNomineeFormData({ ...nomineeList[index] });
@@ -371,7 +385,25 @@ const handleExperienceChange = (field, value) => {
     setShowNomineeForm(false);
   };
 
-  // ──────────────── BULK UPLOAD HANDLERS ────────────────
+  // Qualification & Experience handlers (unchanged)
+  const handleQualificationChange = (level, field, value) => {
+    setQualifications(prev => ({
+      ...prev,
+      [level]: {
+        ...prev[level],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleExperienceChange = (field, value) => {
+    setExperience(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // ──────────────── BULK UPLOAD HANDLERS (unchanged) ────────────────
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -496,6 +528,7 @@ const handleExperienceChange = (field, value) => {
     if (touched.departmentId) setErrors(prev => ({ ...prev, departmentId: 'This field is required' }));
   };
 
+  // ─── Submit Handler (updated to include designationId) ──────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -503,7 +536,8 @@ const handleExperienceChange = (field, value) => {
       'name', 'email', 'phone', 'password',
       'branchId', 'departmentId', 'roleId', 'gradeId',
       'joiningDate', 'address',
-      'bankAccount', 'uan', 'pan'
+      'bankAccount', 'uan', 'pan',
+      'designationId' // NEW
     ];
 
     setTouched(allFields.reduce((a, f) => ({ ...a, [f]: true }), {}));
@@ -526,8 +560,6 @@ const handleExperienceChange = (field, value) => {
         joiningDate: formData.joiningDate,
         roleId: parseInt(formData.roleId),
         departmentId: parseInt(formData.departmentId),
-         designation: formData.designation,  
-    
         branchId: parseInt(formData.branchId),
         gradeId: formData.gradeId ? parseInt(formData.gradeId) : null,
         address: formData.address.trim(),
@@ -535,12 +567,13 @@ const handleExperienceChange = (field, value) => {
         bankAccount: formData.bankAccount,
         uan: formData.uan,
         pan: formData.pan,
+        designationId: parseInt(formData.designationId), // NEW: send ID
         marriedStatus: marriedStatus,
         childrenCount: parseInt(childrenCount) || 0,
         child1: child1,
-  child2: child2,
-   qualifications: qualifications,
-  experience: experience,
+        child2: child2,
+        qualifications: qualifications,
+        experience: experience,
         fatherName: fatherName,
         motherName: motherName,
         nomineeList: nomineeList.map(n => ({
@@ -603,6 +636,7 @@ const handleExperienceChange = (field, value) => {
     } catch (err) { toast.error('Error', err.response?.data?.message || 'Failed to delete'); }
   };
 
+  // ─── Edit Handler (now also sets designationId) ─────────────────────
   const handleEdit = (emp) => {
     setSelectedEmployee(emp);
     const fd = {
@@ -610,8 +644,23 @@ const handleExperienceChange = (field, value) => {
       phone: emp.phone || '', joiningDate: emp.joiningDate || '',
       roleId: '', departmentId: '', branchId: '', gradeId: '',
       address: emp.address || '', profilePicture: emp.profilePicture || '',
-      bankAccount: emp.bankAccount || '', uan: emp.uan || '', pan: emp.pan || ''
+      bankAccount: emp.bankAccount || '', uan: emp.uan || '', pan: emp.pan || '',
+      designationId: '' // will be set below
     };
+
+    // Try to set designationId
+    if (emp.designationId) {
+      fd.designationId = emp.designationId;
+    } else if (emp.designation) {
+      // If only name is available, find matching ID from designations list
+      const match = designations.find(d => d.designationName === emp.designation);
+      if (match) fd.designationId = match.id;
+      else {
+        // If no match, leave empty and show warning (optional)
+        toast.warning('Designation Mismatch', 'Could not find matching designation ID. Please reselect.');
+      }
+    }
+
     if (emp.branchName) {
       const branch = branches.find(b => b.name === emp.branchName);
       if (branch) { fd.branchId = branch.id; filterDepartmentsByBranch(branch.id); }
@@ -634,37 +683,34 @@ const handleExperienceChange = (field, value) => {
     setMarriedStatus(emp.marriedStatus || '');
     setChildrenCount(emp.childrenCount || 0);
     setChild1(emp.child1 || '');
-setChild2(emp.child2 || '');
-if (emp.qualifications) {
-  setQualifications(emp.qualifications);
-}
-if (emp.experience) {
-  setExperience(emp.experience);
-}
+    setChild2(emp.child2 || '');
+    if (emp.qualifications) setQualifications(emp.qualifications);
+    if (emp.experience) setExperience(emp.experience);
     setFatherName(emp.fatherName || '');
     setMotherName(emp.motherName || '');
     setNomineeList(emp.nomineeList || []);
   };
 
   const resetForm = () => {
-    setFormData({ 
-      name: '', email: '', password: '', phone: '', 
-      joiningDate: '', roleId: '', departmentId: '', 
-      branchId: '', gradeId: '', address: '', 
-      profilePicture: '', bankAccount: '', uan: '', pan: '' 
+    setFormData({
+      name: '', email: '', password: '', phone: '',
+      joiningDate: '', roleId: '', departmentId: '',
+      branchId: '', gradeId: '', address: '',
+      profilePicture: '', bankAccount: '', uan: '', pan: '',
+      designationId: '' // NEW
     });
     setErrors({}); setTouched({});
     setEditMode(false); setSelectedEmployee(null);
     setMarriedStatus('');
     setChildrenCount(0);
     setChild1('');
-setChild2('');
-setQualifications({
-  tenth: { board: '', percentage: '', year: '' },
-  twelfth: { board: '', percentage: '', year: '' },
-  graduation: { university: '', degree: '', cgpa: '', percentage: '', year: '' }
-});
-setExperience({ company: '', position: '', years: '', months: '' });
+    setChild2('');
+    setQualifications({
+      tenth: { board: '', percentage: '', year: '' },
+      twelfth: { board: '', percentage: '', year: '' },
+      graduation: { university: '', degree: '', cgpa: '', percentage: '', year: '' }
+    });
+    setExperience({ company: '', position: '', years: '', months: '' });
     setFatherName('');
     setMotherName('');
     setNomineeList([]);
@@ -772,7 +818,7 @@ setExperience({ company: '', position: '', years: '', months: '' });
                     <th style={{ width: 44 }}>#</th>
                     <th>Employee</th>
                     <th>Department</th>
-                     <th>Designation</th>
+                    <th>Designation</th>
                     <th>Role</th>
                     <th>Branch</th>
                     <th>Joined</th>
@@ -803,7 +849,7 @@ setExperience({ company: '', position: '', years: '', months: '' });
                             ? <span className="emp-pill emp-pill--indigo">{emp.departmentName}</span>
                             : <span className="emp-dash">—</span>}
                         </td>
-                                                <td>
+                        <td>
                           {emp.designation
                             ? <span className="emp-pill emp-pill--teal">{emp.designation}</span>
                             : <span className="emp-dash">—</span>}
@@ -829,7 +875,7 @@ setExperience({ company: '', position: '', years: '', months: '' });
                     );
                   }) : (
                     <tr>
-                      <td colSpan="7" className="emp-empty">
+                      <td colSpan="8" className="emp-empty">
                         <div className="emp-empty-inner">
                           <span className="emp-empty-icon">👤</span>
                           <p>No employees found</p>
@@ -867,7 +913,7 @@ setExperience({ company: '', position: '', years: '', months: '' });
           </div>
         </>
       ) : (
-        // Form view
+        // ─── FORM VIEW ────────────────────────────────────────────────
         <div className="emp-form-wrap">
           <form onSubmit={handleSubmit} className="emp-form-compact">
             {/* Personal Information */}
@@ -1002,25 +1048,29 @@ setExperience({ company: '', position: '', years: '', months: '' });
                   </select>
                   <FieldError msg={errors.departmentId} />
                 </div>
-                               {/* --- DESIGNATION DROPDOWN (Hardcoded) START --- */}
-                <div className={`emp-field-compact ${isFieldErr('designation') ? 'has-error' : ''} ${isFieldOk('designation') ? 'has-ok' : ''}`}>
-                  <label>Designation</label>
+
+                {/* ─── NEW: Dynamic Designation Dropdown ──────────────── */}
+                <div className={`emp-field-compact ${isFieldErr('designationId') ? 'has-error' : ''} ${isFieldOk('designationId') ? 'has-ok' : ''}`}>
+                  <label className="required">Designation</label>
                   <select
-                    value={formData.designation || ''}
-                    onChange={(e) => handleChange('designation', e.target.value)}
-                    onBlur={() => handleBlur('designation')}
+                    value={formData.designationId}
+                    onChange={(e) => handleChange('designationId', e.target.value)}
+                    onBlur={() => handleBlur('designationId')}
+                    disabled={loadingDesignations}
                   >
-                    <option value="">Select designation</option>
-                    <option value="Software Engineer">Software Engineer</option>
-                    <option value="Senior Developer">Senior Developer</option>
-                    <option value="Project Manager">Project Manager</option>
-                    <option value="HR Executive">HR Executive</option>
-                    <option value="Accountant">Accountant</option>
-                    <option value="System Admin">System Admin</option>
+                    <option value="">{loadingDesignations ? 'Loading...' : 'Select designation'}</option>
+                    {designations.map(d => (
+                      <option key={d.id} value={d.id}>{d.designationName}</option>
+                    ))}
                   </select>
-                  <FieldError msg={errors.designation} />
+                  {designations.length === 0 && !loadingDesignations && (
+                    <small style={{ color: '#f59e0b', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                      No designations loaded. Please check the API.
+                    </small>
+                  )}
+                  <FieldError msg={errors.designationId} />
                 </div>
-                
+
                 <div className={`emp-field-compact ${isFieldErr('roleId') ? 'has-error' : ''} ${isFieldOk('roleId') ? 'has-ok' : ''}`}>
                   <label className="required">Role</label>
                   <select
@@ -1078,203 +1128,194 @@ setExperience({ company: '', position: '', years: '', months: '' });
                 <FieldError msg={errors.address} />
               </div>
             </div>
-{/* Qualification Section */}
-<div className="emp-divider" />
-<div className="emp-form-section-compact">
-  <div className="emp-section-label">
-    <FaGraduationCap style={{ marginRight: '8px' }} /> Educational Qualifications
-  </div>
 
-  {/* 10th Standard */}
-  <div className="emp-form-section-compact" style={{ marginBottom: '20px' }}>
-    <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>10th Standard</div>
-    <div className="emp-form-grid-3col">
-      <div className="emp-field-compact">
-        <label>Board</label>
-        <input
-          type="text"
-          placeholder="e.g., CBSE, ICSE, State Board"
-          value={qualifications.tenth.board}
-          onChange={(e) => handleQualificationChange('tenth', 'board', e.target.value)}
-        />
-      </div>
-      <div className="emp-field-compact">
-        <label>Percentage (%)</label>
-        <input
-          type="number"
-          placeholder="Enter percentage"
-          min="0"
-          max="100"
-          step="0.01"
-          value={qualifications.tenth.percentage}
-          onChange={(e) => handleQualificationChange('tenth', 'percentage', e.target.value)}
-        />
-      </div>
-      <div className="emp-field-compact">
-        <label>Passing Year</label>
-        <input
-          type="number"
-          placeholder="YYYY"
-          min="1950"
-          max="2026"
-          value={qualifications.tenth.year}
-          onChange={(e) => handleQualificationChange('tenth', 'year', e.target.value)}
-        />
-      </div>
-    </div>
-  </div>
+            {/* Qualification Section (unchanged) */}
+            <div className="emp-divider" />
+            <div className="emp-form-section-compact">
+              <div className="emp-section-label">
+                <FaGraduationCap style={{ marginRight: '8px' }} /> Educational Qualifications
+              </div>
+              <div className="emp-form-section-compact" style={{ marginBottom: '20px' }}>
+                <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>10th Standard</div>
+                <div className="emp-form-grid-3col">
+                  <div className="emp-field-compact">
+                    <label>Board</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., CBSE, ICSE, State Board"
+                      value={qualifications.tenth.board}
+                      onChange={(e) => handleQualificationChange('tenth', 'board', e.target.value)}
+                    />
+                  </div>
+                  <div className="emp-field-compact">
+                    <label>Percentage (%)</label>
+                    <input
+                      type="number"
+                      placeholder="Enter percentage"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={qualifications.tenth.percentage}
+                      onChange={(e) => handleQualificationChange('tenth', 'percentage', e.target.value)}
+                    />
+                  </div>
+                  <div className="emp-field-compact">
+                    <label>Passing Year</label>
+                    <input
+                      type="number"
+                      placeholder="YYYY"
+                      min="1950"
+                      max="2026"
+                      value={qualifications.tenth.year}
+                      onChange={(e) => handleQualificationChange('tenth', 'year', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
 
-  {/* 12th Standard */}
-  <div className="emp-form-section-compact" style={{ marginBottom: '20px' }}>
-    <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>12th Standard</div>
-    <div className="emp-form-grid-3col">
-      <div className="emp-field-compact">
-        <label>Board</label>
-        <input
-          type="text"
-          placeholder="e.g., CBSE, ICSE, State Board"
-          value={qualifications.twelfth.board}
-          onChange={(e) => handleQualificationChange('twelfth', 'board', e.target.value)}
-        />
-      </div>
-      <div className="emp-field-compact">
-        <label>Percentage (%)</label>
-        <input
-          type="number"
-          placeholder="Enter percentage"
-          min="0"
-          max="100"
-          step="0.01"
-          value={qualifications.twelfth.percentage}
-          onChange={(e) => handleQualificationChange('twelfth', 'percentage', e.target.value)}
-        />
-      </div>
-      <div className="emp-field-compact">
-        <label>Passing Year</label>
-        <input
-          type="number"
-          placeholder="YYYY"
-          min="1950"
-          max="2026"
-          value={qualifications.twelfth.year}
-          onChange={(e) => handleQualificationChange('twelfth', 'year', e.target.value)}
-        />
-      </div>
-    </div>
-  </div>
+              <div className="emp-form-section-compact" style={{ marginBottom: '20px' }}>
+                <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>12th Standard</div>
+                <div className="emp-form-grid-3col">
+                  <div className="emp-field-compact">
+                    <label>Board</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., CBSE, ICSE, State Board"
+                      value={qualifications.twelfth.board}
+                      onChange={(e) => handleQualificationChange('twelfth', 'board', e.target.value)}
+                    />
+                  </div>
+                  <div className="emp-field-compact">
+                    <label>Percentage (%)</label>
+                    <input
+                      type="number"
+                      placeholder="Enter percentage"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={qualifications.twelfth.percentage}
+                      onChange={(e) => handleQualificationChange('twelfth', 'percentage', e.target.value)}
+                    />
+                  </div>
+                  <div className="emp-field-compact">
+                    <label>Passing Year</label>
+                    <input
+                      type="number"
+                      placeholder="YYYY"
+                      min="1950"
+                      max="2026"
+                      value={qualifications.twelfth.year}
+                      onChange={(e) => handleQualificationChange('twelfth', 'year', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
 
-  {/* Graduation */}
-  <div className="emp-form-section-compact">
-    <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>Graduation</div>
-    <div className="emp-form-grid-3col">
-      <div className="emp-field-compact">
-        <label>University</label>
-        <input
-          type="text"
-          placeholder="University name"
-          value={qualifications.graduation.university}
-          onChange={(e) => handleQualificationChange('graduation', 'university', e.target.value)}
-        />
-      </div>
-      <div className="emp-field-compact">
-        <label>Degree</label>
-        <input
-          type="text"
-          placeholder="e.g., B.Tech, B.Sc, B.Com, BA"
-          value={qualifications.graduation.degree}
-          onChange={(e) => handleQualificationChange('graduation', 'degree', e.target.value)}
-        />
-      </div>
-      <div className="emp-field-compact">
-        <label>CGPA</label>
-        <input
-          type="number"
-          placeholder="CGPA (0-10)"
-          min="0"
-          max="10"
-          step="0.01"
-          value={qualifications.graduation.cgpa}
-          onChange={(e) => handleQualificationChange('graduation', 'cgpa', e.target.value)}
-        />
-      </div>
-      <div className="emp-field-compact">
-        <label>Passing Year</label>
-        <input
-          type="number"
-          placeholder="YYYY"
-          min="1950"
-          max="2026"
-          value={qualifications.graduation.year}
-          onChange={(e) => handleQualificationChange('graduation', 'year', e.target.value)}
-        />
-      </div>
-    </div>
-  </div>
-</div>
+              <div className="emp-form-section-compact">
+                <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>Graduation</div>
+                <div className="emp-form-grid-3col">
+                  <div className="emp-field-compact">
+                    <label>University</label>
+                    <input
+                      type="text"
+                      placeholder="University name"
+                      value={qualifications.graduation.university}
+                      onChange={(e) => handleQualificationChange('graduation', 'university', e.target.value)}
+                    />
+                  </div>
+                  <div className="emp-field-compact">
+                    <label>Degree</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., B.Tech, B.Sc, B.Com, BA"
+                      value={qualifications.graduation.degree}
+                      onChange={(e) => handleQualificationChange('graduation', 'degree', e.target.value)}
+                    />
+                  </div>
+                  <div className="emp-field-compact">
+                    <label>CGPA</label>
+                    <input
+                      type="number"
+                      placeholder="CGPA (0-10)"
+                      min="0"
+                      max="10"
+                      step="0.01"
+                      value={qualifications.graduation.cgpa}
+                      onChange={(e) => handleQualificationChange('graduation', 'cgpa', e.target.value)}
+                    />
+                  </div>
+                  <div className="emp-field-compact">
+                    <label>Passing Year</label>
+                    <input
+                      type="number"
+                      placeholder="YYYY"
+                      min="1950"
+                      max="2026"
+                      value={qualifications.graduation.year}
+                      onChange={(e) => handleQualificationChange('graduation', 'year', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
 
-{/* Experience Section */}
-<div className="emp-divider" />
-<div className="emp-form-section-compact">
-  <div className="emp-section-label">
-    <FaBriefcase style={{ marginRight: '8px' }} /> Work Experience
-  </div>
-  
-  <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-    <div className="emp-field-compact">
-      <label>Company Name</label>
-      <input
-        type="text"
-        placeholder="Last/Current company"
-        value={experience.company}
-        onChange={(e) => handleExperienceChange('company', e.target.value)}
-      />
-    </div>
-    
-    <div className="emp-field-compact">
-      <label>Position / Designation</label>
-      <input
-        type="text"
-        placeholder="e.g., Software Engineer, Manager"
-        value={experience.position}
-        onChange={(e) => handleExperienceChange('position', e.target.value)}
-      />
-    </div>
-    
-    <div className="emp-field-compact">
-      <label>Years of Experience</label>
-      <input
-        type="number"
-        placeholder="Years"
-        min="0"
-        max="50"
-        value={experience.years}
-        onChange={(e) => handleExperienceChange('years', e.target.value)}
-      />
-    </div>
-    
-    <div className="emp-field-compact">
-      <label>Months of Experience</label>
-      <input
-        type="number"
-        placeholder="Months (0-11)"
-        min="0"
-        max="11"
-        value={experience.months}
-        onChange={(e) => handleExperienceChange('months', e.target.value)}
-      />
-    </div>
-  </div>
-  
-</div>
-            {/* Family Information */}
+            {/* Experience Section (unchanged) */}
+            <div className="emp-divider" />
+            <div className="emp-form-section-compact">
+              <div className="emp-section-label">
+                <FaBriefcase style={{ marginRight: '8px' }} /> Work Experience
+              </div>
+              <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="emp-field-compact">
+                  <label>Company Name</label>
+                  <input
+                    type="text"
+                    placeholder="Last/Current company"
+                    value={experience.company}
+                    onChange={(e) => handleExperienceChange('company', e.target.value)}
+                  />
+                </div>
+                <div className="emp-field-compact">
+                  <label>Position / Designation</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Software Engineer, Manager"
+                    value={experience.position}
+                    onChange={(e) => handleExperienceChange('position', e.target.value)}
+                  />
+                </div>
+                <div className="emp-field-compact">
+                  <label>Years of Experience</label>
+                  <input
+                    type="number"
+                    placeholder="Years"
+                    min="0"
+                    max="50"
+                    value={experience.years}
+                    onChange={(e) => handleExperienceChange('years', e.target.value)}
+                  />
+                </div>
+                <div className="emp-field-compact">
+                  <label>Months of Experience</label>
+                  <input
+                    type="number"
+                    placeholder="Months (0-11)"
+                    min="0"
+                    max="11"
+                    value={experience.months}
+                    onChange={(e) => handleExperienceChange('months', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Family Information (unchanged) */}
             <div className="emp-divider" />
             <div className="emp-form-section-compact">
               <div className="emp-section-label">
                 <FaUserFriends style={{ marginRight: '8px' }} /> Family Information
               </div>
-              
-              {/* Married Status Dropdown */}
-               <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div className="emp-field-compact">
                   <label>Father's Name</label>
                   <input
@@ -1294,7 +1335,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
                   />
                 </div>
               </div>
-            </div>
               <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div className="emp-field-compact">
                   <label>Married Status</label>
@@ -1307,7 +1347,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
                     <option value="NO">No</option>
                   </select>
                 </div>
-                
                 <div className="emp-field-compact">
                   <label>Number of Children</label>
                   <input
@@ -1319,40 +1358,33 @@ setExperience({ company: '', position: '', years: '', months: '' });
                     onChange={(e) => setChildrenCount(parseInt(e.target.value) || 0)}
                   />
                 </div>
-                {/* Children Details - Only Child 1 and Child 2 */}
-<div className="emp-divider" />
-<div className="emp-form-section-compact">
- 
-  
-  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-    {/* Child 1 Input */}
-    <div className="emp-field-compact">
-      <label>Child 1 Name</label>
-      <input
-        type="text"
-        placeholder="Enter first child's name"
-        value={child1}
-        onChange={(e) => setChild1(e.target.value)}
-      />
-    </div>
-    
-    {/* Child 2 Input */}
-    <div className="emp-field-compact">
-      <label>Child 2 Name</label>
-      <input
-        type="text"
-        placeholder="Enter second child's name"
-        value={child2}
-        onChange={(e) => setChild2(e.target.value)}
-      />
-    </div>
-  </div>
-</div>
               </div>
+              <div className="emp-divider" />
+              <div className="emp-form-section-compact">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="emp-field-compact">
+                    <label>Child 1 Name</label>
+                    <input
+                      type="text"
+                      placeholder="Enter first child's name"
+                      value={child1}
+                      onChange={(e) => setChild1(e.target.value)}
+                    />
+                  </div>
+                  <div className="emp-field-compact">
+                    <label>Child 2 Name</label>
+                    <input
+                      type="text"
+                      placeholder="Enter second child's name"
+                      value={child2}
+                      onChange={(e) => setChild2(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
 
-             
-
-            {/* Nominee List Section */}
+            {/* Nominee List Section (unchanged) */}
             <div className="emp-divider" />
             <div className="emp-form-section-compact">
               <div className="emp-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1364,7 +1396,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
                 )}
               </div>
 
-              {/* Nominee List Table */}
               {nomineeList.length > 0 && (
                 <div className="emp-table-wrap" style={{ marginTop: '16px' }}>
                   <table className="emp-table" style={{ minWidth: '100%' }}>
@@ -1401,7 +1432,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
                 </div>
               )}
 
-              {/* Add/Edit Nominee Form */}
               {showNomineeForm && (
                 <div className="emp-family-form" style={{ marginTop: '16px' }}>
                   <div className="emp-family-form-header">
@@ -1410,7 +1440,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
                       <FaTimes />
                     </button>
                   </div>
-                  
                   <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div className="emp-field-compact">
                       <label className="required">Nominee Full Name</label>
@@ -1421,7 +1450,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
                         onChange={(e) => setNomineeFormData({ ...nomineeFormData, name: e.target.value })}
                       />
                     </div>
-                    
                     <div className="emp-field-compact">
                       <label className="required">Relation</label>
                       <select
@@ -1434,7 +1462,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
                         ))}
                       </select>
                     </div>
-                    
                     <div className="emp-field-compact">
                       <label>Phone Number</label>
                       <input
@@ -1446,7 +1473,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
                       />
                     </div>
                   </div>
-                  
                   <div className="emp-family-form-actions" style={{ marginTop: '16px' }}>
                     <button type="button" onClick={resetNomineeForm} className="emp-cancel-family-btn">
                       Cancel
@@ -1509,7 +1535,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
             <p className="emp-modal-body">
               Upload an Excel or CSV file containing employee data.
             </p>
-            
             <div className="emp-bulk-upload-area">
               <div 
                 className={`emp-file-dropzone ${selectedFile ? 'has-file' : ''}`}
@@ -1523,7 +1548,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
                   style={{ display: 'none' }}
                   disabled={uploading}
                 />
-                
                 {!selectedFile ? (
                   <>
                     <FaUpload size={24} style={{ color: '#6366f1', marginBottom: '8px' }} />
@@ -1559,7 +1583,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
                 )}
               </div>
             </div>
-
             <div className="emp-bulk-info">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <FaDownload size={14} style={{ color: '#6366f1' }} />
@@ -1576,7 +1599,6 @@ setExperience({ company: '', position: '', years: '', months: '' });
                 <FaDownload size={12} /> Download Sample Template
               </button>
             </div>
-
             <div className="emp-modal-actions" style={{ marginTop: '20px' }}>
               <button 
                 className="emp-modal-cancel" 
