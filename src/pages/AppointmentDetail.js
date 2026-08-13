@@ -11,20 +11,11 @@ import axios from "axios";
 import { BASE_URL, STORAGE_KEYS } from "../config/api.config";
 
 const AppointmentDetails = ({ employeeId, initialData, onSuccess, onCancel }) => {
-  const [appointments, setAppointments] = useState(initialData?.appointments || [
-    { id: 1, employeeId:1, appointmentOrderNo: 'APP/2024/001', appointmentDate: '2024-01-15', appointmentAuthority: 'Managing Director', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'Software Engineer', initialDepartment: 'IT', initialBranch: 'Mumbai', joiningDate: '2024-01-15', probationPeriod: '6', confirmationDueDate: '2024-07-15', createdAt: '2024-01-15T10:30:00Z', appointmentOrderFileName: 'appointment_letter.pdf', appointmentOrderFileData: null },
-    { id: 2, employeeId:2, appointmentOrderNo: 'APP/2024/002', appointmentDate: '2024-02-20', appointmentAuthority: 'CEO', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'HR Manager', initialDepartment: 'HR', initialBranch: 'Delhi', joiningDate: '2024-02-20', probationPeriod: '6', confirmationDueDate: '2024-08-20', createdAt: '2024-02-20T11:45:00Z', appointmentOrderFileName: 'offer_letter.pdf', appointmentOrderFileData: null },
-    { id: 3, employeeId:3, appointmentOrderNo: 'APP/2024/003', appointmentDate: '2024-03-10', appointmentAuthority: 'HR Director', appointmentType: 'Contract', employmentType: 'Contractual', initialDesignation: 'Senior Developer', initialDepartment: 'IT', initialBranch: 'Bangalore', joiningDate: '2024-03-10', probationPeriod: '3', confirmationDueDate: '2024-06-10', createdAt: '2024-03-10T09:15:00Z' },
-    { id: 4, employeeId:4, appointmentOrderNo: 'APP/2024/004', appointmentDate: '2024-04-05', appointmentAuthority: 'Managing Director', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'Tech Lead', initialDepartment: 'IT', initialBranch: 'Mumbai', joiningDate: '2024-04-05', probationPeriod: '6', confirmationDueDate: '2024-10-05', createdAt: '2024-04-05T14:20:00Z' },
-    { id: 5, employeeId:5, appointmentOrderNo: 'APP/2024/005', appointmentDate: '2024-05-12', appointmentAuthority: 'HR Director', appointmentType: 'Temporary', employmentType: 'Part-Time', initialDesignation: 'HR Executive', initialDepartment: 'HR', initialBranch: 'Delhi', joiningDate: '2024-05-12', probationPeriod: '3', confirmationDueDate: '2024-08-12', createdAt: '2024-05-12T10:00:00Z' },
-    { id: 6, employeeId:6, appointmentOrderNo: 'APP/2024/006', appointmentDate: '2024-06-01', appointmentAuthority: 'CEO', appointmentType: 'Permanent', employmentType: 'Full-Time', initialDesignation: 'Sales Manager', initialDepartment: 'Sales', initialBranch: 'Bangalore', joiningDate: '2024-06-01', probationPeriod: '6', confirmationDueDate: '2024-12-01', createdAt: '2024-06-01T09:30:00Z' }
-  ]);
-  
+  const [appointments, setAppointments] = useState([]);
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
 
-  // ✅ formData now carries both <field>Id AND <field>Name for every dropdown-backed field
   const [formData, setFormData] = useState({
     employeeId: '',
     employeeCode: '',
@@ -110,7 +101,7 @@ const ensureToken = () => {
 };
 
 // ============================================
-// ✅ REVERSE-LOOKUP HELPERS (name -> id), normalized match
+// ✅ REVERSE-LOOKUP HELPERS
 // ============================================
 const norm = (s) => (s || '').trim().toLowerCase();
 const getDeptIdByName = (name) => departmentsList.find(d => norm(d.name) === norm(name))?.id || '';
@@ -189,7 +180,6 @@ const fetchAppointments = useCallback(async () => {
   }
 }, []);
 
-// ✅ Fetch Employees from API
 const fetchEmployees = useCallback(async () => {
   if (!ensureToken()) return;
   setLoadingEmployees(true);
@@ -211,12 +201,16 @@ const fetchEmployees = useCallback(async () => {
     const mapped = data.map((item) => ({
       id: item.id,
       name: item.name || item.fullName || 'Unknown',
-      code: item.code || item.employeeCode || '',
+      code: item.employeeCode || item.code || '',  
+      employeeCode: item.employeeCode || item.code || '',
       email: item.email || '',
       department: item.department || item.departmentName || '',
+      departmentName: item.department || item.departmentName || '',
       designation: item.designation || item.designationName || '',
+      designationName: item.designation || item.designationName || '',
     }));
     
+    console.log("✅ Mapped Employees:", mapped);
     setEmployees(mapped);
   } catch (err) {
     console.error('Fetch employees error:', err);
@@ -226,9 +220,7 @@ const fetchEmployees = useCallback(async () => {
   }
 }, []);
 
-// ============================================
-// ✅ HELPER FUNCTIONS - COPY PASTE ALL
-// ============================================
+
 const getAppointmentTypeLabel = (type) => {
   if (!type) return '—';
   return type;
@@ -271,9 +263,6 @@ const getEmployeeCode = (appointment) => {
   const emp = employees.find(e => e.id === appointment.employeeId);
   return emp?.code || '';
 };
-// ============================================
-// ✅ FETCH FUNCTIONS FOR DROPDOWNS
-// ============================================
 
 // 1. Fetch Departments
 const fetchDepartments = useCallback(async () => {
@@ -487,9 +476,7 @@ const fetchAppointmentTypes = useCallback(async () => {
   }
 }, []);
 
-// ============================================
-// ✅ LOAD DROPDOWNS ON MOUNT
-// ============================================
+
 useEffect(() => {
   const loadDropdowns = async () => {
     await Promise.all([
@@ -514,7 +501,6 @@ useEffect(() => {
  const handleViewDocument = async (e, appointment) => {
   e.stopPropagation();
   
-  // ✅ Agar already document data hai toh preview dikhao
   if (appointment.documentData || appointment.appointmentOrderFileData) {
     setSelectedAppointment(appointment);
     setShowDocumentActions(true);
@@ -525,7 +511,6 @@ useEffect(() => {
     return;
   }
   
-  // ✅ Agar document name hai toh API se fetch karo
   if (appointment.documentName) {
     setSelectedAppointment(appointment);
     setShowDocumentActions(true);
@@ -570,24 +555,41 @@ useEffect(() => {
 });
 
  const handleEmployeeSelect = (employee) => {
-  setSelectedEmployee(employee);
+  console.log("👤 SELECTED EMPLOYEE:", employee);
+
+  const empCode = employee.employeeCode || employee.code || `EMP${String(employee.id || '').padStart(4, '0')}`;
+  const empDepartment = employee.department || employee.departmentName || '';
+  const empDesignation = employee.designation || employee.designationName || '';
+  
+  console.log("📌 Employee Code:", empCode);
+  console.log("📌 Department:", empDepartment);
+  console.log("📌 Designation:", empDesignation);
+
+  const matchedDept = departmentsList.find(d => norm(d.name) === norm(empDepartment));
+  const matchedDesig = designationsList.find(d => norm(d.name) === norm(empDesignation));
+
+  setSelectedEmployee({
+    ...employee,
+    code: empCode,
+    employeeCode: empCode,
+    department: empDepartment,
+    departmentName: empDepartment,
+    designation: empDesignation,
+    designationName: empDesignation
+  });
+  
   setEmployeeSearchTerm(employee.name);
   setShowEmployeeDropdown(false);
-
-  // ✅ naam se match karke ID nikaalo
-  const matchedDept = departmentsList.find(d => norm(d.name) === norm(employee.department));
-  const matchedDesig = designationsList.find(d => norm(d.name) === norm(employee.designation));
 
   setFormData(prev => ({
     ...prev,
     employeeId: employee.id,
-    employeeCode: employee.code || '',
-    initialDepartmentId: matchedDept?.id || '',
-    initialDepartmentName: matchedDept?.name || employee.department || '',
-    initialDesignationId: matchedDesig?.id || '',
-    initialDesignationName: matchedDesig?.name || employee.designation || '',
+    employeeCode: empCode,
+    departmentName: empDepartment,     
+    designationName: empDesignation,
+   
   }));
-};
+}
 
   const getPaginationRange = () => {
     const delta = 2;
@@ -631,9 +633,6 @@ useEffect(() => {
     }
   };
 
-  // ============================================
-  // ✅ NAME+ID PAIR HANDLERS — every dropdown sets both Id and Name together
-  // ============================================
   const handleDeptSelect = (value) => {
     const selected = departmentsList.find(d => String(d.id) === String(value));
     setFormData(prev => ({ ...prev, initialDepartmentId: value, initialDepartmentName: selected?.name || '' }));
@@ -791,8 +790,7 @@ useEffect(() => {
     let res;
 
     if (editingAppointment) {
-      // ✅ UPDATE — sirf wahi fields jo backend accept karta hai
-      // fallback: agar Id khali reh gaya ho kisi wajah se, Name se dobara lookup karo
+      
       const updatePayload = {
         appointmentOrderNumber: formData.appointmentOrderNo,
         appointmentDate: formData.appointmentDate,
@@ -809,7 +807,6 @@ useEffect(() => {
         getAxiosConfig()
       );
     } else {
-      // ✅ CREATE — poora payload with IDs (with name-based fallback)
       const createPayload = {
         employeeId: selectedEmployee?.id || Number(formData.employeeId) || 0,
         appointmentOrderNumber: formData.appointmentOrderNo,
@@ -1073,10 +1070,14 @@ const handleEdit = (appointment) => {
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               >
-                                <div>
-                                  <div className="fw-bold">{emp.name}</div>
-                                  <small className="text-muted">Code: {emp.code} | Dept: {emp.department}</small>
-                                </div>
+                               <div>
+  <div className="fw-bold">{emp.name}</div>
+  <small className="text-muted">
+    Code: {emp.code || emp.employeeCode || 'N/A'} | 
+    Dept: {emp.department || emp.departmentName || 'N/A'} | 
+    Designation: {emp.designation || emp.designationName || 'N/A'}
+  </small>
+</div>
                                 <div>
                                   <span className="badge bg-light text-dark">{emp.designation}</span>
                                 </div>
@@ -1093,27 +1094,26 @@ const handleEdit = (appointment) => {
                   </div>
                 </div>
 
-               <div className="cert-field-compact">
+           <div className="cert-field-compact">
   <label>Employee Code</label>
   <input 
     type="text" 
     className="form-control bg-light" 
-    value={selectedEmployee?.code || formData.employeeCode || ''} 
+    value={selectedEmployee?.employeeCode || selectedEmployee?.code || formData.employeeCode || 'Auto-generated'} 
     readOnly 
     placeholder="Auto-populated"
-    style={{ fontSize: '14px', padding: '6px 12px' }}
+    style={{ fontSize: '14px', padding: '6px 12px', background: '#f3f4f6' }}
   />
 </div>
-
-               <div className="cert-field-compact">
+            <div className="cert-field-compact">
   <label>Department</label>
   <input 
     type="text" 
     className="form-control bg-light" 
-    value={selectedEmployee?.department || formData.initialDepartmentName || ''} 
+    value={selectedEmployee?.departmentName || selectedEmployee?.department || formData.initialDepartmentName || ''} 
     readOnly 
     placeholder="Auto-populated"
-    style={{ fontSize: '14px', padding: '6px 12px' }}
+    style={{ fontSize: '14px', padding: '6px 12px', background: '#f3f4f6' }}
   />
 </div>
   <div className={`cert-field-compact ${touched.initialDepartmentId && errors.initialDepartmentId ? 'has-error' : ''}`}>
@@ -1131,15 +1131,15 @@ const handleEdit = (appointment) => {
   {loadingDepartments && <small>Loading...</small>}
   <FieldError msg={errors.initialDepartmentId} />
 </div>
-              <div className="cert-field-compact">
+           <div className="cert-field-compact">
   <label>Designation</label>
   <input 
     type="text" 
     className="form-control bg-light" 
-    value={selectedEmployee?.designation || formData.initialDesignationName || ''} 
+    value={selectedEmployee?.designationName || selectedEmployee?.designation || formData.initialDesignationName || ''} 
     readOnly 
     placeholder="Auto-populated"
-    style={{ fontSize: '14px', padding: '6px 12px' }}
+    style={{ fontSize: '14px', padding: '6px 12px', background: '#f3f4f6' }}
   />
 </div>
 <div className={`cert-field-compact ${touched.initialDesignationId && errors.initialDesignationId ? 'has-error' : ''}`}>
