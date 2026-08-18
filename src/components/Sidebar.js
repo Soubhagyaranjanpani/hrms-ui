@@ -69,7 +69,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     {path : '/Retirement', icon:<FaBuilding />,label:'Retirement',roles:['Admin','Hr']},
     {path: '/Timeline', icon:<FaTimeline />,label:'Timeline',roles:['Admin','Hr']},
     {path: '/DocumentsRepository',icon:<FaDochub />,label:'Documents',roles:['Admin','Hr']},
-    {path: '/SearchBook',icon:<FaBook />,label:'Service Book History',roles:['Admin','Hr']},
+    {path: '/ServiceBookHistory',icon:<FaBook />,label:'Service Book History',roles:['Admin','Hr']},
     {path:'/AuditTrail',icon:<FaTrailer />,label:'Audit History',roles:['Admin','Hr']},
     {path: '/ServicebookReport',icon:<FaBook />,label:'Report',roles:['Admin','Hr']},
   ];

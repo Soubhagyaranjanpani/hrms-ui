@@ -47,7 +47,7 @@ import TrainingHistory from './pages/TrainingHistory';
 import Retirement from './pages/Retirement';
 import Timeline from './pages/Timeline';
 import DocumentsRepository from './pages/DocumentsRepository';
-import SearchBook from './pages/SearchBook';
+import ServiceBookHistory from './pages/ServiceBookHistory';
 import AuditTrail from './pages/AuditTrail';
 import ServicebookReport from './pages/ServicebookReport';
 import EmployeeDesignation from './pages/EmployeeDesignation';
@@ -76,6 +76,7 @@ import LeaveTypes from './Masters/Leave';
 import DeviceManagement from './pages/DeviceManagement';
 import DeviceConfiguration from './pages/DeviceConfiguration';
 import MapDevice from './pages/MapDevice';
+import BiometricMapping from './pages/BiometricMapping';
 import { BiCurrentLocation } from 'react-icons/bi';
 
 
@@ -193,7 +194,7 @@ function App() {
           <Route path="Retirement" element={<Retirement user={currentUser}/>}/>
           <Route path="Timeline" element={<Timeline user={currentUser}/>}/>
           <Route path="DocumentsRepository" element={<DocumentsRepository user={currentUser}/>}/>
-          <Route path="SearchBook" element={<SearchBook user={currentUser}/>}/>
+          <Route path="ServiceBookHistory" element={<ServiceBookHistory user={currentUser}/>}/>
           <Route path="AuditTrail" element={<AuditTrail user={BiCurrentLocation}/>}/>
           <Route path="ServicebookReport" element={<ServicebookReport user={currentUser}/>}/>
           <Route path="EmployeeDesignation" element={<EmployeeDesignation user={currentUser}/>}/>
@@ -215,6 +216,7 @@ function App() {
           <Route path="DeviceManagement" element={<DeviceManagement user={currentUser}/>}/>
           <Route path="DeviceConfiguration" element={<DeviceConfiguration user={currentUser}/>}/>
           <Route path="MapDevice" element={<MapDevice user={currentUser}/>}/>
+          <Route path="BiometricMapping" element={<BiometricMapping user={currentUser}/>}/>
         </Route>
       </Routes>
     </Router>
