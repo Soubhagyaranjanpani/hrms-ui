@@ -481,7 +481,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
         @media (max-width: 480px) { .filter-grid { grid-template-columns: 1fr; } }
         .text-muted { color: #94a3b8; }
         .small { font-size: 12px; }
-        .no-print { display: inline-block; }
+        .no-print { display: inline-block; } 
         @media print { .no-print { display: none !important; } }
         .filter-label { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px; display: block; }
         .filter-input { width: 100%; padding: 9px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 13px; outline: none; background: #f8fafc; transition: all 0.3s ease; font-family: "'Inter', sans-serif"; }
@@ -505,7 +505,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={styles.iconContainer}><FaBook size={20} /></div>
             <div>
-              <h1 style={styles.headerTitle}> Employee Service Book</h1>
+              <h1 style={styles.headerTitle}> Employee Service Book History</h1>
               <p style={styles.headerSubtitle}>
                 {showDetailView ? ` ${viewEmployee?.name} - Service Record` :
                  hasActiveFilters ? ` ${totalItems.toLocaleString()} employee${totalItems !== 1 ? 's' : ''} found` : 
