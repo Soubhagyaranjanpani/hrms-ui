@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  FaSearch, FaUserTie, FaBuilding, FaBriefcase, FaCalendarAlt, 
+import {
+  FaSearch, FaUserTie, FaBuilding, FaBriefcase, FaCalendarAlt,
   FaBook, FaEye, FaDownload, FaPrint, FaTimes,
   FaCheckCircle, FaClock, FaUserCheck, FaFileAlt, FaChartLine,
   FaExchangeAlt, FaTrophy, FaRupeeSign, FaChalkboardTeacher,
@@ -36,160 +36,160 @@ const DetailCard = ({ icon, label, value, bg, badge, color }) => (
   </div>
 );
 
-const ServiceBookSearch = ({ user, onCancel }) => {
+const ServiceBookHistory = ({ user, onCancel }) => {
   // ─── Employees Data ──────────────────────────────────────────
- const [employees, setEmployees] = useState([
-  { 
-    id: 1, 
-    name: 'Rahul Sharma', 
-    code: 'EMP001', 
-    branch: 'Noida',
-    department: 'IT', 
-    designation: 'Senior Developer', 
-    status: 'Active', 
-    joiningDate: '2020-01-10', 
-    retirementDate: '2058-12-31', 
-    photo: null,
-    appointment: { orderNo: 'APP-001', appointmentDate: '2020-01-05', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Software Engineer', joiningDate: '2020-01-10' },
-    confirmation: { confirmationDate: '2020-07-10', confirmationOrderNo: 'CONF-001', probationCompleted: 'Yes' },
-    promotions: [{ effectiveDate: '2022-04-01', from: 'Software Engineer', to: 'Senior Software Engineer', orderNo: 'PRO-001' }, { effectiveDate: '2024-04-01', from: 'Senior Software Engineer', to: 'Team Lead', orderNo: 'PRO-002' }],
-    transfers: [{ date: '2023-06-01', fromBranch: 'Noida', toBranch: 'Delhi', reason: 'Promotion' }],
-    deputations: [{ organization: 'Ministry of Corporate Affairs', startDate: '2024-01-15', endDate: '2024-06-15', status: 'Completed' }],
-    payRevisions: [{ effectiveDate: '2023-01-01', oldBasic: '50000', newBasic: '55000', orderNo: 'PAY-001' }],
-    training: [{ trainingName: 'React Advanced', provider: 'Udemy', type: 'Technical', startDate: '2023-03-01', endDate: '2023-03-15', certificate: 'cert.pdf' }],
-    awards: [{ awardName: 'Best Performer', date: '2023-12-01', issuedBy: 'CEO Office' }],
-    disciplinary: [{ caseNo: 'DISC-001', action: 'Warning', status: 'Closed' }],
-    qualifications: [{ qualification: 'B.Tech CSE', university: 'IIT Delhi', year: '2018' }],
-    certifications: [{ certificate: 'AWS Certified', issuedBy: 'Amazon', validTill: '2026-12-31' }],
-    documents: [{ documentName: 'Appointment Letter', uploadDate: '2020-01-10', download: '#' }]
-  },
-  { 
-    id: 2, 
-    name: 'Jane Smith', 
-    code: 'EMP002', 
-    branch: 'Delhi',
-    department: 'HR', 
-    designation: 'HR Manager', 
-    status: 'Active', 
-    joiningDate: '2019-06-10', 
-    retirementDate: null, 
-    photo: null,
-    appointment: { orderNo: 'APP-002', appointmentDate: '2019-06-05', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'HR Executive', joiningDate: '2019-06-10' },
-    confirmation: { confirmationDate: '2019-12-10', confirmationOrderNo: 'CONF-002', probationCompleted: 'Yes' },
-    promotions: [{ effectiveDate: '2021-04-01', from: 'HR Executive', to: 'HR Manager', orderNo: 'PRO-003' }],
-    transfers: [],
-    deputations: [],
-    payRevisions: [{ effectiveDate: '2022-01-01', oldBasic: '45000', newBasic: '50000', orderNo: 'PAY-002' }],
-    training: [{ trainingName: 'Leadership Skills', provider: 'Coursera', type: 'Soft Skills', startDate: '2022-08-01', endDate: '2022-08-15', certificate: 'cert.pdf' }],
-    awards: [{ awardName: 'Employee of the Year', date: '2022-12-01', issuedBy: 'CEO Office' }],
-    disciplinary: [],
-    qualifications: [{ qualification: 'MBA HR', university: 'XLRI', year: '2017' }],
-    certifications: [{ certificate: 'SHRM Certified', issuedBy: 'SHRM', validTill: '2025-12-31' }],
-    documents: [{ documentName: 'Appointment Letter', uploadDate: '2019-06-10', download: '#' }]
-  },
-  { 
-    id: 3, 
-    name: 'Mike Johnson', 
-    code: 'EMP003', 
-    branch: 'Noida',
-    department: 'IT', 
-    designation: 'Senior Developer', 
-    status: 'Active', 
-    joiningDate: '2021-03-20', 
-    retirementDate: null, 
-    photo: null,
-    appointment: { orderNo: 'APP-003', appointmentDate: '2021-03-15', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Junior Developer', joiningDate: '2021-03-20' },
-    confirmation: { confirmationDate: '2021-09-20', confirmationOrderNo: 'CONF-003', probationCompleted: 'Yes' },
-    promotions: [{ effectiveDate: '2023-04-01', from: 'Junior Developer', to: 'Senior Developer', orderNo: 'PRO-004' }],
-    transfers: [],
-    deputations: [],
-    payRevisions: [{ effectiveDate: '2023-01-01', oldBasic: '40000', newBasic: '45000', orderNo: 'PAY-003' }],
-    training: [{ trainingName: 'React Basics', provider: 'Udemy', type: 'Technical', startDate: '2023-02-01', endDate: '2023-02-15', certificate: 'cert.pdf' }],
-    awards: [],
-    disciplinary: [],
-    qualifications: [{ qualification: 'B.Sc IT', university: 'Delhi University', year: '2019' }],
-    certifications: [{ certificate: 'React Certified', issuedBy: 'Meta', validTill: '2025-03-20' }],
-    documents: [{ documentName: 'Appointment Letter', uploadDate: '2021-03-20', download: '#' }]
-  },
-  { 
-    id: 4, 
-    name: 'Sarah Williams', 
-    code: 'EMP004', 
-    branch: 'Gurgaon',
-    department: 'Sales', 
-    designation: 'Sales Manager', 
-    status: 'Retired', 
-    joiningDate: '2010-08-01', 
-    retirementDate: '2024-03-31', 
-    photo: null,
-    appointment: { orderNo: 'APP-004', appointmentDate: '2010-07-25', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Sales Executive', joiningDate: '2010-08-01' },
-    confirmation: { confirmationDate: '2011-02-01', confirmationOrderNo: 'CONF-004', probationCompleted: 'Yes' },
-    promotions: [
-      { effectiveDate: '2013-04-01', from: 'Sales Executive', to: 'Senior Sales Executive', orderNo: 'PRO-005' },
-      { effectiveDate: '2017-04-01', from: 'Senior Sales Executive', to: 'Sales Manager', orderNo: 'PRO-006' }
-    ],
-    transfers: [{ date: '2015-06-01', fromBranch: 'Delhi', toBranch: 'Gurgaon', reason: 'New Branch' }],
-    deputations: [],
-    payRevisions: [
-      { effectiveDate: '2015-01-01', oldBasic: '30000', newBasic: '35000', orderNo: 'PAY-004' },
-      { effectiveDate: '2020-01-01', oldBasic: '50000', newBasic: '60000', orderNo: 'PAY-005' }
-    ],
-    training: [
-      { trainingName: 'Sales Management', provider: 'Salesforce', type: 'Professional', startDate: '2018-05-01', endDate: '2018-05-15', certificate: 'cert.pdf' },
-      { trainingName: 'Customer Relationship', provider: 'Zoho', type: 'Professional', startDate: '2020-06-01', endDate: '2020-06-10', certificate: 'cert.pdf' }
-    ],
-    awards: [
-      { awardName: 'Top Sales Performer', date: '2015-12-01', issuedBy: 'CEO Office' },
-      { awardName: 'Best Manager', date: '2019-12-01', issuedBy: 'CEO Office' }
-    ],
-    disciplinary: [],
-    qualifications: [{ qualification: 'MBA Marketing', university: 'IIM Lucknow', year: '2008' }],
-    certifications: [],
-    documents: [{ documentName: 'Appointment Letter', uploadDate: '2010-08-01', download: '#' }]
-  },
-  { 
-    id: 5, 
-    name: 'David Brown', 
-    code: 'EMP005', 
-    branch: 'Noida',
-    department: 'Finance', 
-    designation: 'Accountant', 
-    status: 'Active', 
-    joiningDate: '2022-01-10', 
-    retirementDate: null, 
-    photo: null,
-    appointment: { orderNo: 'APP-005', appointmentDate: '2022-01-05', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Accountant', joiningDate: '2022-01-10' },
-    confirmation: { confirmationDate: '2022-07-10', confirmationOrderNo: 'CONF-005', probationCompleted: 'Yes' },
-    promotions: [],
-    transfers: [],
-    deputations: [],
-    payRevisions: [{ effectiveDate: '2023-01-01', oldBasic: '35000', newBasic: '38000', orderNo: 'PAY-006' }],
-    training: [{ trainingName: 'Advanced Excel', provider: 'Coursera', type: 'Technical', startDate: '2022-04-01', endDate: '2022-04-10', certificate: 'cert.pdf' }],
-    awards: [],
-    disciplinary: [{ caseNo: 'DISC-002', action: 'Misconduct', status: 'Pending' }],
-    qualifications: [{ qualification: 'B.Com', university: 'Delhi University', year: '2020' }],
-    certifications: [],
-    documents: [{ documentName: 'Appointment Letter', uploadDate: '2022-01-10', download: '#' }]
-  }
-]);
+  const [employees, setEmployees] = useState([
+    {
+      id: 1,
+      name: 'Rahul Sharma',
+      code: 'EMP001',
+      branch: 'Noida',
+      department: 'IT',
+      designation: 'Senior Developer',
+      status: 'Active',
+      joiningDate: '2020-01-10',
+      retirementDate: '2058-12-31',
+      photo: null,
+      appointment: { orderNo: 'APP-001', appointmentDate: '2020-01-05', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Software Engineer', joiningDate: '2020-01-10' },
+      confirmation: { confirmationDate: '2020-07-10', confirmationOrderNo: 'CONF-001', probationCompleted: 'Yes' },
+      promotions: [{ effectiveDate: '2022-04-01', from: 'Software Engineer', to: 'Senior Software Engineer', orderNo: 'PRO-001' }, { effectiveDate: '2024-04-01', from: 'Senior Software Engineer', to: 'Team Lead', orderNo: 'PRO-002' }],
+      transfers: [{ date: '2023-06-01', fromBranch: 'Noida', toBranch: 'Delhi', reason: 'Promotion' }],
+      deputations: [{ organization: 'Ministry of Corporate Affairs', startDate: '2024-01-15', endDate: '2024-06-15', status: 'Completed' }],
+      payRevisions: [{ effectiveDate: '2023-01-01', oldBasic: '50000', newBasic: '55000', orderNo: 'PAY-001' }],
+      training: [{ trainingName: 'React Advanced', provider: 'Udemy', type: 'Technical', startDate: '2023-03-01', endDate: '2023-03-15', certificate: 'cert.pdf' }],
+      awards: [{ awardName: 'Best Performer', date: '2023-12-01', issuedBy: 'CEO Office' }],
+      disciplinary: [{ caseNo: 'DISC-001', action: 'Warning', status: 'Closed' }],
+      qualifications: [{ qualification: 'B.Tech CSE', university: 'IIT Delhi', year: '2018' }],
+      certifications: [{ certificate: 'AWS Certified', issuedBy: 'Amazon', validTill: '2026-12-31' }],
+      documents: [{ documentName: 'Appointment Letter', uploadDate: '2020-01-10', download: '#' }]
+    },
+    {
+      id: 2,
+      name: 'Jane Smith',
+      code: 'EMP002',
+      branch: 'Delhi',
+      department: 'HR',
+      designation: 'HR Manager',
+      status: 'Active',
+      joiningDate: '2019-06-10',
+      retirementDate: null,
+      photo: null,
+      appointment: { orderNo: 'APP-002', appointmentDate: '2019-06-05', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'HR Executive', joiningDate: '2019-06-10' },
+      confirmation: { confirmationDate: '2019-12-10', confirmationOrderNo: 'CONF-002', probationCompleted: 'Yes' },
+      promotions: [{ effectiveDate: '2021-04-01', from: 'HR Executive', to: 'HR Manager', orderNo: 'PRO-003' }],
+      transfers: [],
+      deputations: [],
+      payRevisions: [{ effectiveDate: '2022-01-01', oldBasic: '45000', newBasic: '50000', orderNo: 'PAY-002' }],
+      training: [{ trainingName: 'Leadership Skills', provider: 'Coursera', type: 'Soft Skills', startDate: '2022-08-01', endDate: '2022-08-15', certificate: 'cert.pdf' }],
+      awards: [{ awardName: 'Employee of the Year', date: '2022-12-01', issuedBy: 'CEO Office' }],
+      disciplinary: [],
+      qualifications: [{ qualification: 'MBA HR', university: 'XLRI', year: '2017' }],
+      certifications: [{ certificate: 'SHRM Certified', issuedBy: 'SHRM', validTill: '2025-12-31' }],
+      documents: [{ documentName: 'Appointment Letter', uploadDate: '2019-06-10', download: '#' }]
+    },
+    {
+      id: 3,
+      name: 'Mike Johnson',
+      code: 'EMP003',
+      branch: 'Noida',
+      department: 'IT',
+      designation: 'Senior Developer',
+      status: 'Active',
+      joiningDate: '2021-03-20',
+      retirementDate: null,
+      photo: null,
+      appointment: { orderNo: 'APP-003', appointmentDate: '2021-03-15', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Junior Developer', joiningDate: '2021-03-20' },
+      confirmation: { confirmationDate: '2021-09-20', confirmationOrderNo: 'CONF-003', probationCompleted: 'Yes' },
+      promotions: [{ effectiveDate: '2023-04-01', from: 'Junior Developer', to: 'Senior Developer', orderNo: 'PRO-004' }],
+      transfers: [],
+      deputations: [],
+      payRevisions: [{ effectiveDate: '2023-01-01', oldBasic: '40000', newBasic: '45000', orderNo: 'PAY-003' }],
+      training: [{ trainingName: 'React Basics', provider: 'Udemy', type: 'Technical', startDate: '2023-02-01', endDate: '2023-02-15', certificate: 'cert.pdf' }],
+      awards: [],
+      disciplinary: [],
+      qualifications: [{ qualification: 'B.Sc IT', university: 'Delhi University', year: '2019' }],
+      certifications: [{ certificate: 'React Certified', issuedBy: 'Meta', validTill: '2025-03-20' }],
+      documents: [{ documentName: 'Appointment Letter', uploadDate: '2021-03-20', download: '#' }]
+    },
+    {
+      id: 4,
+      name: 'Sarah Williams',
+      code: 'EMP004',
+      branch: 'Gurgaon',
+      department: 'Sales',
+      designation: 'Sales Manager',
+      status: 'Retired',
+      joiningDate: '2010-08-01',
+      retirementDate: '2024-03-31',
+      photo: null,
+      appointment: { orderNo: 'APP-004', appointmentDate: '2010-07-25', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Sales Executive', joiningDate: '2010-08-01' },
+      confirmation: { confirmationDate: '2011-02-01', confirmationOrderNo: 'CONF-004', probationCompleted: 'Yes' },
+      promotions: [
+        { effectiveDate: '2013-04-01', from: 'Sales Executive', to: 'Senior Sales Executive', orderNo: 'PRO-005' },
+        { effectiveDate: '2017-04-01', from: 'Senior Sales Executive', to: 'Sales Manager', orderNo: 'PRO-006' }
+      ],
+      transfers: [{ date: '2015-06-01', fromBranch: 'Delhi', toBranch: 'Gurgaon', reason: 'New Branch' }],
+      deputations: [],
+      payRevisions: [
+        { effectiveDate: '2015-01-01', oldBasic: '30000', newBasic: '35000', orderNo: 'PAY-004' },
+        { effectiveDate: '2020-01-01', oldBasic: '50000', newBasic: '60000', orderNo: 'PAY-005' }
+      ],
+      training: [
+        { trainingName: 'Sales Management', provider: 'Salesforce', type: 'Professional', startDate: '2018-05-01', endDate: '2018-05-15', certificate: 'cert.pdf' },
+        { trainingName: 'Customer Relationship', provider: 'Zoho', type: 'Professional', startDate: '2020-06-01', endDate: '2020-06-10', certificate: 'cert.pdf' }
+      ],
+      awards: [
+        { awardName: 'Top Sales Performer', date: '2015-12-01', issuedBy: 'CEO Office' },
+        { awardName: 'Best Manager', date: '2019-12-01', issuedBy: 'CEO Office' }
+      ],
+      disciplinary: [],
+      qualifications: [{ qualification: 'MBA Marketing', university: 'IIM Lucknow', year: '2008' }],
+      certifications: [],
+      documents: [{ documentName: 'Appointment Letter', uploadDate: '2010-08-01', download: '#' }]
+    },
+    {
+      id: 5,
+      name: 'David Brown',
+      code: 'EMP005',
+      branch: 'Noida',
+      department: 'Finance',
+      designation: 'Accountant',
+      status: 'Active',
+      joiningDate: '2022-01-10',
+      retirementDate: null,
+      photo: null,
+      appointment: { orderNo: 'APP-005', appointmentDate: '2022-01-05', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Accountant', joiningDate: '2022-01-10' },
+      confirmation: { confirmationDate: '2022-07-10', confirmationOrderNo: 'CONF-005', probationCompleted: 'Yes' },
+      promotions: [],
+      transfers: [],
+      deputations: [],
+      payRevisions: [{ effectiveDate: '2023-01-01', oldBasic: '35000', newBasic: '38000', orderNo: 'PAY-006' }],
+      training: [{ trainingName: 'Advanced Excel', provider: 'Coursera', type: 'Technical', startDate: '2022-04-01', endDate: '2022-04-10', certificate: 'cert.pdf' }],
+      awards: [],
+      disciplinary: [{ caseNo: 'DISC-002', action: 'Misconduct', status: 'Pending' }],
+      qualifications: [{ qualification: 'B.Com', university: 'Delhi University', year: '2020' }],
+      certifications: [],
+      documents: [{ documentName: 'Appointment Letter', uploadDate: '2022-01-10', download: '#' }]
+    }
+  ]);
 
- const DUMMY_EMPLOYEES = [
-  { id: 1, name: 'Rahul Sharma', code: 'EMP001', department: 'IT', designation: 'Senior Developer', branch: 'Noida' },
-  { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager', branch: 'Delhi' },
-  { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer', branch: 'Noida' },
-  { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager', branch: 'Gurgaon' },
-  { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant', branch: 'Noida' }
-];
+  const DUMMY_EMPLOYEES = [
+    { id: 1, name: 'Rahul Sharma', code: 'EMP001', department: 'IT', designation: 'Senior Developer', branch: 'Noida' },
+    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager', branch: 'Delhi' },
+    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer', branch: 'Noida' },
+    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager', branch: 'Gurgaon' },
+    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant', branch: 'Noida' }
+  ];
 
   // ─── State ──────────────────────────────────────────────────
   const printRef = useRef(null);
   const fileInputRef = useRef(null);
-  
+
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
-  
+
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(4);
   const [viewEmployee, setViewEmployee] = useState(null);
@@ -200,12 +200,12 @@ const ServiceBookSearch = ({ user, onCancel }) => {
   const [filters, setFilters] = useState({
     employeeName: '',
     employeeCode: '',
-     branch: '', 
+    branch: '',
     department: '',
     designation: '',
     status: ''
   });
-const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  // ✅ Branch list
+  const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  // ✅ Branch list
   const departments = ['IT', 'HR', 'Finance', 'Sales', 'Marketing', 'Operations'];
   const designations = ['Software Engineer', 'Senior Developer', 'Tech Lead', 'HR Manager', 'Sales Manager', 'Accountant', 'Marketing Manager', 'Operations Manager', 'Product Manager'];
   const statuses = ['Active', 'Retired'];
@@ -226,9 +226,9 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
       const search = filters.employeeCode.toLowerCase();
       filtered = filtered.filter(emp => emp.code?.toLowerCase().includes(search));
     }
-     if (filters.branch) {                    
-    filtered = filtered.filter(emp => emp.branch === filters.branch);
-  }
+    if (filters.branch) {
+      filtered = filtered.filter(emp => emp.branch === filters.branch);
+    }
     if (filters.department) {
       filtered = filtered.filter(emp => emp.department === filters.department);
     }
@@ -278,7 +278,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
     setFilters({
       employeeName: '',
       employeeCode: '',
-       branch: '',
+      branch: '',
       department: '',
       designation: '',
       status: ''
@@ -303,7 +303,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
     const reader = new FileReader();
     reader.onloadend = () => {
       const photoData = reader.result;
-      setEmployees(prev => prev.map(emp => 
+      setEmployees(prev => prev.map(emp =>
         emp.id === viewEmployee?.id ? { ...emp, photo: photoData } : emp
       ));
       setViewEmployee(prev => prev ? { ...prev, photo: photoData } : null);
@@ -319,7 +319,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
 
   const handlePhotoRemove = () => {
     if (!viewEmployee) return;
-    setEmployees(prev => prev.map(emp => 
+    setEmployees(prev => prev.map(emp =>
       emp.id === viewEmployee.id ? { ...emp, photo: null } : emp
     ));
     setViewEmployee(prev => prev ? { ...prev, photo: null } : null);
@@ -508,8 +508,8 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
               <h1 style={styles.headerTitle}> Employee Service Book History</h1>
               <p style={styles.headerSubtitle}>
                 {showDetailView ? ` ${viewEmployee?.name} - Service Record` :
-                 hasActiveFilters ? ` ${totalItems.toLocaleString()} employee${totalItems !== 1 ? 's' : ''} found` : 
-                 'Apply filters to search employee records'}
+                  hasActiveFilters ? ` ${totalItems.toLocaleString()} employee${totalItems !== 1 ? 's' : ''} found` :
+                    'Apply filters to search employee records'}
               </p>
             </div>
           </div>
@@ -518,8 +518,8 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             {showDetailView && viewEmployee && (
               <>
-                <button 
-                  onClick={handlePrint} 
+                <button
+                  onClick={handlePrint}
                   style={{
                     padding: '8px 18px',
                     borderRadius: '10px',
@@ -541,8 +541,8 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                   <FaPrint size={14} /> Print Service Book
                 </button>
 
-                <button 
-                  onClick={handleDownloadPDF} 
+                <button
+                  onClick={handleDownloadPDF}
                   style={{
                     padding: '8px 18px',
                     borderRadius: '10px',
@@ -597,8 +597,8 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                 />
                 <div style={{ position: 'relative', width: '120px', height: '120px' }}>
                   {viewEmployee.photo ? (
-                    <img 
-                      src={viewEmployee.photo} 
+                    <img
+                      src={viewEmployee.photo}
                       alt={viewEmployee.name}
                       style={{
                         width: '100%', height: '100%', borderRadius: '50%',
@@ -619,8 +619,8 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                       {getInitials(viewEmployee.name)}
                     </div>
                   )}
-                  
-                  <button 
+
+                  <button
                     className="photo-upload-btn no-print"
                     onClick={triggerFileInput}
                     title="Upload Photo"
@@ -630,7 +630,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                   </button>
 
                   {viewEmployee.photo && (
-                    <button 
+                    <button
                       className="photo-remove-btn no-print"
                       onClick={handlePhotoRemove}
                       title="Remove Photo"
@@ -647,7 +647,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '6px', fontSize: '14px', opacity: 0.9 }}>
                   <span><FaIdCard size={12} style={{ marginRight: '6px' }} /> ID: {viewEmployee.id}</span>
                   <span><FaIdCard size={12} style={{ marginRight: '6px' }} /> {viewEmployee.code}</span>
-                  
+
                   <span><FaBuilding size={12} style={{ marginRight: '6px' }} /> {viewEmployee.department}</span>
                   <span><FaUserTie size={12} style={{ marginRight: '6px' }} /> {viewEmployee.designation}</span>
                   {getStatusBadge(viewEmployee.status)}
@@ -663,7 +663,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
               <div className="detail-grid">
                 <DetailCard icon={<FaIdCard size={14} color="#9d174d" />} label="Employee ID" value={viewEmployee.id} bg="#f8fafc" />
                 <DetailCard icon={<FaIdCard size={14} color="#9d174d" />} label="Employee Code" value={viewEmployee.code} bg="#f8fafc" />
-                 <DetailCard icon={<FaMapMarkerAlt size={14} color="#9d174d" />} label="Branch" value={viewEmployee.branch || 'Noida'} bg="#f8fafc" />
+                <DetailCard icon={<FaMapMarkerAlt size={14} color="#9d174d" />} label="Branch" value={viewEmployee.branch || 'Noida'} bg="#f8fafc" />
                 <DetailCard icon={<FaBuilding size={14} color="#9d174d" />} label="Department" value={viewEmployee.department} bg="#f8fafc" />
                 <DetailCard icon={<FaUserTie size={14} color="#9d174d" />} label="Designation" value={viewEmployee.designation} bg="#f8fafc" />
                 <DetailCard icon={<FaCalendarAlt size={14} color="#9d174d" />} label="Joining Date" value={formatDate(viewEmployee.joiningDate)} bg="#f8fafc" />
@@ -993,118 +993,118 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
               </div>
             )}
 
-      
-           {/* ─── Section 14: Timeline ────────────────────────────── */}
-<div className="mb-4">
-  <h4 className="d-flex align-items-center gap-2 mb-3" style={{ fontSize: '15px', fontWeight: '600', color: '#0f172a' }}>
-    <FaHistory size={16} color="#9d174d" /> Timeline
-  </h4>
-  
-  <div className="card border-0 shadow-sm" style={{ background: '#f8fafc', borderRadius: '12px' }}>
-    <div className="card-body p-4">
-      <ul className="list-unstyled mb-0 position-relative" style={{ paddingLeft: '30px' }}>
-        {/* Timeline Line */}
-        <div className="position-absolute" style={{ 
-          left: '14px', 
-          top: '12px', 
-          bottom: '12px', 
-          width: '2px', 
-          background: 'linear-gradient(180deg, #9d174d, #e2e8f0)'
-        }} />
-        
-        {/* Event 1: 2020 Appointment */}
-        <li className="mb-3 position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle bg-primary flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', border: '2px solid white', boxShadow: '0 0 0 2px #9d174d', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge bg-primary px-2 py-1" style={{ background: '#9d174d' }}>2020</span>
-                <span className="fw-semibold text-dark">📋 Appointment</span>
-                <span className="text-muted ms-auto small">10 Jan 2020</span>
+
+            {/* ─── Section 14: Timeline ────────────────────────────── */}
+            <div className="mb-4">
+              <h4 className="d-flex align-items-center gap-2 mb-3" style={{ fontSize: '15px', fontWeight: '600', color: '#0f172a' }}>
+                <FaHistory size={16} color="#9d174d" /> Timeline
+              </h4>
+
+              <div className="card border-0 shadow-sm" style={{ background: '#f8fafc', borderRadius: '12px' }}>
+                <div className="card-body p-4">
+                  <ul className="list-unstyled mb-0 position-relative" style={{ paddingLeft: '30px' }}>
+                    {/* Timeline Line */}
+                    <div className="position-absolute" style={{
+                      left: '14px',
+                      top: '12px',
+                      bottom: '12px',
+                      width: '2px',
+                      background: 'linear-gradient(180deg, #9d174d, #e2e8f0)'
+                    }} />
+
+                    {/* Event 1: 2020 Appointment */}
+                    <li className="mb-3 position-relative">
+                      <div className="d-flex align-items-start gap-3">
+                        <div className="rounded-circle bg-primary flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', border: '2px solid white', boxShadow: '0 0 0 2px #9d174d', zIndex: 1 }} />
+                        <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
+                          <div className="d-flex flex-wrap align-items-center gap-2">
+                            <span className="badge bg-primary px-2 py-1" style={{ background: '#9d174d' }}>2020</span>
+                            <span className="fw-semibold text-dark">📋 Appointment</span>
+                            <span className="text-muted ms-auto small">10 Jan 2020</span>
+                          </div>
+                          <div className="text-muted small mt-1">Joined as Software Engineer</div>
+                        </div>
+                      </div>
+                    </li>
+
+                    {/* Event 2: 2020 Confirmation */}
+                    <li className="mb-3 position-relative">
+                      <div className="d-flex align-items-start gap-3">
+                        <div className="rounded-circle bg-success flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', border: '2px solid white', boxShadow: '0 0 0 2px #10b981', zIndex: 1 }} />
+                        <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
+                          <div className="d-flex flex-wrap align-items-center gap-2">
+                            <span className="badge px-2 py-1" style={{ background: '#10b981' }}>2020</span>
+                            <span className="fw-semibold text-dark">✅ Confirmation</span>
+                            <span className="text-muted ms-auto small">10 Jul 2020</span>
+                          </div>
+                          <div className="text-muted small mt-1">Probation completed successfully</div>
+                        </div>
+                      </div>
+                    </li>
+
+                    {/* Event 3: 2022 Promotion */}
+                    <li className="mb-3 position-relative">
+                      <div className="d-flex align-items-start gap-3">
+                        <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#f59e0b', border: '2px solid white', boxShadow: '0 0 0 2px #f59e0b', zIndex: 1 }} />
+                        <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
+                          <div className="d-flex flex-wrap align-items-center gap-2">
+                            <span className="badge px-2 py-1" style={{ background: '#f59e0b' }}>2022</span>
+                            <span className="fw-semibold text-dark">📈 Promotion</span>
+                            <span className="text-muted ms-auto small">01 Apr 2022</span>
+                          </div>
+                          <div className="text-muted small mt-1">Software Engineer → Senior Software Engineer</div>
+                        </div>
+                      </div>
+                    </li>
+
+                    {/* Event 4: 2023 Training */}
+                    <li className="mb-3 position-relative">
+                      <div className="d-flex align-items-start gap-3">
+                        <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#6366f1', border: '2px solid white', boxShadow: '0 0 0 2px #6366f1', zIndex: 1 }} />
+                        <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
+                          <div className="d-flex flex-wrap align-items-center gap-2">
+                            <span className="badge px-2 py-1" style={{ background: '#6366f1' }}>2023</span>
+                            <span className="fw-semibold text-dark">📚 Training</span>
+                            <span className="text-muted ms-auto small">01 Mar 2023</span>
+                          </div>
+                          <div className="text-muted small mt-1">React Advanced - Technical Training</div>
+                        </div>
+                      </div>
+                    </li>
+
+                    {/* Event 5: 2024 Transfer */}
+                    <li className="mb-3 position-relative">
+                      <div className="d-flex align-items-start gap-3">
+                        <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#8b5cf6', border: '2px solid white', boxShadow: '0 0 0 2px #8b5cf6', zIndex: 1 }} />
+                        <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
+                          <div className="d-flex flex-wrap align-items-center gap-2">
+                            <span className="badge px-2 py-1" style={{ background: '#8b5cf6' }}>2024</span>
+                            <span className="fw-semibold text-dark">🔄 Transfer</span>
+                            <span className="text-muted ms-auto small">15 Jan 2024</span>
+                          </div>
+                          <div className="text-muted small mt-1">Deputation - Ministry of Corporate Affairs</div>
+                        </div>
+                      </div>
+                    </li>
+
+                    {/* Event 6: 2025 Award */}
+                    <li className="position-relative">
+                      <div className="d-flex align-items-start gap-3">
+                        <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#ec4899', border: '2px solid white', boxShadow: '0 0 0 2px #ec4899', zIndex: 1 }} />
+                        <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
+                          <div className="d-flex flex-wrap align-items-center gap-2">
+                            <span className="badge px-2 py-1" style={{ background: '#ec4899' }}>2025</span>
+                            <span className="fw-semibold text-dark">🏆 Award</span>
+                            <span className="text-muted ms-auto small">15 Jan 2025</span>
+                          </div>
+                          <div className="text-muted small mt-1">Best Performer - CEO Office</div>
+                        </div>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
               </div>
-              <div className="text-muted small mt-1">Joined as Software Engineer</div>
             </div>
-          </div>
-        </li>
-        
-        {/* Event 2: 2020 Confirmation */}
-        <li className="mb-3 position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle bg-success flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', border: '2px solid white', boxShadow: '0 0 0 2px #10b981', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge px-2 py-1" style={{ background: '#10b981' }}>2020</span>
-                <span className="fw-semibold text-dark">✅ Confirmation</span>
-                <span className="text-muted ms-auto small">10 Jul 2020</span>
-              </div>
-              <div className="text-muted small mt-1">Probation completed successfully</div>
-            </div>
-          </div>
-        </li>
-        
-        {/* Event 3: 2022 Promotion */}
-        <li className="mb-3 position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#f59e0b', border: '2px solid white', boxShadow: '0 0 0 2px #f59e0b', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge px-2 py-1" style={{ background: '#f59e0b' }}>2022</span>
-                <span className="fw-semibold text-dark">📈 Promotion</span>
-                <span className="text-muted ms-auto small">01 Apr 2022</span>
-              </div>
-              <div className="text-muted small mt-1">Software Engineer → Senior Software Engineer</div>
-            </div>
-          </div>
-        </li>
-        
-        {/* Event 4: 2023 Training */}
-        <li className="mb-3 position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#6366f1', border: '2px solid white', boxShadow: '0 0 0 2px #6366f1', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge px-2 py-1" style={{ background: '#6366f1' }}>2023</span>
-                <span className="fw-semibold text-dark">📚 Training</span>
-                <span className="text-muted ms-auto small">01 Mar 2023</span>
-              </div>
-              <div className="text-muted small mt-1">React Advanced - Technical Training</div>
-            </div>
-          </div>
-        </li>
-        
-        {/* Event 5: 2024 Transfer */}
-        <li className="mb-3 position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#8b5cf6', border: '2px solid white', boxShadow: '0 0 0 2px #8b5cf6', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge px-2 py-1" style={{ background: '#8b5cf6' }}>2024</span>
-                <span className="fw-semibold text-dark">🔄 Transfer</span>
-                <span className="text-muted ms-auto small">15 Jan 2024</span>
-              </div>
-              <div className="text-muted small mt-1">Deputation - Ministry of Corporate Affairs</div>
-            </div>
-          </div>
-        </li>
-        
-        {/* Event 6: 2025 Award */}
-        <li className="position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#ec4899', border: '2px solid white', boxShadow: '0 0 0 2px #ec4899', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge px-2 py-1" style={{ background: '#ec4899' }}>2025</span>
-                <span className="fw-semibold text-dark">🏆 Award</span>
-                <span className="text-muted ms-auto small">15 Jan 2025</span>
-              </div>
-              <div className="text-muted small mt-1">Best Performer - CEO Office</div>
-            </div>
-          </div>
-        </li>
-      </ul>
-    </div>
-  </div>
-</div>
           </div>
         </div>
       ) : (
@@ -1132,7 +1132,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                 )}
               </div>
             </div>
-            
+
             <div className="filter-grid">
               <div>
                 <label className="filter-label">Employee Name</label>
@@ -1143,12 +1143,12 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                 <input type="text" className="filter-input" placeholder="e.g., EMP001" value={filters.employeeCode} onChange={(e) => handleFilterChange('employeeCode', e.target.value)} />
               </div>
               <div>
-    <label className="filter-label">Branch</label>
-    <select className="filter-input" value={filters.branch} onChange={(e) => handleFilterChange('branch', e.target.value)}>
-      <option value="">All Branches</option>
-      {branches.map(branch => <option key={branch} value={branch}>{branch}</option>)}
-    </select>
-  </div>
+                <label className="filter-label">Branch</label>
+                <select className="filter-input" value={filters.branch} onChange={(e) => handleFilterChange('branch', e.target.value)}>
+                  <option value="">All Branches</option>
+                  {branches.map(branch => <option key={branch} value={branch}>{branch}</option>)}
+                </select>
+              </div>
               <div>
                 <label className="filter-label">Department</label>
                 <select className="filter-input" value={filters.department} onChange={(e) => handleFilterChange('department', e.target.value)}>
@@ -1213,11 +1213,11 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                             </div>
                           </td>
                           <td style={{ ...styles.tableCell, fontFamily: "'JetBrains Mono', monospace", fontSize: '13px' }}>{emp.code}</td>
-                           <td style={styles.tableCell}>
-          <span className="cert-status-badge" style={{ background: '#eef2ff', color: '#9d174d' }}>
-            {emp.branch || '—'}
-          </span>
-        </td>
+                          <td style={styles.tableCell}>
+                            <span className="cert-status-badge" style={{ background: '#eef2ff', color: '#9d174d' }}>
+                              {emp.branch || '—'}
+                            </span>
+                          </td>
                           <td style={styles.tableCell}>
                             <span className="cert-status-badge" style={{ background: '#eef2ff', color: '#9d174d' }}>{emp.department}</span>
                           </td>
@@ -1275,8 +1275,8 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
               )}
             </div>
           ) : (
-           <>
-           </>
+            <>
+            </>
           )}
         </>
       )}
@@ -1284,4 +1284,4 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
   );
 };
 
-export default ServiceBookSearch;
+export default ServiceBookHistory;
