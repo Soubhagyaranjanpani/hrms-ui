@@ -1,66 +1,21 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect,useCallback} from 'react';
 import { 
-  FaSearch, FaPlus, FaTimes, FaFilePdf, FaFileWord, 
-  FaFileImage, FaDownload, FaTrash, FaEdit, FaFileAlt,
+  FaSearch,FaTimes, FaFilePdf, FaFileWord, 
+  FaFileImage, FaDownload, FaFileAlt,
   FaChartLine, FaExchangeAlt, FaTrophy, FaRupeeSign, 
-  FaChalkboardTeacher, FaClock, FaSave, FaArrowLeft,
-  FaChevronDown, FaUpload, FaEye, FaFilter, FaBuilding,
+  FaChalkboardTeacher, FaClock,FaArrowLeft,
+  FaChevronDown, FaEye, FaFilter, FaBuilding,
   FaUserTie, FaBriefcase, FaCheckCircle, FaCalendarAlt,
-  FaUser, FaArrowRight
+  FaUser,
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import axios from 'axios';
+import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
 
 const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onCancel }) => {
- const [documents, setDocuments] = useState([
-  // ─── JOHN DOE (Employee 1) ──────────────────────────────
-  { id: 1, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order.pdf', fileType: 'pdf', fileSize: '1.2 MB', date: '2020-01-15', uploadedBy: 'HR Admin', uploadedOn: '2020-01-15', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Software Engineer' },
-  { id: 2, category: 'confirmation', title: 'Confirmation Letter', fileName: 'Confirmation_Letter.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2020-07-15', uploadedBy: 'HR Manager', uploadedOn: '2020-07-15', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Software Engineer' },
-  { id: 3, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2021-03-01', uploadedBy: 'HR Manager', uploadedOn: '2021-03-01', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
-  { id: 4, category: 'salaryRevision', title: 'Salary Slip - Jan 2024', fileName: 'Salary_Slip_Jan2024.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2024-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2024-01-01', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
-  { id: 5, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order_John.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2023-06-01', uploadedBy: 'HR Admin', uploadedOn: '2023-06-01', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
-  { id: 6, category: 'award', title: 'Best Employee Award 2023', fileName: 'Best_Employee_Award.pdf', fileType: 'pdf', fileSize: '1.5 MB', date: '2023-12-20', uploadedBy: 'CEO Office', uploadedOn: '2023-12-20', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
-  { id: 7, category: 'training', title: 'AWS Certification', fileName: 'AWS_Certification.pdf', fileType: 'pdf', fileSize: '2.1 MB', date: '2023-08-10', uploadedBy: 'Employee', uploadedOn: '2023-08-15', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
-{ id: 8, category: 'retirement', title: 'Retirement Document', fileName: 'Retirement_John.pdf', fileType: 'pdf', fileSize: '1.0 MB', date: '2024-12-31', uploadedBy: 'HR Admin', uploadedOn: '2024-12-31', employeeName: 'John Doe', employeeId: 1, department: 'IT', branch: 'Mumbai', designation: 'Senior Software Engineer' },
-
-  // ─── JANE SMITH (Employee 2) ──────────────────────────────
-  { id: 9, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order_Jane.pdf', fileType: 'pdf', fileSize: '1.1 MB', date: '2019-03-10', uploadedBy: 'HR Admin', uploadedOn: '2019-03-10', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'HR Manager' },
-  { id: 10, category: 'confirmation', title: 'Confirmation Letter', fileName: 'Confirmation_Letter_Jane.pdf', fileType: 'pdf', fileSize: '756 KB', date: '2019-09-10', uploadedBy: 'HR Manager', uploadedOn: '2019-09-10', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'HR Manager' },
-  { id: 11, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order_Jane.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2021-06-01', uploadedBy: 'HR Manager', uploadedOn: '2021-06-01', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'Senior HR Manager' },
-  { id: 12, category: 'salaryRevision', title: 'Salary Slip - Jan 2024', fileName: 'Salary_Slip_Jane_Jan2024.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2024-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2024-01-01', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'Senior HR Manager' },
-  { id: 13, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order_Jane.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2022-06-01', uploadedBy: 'HR Admin', uploadedOn: '2022-06-01', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'Senior HR Manager' },
-  { id: 14, category: 'award', title: 'HR Excellence Award', fileName: 'HR_Excellence_Award.pdf', fileType: 'pdf', fileSize: '1.3 MB', date: '2022-12-15', uploadedBy: 'CEO Office', uploadedOn: '2022-12-15', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'Senior HR Manager' },
-  { id: 15, category: 'training', title: 'Leadership Training', fileName: 'Leadership_Training.pdf', fileType: 'pdf', fileSize: '1.8 MB', date: '2023-05-20', uploadedBy: 'Employee', uploadedOn: '2023-05-25', employeeName: 'Jane Smith', employeeId: 2, department: 'HR', branch: 'Delhi', designation: 'Senior HR Manager' },
-
-  // ─── MIKE JOHNSON (Employee 3) ────────────────────────────
-  { id: 16, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order_Mike.pdf', fileType: 'pdf', fileSize: '1.2 MB', date: '2020-08-20', uploadedBy: 'HR Admin', uploadedOn: '2020-08-20', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Senior Developer' },
-  { id: 17, category: 'confirmation', title: 'Confirmation Letter', fileName: 'Confirmation_Letter_Mike.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2021-02-20', uploadedBy: 'HR Manager', uploadedOn: '2021-02-20', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Senior Developer' },
-  { id: 18, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order_Mike.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2022-09-01', uploadedBy: 'HR Manager', uploadedOn: '2022-09-01', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Tech Lead' },
-  { id: 19, category: 'salaryRevision', title: 'Salary Slip - Jan 2024', fileName: 'Salary_Slip_Mike_Jan2024.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2024-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2024-01-01', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Tech Lead' },
-  { id: 20, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order_Mike.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2023-03-01', uploadedBy: 'HR Admin', uploadedOn: '2023-03-01', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Tech Lead' },
-  { id: 21, category: 'award', title: 'Innovation Award', fileName: 'Innovation_Award.pdf', fileType: 'pdf', fileSize: '1.2 MB', date: '2023-10-10', uploadedBy: 'CEO Office', uploadedOn: '2023-10-10', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Tech Lead' },
-  { id: 22, category: 'training', title: 'Python Certification', fileName: 'Python_Certification.pdf', fileType: 'pdf', fileSize: '2.0 MB', date: '2023-07-15', uploadedBy: 'Employee', uploadedOn: '2023-07-20', employeeName: 'Mike Johnson', employeeId: 3, department: 'IT', branch: 'Bangalore', designation: 'Tech Lead' },
-
-  // ─── SARAH WILLIAMS (Employee 4) ──────────────────────────
-  { id: 23, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order_Sarah.pdf', fileType: 'pdf', fileSize: '1.0 MB', date: '2021-01-05', uploadedBy: 'HR Admin', uploadedOn: '2021-01-05', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Sales Manager' },
-  { id: 24, category: 'confirmation', title: 'Confirmation Letter', fileName: 'Confirmation_Letter_Sarah.pdf', fileType: 'pdf', fileSize: '756 KB', date: '2021-07-05', uploadedBy: 'HR Manager', uploadedOn: '2021-07-05', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Sales Manager' },
-  { id: 25, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order_Sarah.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2023-01-01', uploadedBy: 'HR Manager', uploadedOn: '2023-01-01', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Senior Sales Manager' },
-  { id: 26, category: 'salaryRevision', title: 'Salary Slip - Jan 2024', fileName: 'Salary_Slip_Sarah_Jan2024.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2024-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2024-01-01', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Senior Sales Manager' },
-  { id: 27, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order_Sarah.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2022-12-01', uploadedBy: 'HR Admin', uploadedOn: '2022-12-01', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Senior Sales Manager' },
-  { id: 28, category: 'award', title: 'Best Sales Award 2023', fileName: 'Best_Sales_Award.pdf', fileType: 'pdf', fileSize: '1.4 MB', date: '2023-12-20', uploadedBy: 'CEO Office', uploadedOn: '2023-12-20', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Senior Sales Manager' },
-  { id: 29, category: 'training', title: 'Sales Training Certificate', fileName: 'Sales_Training.pdf', fileType: 'pdf', fileSize: '1.6 MB', date: '2023-04-10', uploadedBy: 'Employee', uploadedOn: '2023-04-15', employeeName: 'Sarah Williams', employeeId: 4, department: 'Sales', branch: 'Mumbai', designation: 'Senior Sales Manager' },
-
-  // ─── DAVID BROWN (Employee 5) ─────────────────────────────
-  { id: 30, category: 'appointment', title: 'Appointment Order', fileName: 'Appointment_Order_David.pdf', fileType: 'pdf', fileSize: '1.1 MB', date: '2018-11-15', uploadedBy: 'HR Admin', uploadedOn: '2018-11-15', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Accountant' },
-  { id: 31, category: 'confirmation', title: 'Confirmation Letter', fileName: 'Confirmation_Letter_David.pdf', fileType: 'pdf', fileSize: '756 KB', date: '2019-05-15', uploadedBy: 'HR Manager', uploadedOn: '2019-05-15', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Accountant' },
-  { id: 32, category: 'promotion', title: 'Promotion Order', fileName: 'Promotion_Order_David.pdf', fileType: 'pdf', fileSize: '856 KB', date: '2022-04-01', uploadedBy: 'HR Manager', uploadedOn: '2022-04-01', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
-  { id: 33, category: 'salaryRevision', title: 'Salary Slip - Jan 2024', fileName: 'Salary_Slip_David_Jan2024.pdf', fileType: 'pdf', fileSize: '432 KB', date: '2024-01-01', uploadedBy: 'Payroll Manager', uploadedOn: '2024-01-01', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
-  { id: 34, category: 'transfer', title: 'Transfer Order', fileName: 'Transfer_Order_David.pdf', fileType: 'pdf', fileSize: '654 KB', date: '2021-06-01', uploadedBy: 'HR Admin', uploadedOn: '2021-06-01', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
-  { id: 35, category: 'award', title: 'Best Employee Award', fileName: 'Award_Certificate.pdf', fileType: 'pdf', fileSize: '1.5 MB', date: '2022-01-20', uploadedBy: 'CEO Office', uploadedOn: '2022-01-20', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
-  { id: 36, category: 'training', title: 'Financial Analysis Certificate', fileName: 'Financial_Analysis.pdf', fileType: 'pdf', fileSize: '1.9 MB', date: '2023-09-01', uploadedBy: 'Employee', uploadedOn: '2023-09-05', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
-  { id: 37, category: 'retirement', title: 'Retirement Document', fileName: 'Retirement_David.pdf', fileType: 'pdf', fileSize: '1.0 MB', date: '2024-12-31', uploadedBy: 'HR Admin', uploadedOn: '2024-12-31', employeeName: 'David Brown', employeeId: 5, department: 'Finance', branch: 'Delhi', designation: 'Senior Accountant' },
-]);
-  // Search and Filter States 
+  // Existing states
+  const [documents, setDocuments] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [employeeNameSearch, setEmployeeNameSearch] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -73,23 +28,356 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [realEmployees, setRealEmployees] = useState([]);
+  const [realDocuments, setRealDocuments] = useState([]);
+  const [branchList, setBranchList] = useState([]);
+  const [departmentList, setDepartmentList] = useState([]);
+  const [designationList, setDesignationList] = useState([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [debouncedEmployeeCode, setDebouncedEmployeeCode] = useState('');
+  const [debouncedEmployeeName, setDebouncedEmployeeName] = useState('');
+  const [filters, setFilters] = useState({
+    department: 'all',
+    branch: 'all',
+    designation: 'all',
+    fromDate: '',
+    toDate: '',
+    category: 'all'
+  });
+  const [totalItems, setTotalItems] = useState(0);
+const [totalPages, setTotalPages] = useState(0);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchStats, setSearchStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0
+  });
   
   // Pagination States
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
   
-  // ─── View Page State ────────────────────────────────────
+  // View Page State
   const [showViewPage, setShowViewPage] = useState(false);
   const [viewingEmployee, setViewingEmployee] = useState(null);
   const [viewingEmployeeDocs, setViewingEmployeeDocs] = useState([]);
   const [selectedDocForPreview, setSelectedDocForPreview] = useState(null);
+
+
+  const getAuthToken = () => {
+  const token = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  return token;
+};
+
+const getAxiosConfig = () => {
+  const token = getAuthToken();
+  return {
+    headers: {
+      Authorization: token ? `Bearer ${token}` : '', 
+      'Content-Type': 'application/json',
+    },
+  };
+};
+
+// ─── ENSURE TOKEN ──────────────────────────────────────────
+const ensureToken = () => {
+  const token = getAuthToken();
+  if (!token) {
+    toast.error("Authentication Required", "Please login to continue");
+    return false;
+  }
+  return true;
+};
 
   // Refs
   const employeeInputRef = useRef(null);
   const dropdownRef = useRef(null);
   const employeeNameInputRef = useRef(null);
 
-  // Close dropdown when clicking outside
+ const fetchEmployees = useCallback(async (pageNum = 0) => {
+  if (!ensureToken()) return;
+  setSearchLoading(true);
+  try {
+    const params = {
+      page: pageNum,
+      size: rowsPerPage,
+    };
+    
+    if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+    if (filters.employeeCode) params.employeeCode = filters.employeeCode;
+    if (filters.employeeName) params.employeeName = filters.employeeName;
+    if (filters.department) params.department = filters.department;
+    if (filters.designation) params.designation = filters.designation;
+    if (filters.branch) params.branch = filters.branch;
+    if (filters.status) params.status = filters.status;
+
+    const res = await axios.get(
+      `${BASE_URL}/api/employees`,
+      { ...getAxiosConfig(), params }
+    );
+
+    console.log("📥 Employees Response:", res.data);
+
+    let employeesData = [];
+    let totalElements = 0;
+    let totalPagesData = 0;
+
+    if (res.data?.status === 200) {
+      if (res.data.response?.content) {
+        employeesData = res.data.response.content;
+        totalElements = res.data.response.totalElements || 0;
+        totalPagesData = res.data.response.totalPages || 0;
+      } else if (Array.isArray(res.data.response)) {
+        employeesData = res.data.response;
+        totalElements = employeesData.length;
+        totalPagesData = Math.ceil(totalElements / rowsPerPage);
+      }
+    } else if (res.data?.content) {
+      employeesData = res.data.content;
+      totalElements = res.data.totalElements || 0;
+      totalPagesData = res.data.totalPages || 0;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      employeesData = res.data.data;
+      totalElements = employeesData.length;
+      totalPagesData = Math.ceil(totalElements / rowsPerPage);
+    } else if (Array.isArray(res.data)) {
+      employeesData = res.data;
+      totalElements = employeesData.length;
+      totalPagesData = Math.ceil(totalElements / rowsPerPage);
+    }
+
+    const mappedEmployees = employeesData.map((item) => ({
+      id: item.id || item.employeeId,
+      code: item.employeeCode || item.code || '',
+      name: item.employeeName || item.name || 'Unknown',
+      department: item.departmentName || item.department || '',
+      designation: item.designation || item.designationName || '',
+      joiningDate: item.joiningDate || item.dateOfJoining || '',
+      status: item.isActive ? 'Active' : 'Inactive',
+      email: item.email || '',
+      phone: item.phone || '',
+      dob: item.dob || '',
+      gender: item.gender || '',
+      experience: item.experience || '',
+      location: item.location || '',
+      branch: item.branch || item.branchName || '',
+      grade: item.grade || ''
+    }));
+
+    setRealEmployees(mappedEmployees); 
+    setSearchResults(mappedEmployees);
+    setTotalItems(totalElements);
+    setTotalPages(totalPagesData);
+    setHasSearched(true);
+    setSearchStats({
+      totalEmployees: totalElements,
+      filteredCount: mappedEmployees.length,
+      searchTime: `${Math.round(Math.random() * 50 + 10)}ms`
+    });
+
+  } catch (err) {
+    console.error('Fetch employees error:', err);
+    toast.error('Error', err.response?.data?.message || 'Failed to fetch employees');
+    setSearchResults([]);
+    setRealEmployees([]);  
+    setTotalItems(0);
+    setTotalPages(0);
+  } finally {
+    setSearchLoading(false);
+  }
+}, [debouncedSearchTerm, debouncedEmployeeCode, debouncedEmployeeName, filters, rowsPerPage]);
+
+// ─── FETCH BRANCHES ──────────────────────────────────────────
+const fetchBranches = useCallback(async () => {
+  if (!ensureToken()) return;
+  try {
+    const res = await axios.get(`${BASE_URL}/branches/list?flag=0`, getAxiosConfig());
+    console.log("📥 Branches Response:", res.data);
+    
+    let data = [];
+    if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map(item => ({
+      id: item.id,
+      name: item.name || item.branchName || ''
+    }));
+    setBranchList(mapped);
+  } catch (err) {
+    console.error('Fetch branches error:', err);
+    setBranchList([]);
+  }
+}, []);
+
+// ─── FETCH DEPARTMENTS ──────────────────────────────────────────
+const fetchDepartments = useCallback(async () => {
+  if (!ensureToken()) return;
+  try {
+    const res = await axios.get(`${BASE_URL}/departments/list?flag=0`, getAxiosConfig());
+    console.log("📥 Departments Response:", res.data);
+    
+    let data = [];
+    if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map(item => ({
+      id: item.id,
+      name: item.name || item.departmentName || ''
+    }));
+    setDepartmentList(mapped);
+  } catch (err) {
+    console.error('Fetch departments error:', err);
+    setDepartmentList([]);
+  }
+}, []);
+
+// ─── FETCH DESIGNATIONS ──────────────────────────────────────────
+const fetchDesignations = useCallback(async () => {
+  if (!ensureToken()) return;
+  try {
+    const res = await axios.get(`${BASE_URL}/api/designations/list?flag=0`, getAxiosConfig());
+    console.log("📥 Designations Response:", res.data);
+    
+    let data = [];
+    if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+      data = res.data.response;
+    } else if (res.data?.data && Array.isArray(res.data.data)) {
+      data = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      data = res.data;
+    }
+    
+    const mapped = data.map(item => ({
+      id: item.id,
+      name: item.name || item.designationName || ''
+    }));
+    setDesignationList(mapped);
+  } catch (err) {
+    console.error('Fetch designations error:', err);
+    setDesignationList([]);
+  }
+}, []);
+
+
+// ─── FETCH DOCUMENTS ──────────────────────────────────────────
+
+const fetchDocuments = useCallback(async (employeeId = null) => {
+  if (!ensureToken()) return;
+  setLoading(true);
+  try {
+    let url;
+    if (employeeId !== null && employeeId !== undefined && employeeId !== 0) {
+      const cleanId = Number(employeeId);
+      url = `${BASE_URL}/api/documents/employee/${cleanId}`;
+    } else {
+      url = `${BASE_URL}/api/documents/employee/0`;
+    }
+    
+    const res = await axios.get(url, getAxiosConfig());
+    let docData = [];
+    if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+      docData = res.data.response;
+    }
+
+    console.log("📄 Document Count:", docData.length);
+
+    const employee = realEmployees.find(emp => emp.id === Number(employeeId));
+
+    let mappedDocs = [];
+    
+    if (docData && docData.length > 0) {
+      mappedDocs = docData.map((doc, index) => ({
+        id: doc.id || doc.documentId || index + 1,
+        fileName: doc.fileName || doc.documentName || 'document.pdf',
+        filePath: doc.filePath || doc.documentUrl || '',
+        fileType: doc.fileType || 'pdf',
+        fileSize: doc.fileSize || '0',
+        category: doc.category || doc.documentType || 'EDUCATION',
+        documentType: doc.documentType || doc.type || 'DEGREE_CERTIFICATE',
+        isVerified: doc.isVerified || false,
+        uploadedAt: doc.uploadedAt || doc.createdAt || doc.date || '',
+        uploadedBy: doc.uploadedBy || doc.createdBy || 'HR Admin',
+        
+        employeeName: employee?.name || doc.employeeName || 'Unknown',
+        employeeId: employeeId || doc.employeeId || 0,
+        department: employee?.department || doc.department || '—',
+        branch: employee?.branch || doc.branch || '—',
+        designation: employee?.designation || doc.designation || '—',
+        
+        title: doc.documentType || doc.category || doc.title || 'Document',
+        date: doc.uploadedAt || doc.createdAt || doc.date || '',
+        serviceBookNumber: doc.serviceBookNumber || '',
+        documentUrl: doc.filePath || doc.documentUrl || ''
+      }));
+    } else {
+      console.log("⚠️ No documents found, showing employee details only");
+      
+      mappedDocs = [{
+        id: 0,
+        fileName: 'No documents found',
+        filePath: '',
+        fileType: '',
+        fileSize: '0',
+        category: 'NONE',
+        documentType: 'NONE',
+        isVerified: false,
+        uploadedAt: new Date().toISOString(),
+        uploadedBy: 'System',
+        
+        employeeName: employee?.name || 'Unknown',
+        employeeId: employeeId || 0,
+        department: employee?.department || '—',
+        branch: employee?.branch || '—',
+        designation: employee?.designation || '—',
+        
+        title: 'No Documents',
+        date: new Date().toISOString(),
+        serviceBookNumber: '',
+        documentUrl: ''
+      }];
+      
+      toast.info('No Documents', `No documents found for ${employee?.name || 'Employee'}`);
+    }
+
+  
+    setRealDocuments(mappedDocs || []);
+setDocuments(mappedDocs || []);
+    setHasSearched(true);
+    
+    setTotalItems(mappedDocs.length);
+    setTotalPages(Math.ceil(mappedDocs.length / rowsPerPage));
+
+  } catch (err) {
+    setRealDocuments([]);
+    setDocuments([]);
+    toast.error('Error', err.response?.data?.message || 'Failed to fetch documents');
+  } finally {
+    setLoading(false);
+  }
+}, [realEmployees, rowsPerPage]);
+
+
+useEffect(() => {
+  fetchEmployees();
+  fetchBranches();
+  fetchDepartments();
+  fetchDesignations();
+    fetchDocuments();
+    setHasSearched(true);
+} ,[]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target) && 
@@ -101,18 +389,7 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const DUMMY_EMPLOYEES = [
-    { id: 1, name: 'John Doe', code: 'EMP001', department: 'IT', branch: 'Mumbai', designation: 'Software Engineer' },
-    { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', branch: 'Delhi', designation: 'HR Manager' },
-    { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', branch: 'Bangalore', designation: 'Senior Developer' },
-    { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', branch: 'Mumbai', designation: 'Sales Manager' },
-    { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', branch: 'Delhi', designation: 'Accountant' },
-    { id: 6, name: 'Robert Wilson', code: 'EMP006', department: 'IT', branch: 'Bangalore', designation: 'DevOps Engineer' },
-    { id: 7, name: 'Emily Davis', code: 'EMP007', department: 'HR', branch: 'Mumbai', designation: 'Recruitment Specialist' },
-    { id: 8, name: 'James Taylor', code: 'EMP008', department: 'Finance', branch: 'Bangalore', designation: 'Financial Analyst' },
-    { id: 9, name: 'Lisa Anderson', code: 'EMP009', department: 'Sales', branch: 'Delhi', designation: 'Sales Executive' },
-    { id: 10, name: 'Michael Brown', code: 'EMP010', department: 'IT', branch: 'Mumbai', designation: 'System Administrator' }
-  ];
+
 
   const documentCategories = [
     { id: 'appointment', label: 'Appointment Orders', icon: <FaFileAlt />, color: '#4f46e5', bg: '#e0e7ff' },
@@ -130,13 +407,7 @@ const ServiceBookDocumentRepository = ({ employeeId, initialData, onSuccess, onC
   const branches = ['all', ...new Set(documents.map(doc => doc.branch))];
   const designations = ['all', ...new Set(documents.map(doc => doc.designation))];
 
- const filteredDummyEmployees = DUMMY_EMPLOYEES.filter(emp => 
-  emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
-  emp.code.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-  emp.department.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-  emp.designation.toLowerCase().includes(employeeSearchTerm.toLowerCase())
-);
-
+ 
   // Get unique employee names from documents for the employee name input
   const uniqueEmployeeNames = [...new Set(documents.map(doc => doc.employeeName))];
 
@@ -251,33 +522,46 @@ const getFilteredEmployees = () => {
   
   return employees;
 };
-  
-const filteredEmployees = getFilteredEmployees();
-const totalItems = filteredEmployees.length;
-const totalPages = Math.ceil(totalItems / rowsPerPage);
+
+// ─── PAGINATION CALCULATIONS ──────────────────────────
 const startIndex = page * rowsPerPage;
-const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
+const currentDocuments = documents && Array.isArray(documents) 
+  ? documents.slice(startIndex, startIndex + rowsPerPage) 
+  : [];
+const docTotal = documents?.length || 0;
+const docPages = Math.ceil(docTotal / rowsPerPage) || 1;
 
-  const getPaginationRange = () => {
-    const delta = 2;
-    const range = [];
-    const left = Math.max(0, page - delta);
-    const right = Math.min(totalPages - 1, page + delta);
-    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
-    for (let i = left; i <= right; i++) range.push(i);
-    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
-    return range;
-  };
+// ─── PAGINATION RANGE ──────────────────────────────────
+const getPaginationRange = () => {
+  const delta = 2;
+  const range = [];
+  const total = docPages || 1;
+  const left = Math.max(0, page - delta);
+  const right = Math.min(total - 1, page + delta);
+  if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+  for (let i = left; i <= right; i++) range.push(i);
+  if (right < total - 1) { if (right < total - 2) range.push('...'); range.push(total - 1); }
+  return range;
+};
 
-  const handleEmployeeSelect = (employee) => {
-    setSelectedEmployee(employee);
-    setEmployeeSearchTerm(employee.name);
-    setEmployeeNameSearch(employee.name);
-    setShowEmployeeDropdown(false);
-    setPage(0);
-    setHasSearched(true);
-    toast.success('Employee Selected', `Showing documents for ${employee.name}`);
-  };
+const handleEmployeeSelect = (employee) => {
+  setSelectedEmployee(employee);
+  setEmployeeSearchTerm(employee.name);
+  setShowEmployeeDropdown(false);
+
+  if (employee?.id) {
+    const empId = Number(employee.id);
+    console.log("🔄 Sending Employee ID:", empId);
+    
+    if (empId > 0) {
+      fetchDocuments(empId);
+    } else {
+      toast.error("Error", "Invalid Employee ID");
+    }
+  } else {
+    toast.error("Error", "Employee ID not found");
+  }
+};
 
   const handleEmployeeNameSelect = (name) => {
     setEmployeeNameSearch(name);
@@ -296,31 +580,33 @@ const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPe
   const handleSearch = () => {
   setHasSearched(true);
   setPage(0);
-  if (!searchTerm && !employeeNameSearch && !selectedEmployee && activeCategory === 'all' && 
-      selectedDepartment === 'all' && selectedBranch === 'all' && selectedDesignation === 'all' &&
-      !fromDate && !toDate) {
-    toast.info('Showing All', 'Displaying all documents');
+  
+  if (selectedEmployee?.id) {
+    fetchDocuments(selectedEmployee.id);
   } else {
-    const employees = getFilteredEmployees();
-    toast.success('Search Complete', `Found ${employees.length} employees`);
+    fetchDocuments(0);
   }
 };
 
   const handleReset = () => {
-    setSearchTerm('');
-    setSelectedEmployee(null);
-    setEmployeeSearchTerm('');
-    setEmployeeNameSearch('');
-    setActiveCategory('all');
-    setSelectedDepartment('all');
-    setSelectedBranch('all');
-    setSelectedDesignation('all');
-    setFromDate('');
-    setToDate('');
-    setHasSearched(false);
-    setPage(0);
-    toast.info('Reset', 'Search filters cleared');
-  };
+  setSearchTerm('');
+  setSelectedEmployee(null);
+  setEmployeeSearchTerm('');
+  setEmployeeNameSearch('');
+  setActiveCategory('all');
+  setSelectedDepartment('all');
+  setSelectedBranch('all');
+  setSelectedDesignation('all');
+  setFromDate('');
+  setToDate('');
+  setHasSearched(false);
+  setPage(0);
+  
+  setRealDocuments([]);
+  setDocuments([]);
+  
+  toast.info('Reset', 'Search filters cleared');
+};
 
  const handleDownload = (doc) => {
   // Simulate download
@@ -328,22 +614,34 @@ const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPe
  };
 
   // ─── View Employee Documents ─────────────────────────────
-  const handleViewEmployee = (employeeName) => {
-    const employee = DUMMY_EMPLOYEES.find(emp => emp.name === employeeName);
-    if (employee) {
-      const docs = documents.filter(doc => doc.employeeName === employeeName);
-      setViewingEmployee(employee);
-      setViewingEmployeeDocs(docs);
-      // Set first document as selected for preview
-      if (docs.length > 0) {
-        setSelectedDocForPreview(docs[0]);
-      }
-      setShowViewPage(true);
-    } else {
-      toast.warning('Not Found', 'Employee details not found');
+const handleViewEmployee = (employeeName) => {
+  const employee = realEmployees.find(emp => emp.name === employeeName);
+  if (employee) {
+    const docs = documents.filter(doc => doc.employeeName === employeeName);
+    setViewingEmployee(employee);
+    setViewingEmployeeDocs(docs);
+    if (docs.length > 0) {
+      setSelectedDocForPreview(docs[0]);
     }
-  };
+    setShowViewPage(true);
+  } else {
+    toast.warning('Not Found', 'Employee details not found');
+  }
+};
 
+const handleViewDocument = (doc) => {
+  // Employee details fetch karo
+  const employee = realEmployees.find(emp => emp.id === doc.employeeId);
+  if (employee) {
+    const docs = documents.filter(d => d.employeeId === doc.employeeId);
+    setViewingEmployee(employee);
+    setViewingEmployeeDocs(docs);
+    setSelectedDocForPreview(doc);
+    setShowViewPage(true);
+  } else {
+    toast.warning('Not Found', 'Employee details not found');
+  }
+};
   const handleBackToList = () => {
     setShowViewPage(false);
     setViewingEmployee(null);
@@ -485,64 +783,58 @@ const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPe
                 <th style={{ ...viewPageStyles.th, textAlign: 'center', width: '160px' }}>Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {viewingEmployeeDocs.length > 0 ? (
-                viewingEmployeeDocs.map((doc, idx) => {
-                  const cat = getCategoryInfo(doc.category);
-                  return (
-                    <tr key={doc.id}>
-                      <td style={{ ...viewPageStyles.td, color: '#94a3b8', fontSize: '12px', textAlign: 'center' }}>{idx + 1}</td>
-                      <td style={viewPageStyles.td}>
-                        <span style={{ ...viewPageStyles.badge, backgroundColor: cat.bg, color: cat.color }}>
-                          {cat.icon} {cat.label}
-                        </span>
-                      </td>
-                      <td style={{ ...viewPageStyles.td, fontWeight: '500', color: '#0f172a' }}>{doc.title}</td>
-                      <td style={viewPageStyles.td}>{formatDate(doc.date)}</td>
-                      <td style={{ ...viewPageStyles.td, textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                         <button
-  style={{
-    ...viewPageStyles.btnInfo,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease'
-  }}
-  onClick={() => handleSelectDocumentForPreview(doc)}
-  title="View Document"
-  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
->
-  <FaEye size={12} /> View
-</button>
-                         <button
-  style={{
-    ...viewPageStyles.btnSuccess,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease'
-  }}
-  onClick={() => handleDownload(doc)}
-  title="Download"
-  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
->
-  <FaDownload size={12} /> Download
-</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan="5">
-                    <div style={viewPageStyles.emptyState}>
-                      <FaFileAlt size={48} style={{ color: '#cbd5e1', marginBottom: '16px' }} />
-                      <div style={{ fontSize: '16px', fontWeight: '500', color: '#475569' }}>No documents found for this employee</div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
+<tbody>
+  {viewingEmployeeDocs && viewingEmployeeDocs.length > 0 ? (
+    viewingEmployeeDocs.map((doc, idx) => {
+      const cat = getCategoryInfo(doc.category);
+      return (
+        <tr key={doc.id || idx}>
+          <td style={{ ...viewPageStyles.td, color: '#94a3b8', fontSize: '12px', textAlign: 'center' }}>
+            {idx + 1}
+          </td>
+          <td style={viewPageStyles.td}>
+            <span style={{ ...viewPageStyles.badge, backgroundColor: cat.bg, color: cat.color }}>
+              {cat.icon} {cat.label}
+            </span>
+          </td>
+          <td style={{ ...viewPageStyles.td, fontWeight: '500', color: '#0f172a' }}>
+            {doc.title || doc.fileName}
+          </td>
+          <td style={viewPageStyles.td}>
+            {formatDate(doc.date || doc.uploadedAt)}
+          </td>
+          <td style={{ ...viewPageStyles.td, textAlign: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              <button
+                style={viewPageStyles.btnInfo}
+                onClick={() => handleSelectDocumentForPreview(doc)}
+              >
+                <FaEye size={12} /> View
+              </button>
+              <button
+                style={viewPageStyles.btnSuccess}
+                onClick={() => handleDownload(doc)}
+              >
+                <FaDownload size={12} /> Download
+              </button>
+            </div>
+          </td>
+        </tr>
+      );
+    })
+  ) : (
+    <tr>
+      <td colSpan="5">
+        <div style={viewPageStyles.emptyState}>
+          <FaFileAlt size={48} style={{ color: '#cbd5e1', marginBottom: '16px' }} />
+          <div style={{ fontSize: '16px', fontWeight: '500', color: '#475569' }}>
+            No documents found for this employee
+          </div>
+        </div>
+      </td>
+    </tr>
+  )}
+</tbody>
           </table>
         </div>
       </div>
@@ -903,9 +1195,10 @@ const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPe
                 }
               }}
             >
-              <option value="all">All Branches</option>
-              {branches.filter(b => b !== 'all').map(branch => (
-                <option key={branch} value={branch}>{branch}</option>
+    <option value="">All Branches</option>
+    {branchList.map(branch => (
+      <option key={branch.id} value={branch.name}>{branch.name}</option>
+   
               ))}
             </select>
             <FaChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
@@ -928,9 +1221,9 @@ const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPe
                 }
               }}
             >
-              <option value="all">All Departments</option>
-              {departments.filter(d => d !== 'all').map(dept => (
-                <option key={dept} value={dept}>{dept}</option>
+              <option value="">All Departments</option>
+    {departmentList.map(dept => (
+      <option key={dept.id} value={dept.name}>{dept.name}</option>
               ))}
             </select>
             <FaChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
@@ -953,33 +1246,80 @@ const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPe
                 }
               }}
             >
-              <option value="all">All Designations</option>
-              {designations.filter(d => d !== 'all').map(desig => (
-                <option key={desig} value={desig}>{desig}</option>
+              <option value="">All Designations</option>
+    {designationList.map(desg => (
+      <option key={desg.id} value={desg.name}>{desg.name}</option>
               ))}
             </select>
             <FaChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
           </div>
         </div>
 
-        <div>
-          <label className="search-label">
-            <FaSearch size={11} style={{ marginRight: '4px' }} /> Employee Name
-          </label>
-          <input
-            className="service-doc-input"
-            type="text"
-            placeholder="Search by name..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setPage(0);
-              if (e.target.value) {
-                setHasSearched(true);
-              }
-            }}
-          />
+       <div>
+  <label className="search-label">
+    <FaSearch size={11} style={{ marginRight: '4px' }} /> Employee Name
+  </label>
+  <div style={{ position: 'relative' }}>
+    <input
+      className="service-doc-input"
+      type="text"
+      placeholder="Search by name..."
+      value={employeeSearchTerm}
+      onChange={(e) => {
+        setEmployeeSearchTerm(e.target.value);
+        setShowEmployeeDropdown(true);
+        setPage(0);
+        if (e.target.value === '') {
+          setSelectedEmployee(null);
+          setRealDocuments([]);
+          setDocuments([]);
+          setHasSearched(false);
+        } else {
+          setHasSearched(true);
+        }
+      }}
+      onFocus={() => {
+        if (employeeSearchTerm.length > 0) {
+          setShowEmployeeDropdown(true);
+        }
+      }}
+    />
+    
+{/* Employee Dropdown */}
+{showEmployeeDropdown && employeeSearchTerm.length > 0 && (
+  <div className="service-doc-dropdown" ref={dropdownRef}>
+    {realEmployees
+      .filter(emp => 
+        emp.name?.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+        emp.code?.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+      )
+      .map(emp => (
+        <div 
+          key={emp.id} 
+          className="service-doc-dropdown-item"
+          onClick={() => handleEmployeeSelect(emp)}  
+        >
+          <div>
+            <div className="emp-name">{emp.name}</div>
+            <div className="emp-details">
+              Code: {emp.code} | Dept: {emp.department || '—'}
+            </div>
+          </div>
+          <span className="emp-branch">{emp.designation || '—'}</span>
         </div>
+      ))}
+    {realEmployees.filter(emp => 
+      emp.name?.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+      emp.code?.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+    ).length === 0 && (
+      <div className="service-doc-dropdown-item">
+        <span style={{ color: '#94a3b8' }}>No employees found</span>
+      </div>
+    )}
+  </div>
+)}
+  </div>
+</div>
 
         <div>
           <label className="search-label">
@@ -1031,7 +1371,7 @@ const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPe
           {/* Results Summary */}
           <div style={{ padding: '12px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-              <span style={{ fontWeight: '600', color: '#0f172a' }}>{totalItems}</span>
+              <span style={{ fontWeight: '600', color: '#0f172a' }}>{docTotal}</span>
               <span style={{ color: '#64748b' }}> document(s) found</span>
               {employeeNameSearch && (
                 <span className="filter-tag" style={{ background: '#dbeafe', color: '#2563eb' }}>
@@ -1094,73 +1434,115 @@ const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPe
                   <th style={{ width: '140px', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
-             <tbody>
-  {currentEmployees.length > 0 ? (
-    currentEmployees.map((emp, idx) => (
-      <tr key={emp.id}>
-        <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>{startIndex + idx + 1}</td>
-        <td style={{ fontWeight: '600', color: '#0f172a' }}>{emp.name}</td>
+           <tbody>
+  {currentDocuments && currentDocuments.length > 0 ? (  
+    currentDocuments.map((doc, idx) => (
+      <tr key={doc.id || idx}>
+        <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>
+          {startIndex + idx + 1}
+        </td>
+        <td style={{ fontWeight: '600', color: '#0f172a' }}>
+          {doc.employeeName || selectedEmployee?.name || 'Unknown'}
+        </td>
         <td>
           <span style={{ padding: '2px 10px', background: '#dbeafe', borderRadius: '12px', fontSize: '11px', color: '#2563eb' }}>
-            {emp.department || '—'}
+            {doc.department || selectedEmployee?.department || '—'}
           </span>
         </td>
         <td>
           <span style={{ padding: '2px 10px', background: '#d1fae5', borderRadius: '12px', fontSize: '11px', color: '#059669' }}>
-            {emp.branch || '—'}
+            {doc.branch || selectedEmployee?.branch || '—'}
           </span>
         </td>
-        <td style={{ color: '#334155' }}>{emp.designation || '—'}</td>
+        <td style={{ color: '#334155' }}>
+          {doc.designation || selectedEmployee?.designation || '—'}
+        </td>
         <td>
           <span style={{ padding: '2px 10px', background: '#fce7f3', borderRadius: '12px', fontSize: '11px', color: '#9d174d' }}>
-            {emp.documentCount} Documents
+            {doc.id === 0 ? '📄 No Documents' : doc.category || '—'}
           </span>
         </td>
         <td>
           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
             <button
               style={{ padding: '6px 12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
-              onClick={() => handleViewEmployee(emp.name)}
-              title="View All Documents"
+              onClick={() => handleViewDocument(doc)}
             >
               <FaEye size={12} /> View
             </button>
+            
+            {doc.id !== 0 && (
+              <button
+                style={{ padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+                onClick={() => handleDownload(doc)}
+              >
+                <FaDownload size={12} /> Download
+              </button>
+            )}
           </div>
         </td>
       </tr>
     ))
-                ) : (
-                  <tr>
-                    <td colSpan="8">
-                      <div className="empty-state">
-                        <FaFileAlt size={48} />
-                        <div style={{ fontSize: '16px', fontWeight: '500', color: '#475569' }}>No documents found</div>
-                        <div style={{ fontSize: '13px', marginTop: '4px' }}>Try adjusting your search or filter criteria</div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
+  ) : (
+    <tr>
+      <td colSpan="7">
+        <div className="empty-state">
+          <FaFileAlt size={48} />
+          <div style={{ fontSize: '16px', fontWeight: '500', color: '#475569' }}>
+            {loading ? 'Loading...' : 'No documents found'}
+          </div>
+          <div style={{ fontSize: '13px', marginTop: '4px', color: '#94a3b8' }}>
+            {loading ? 'Please wait...' : 'Try adjusting your search or filter criteria'}
+          </div>
+        </div>
+      </td>
+    </tr>
+  )}
+</tbody>
             </table>
           </div>
 
-          {/* PAGINATION */}
-          {totalItems > 0 && (
-            <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-              <span style={{ fontSize: '13px', color: '#64748b' }}>
-                Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems}
-              </span>
-              <div className="service-doc-pagination">
-                <button className="service-doc-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
-                {getPaginationRange().map((pg, i) => 
-                  pg === '...' ? 
-                    <span key={`dots-${i}`} style={{ padding: '6px 8px', color: '#94a3b8' }}>…</span> : 
-                    <button key={pg} className={`service-doc-page-btn ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>{pg + 1}</button>
-                )}
-                <button className="service-doc-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
-              </div>
-            </div>
-          )}
+          
+        {/* PAGINATION */}
+{docTotal > 0 && (
+  <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+    <span style={{ fontSize: '13px', color: '#64748b' }}>
+      Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, docTotal)} of {docTotal}
+    </span>
+    <div className="service-doc-pagination">
+      <button 
+        className="service-doc-page-btn" 
+        disabled={page === 0} 
+        onClick={() => setPage(p => p - 1)}
+      >
+        ← Prev
+      </button>
+      
+      {getPaginationRange().map((pg, idx) => {
+        if (pg === '...') {
+          return <span key={`ellipsis-${idx}`} style={{ padding: '6px 8px', color: '#94a3b8' }}>…</span>;
+        }
+        return (
+          <button 
+            key={pg} 
+            className={`service-doc-page-btn ${pg === page ? 'active' : ''}`} 
+            onClick={() => setPage(pg)}
+          >
+            {pg + 1}
+          </button>
+        );
+      })}
+      
+      <button 
+        className="service-doc-page-btn" 
+        disabled={page + 1 >= docPages} 
+        onClick={() => setPage(p => p + 1)}
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+)}
         </div>
       ) : (
         <></>
