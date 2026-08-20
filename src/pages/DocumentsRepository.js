@@ -1181,7 +1181,7 @@ const handleViewDocument = (doc) => {
             <FaFilter style={{ marginRight: '8px' }} /> Filters
           </div>
           <label className="search-label">
-            <FaBriefcase size={11} style={{ marginRight: '4px' }} /> Branch
+             Branch
           </label>
           <div style={{ position: 'relative' }}>
             <select
@@ -1207,7 +1207,7 @@ const handleViewDocument = (doc) => {
 
         <div>
           <label className="search-label">
-            <FaBuilding size={11} style={{ marginRight: '4px' }} /> Department
+             Department
           </label>
           <div style={{ position: 'relative' }}>
             <select
@@ -1232,7 +1232,7 @@ const handleViewDocument = (doc) => {
 
         <div>
           <label className="search-label">
-            <FaUserTie size={11} style={{ marginRight: '4px' }} /> Designation
+          Designation
           </label>
           <div style={{ position: 'relative' }}>
             <select
@@ -1257,7 +1257,7 @@ const handleViewDocument = (doc) => {
 
        <div>
   <label className="search-label">
-    <FaSearch size={11} style={{ marginRight: '4px' }} /> Employee Name
+  Employee Name
   </label>
   <div style={{ position: 'relative' }}>
     <input
@@ -1323,7 +1323,7 @@ const handleViewDocument = (doc) => {
 
         <div>
           <label className="search-label">
-            <FaCalendarAlt size={11} style={{ marginRight: '4px' }} /> From Date
+          From Date
           </label>
           <input
             type="date"
@@ -1341,7 +1341,7 @@ const handleViewDocument = (doc) => {
 
         <div>
           <label className="search-label">
-            <FaCalendarAlt size={11} style={{ marginRight: '4px' }} /> To Date
+         To Date
           </label>
           <input
             type="date"
