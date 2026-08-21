@@ -92,8 +92,8 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   children: [
     { path: '/devicemanagement', icon: <FaCog />, label: 'Device Management', roles: ['Admin', 'Hr'] },
     { path: '/deviceconfiguration', icon: <FaClock />, label: 'Device Configuration', roles: ['Admin', 'Hr'] },
-    { path: '/MapDevicetoBranch', icon: <FaMapMarker />, label: 'Device Branch Mapping', roles: ['Admin', 'Hr'] },
-    {path: '/MapEmployeetoDevice', icon:<FaDatabase />, label:'Employee Device Mapping',roles:['Admin','Hr']},
+    { path: '/DeviceBranchMapping', icon: <FaMapMarker />, label: 'Device Branch Mapping', roles: ['Admin', 'Hr'] },
+    {path: '/EmployeeDeviceMapping', icon:<FaDatabase />, label:'Employee Device Mapping',roles:['Admin','Hr']},
     {path: '/AttendanceSynchronize', icon:<FaTable/>, label:'Attendance Synchronize',roles:['Admin','Hr']},
     {path: '/AttendanceExceptions',icon:<FaFileExcel/>,label:'Attendance Exceptions',roles:['Admin','Hr']},
     {path: '/DeviceHealthDashboard',icon:<FaHeartCircleCheck/>,label:'Device Health Dashboard',roles:['Admin','Hr']},

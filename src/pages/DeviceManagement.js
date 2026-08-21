@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   FaSave, FaEdit, FaPlus, FaArrowLeft, FaServer,
-  FaSearch, FaFilter
+  FaSearch, FaFilter,FaTimes
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
@@ -265,25 +265,25 @@ const DeviceManagement = () => {
       </div>
 
       {/* ─── SEARCH BAR ────────────────────────────────────── */}
-      {!showForm && (
-        <div style={{ ...styles.card, marginBottom: '16px' }}>
-          <div style={styles.searchBox}>
-            <input
-              style={styles.searchInput}
-              type="text"
-              placeholder="Search by code, name, type, manufacturer, model, serial number or IP..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
-            />
-            <button 
-              style={{ ...styles.btnSecondary, padding: '8px 16px' }}
-              onClick={() => { setSearchTerm(''); setCurrentPage(0); }}
-            >
-              <FaFilter size={12} /> Clear
-            </button>
-          </div>
-        </div>
+    {!showForm && (
+  <div className="emp-search-bar">
+    <div className="emp-search-wrap">
+      <FaSearch className="emp-search-icon" size={12} />
+      <input
+        className="emp-search-input"
+        type="text"
+        placeholder="Search by code, name, type, manufacturer, model, serial number or IP..."
+        value={searchTerm}
+        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
+      />
+      {searchTerm && (
+        <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setCurrentPage(0); }}>
+          <FaTimes size={11} />
+        </button>
       )}
+    </div>
+  </div>
+)}
 
       {/* ─── TABLE ─────────────────────────────────────────── */}
       {!showForm ? (

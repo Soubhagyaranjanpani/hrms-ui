@@ -75,8 +75,8 @@ import Skills from './Masters/Skills';
 import LeaveTypes from './Masters/Leave';
 import DeviceManagement from './pages/DeviceManagement';
 import DeviceConfiguration from './pages/DeviceConfiguration';
-import MapDevicetoBranch from './pages/MapDevicetoBranch';
-import MapEmployeetoDevice from './pages/MapEmployeetoDevice';
+import DeviceBranchMapping from './pages/DeviceBranchMapping';
+import EmployeeDeviceMapping from './pages/EmployeeDeviceMapping';
 import AttendanceSynchronize from './pages/AttendanceSynchronize';
 import AttendanceExceptions from './pages/AttendanceExceptions';
 import DeviceAuditTrail from './pages/DeviceAuditTrail';
@@ -220,11 +220,11 @@ function App() {
           <Route path="JobLocation" element={<JobLocation user={currentUser}/>}/>
           <Route path="DeviceManagement" element={<DeviceManagement user={currentUser}/>}/>
           <Route path="DeviceConfiguration" element={<DeviceConfiguration user={currentUser}/>}/>
-          <Route path="MapDevicetoBranch" element={<MapDevicetoBranch user={currentUser}/>}/>
-          <Route path="/MapEmployeetoDevice" element={<MapEmployeetoDevice user={currentUser}/>}/>
-          <Route path="/AttendanceSynchronize" element={<AttendanceSynchronize user={currentUser}/>}/>
-          <Route path="/AttendanceExceptions" element={<AttendanceExceptions user={currentUser}/>}/>
-          <Route path="/DeviceHealthDashboard" element={<DeviceHealthDashboard user={currentUser}/>}/>
+          <Route path="DeviceBranchMapping" element={<DeviceBranchMapping user={currentUser}/>}/>
+          <Route path="EmployeeDeviceMapping" element={<EmployeeDeviceMapping user={currentUser}/>}/>
+          <Route path="AttendanceSynchronize" element={<AttendanceSynchronize user={currentUser}/>}/>
+          <Route path="AttendanceExceptions" element={<AttendanceExceptions user={currentUser}/>}/>
+          <Route path="DeviceHealthDashboard" element={<DeviceHealthDashboard user={currentUser}/>}/>
           <Route path="DeviceAuditTrail" element={<DeviceAuditTrail user={currentUser}/>}/>
           <Route path="SynchronizationDashboard" element={<SynchronizationDashboard user={currentUser}/>}/>
         </Route>

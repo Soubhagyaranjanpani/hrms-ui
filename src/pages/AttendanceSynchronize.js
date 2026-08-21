@@ -4,7 +4,7 @@ import {
   FaCalendarAlt, FaToggleOn, FaServer, FaCheckCircle,
   FaToggleOff, FaExclamationCircle, FaSearch, FaFilter,
   FaClock, FaDownload, FaHistory, FaUser, FaFingerprint,
-  FaRobot, FaClock as FaClockIcon
+  FaRobot, FaClock as FaClockIcon,FaTimes
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
@@ -471,27 +471,25 @@ const AttendanceSynchronization = () => {
       </div>
 
       {/* ─── SEARCH BAR ────────────────────────────────────── */}
-      {!showForm && (
-        <div style={{ ...styles.card, marginBottom: '16px' }}>
-          <div style={styles.searchBox}>
-            <input
-              className="search-input"
-              style={styles.searchInput}
-              type="text"
-              placeholder="Search by device name, code, sync type, status or records..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
-            />
-            <button
-              style={{ ...styles.btnSecondary, padding: '8px 16px' }}
-              onClick={() => { setSearchTerm(''); setCurrentPage(0); }}
-            >
-              Clear
-            </button>
-          </div>
-        </div>
+    {!showForm && (
+  <div className="emp-search-bar">
+    <div className="emp-search-wrap">
+      <FaSearch className="emp-search-icon" size={12} />
+      <input
+        className="emp-search-input"
+        type="text"
+        placeholder="Search by device name, code, sync type, status or records..."
+        value={searchTerm}
+        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
+      />
+      {searchTerm && (
+        <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setCurrentPage(0); }}>
+          <FaTimes size={11} />
+        </button>
       )}
-
+    </div>
+  </div>
+)}
       {/* ─── FORM SECTION ────────────────────────────────── */}
       {showForm && (
         <div style={{ ...styles.card, marginBottom: '24px', borderColor: '#9d174d' }}>

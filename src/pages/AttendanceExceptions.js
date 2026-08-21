@@ -693,27 +693,24 @@ const AttendanceExceptionManagement = () => {
       {/* ─── SEARCH & FILTER ────────────────────────────── */}
       {!showForm && (
         <>
-          <div style={{ ...styles.card, marginBottom: '16px' }}>
-            <div style={styles.searchBox}>
-              <input
-                style={styles.searchInput}
-                type="text"
-                placeholder="Search by employee, device or exception type..."
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
-              />
-              <select
-                style={styles.filterSelect}
-                value={filterStatus}
-                onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(0); }}
-              >
-                <option value="all">All Status</option>
-                {resolutionStatuses.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+         <div className="emp-search-bar">
+  <div className="emp-search-wrap">
+    <FaSearch className="emp-search-icon" size={12} />
+    <input
+      className="emp-search-input"
+      type="text"
+      placeholder="Search by employee, device or exception type..."
+      value={searchTerm}
+      onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
+    />
+    {searchTerm && (
+      <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setCurrentPage(0); }}>
+        <FaTimes size={11} />
+      </button>
+    )}
+  </div>
+ 
+</div>
 
           {/* ─── TABLE ─────────────────────────────────────────── */}
           <div style={styles.card}>
