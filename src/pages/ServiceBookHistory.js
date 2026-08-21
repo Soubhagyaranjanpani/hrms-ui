@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  FaSearch, FaUserTie, FaBuilding, FaBriefcase, FaCalendarAlt, 
+import {
+  FaSearch, FaUserTie, FaBuilding, FaBriefcase, FaCalendarAlt,
   FaBook, FaEye, FaDownload, FaPrint, FaTimes,
   FaCheckCircle, FaClock, FaUserCheck, FaFileAlt, FaChartLine,
   FaExchangeAlt, FaTrophy, FaRupeeSign, FaChalkboardTeacher,
@@ -13,6 +12,9 @@ import {
   FaCamera
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
+import axios from 'axios';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
 
 const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
@@ -37,198 +39,198 @@ const DetailCard = ({ icon, label, value, bg, badge, color }) => (
 );
 
 const ServiceBookSearch = ({ user, onCancel }) => {
-  // ─── Employees Data ──────────────────────────────────────────
- const [employees, setEmployees] = useState([
-  { 
-    id: 1, 
-    name: 'Rahul Sharma', 
-    code: 'EMP001', 
-    branch: 'Noida',
-    department: 'IT', 
-    designation: 'Senior Developer', 
-    status: 'Active', 
-    joiningDate: '2020-01-10', 
-    retirementDate: '2058-12-31', 
-    photo: null,
-    appointment: { orderNo: 'APP-001', appointmentDate: '2020-01-05', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Software Engineer', joiningDate: '2020-01-10' },
-    confirmation: { confirmationDate: '2020-07-10', confirmationOrderNo: 'CONF-001', probationCompleted: 'Yes' },
-    promotions: [{ effectiveDate: '2022-04-01', from: 'Software Engineer', to: 'Senior Software Engineer', orderNo: 'PRO-001' }, { effectiveDate: '2024-04-01', from: 'Senior Software Engineer', to: 'Team Lead', orderNo: 'PRO-002' }],
-    transfers: [{ date: '2023-06-01', fromBranch: 'Noida', toBranch: 'Delhi', reason: 'Promotion' }],
-    deputations: [{ organization: 'Ministry of Corporate Affairs', startDate: '2024-01-15', endDate: '2024-06-15', status: 'Completed' }],
-    payRevisions: [{ effectiveDate: '2023-01-01', oldBasic: '50000', newBasic: '55000', orderNo: 'PAY-001' }],
-    training: [{ trainingName: 'React Advanced', provider: 'Udemy', type: 'Technical', startDate: '2023-03-01', endDate: '2023-03-15', certificate: 'cert.pdf' }],
-    awards: [{ awardName: 'Best Performer', date: '2023-12-01', issuedBy: 'CEO Office' }],
-    disciplinary: [{ caseNo: 'DISC-001', action: 'Warning', status: 'Closed' }],
-    qualifications: [{ qualification: 'B.Tech CSE', university: 'IIT Delhi', year: '2018' }],
-    certifications: [{ certificate: 'AWS Certified', issuedBy: 'Amazon', validTill: '2026-12-31' }],
-    documents: [{ documentName: 'Appointment Letter', uploadDate: '2020-01-10', download: '#' }]
-  },
-  { 
-    id: 2, 
-    name: 'Jane Smith', 
-    code: 'EMP002', 
-    branch: 'Delhi',
-    department: 'HR', 
-    designation: 'HR Manager', 
-    status: 'Active', 
-    joiningDate: '2019-06-10', 
-    retirementDate: null, 
-    photo: null,
-    appointment: { orderNo: 'APP-002', appointmentDate: '2019-06-05', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'HR Executive', joiningDate: '2019-06-10' },
-    confirmation: { confirmationDate: '2019-12-10', confirmationOrderNo: 'CONF-002', probationCompleted: 'Yes' },
-    promotions: [{ effectiveDate: '2021-04-01', from: 'HR Executive', to: 'HR Manager', orderNo: 'PRO-003' }],
-    transfers: [],
-    deputations: [],
-    payRevisions: [{ effectiveDate: '2022-01-01', oldBasic: '45000', newBasic: '50000', orderNo: 'PAY-002' }],
-    training: [{ trainingName: 'Leadership Skills', provider: 'Coursera', type: 'Soft Skills', startDate: '2022-08-01', endDate: '2022-08-15', certificate: 'cert.pdf' }],
-    awards: [{ awardName: 'Employee of the Year', date: '2022-12-01', issuedBy: 'CEO Office' }],
-    disciplinary: [],
-    qualifications: [{ qualification: 'MBA HR', university: 'XLRI', year: '2017' }],
-    certifications: [{ certificate: 'SHRM Certified', issuedBy: 'SHRM', validTill: '2025-12-31' }],
-    documents: [{ documentName: 'Appointment Letter', uploadDate: '2019-06-10', download: '#' }]
-  },
-  { 
-    id: 3, 
-    name: 'Mike Johnson', 
-    code: 'EMP003', 
-    branch: 'Noida',
-    department: 'IT', 
-    designation: 'Senior Developer', 
-    status: 'Active', 
-    joiningDate: '2021-03-20', 
-    retirementDate: null, 
-    photo: null,
-    appointment: { orderNo: 'APP-003', appointmentDate: '2021-03-15', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Junior Developer', joiningDate: '2021-03-20' },
-    confirmation: { confirmationDate: '2021-09-20', confirmationOrderNo: 'CONF-003', probationCompleted: 'Yes' },
-    promotions: [{ effectiveDate: '2023-04-01', from: 'Junior Developer', to: 'Senior Developer', orderNo: 'PRO-004' }],
-    transfers: [],
-    deputations: [],
-    payRevisions: [{ effectiveDate: '2023-01-01', oldBasic: '40000', newBasic: '45000', orderNo: 'PAY-003' }],
-    training: [{ trainingName: 'React Basics', provider: 'Udemy', type: 'Technical', startDate: '2023-02-01', endDate: '2023-02-15', certificate: 'cert.pdf' }],
-    awards: [],
-    disciplinary: [],
-    qualifications: [{ qualification: 'B.Sc IT', university: 'Delhi University', year: '2019' }],
-    certifications: [{ certificate: 'React Certified', issuedBy: 'Meta', validTill: '2025-03-20' }],
-    documents: [{ documentName: 'Appointment Letter', uploadDate: '2021-03-20', download: '#' }]
-  },
-  { 
-    id: 4, 
-    name: 'Sarah Williams', 
-    code: 'EMP004', 
-    branch: 'Gurgaon',
-    department: 'Sales', 
-    designation: 'Sales Manager', 
-    status: 'Retired', 
-    joiningDate: '2010-08-01', 
-    retirementDate: '2024-03-31', 
-    photo: null,
-    appointment: { orderNo: 'APP-004', appointmentDate: '2010-07-25', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Sales Executive', joiningDate: '2010-08-01' },
-    confirmation: { confirmationDate: '2011-02-01', confirmationOrderNo: 'CONF-004', probationCompleted: 'Yes' },
-    promotions: [
-      { effectiveDate: '2013-04-01', from: 'Sales Executive', to: 'Senior Sales Executive', orderNo: 'PRO-005' },
-      { effectiveDate: '2017-04-01', from: 'Senior Sales Executive', to: 'Sales Manager', orderNo: 'PRO-006' }
-    ],
-    transfers: [{ date: '2015-06-01', fromBranch: 'Delhi', toBranch: 'Gurgaon', reason: 'New Branch' }],
-    deputations: [],
-    payRevisions: [
-      { effectiveDate: '2015-01-01', oldBasic: '30000', newBasic: '35000', orderNo: 'PAY-004' },
-      { effectiveDate: '2020-01-01', oldBasic: '50000', newBasic: '60000', orderNo: 'PAY-005' }
-    ],
-    training: [
-      { trainingName: 'Sales Management', provider: 'Salesforce', type: 'Professional', startDate: '2018-05-01', endDate: '2018-05-15', certificate: 'cert.pdf' },
-      { trainingName: 'Customer Relationship', provider: 'Zoho', type: 'Professional', startDate: '2020-06-01', endDate: '2020-06-10', certificate: 'cert.pdf' }
-    ],
-    awards: [
-      { awardName: 'Top Sales Performer', date: '2015-12-01', issuedBy: 'CEO Office' },
-      { awardName: 'Best Manager', date: '2019-12-01', issuedBy: 'CEO Office' }
-    ],
-    disciplinary: [],
-    qualifications: [{ qualification: 'MBA Marketing', university: 'IIM Lucknow', year: '2008' }],
-    certifications: [],
-    documents: [{ documentName: 'Appointment Letter', uploadDate: '2010-08-01', download: '#' }]
-  },
-  { 
-    id: 5, 
-    name: 'David Brown', 
-    code: 'EMP005', 
-    branch: 'Noida',
-    department: 'Finance', 
-    designation: 'Accountant', 
-    status: 'Active', 
-    joiningDate: '2022-01-10', 
-    retirementDate: null, 
-    photo: null,
-    appointment: { orderNo: 'APP-005', appointmentDate: '2022-01-05', appointmentType: 'Direct', employmentType: 'Permanent', initialDesignation: 'Accountant', joiningDate: '2022-01-10' },
-    confirmation: { confirmationDate: '2022-07-10', confirmationOrderNo: 'CONF-005', probationCompleted: 'Yes' },
-    promotions: [],
-    transfers: [],
-    deputations: [],
-    payRevisions: [{ effectiveDate: '2023-01-01', oldBasic: '35000', newBasic: '38000', orderNo: 'PAY-006' }],
-    training: [{ trainingName: 'Advanced Excel', provider: 'Coursera', type: 'Technical', startDate: '2022-04-01', endDate: '2022-04-10', certificate: 'cert.pdf' }],
-    awards: [],
-    disciplinary: [{ caseNo: 'DISC-002', action: 'Misconduct', status: 'Pending' }],
-    qualifications: [{ qualification: 'B.Com', university: 'Delhi University', year: '2020' }],
-    certifications: [],
-    documents: [{ documentName: 'Appointment Letter', uploadDate: '2022-01-10', download: '#' }]
-  }
-]);
-
- const DUMMY_EMPLOYEES = [
-  { id: 1, name: 'Rahul Sharma', code: 'EMP001', department: 'IT', designation: 'Senior Developer', branch: 'Noida' },
-  { id: 2, name: 'Jane Smith', code: 'EMP002', department: 'HR', designation: 'HR Manager', branch: 'Delhi' },
-  { id: 3, name: 'Mike Johnson', code: 'EMP003', department: 'IT', designation: 'Senior Developer', branch: 'Noida' },
-  { id: 4, name: 'Sarah Williams', code: 'EMP004', department: 'Sales', designation: 'Sales Manager', branch: 'Gurgaon' },
-  { id: 5, name: 'David Brown', code: 'EMP005', department: 'Finance', designation: 'Accountant', branch: 'Noida' }
-];
+  // ─── Authentication helpers ───────────────────────────────
+  const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  const getAxiosConfig = () => ({
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  const ensureToken = () => {
+    const token = getAuthToken();
+    if (!token) {
+      toast.error('Authentication Required', 'Please login to continue');
+      return false;
+    }
+    return true;
+  };
 
   // ─── State ──────────────────────────────────────────────────
   const printRef = useRef(null);
   const fileInputRef = useRef(null);
-  
+
+  // Employee list (basic info for table)
+  const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
-  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
-  
-  const [page, setPage] = useState(0);
-  const [rowsPerPage] = useState(4);
+  const [loading, setLoading] = useState(false);
+  const [fetchingHistory, setFetchingHistory] = useState(false);
+
+  // Filter dropdown options
+  const [departments, setDepartments] = useState([]);
+  const [designations, setDesignations] = useState([]);
+  const [branches, setBranches] = useState([]);
+
+  // Selected employee for detail view
   const [viewEmployee, setViewEmployee] = useState(null);
   const [showDetailView, setShowDetailView] = useState(false);
+
+  // Upload state
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // ─── Filter States ──────────────────────────────────────────
   const [filters, setFilters] = useState({
     employeeName: '',
     employeeCode: '',
-     branch: '', 
+    branch: '',
     department: '',
     designation: '',
     status: ''
   });
-const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  // ✅ Branch list
-  const departments = ['IT', 'HR', 'Finance', 'Sales', 'Marketing', 'Operations'];
-  const designations = ['Software Engineer', 'Senior Developer', 'Tech Lead', 'HR Manager', 'Sales Manager', 'Accountant', 'Marketing Manager', 'Operations Manager', 'Product Manager'];
-  const statuses = ['Active', 'Retired'];
 
-  const hasActiveFilters = Object.values(filters).some(val => val !== '');
+  // ─── Pagination ─────────────────────────────────────────────
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(4);
 
-  useEffect(() => {
-    if (!hasActiveFilters) {
+  // ─── API fetch functions ────────────────────────────────────
+
+  // Fetch employees (basic list)
+  const fetchEmployees = async () => {
+    if (!ensureToken()) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/api/employees`, {
+        ...getAxiosConfig(),
+        params: { size: 1000, page: 0 }
+      });
+      if (res.data?.status === 200) {
+        let empData = Array.isArray(res.data.response)
+          ? res.data.response
+          : (res.data.response?.content || res.data.response?.data || []);
+        setEmployees(empData);
+        setFilteredEmployees(empData); // initially show all
+      } else {
+        setEmployees([]);
+        setFilteredEmployees([]);
+      }
+    } catch (err) {
+      console.error('Fetch employees error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to fetch employees');
+      setEmployees([]);
       setFilteredEmployees([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch departments for filter dropdown
+  const fetchDepartments = async () => {
+    if (!ensureToken()) return;
+    try {
+      const res = await axios.get(`${BASE_URL}/departments/list?flag=0`, getAxiosConfig());
+      let list = [];
+      if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+        list = res.data.response;
+      } else if (Array.isArray(res.data)) {
+        list = res.data;
+      }
+      setDepartments(list.map(item => item.name || item.departmentName || ''));
+    } catch (err) {
+      console.error('Fetch departments error:', err);
+      setDepartments([]);
+    }
+  };
+
+  // Fetch designations for filter dropdown
+  const fetchDesignations = async () => {
+    if (!ensureToken()) return;
+    try {
+      const res = await axios.get(`${BASE_URL}/api/designations/list?flag=0`, getAxiosConfig());
+      let list = [];
+      if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+        list = res.data.response;
+      } else if (Array.isArray(res.data)) {
+        list = res.data;
+      }
+      setDesignations(list.map(item => item.name || item.designationName || ''));
+    } catch (err) {
+      console.error('Fetch designations error:', err);
+      setDesignations([]);
+    }
+  };
+
+  // Fetch branches for filter dropdown
+  const fetchBranches = async () => {
+    if (!ensureToken()) return;
+    try {
+      const res = await axios.get(`${BASE_URL}/branches/list?flag=0`, getAxiosConfig());
+      let list = [];
+      if (res.data?.status === 200 && Array.isArray(res.data.response)) {
+        list = res.data.response;
+      } else if (Array.isArray(res.data)) {
+        list = res.data;
+      }
+      setBranches(list.map(item => item.name || item.branchName || ''));
+    } catch (err) {
+      console.error('Fetch branches error:', err);
+      setBranches([]);
+    }
+  };
+
+  // Fetch full employee history for detail view
+  const fetchEmployeeHistory = async (employeeId) => {
+    if (!ensureToken()) return;
+    setFetchingHistory(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/employees/${employeeId}/history`, getAxiosConfig());
+      if (res.data?.status === 200) {
+        const history = res.data.response;
+        // Ensure we have at least the basic fields
+        setViewEmployee(history);
+        setShowDetailView(true);
+      } else {
+        throw new Error(res.data?.message || 'Failed to fetch employee history');
+      }
+    } catch (err) {
+      console.error('Fetch history error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to load employee details');
+    } finally {
+      setFetchingHistory(false);
+    }
+  };
+
+  // ─── Load data on mount ────────────────────────────────────
+  useEffect(() => {
+    const loadAll = async () => {
+      await fetchEmployees();
+      await fetchDepartments();
+      await fetchDesignations();
+      await fetchBranches();
+    };
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Apply filters ──────────────────────────────────────────
+  useEffect(() => {
+    const hasActive = Object.values(filters).some(val => val !== '');
+    if (!hasActive) {
+      setFilteredEmployees(employees);
+      setPage(0);
       return;
     }
     let filtered = [...employees];
     if (filters.employeeName) {
       const search = filters.employeeName.toLowerCase();
-      filtered = filtered.filter(emp => emp.name.toLowerCase().includes(search));
+      filtered = filtered.filter(emp => emp.name?.toLowerCase().includes(search));
     }
     if (filters.employeeCode) {
       const search = filters.employeeCode.toLowerCase();
       filtered = filtered.filter(emp => emp.code?.toLowerCase().includes(search));
     }
-     if (filters.branch) {                    
-    filtered = filtered.filter(emp => emp.branch === filters.branch);
-  }
+    if (filters.branch) {
+      filtered = filtered.filter(emp => emp.branch === filters.branch);
+    }
     if (filters.department) {
       filtered = filtered.filter(emp => emp.department === filters.department);
     }
@@ -242,33 +244,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
     setPage(0);
   }, [filters, employees]);
 
-  const filteredEmployeeResults = DUMMY_EMPLOYEES.filter(emp => {
-    const search = employeeSearchTerm.toLowerCase();
-    return emp.name.toLowerCase().includes(search) || emp.code.toLowerCase().includes(search);
-  });
-
-  const handleEmployeeSelect = (employee) => {
-    const emp = employees.find(e => e.id === employee.id) || employee;
-    setSelectedEmployee(emp);
-    setEmployeeSearchTerm(employee.name);
-    setShowEmployeeDropdown(false);
-  };
-
-  const totalItems = filteredEmployees.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage);
-  const startIndex = page * rowsPerPage;
-  const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
-
-  const getPaginationRange = () => {
-    const delta = 2;
-    const range = [];
-    const left = Math.max(0, page - delta);
-    const right = Math.min(totalPages - 1, page + delta);
-    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
-    for (let i = left; i <= right; i++) range.push(i);
-    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
-    return range;
-  };
+  // ─── Handlers ──────────────────────────────────────────────
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
@@ -278,17 +254,32 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
     setFilters({
       employeeName: '',
       employeeCode: '',
-       branch: '',
+      branch: '',
       department: '',
       designation: '',
       status: ''
     });
-    setFilteredEmployees([]);
+    setFilteredEmployees(employees);
     setPage(0);
   };
 
-  // ─── Image Upload ──────────────────────────────────────────
+  const handleViewEmployee = (employee) => {
+    // Fetch full history
+    fetchEmployeeHistory(employee.id);
+  };
+
+  const handleBackFromDetail = () => {
+    setShowDetailView(false);
+    setViewEmployee(null);
+  };
+
+  const handleCancel = () => {
+    if (onCancel) onCancel();
+  };
+
+  // ─── Photo upload (mocked) ────────────────────────────────
   const handlePhotoUpload = (e) => {
+    // Keep the same mock logic – in real app you'd call an upload API
     const file = e.target.files[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
@@ -303,9 +294,6 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
     const reader = new FileReader();
     reader.onloadend = () => {
       const photoData = reader.result;
-      setEmployees(prev => prev.map(emp => 
-        emp.id === viewEmployee?.id ? { ...emp, photo: photoData } : emp
-      ));
       setViewEmployee(prev => prev ? { ...prev, photo: photoData } : null);
       setUploadingPhoto(false);
       toast.success('Success', 'Photo uploaded successfully');
@@ -318,10 +306,6 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
   };
 
   const handlePhotoRemove = () => {
-    if (!viewEmployee) return;
-    setEmployees(prev => prev.map(emp => 
-      emp.id === viewEmployee.id ? { ...emp, photo: null } : emp
-    ));
     setViewEmployee(prev => prev ? { ...prev, photo: null } : null);
     toast.info('Removed', 'Photo removed successfully');
   };
@@ -332,19 +316,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
     }
   };
 
-  const handleViewEmployee = (employee) => {
-    setViewEmployee(employee);
-    setShowDetailView(true);
-  };
-
-  const handleBackFromDetail = () => {
-    setShowDetailView(false);
-    setViewEmployee(null);
-  };
-
-  const handleCancel = () => {
-    if (onCancel) onCancel();
-  };
+  // ─── Utilities ─────────────────────────────────────────────
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
@@ -366,9 +338,28 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
     );
   };
 
-  const getInitials = (name) => name.split(' ').map(n => n[0]).join('').toUpperCase();
+  const getInitials = (name) => name?.split(' ').map(n => n[0]).join('').toUpperCase() || '?';
 
-  // ─── Print Handler ──────────────────────────────────────────
+  const hasActiveFilters = Object.values(filters).some(val => val !== '');
+
+  // ─── Pagination ─────────────────────────────────────────────
+  const totalItems = filteredEmployees.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
+
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    return range;
+  };
+
+  // ─── Print & PDF ────────────────────────────────────────────
   const handlePrint = () => {
     const printContent = printRef.current;
     if (!printContent) {
@@ -410,7 +401,6 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
     printWindow.document.close();
   };
 
-  // ─── Download PDF ──────────────────────────────────────────
   const handleDownloadPDF = async () => {
     if (!viewEmployee) {
       toast.warning('Error', 'No employee data to download');
@@ -439,6 +429,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
     }
   };
 
+  // ─── Styles (unchanged) ────────────────────────────────────
   const styles = {
     container: { padding: '24px 28px', background: 'linear-gradient(135deg, #f8f9fc 0%, #f0f2f8 100%)', minHeight: '100vh', fontFamily: "'Inter', 'Segoe UI', sans-serif" },
     headerCard: { background: 'white', borderRadius: '20px', padding: '20px 28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #e8ecf1' },
@@ -462,6 +453,12 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
     tableGridHeader: { padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: '#9d174d', textTransform: 'uppercase', background: '#faf5f7', borderBottom: '1.5px solid #e2e8f0' },
     tableGridCell: { padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }
   };
+
+  // ─── Render ──────────────────────────────────────────────────
+
+  if (loading && employees.length === 0) {
+    return <LoadingSpinner message="Loading employees..." />;
+  }
 
   return (
     <div style={styles.container}>
@@ -501,7 +498,6 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
       {/* ─── HEADER ──────────────────────────────────────────── */}
       <div style={styles.headerCard}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-          {/* ─── LEFT: Icon + Title ──────────────────────────── */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={styles.iconContainer}><FaBook size={20} /></div>
             <div>
@@ -514,7 +510,6 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
             </div>
           </div>
 
-          {/* ─── RIGHT: Print + PDF + Back/Cancel ────────────── */}
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             {showDetailView && viewEmployee && (
               <>
@@ -586,7 +581,6 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
           {/* ─── Header with Photo ──────────────────────────────── */}
           <div style={styles.detailHeader}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
-              {/* ─── LEFT: Photo Upload ────────────────────────── */}
               <div className="photo-upload-container" style={{ position: 'relative', flexShrink: 0 }}>
                 <input
                   ref={fileInputRef}
@@ -596,7 +590,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                   style={{ display: 'none' }}
                 />
                 <div style={{ position: 'relative', width: '120px', height: '120px' }}>
-                  {viewEmployee.photo ? (
+                  {viewEmployee.photo && viewEmployee.photo !== 'default_profile.png' ? (
                     <img 
                       src={viewEmployee.photo} 
                       alt={viewEmployee.name}
@@ -629,7 +623,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                     {uploadingPhoto ? <FaSpinner className="cert-spinner" /> : <FaCamera size={14} />}
                   </button>
 
-                  {viewEmployee.photo && (
+                  {viewEmployee.photo && viewEmployee.photo !== 'default_profile.png' && (
                     <button 
                       className="photo-remove-btn no-print"
                       onClick={handlePhotoRemove}
@@ -641,14 +635,12 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                 </div>
               </div>
 
-              {/* ─── RIGHT: Employee Details ───────────────────── */}
               <div>
                 <h2 style={{ fontSize: '24px', fontWeight: 700, margin: 0, color: 'white' }}>{viewEmployee.name}</h2>
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '6px', fontSize: '14px', opacity: 0.9 }}>
                   <span><FaIdCard size={12} style={{ marginRight: '6px' }} /> ID: {viewEmployee.id}</span>
                   <span><FaIdCard size={12} style={{ marginRight: '6px' }} /> {viewEmployee.code}</span>
-                  
-                  <span><FaBuilding size={12} style={{ marginRight: '6px' }} /> {viewEmployee.department}</span>
+                  <span><FaBuilding size={12} style={{ marginRight: '6px' }} /> {viewEmployee.department || '—'}</span>
                   <span><FaUserTie size={12} style={{ marginRight: '6px' }} /> {viewEmployee.designation}</span>
                   {getStatusBadge(viewEmployee.status)}
                 </div>
@@ -663,8 +655,8 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
               <div className="detail-grid">
                 <DetailCard icon={<FaIdCard size={14} color="#9d174d" />} label="Employee ID" value={viewEmployee.id} bg="#f8fafc" />
                 <DetailCard icon={<FaIdCard size={14} color="#9d174d" />} label="Employee Code" value={viewEmployee.code} bg="#f8fafc" />
-                 <DetailCard icon={<FaMapMarkerAlt size={14} color="#9d174d" />} label="Branch" value={viewEmployee.branch || 'Noida'} bg="#f8fafc" />
-                <DetailCard icon={<FaBuilding size={14} color="#9d174d" />} label="Department" value={viewEmployee.department} bg="#f8fafc" />
+                <DetailCard icon={<FaMapMarkerAlt size={14} color="#9d174d" />} label="Branch" value={viewEmployee.branch || '—'} bg="#f8fafc" />
+                <DetailCard icon={<FaBuilding size={14} color="#9d174d" />} label="Department" value={viewEmployee.department || '—'} bg="#f8fafc" />
                 <DetailCard icon={<FaUserTie size={14} color="#9d174d" />} label="Designation" value={viewEmployee.designation} bg="#f8fafc" />
                 <DetailCard icon={<FaCalendarAlt size={14} color="#9d174d" />} label="Joining Date" value={formatDate(viewEmployee.joiningDate)} bg="#f8fafc" />
                 <DetailCard icon={<FaClock size={14} color="#9d174d" />} label="Status" value={getStatusBadge(viewEmployee.status)} bg="#f8fafc" badge />
@@ -993,120 +985,76 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
               </div>
             )}
 
-      
-           {/* ─── Section 14: Timeline ────────────────────────────── */}
-<div className="mb-4">
-  <h4 className="d-flex align-items-center gap-2 mb-3" style={{ fontSize: '15px', fontWeight: '600', color: '#0f172a' }}>
-    <FaHistory size={16} color="#9d174d" /> Timeline
-  </h4>
-  
-  <div className="card border-0 shadow-sm" style={{ background: '#f8fafc', borderRadius: '12px' }}>
-    <div className="card-body p-4">
-      <ul className="list-unstyled mb-0 position-relative" style={{ paddingLeft: '30px' }}>
-        {/* Timeline Line */}
-        <div className="position-absolute" style={{ 
-          left: '14px', 
-          top: '12px', 
-          bottom: '12px', 
-          width: '2px', 
-          background: 'linear-gradient(180deg, #9d174d, #e2e8f0)'
-        }} />
-        
-        {/* Event 1: 2020 Appointment */}
-        <li className="mb-3 position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle bg-primary flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', border: '2px solid white', boxShadow: '0 0 0 2px #9d174d', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge bg-primary px-2 py-1" style={{ background: '#9d174d' }}>2020</span>
-                <span className="fw-semibold text-dark">📋 Appointment</span>
-                <span className="text-muted ms-auto small">10 Jan 2020</span>
+            {/* ─── Section 14: Timeline ────────────────────────────── */}
+            {viewEmployee.timeline && viewEmployee.timeline.length > 0 && (
+              <div className="mb-4">
+                <h4 className="d-flex align-items-center gap-2 mb-3" style={{ fontSize: '15px', fontWeight: '600', color: '#0f172a' }}>
+                  <FaHistory size={16} color="#9d174d" /> Timeline
+                </h4>
+                
+                <div className="card border-0 shadow-sm" style={{ background: '#f8fafc', borderRadius: '12px' }}>
+                  <div className="card-body p-4">
+                    <ul className="list-unstyled mb-0 position-relative" style={{ paddingLeft: '30px' }}>
+                      <div className="position-absolute" style={{ 
+                        left: '14px', 
+                        top: '12px', 
+                        bottom: '12px', 
+                        width: '2px', 
+                        background: 'linear-gradient(180deg, #9d174d, #e2e8f0)'
+                      }} />
+                      
+                      {viewEmployee.timeline.map((event, idx) => {
+                        const colors = {
+                          appointment: '#9d174d',
+                          confirmation: '#10b981',
+                          promotion: '#f59e0b',
+                          transfer: '#8b5cf6',
+                          deputation: '#6366f1',
+                          training: '#3b82f6',
+                          award: '#ec4899',
+                          disciplinary: '#ef4444',
+                          payRevision: '#059669'
+                        };
+                        const bgColor = colors[event.type] || '#6b7280';
+                        const iconMap = {
+                          appointment: '📋',
+                          confirmation: '✅',
+                          promotion: '📈',
+                          transfer: '🔄',
+                          deputation: '✈️',
+                          training: '📚',
+                          award: '🏆',
+                          disciplinary: '⚖️',
+                          payRevision: '💰'
+                        };
+                        const icon = iconMap[event.type] || '📌';
+                        const year = new Date(event.date).getFullYear();
+                        return (
+                          <li key={idx} className="mb-3 position-relative">
+                            <div className="d-flex align-items-start gap-3">
+                              <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: bgColor, border: '2px solid white', boxShadow: `0 0 0 2px ${bgColor}`, zIndex: 1 }} />
+                              <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
+                                <div className="d-flex flex-wrap align-items-center gap-2">
+                                  <span className="badge px-2 py-1" style={{ background: bgColor }}>{year}</span>
+                                  <span className="fw-semibold text-dark">{icon} {event.title}</span>
+                                  <span className="text-muted ms-auto small">{formatDate(event.date)}</span>
+                                </div>
+                                {event.remarks && <div className="text-muted small mt-1">{event.remarks}</div>}
+                                {event.referenceNo && <div className="text-muted small mt-1">Ref: {event.referenceNo}</div>}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </div>
               </div>
-              <div className="text-muted small mt-1">Joined as Software Engineer</div>
-            </div>
-          </div>
-        </li>
-        
-        {/* Event 2: 2020 Confirmation */}
-        <li className="mb-3 position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle bg-success flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', border: '2px solid white', boxShadow: '0 0 0 2px #10b981', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge px-2 py-1" style={{ background: '#10b981' }}>2020</span>
-                <span className="fw-semibold text-dark">✅ Confirmation</span>
-                <span className="text-muted ms-auto small">10 Jul 2020</span>
-              </div>
-              <div className="text-muted small mt-1">Probation completed successfully</div>
-            </div>
-          </div>
-        </li>
-        
-        {/* Event 3: 2022 Promotion */}
-        <li className="mb-3 position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#f59e0b', border: '2px solid white', boxShadow: '0 0 0 2px #f59e0b', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge px-2 py-1" style={{ background: '#f59e0b' }}>2022</span>
-                <span className="fw-semibold text-dark">📈 Promotion</span>
-                <span className="text-muted ms-auto small">01 Apr 2022</span>
-              </div>
-              <div className="text-muted small mt-1">Software Engineer → Senior Software Engineer</div>
-            </div>
-          </div>
-        </li>
-        
-        {/* Event 4: 2023 Training */}
-        <li className="mb-3 position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#6366f1', border: '2px solid white', boxShadow: '0 0 0 2px #6366f1', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge px-2 py-1" style={{ background: '#6366f1' }}>2023</span>
-                <span className="fw-semibold text-dark">📚 Training</span>
-                <span className="text-muted ms-auto small">01 Mar 2023</span>
-              </div>
-              <div className="text-muted small mt-1">React Advanced - Technical Training</div>
-            </div>
-          </div>
-        </li>
-        
-        {/* Event 5: 2024 Transfer */}
-        <li className="mb-3 position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#8b5cf6', border: '2px solid white', boxShadow: '0 0 0 2px #8b5cf6', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge px-2 py-1" style={{ background: '#8b5cf6' }}>2024</span>
-                <span className="fw-semibold text-dark">🔄 Transfer</span>
-                <span className="text-muted ms-auto small">15 Jan 2024</span>
-              </div>
-              <div className="text-muted small mt-1">Deputation - Ministry of Corporate Affairs</div>
-            </div>
-          </div>
-        </li>
-        
-        {/* Event 6: 2025 Award */}
-        <li className="position-relative">
-          <div className="d-flex align-items-start gap-3">
-            <div className="rounded-circle flex-shrink-0 mt-1" style={{ width: '14px', height: '14px', background: '#ec4899', border: '2px solid white', boxShadow: '0 0 0 2px #ec4899', zIndex: 1 }} />
-            <div className="bg-white rounded-3 p-3 w-100 shadow-sm" style={{ border: '1px solid #f1f5f9' }}>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="badge px-2 py-1" style={{ background: '#ec4899' }}>2025</span>
-                <span className="fw-semibold text-dark">🏆 Award</span>
-                <span className="text-muted ms-auto small">15 Jan 2025</span>
-              </div>
-              <div className="text-muted small mt-1">Best Performer - CEO Office</div>
-            </div>
-          </div>
-        </li>
-      </ul>
-    </div>
-  </div>
-</div>
+            )}
           </div>
         </div>
+      ) : fetchingHistory ? (
+        <LoadingSpinner message="Loading employee history..." />
       ) : (
         // ─── FILTER & TABLE VIEW ──────────────────────────────
         <>
@@ -1143,12 +1091,12 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                 <input type="text" className="filter-input" placeholder="e.g., EMP001" value={filters.employeeCode} onChange={(e) => handleFilterChange('employeeCode', e.target.value)} />
               </div>
               <div>
-    <label className="filter-label">Branch</label>
-    <select className="filter-input" value={filters.branch} onChange={(e) => handleFilterChange('branch', e.target.value)}>
-      <option value="">All Branches</option>
-      {branches.map(branch => <option key={branch} value={branch}>{branch}</option>)}
-    </select>
-  </div>
+                <label className="filter-label">Branch</label>
+                <select className="filter-input" value={filters.branch} onChange={(e) => handleFilterChange('branch', e.target.value)}>
+                  <option value="">All Branches</option>
+                  {branches.map(branch => <option key={branch} value={branch}>{branch}</option>)}
+                </select>
+              </div>
               <div>
                 <label className="filter-label">Department</label>
                 <select className="filter-input" value={filters.department} onChange={(e) => handleFilterChange('department', e.target.value)}>
@@ -1167,7 +1115,9 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                 <label className="filter-label">Status</label>
                 <select className="filter-input" value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
                   <option value="">All Status</option>
-                  {statuses.map(st => <option key={st} value={st}>{st}</option>)}
+                  <option value="Active">Active</option>
+                  <option value="Retired">Retired</option>
+                  <option value="Terminated">Terminated</option>
                 </select>
               </div>
             </div>
@@ -1213,13 +1163,13 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                             </div>
                           </td>
                           <td style={{ ...styles.tableCell, fontFamily: "'JetBrains Mono', monospace", fontSize: '13px' }}>{emp.code}</td>
-                           <td style={styles.tableCell}>
-          <span className="cert-status-badge" style={{ background: '#eef2ff', color: '#9d174d' }}>
-            {emp.branch || '—'}
-          </span>
-        </td>
                           <td style={styles.tableCell}>
-                            <span className="cert-status-badge" style={{ background: '#eef2ff', color: '#9d174d' }}>{emp.department}</span>
+                            <span className="cert-status-badge" style={{ background: '#eef2ff', color: '#9d174d' }}>
+                              {emp.branch || '—'}
+                            </span>
+                          </td>
+                          <td style={styles.tableCell}>
+                            <span className="cert-status-badge" style={{ background: '#eef2ff', color: '#9d174d' }}>{emp.department || '—'}</span>
                           </td>
                           <td style={styles.tableCell}>{emp.designation}</td>
                           <td style={{ ...styles.tableCell, fontFamily: "'JetBrains Mono', monospace", fontSize: '13px' }}>{formatDate(emp.joiningDate)}</td>
@@ -1237,7 +1187,7 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="8" style={{ padding: '40px', textAlign: 'center' }}>
+                        <td colSpan="9" style={{ padding: '40px', textAlign: 'center' }}>
                           <FaSearch size={36} style={{ color: '#cbd5e1', marginBottom: '12px' }} />
                           <h3 style={{ color: '#475569', margin: 0, fontSize: '16px' }}>No records found</h3>
                           <p style={{ color: '#94a3b8', fontSize: '14px' }}>Try adjusting your filter criteria</p>
@@ -1275,8 +1225,11 @@ const branches = ['Noida', 'Delhi', 'Gurgaon', 'Mumbai', 'Bangalore', 'Pune'];  
               )}
             </div>
           ) : (
-           <>
-           </>
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
+              <FaSearch size={48} style={{ marginBottom: '16px', opacity: 0.4 }} />
+              <h3 style={{ color: '#475569', fontSize: '18px', margin: '0 0 8px 0' }}>No filters applied</h3>
+              <p style={{ fontSize: '14px' }}>Use the filters above to search for employees</p>
+            </div>
           )}
         </>
       )}
