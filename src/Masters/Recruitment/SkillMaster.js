@@ -927,8 +927,8 @@ const SkillMaster = () => {
                     <th>Type</th>
                     <th>Parent</th>
                     <th>Levels</th>
+                        <th>Description</th>
                     <th style={{ textAlign: 'center' }}>Status</th>
-                    <th>Last Modified</th>
                     <th style={{ width: '120px', textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
@@ -1002,6 +1002,9 @@ const SkillMaster = () => {
                             )}
                           </div>
                         </td>
+                        <td> <span style={{ fontSize: '13px', color: '#374151' }}>
+                               {item.description || '—'} </span>
+                        </td>
                         <td style={{ textAlign: 'center' }}>
                           <div
                             className="d-flex align-items-center justify-content-center gap-1"
@@ -1046,9 +1049,7 @@ const SkillMaster = () => {
                             </span>
                           </div>
                         </td>
-                        <td style={{ fontSize: '12px', color: '#6b7280' }}>
-                          {item.modifiedDate ? formatDate(item.modifiedDate) : formatDate(item.createdDate)}
-                        </td>
+                       
                         <td>
                           <div className="cert-actions" style={{ justifyContent: 'center' }}>
                             <button

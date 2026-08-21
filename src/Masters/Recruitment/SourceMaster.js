@@ -4,17 +4,7 @@ import {
   FaArrowLeft, FaArrowRight, FaCheckCircle, FaCircle
 } from 'react-icons/fa';
 
-// Simple toast notification function (no external dependency)
 const showToast = (type, title, message) => {
-  // You can replace this with your actual toast implementation
-  // For now, using alert for demonstration
-  // Or you can import from your actual toast path
-  console.log(`${type}: ${title} - ${message}`);
-  
-  // If you want to use alert (temporary):
-  // alert(`${title}\n${message}`);
-  
-  // Better: Use a simple DOM-based notification
   const toastContainer = document.getElementById('toast-container') || createToastContainer();
   const toast = document.createElement('div');
   toast.className = `toast-notification toast-${type}`;
@@ -379,8 +369,7 @@ const SourceManagement = () => {
   };
 
   const confirmDelete = () => {
-    // Check if source is used (simulated - in real app, check from backend)
-    const isUsed = false; // Replace with actual check
+    const isUsed = false; 
     
     if (isUsed) {
       showToast('error', 'Cannot Delete', 'This source is already in use and cannot be deleted');
@@ -595,7 +584,6 @@ const SourceManagement = () => {
                     <th>Description</th>
                     <th style={{ textAlign: 'center' }}>Display Order</th>
                     <th style={{ textAlign: 'center' }}>Status</th>
-                    <th>Last Modified</th>
                     <th style={{ width: '120px', textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
@@ -672,9 +660,7 @@ const SourceManagement = () => {
                             </span>
                           </div>
                         </td>
-                        <td style={{ fontSize: '12px', color: '#6b7280' }}>
-                          {src.modifiedDate ? formatDate(src.modifiedDate) : formatDate(src.createdDate)}
-                        </td>
+                      
                         <td>
                           <div className="cert-actions" style={{ justifyContent: 'center' }}>
                             <button 

@@ -568,7 +568,6 @@ const OfferStatusMaster = () => {
                     <th>Status Name</th>
                     <th>Description</th>
                     <th style={{ textAlign: 'center' }}>Status</th>
-                    <th>Last Modified</th>
                     <th style={{ width: '120px', textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
@@ -632,9 +631,7 @@ const OfferStatusMaster = () => {
                             </span>
                           </div>
                         </td>
-                        <td style={{ fontSize: '12px', color: '#6b7280' }}>
-                          {item.modifiedDate ? formatDate(item.modifiedDate) : formatDate(item.createdDate)}
-                        </td>
+                       
                         <td>
                           <div className="cert-actions" style={{ justifyContent: 'center' }}>
                             <button
