@@ -75,8 +75,13 @@ import Skills from './Masters/Skills';
 import LeaveTypes from './Masters/Leave';
 import DeviceManagement from './pages/DeviceManagement';
 import DeviceConfiguration from './pages/DeviceConfiguration';
-import MapDevice from './pages/MapDevice';
-import BiometricMapping from './pages/BiometricMapping';
+import MapDevicetoBranch from './pages/MapDevicetoBranch';
+import MapEmployeetoDevice from './pages/MapEmployeetoDevice';
+import AttendanceSynchronize from './pages/AttendanceSynchronize';
+import AttendanceExceptions from './pages/AttendanceExceptions';
+import DeviceAuditTrail from './pages/DeviceAuditTrail';
+import DeviceHealthDashboard from './pages/DeviceHealthDashboard';
+import SynchronizationDashboard from './pages/SynchronizationDashboard';
 import { BiCurrentLocation } from 'react-icons/bi';
 
 
@@ -215,8 +220,13 @@ function App() {
           <Route path="JobLocation" element={<JobLocation user={currentUser}/>}/>
           <Route path="DeviceManagement" element={<DeviceManagement user={currentUser}/>}/>
           <Route path="DeviceConfiguration" element={<DeviceConfiguration user={currentUser}/>}/>
-          <Route path="MapDevice" element={<MapDevice user={currentUser}/>}/>
-          <Route path="BiometricMapping" element={<BiometricMapping user={currentUser}/>}/>
+          <Route path="MapDevicetoBranch" element={<MapDevicetoBranch user={currentUser}/>}/>
+          <Route path="/MapEmployeetoDevice" element={<MapEmployeetoDevice user={currentUser}/>}/>
+          <Route path="/AttendanceSynchronize" element={<AttendanceSynchronize user={currentUser}/>}/>
+          <Route path="/AttendanceExceptions" element={<AttendanceExceptions user={currentUser}/>}/>
+          <Route path="/DeviceHealthDashboard" element={<DeviceHealthDashboard user={currentUser}/>}/>
+          <Route path="DeviceAuditTrail" element={<DeviceAuditTrail user={currentUser}/>}/>
+          <Route path="SynchronizationDashboard" element={<SynchronizationDashboard user={currentUser}/>}/>
         </Route>
       </Routes>
     </Router>

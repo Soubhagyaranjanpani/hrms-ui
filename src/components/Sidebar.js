@@ -10,11 +10,14 @@ import {
   FaDochub,
   FaBook,
   FaTrailer, FaSync, 
-  FaMapMarker
+  FaMapMarker,
+  FaTable,
+  FaFileExcel,
+  FaDashcube
 } from 'react-icons/fa';
 import { BsChevronDown, BsChevronRight } from 'react-icons/bs';
 import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
-import { FaTimeline } from 'react-icons/fa6';
+import { FaAudible, FaHeartCircleCheck, FaTimeline } from 'react-icons/fa6';
 
 const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogout }) => {
   const [masterOpen, setMasterOpen] = useState(true);
@@ -89,8 +92,13 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   children: [
     { path: '/devicemanagement', icon: <FaCog />, label: 'Device Management', roles: ['Admin', 'Hr'] },
     { path: '/deviceconfiguration', icon: <FaClock />, label: 'Device Configuration', roles: ['Admin', 'Hr'] },
-    { path: '/MapDevice', icon: <FaMapMarker />, label: 'Map Device', roles: ['Admin', 'Hr'] },
-    {path: '/BiometricMapping', icon: <FaMapMarker />, label: 'Biometric Mapping', roles: ['Admin', 'Hr'] },
+    { path: '/MapDevicetoBranch', icon: <FaMapMarker />, label: 'Device Branch Mapping', roles: ['Admin', 'Hr'] },
+    {path: '/MapEmployeetoDevice', icon:<FaDatabase />, label:'Employee Device Mapping',roles:['Admin','Hr']},
+    {path: '/AttendanceSynchronize', icon:<FaTable/>, label:'Attendance Synchronize',roles:['Admin','Hr']},
+    {path: '/AttendanceExceptions',icon:<FaFileExcel/>,label:'Attendance Exceptions',roles:['Admin','Hr']},
+    {path: '/DeviceHealthDashboard',icon:<FaHeartCircleCheck/>,label:'Device Health Dashboard',roles:['Admin','Hr']},
+    {path:'/DeviceAuditTrail',icon:<FaAudible/>,label:'Device Audit Trail',roles:['Admin','Hr']},
+    {path:'/SynchronizationDashboard',icon:<FaDashcube/>,label:'Synchronization Dashboard',roles:['Admin','Hr']},
   ]
 },
 ];
