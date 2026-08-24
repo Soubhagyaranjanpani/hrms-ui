@@ -1,107 +1,81 @@
-
 import React, { useState } from 'react';
 import {
-  FaSave, FaSync, FaHistory, FaEdit,
-  FaToggleOn, FaToggleOff, FaServer, FaCheckCircle,
-  FaExclamationCircle, FaClock, FaWifi, FaPlug,
-  FaFlask, FaPlus
+  FaSave, FaFlask, FaPlug, FaCheckCircle,
+  FaExclamationCircle, FaServer, FaEye, FaEyeSlash,
+  FaEdit, FaPlus, FaTimes, FaArrowLeft, FaSearch
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 
 const DeviceConnectionConfig = () => {
-  // ─── Dummy Data ──────────────────────────────────────────
+  // ─── Dummy Registered Devices ────────────────────────────
   const registeredDevices = [
     { id: 1, deviceCode: 'DEV-001', deviceName: 'Main Gate Scanner', vendor: 'ZKTeco' },
     { id: 2, deviceCode: 'DEV-002', deviceName: 'Office Entry Device', vendor: 'eSSL' },
     { id: 3, deviceCode: 'DEV-003', deviceName: 'Back Door Scanner', vendor: 'Matrix' },
     { id: 4, deviceCode: 'DEV-004', deviceName: 'HR Department Device', vendor: 'Suprema' },
-    { id: 5, deviceCode: 'DEV-005', deviceName: 'Finance Entry Scanner', vendor: 'Hikvision' },
-    { id: 6, deviceCode: 'DEV-006', deviceName: 'IT Lab Device', vendor: 'Realtime' },
-    { id: 7, deviceCode: 'DEV-007', deviceName: 'Sales Office Scanner', vendor: 'Mantra' },
-    { id: 8, deviceCode: 'DEV-008', deviceName: 'Admin Block Device', vendor: 'ZKTeco' },
-    { id: 9, deviceCode: 'DEV-009', deviceName: 'Production Gate', vendor: 'eSSL' },
-    { id: 10, deviceCode: 'DEV-010', deviceName: 'Warehouse Scanner', vendor: 'Matrix' }
+    { id: 5, deviceCode: 'DEV-005', deviceName: 'Finance Entry Scanner', vendor: 'Hikvision' }
   ];
 
-  // ─── Generate More Dummy Devices with Config ────────────
-  const generateDummyDevices = () => {
-    const configs = [];
-    const connectionTypes = ['TCP/IP', 'SDK', 'REST API'];
-    const protocols = ['TCP/IP', 'HTTP', 'HTTPS'];
-    const syncModes = ['Automatic', 'Manual'];
-    const statuses = ['Connected', 'Disconnected'];
-    
-    for (let i = 0; i < 15; i++) {
-      const device = registeredDevices[i % registeredDevices.length];
-      configs.push({
-        id: i + 1,
-        deviceCode: device.deviceCode,
-        deviceName: device.deviceName,
-        vendor: device.vendor,
-        connectionType: connectionTypes[i % 3],
-        ipAddress: `192.168.${Math.floor(i / 5) + 1}.${i * 10 + 100}`,
-        portNumber: 4370 + i,
-        communicationProtocol: protocols[i % 3],
-        syncMode: syncModes[i % 2],
-        syncInterval: (i % 5) + 1,
-        retryCount: (i % 3) + 1,
-        retryInterval: (i % 4) * 10 + 10,
-        connectionTimeout: (i % 5) + 5,
-        enableAutoSync: i % 2 === 0,
-        lastSyncTime: i % 2 === 0 ? '2024-01-15 10:30:00' : '2024-01-14 15:20:00',
-        nextSyncTime: i % 2 === 0 ? '2024-01-15 10:35:00' : 'Not scheduled',
-        connectionStatus: statuses[i % 2]
-      });
-    }
-    return configs;
+  // ─── Dummy Saved Configurations ──────────────────────────
+  const dummyConfigs = [
+    { id: 1, deviceId: 1, deviceCode: 'DEV-001', deviceName: 'Main Gate Scanner', connectionType: 'LAN', ipAddress: '192.168.1.100', port: '4370', username: 'admin', password: 'admin123', syncInterval: '5', connectionStatus: 'Connected' },
+    { id: 2, deviceId: 2, deviceCode: 'DEV-002', deviceName: 'Office Entry Device', connectionType: 'API', ipAddress: '192.168.1.101', port: '8080', username: 'admin', password: 'pass123', syncInterval: '10', connectionStatus: 'Disconnected' },
+    { id: 3, deviceId: 3, deviceCode: 'DEV-003', deviceName: 'Back Door Scanner', connectionType: 'SDK', ipAddress: '192.168.1.102', port: '4370', username: '', password: '', syncInterval: '15', connectionStatus: 'Connected' },
+    { id: 4, deviceId: 4, deviceCode: 'DEV-004', deviceName: 'HR Department Device', connectionType: 'LAN', ipAddress: '192.168.1.103', port: '4370', username: 'admin', password: 'admin123', syncInterval: '30', connectionStatus: 'Connected' },
+    { id: 5, deviceId: 5, deviceCode: 'DEV-005', deviceName: 'Finance Entry Scanner', connectionType: 'API', ipAddress: '192.168.1.104', port: '8080', username: 'admin', password: 'pass123', syncInterval: '5', connectionStatus: 'Disconnected' },
+    { id: 6, deviceId: 1, deviceCode: 'DEV-001', deviceName: 'Main Gate Scanner', connectionType: 'SDK', ipAddress: '192.168.1.105', port: '4370', username: '', password: '', syncInterval: '10', connectionStatus: 'Connected' },
+    { id: 7, deviceId: 2, deviceCode: 'DEV-002', deviceName: 'Office Entry Device', connectionType: 'LAN', ipAddress: '192.168.1.106', port: '4370', username: 'admin', password: 'admin123', syncInterval: '15', connectionStatus: 'Disconnected' },
+    { id: 8, deviceId: 3, deviceCode: 'DEV-003', deviceName: 'Back Door Scanner', connectionType: 'API', ipAddress: '192.168.1.107', port: '8080', username: 'admin', password: 'pass123', syncInterval: '30', connectionStatus: 'Connected' },
+    { id: 9, deviceId: 4, deviceCode: 'DEV-004', deviceName: 'HR Department Device', connectionType: 'LAN', ipAddress: '192.168.1.108', port: '4370', username: 'admin', password: 'admin123', syncInterval: '5', connectionStatus: 'Connected' },
+    { id: 10, deviceId: 5, deviceCode: 'DEV-005', deviceName: 'Finance Entry Scanner', connectionType: 'SDK', ipAddress: '192.168.1.109', port: '4370', username: '', password: '', syncInterval: '10', connectionStatus: 'Disconnected' }
+  ];
+
+  // ─── Initial Config ───────────────────────────────────────
+  const initialConfig = {
+    deviceId: '',
+    connectionType: 'LAN',
+    ipAddress: '',
+    port: '',
+    username: '',
+    password: '',
+    syncInterval: '5',
+    connectionStatus: 'Disconnected'
   };
 
   // ─── States ──────────────────────────────────────────────
-  const [devices, setDevices] = useState(generateDummyDevices());
-  const [currentPage, setCurrentPage] = useState(0);
-  const [rowsPerPage] = useState(5);
-  const [showForm, setShowForm] = useState(false);
-  const [editingDevice, setEditingDevice] = useState(null);
-  const [showLogs, setShowLogs] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [logs, setLogs] = useState([
-    { id: 1, timestamp: '2024-01-15 10:30:00', message: 'Device connected successfully', type: 'success' },
-    { id: 2, timestamp: '2024-01-15 10:25:00', message: 'Sync completed - 45 records updated', type: 'info' },
-    { id: 3, timestamp: '2024-01-15 10:20:00', message: 'Connection timeout, retrying...', type: 'warning' }
-  ]);
-
-  // ─── Form State ──────────────────────────────────────────
-  const [config, setConfig] = useState({
-    deviceId: '',
-    connectionType: 'TCP/IP',
-    ipAddress: '',
-    portNumber: '',
-    communicationProtocol: 'TCP/IP',
-    syncMode: 'Automatic',
-    syncInterval: 5,
-    retryCount: 3,
-    retryInterval: 30,
-    connectionTimeout: 10,
-    enableAutoSync: true,
-    lastSyncTime: '',
-    nextSyncTime: '',
-    connectionStatus: 'Disconnected'
-  });
-
+  const [configs, setConfigs] = useState(dummyConfigs);
+  const [config, setConfig] = useState(initialConfig);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
+  const [isTesting, setIsTesting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [rowsPerPage] = useState(5);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // ─── Connection Options ──────────────────────────────────
-  const connectionTypes = ['TCP/IP', 'SDK', 'REST API'];
-  const communicationProtocols = ['TCP/IP', 'HTTP', 'HTTPS'];
-  const syncModes = ['Automatic', 'Manual'];
+  // ─── Options ─────────────────────────────────────────────
+  const connectionTypes = ['LAN', 'API', 'SDK'];
+  const syncIntervals = ['1', '5', '10', '15', '30', '60'];
+  const statusOptions = ['Connected', 'Disconnected'];
+
+  // ─── Filter Logic ──────────────────────────────────────
+  const filteredConfigs = configs.filter(cfg => {
+    const search = searchTerm.toLowerCase();
+    return cfg.deviceCode.toLowerCase().includes(search) ||
+           cfg.deviceName.toLowerCase().includes(search) ||
+           cfg.connectionType.toLowerCase().includes(search) ||
+           cfg.ipAddress.toLowerCase().includes(search) ||
+           cfg.connectionStatus.toLowerCase().includes(search) ||
+           cfg.port.toString().includes(search);
+  });
 
   // ─── Pagination ──────────────────────────────────────────
-  const totalItems = devices.length;
+  const totalItems = filteredConfigs.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = currentPage * rowsPerPage;
-  const currentDevices = devices.slice(startIndex, startIndex + rowsPerPage);
+  const currentConfigs = filteredConfigs.slice(startIndex, startIndex + rowsPerPage);
 
   const getPaginationRange = () => {
     const delta = 2;
@@ -114,107 +88,130 @@ const DeviceConnectionConfig = () => {
     return range;
   };
 
-  // ─── Form Handlers ───────────────────────────────────────
-  const handleChange = (field, value) => {
-    setConfig({ ...config, [field]: value });
-    if (touched[field]) {
-      validateField(field, value);
-    }
-  };
-
-  const handleBlur = (field) => {
-    setTouched({ ...touched, [field]: true });
-    validateField(field, config[field]);
-  };
-
+  // ─── Validation ──────────────────────────────────────────
   const validateField = (field, value) => {
     let error = '';
-    const requiredFields = ['connectionType', 'ipAddress', 'portNumber', 'communicationProtocol', 'syncMode'];
-    
-    if (requiredFields.includes(field) && !value) {
+    const required = ['deviceId', 'connectionType', 'ipAddress', 'port', 'syncInterval', 'connectionStatus'];
+
+    if (required.includes(field) && !value) {
       error = 'This field is required';
     }
-    
+
     if (field === 'ipAddress' && value) {
       const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
       if (!ipPattern.test(value)) {
         error = 'Invalid IP address format';
       }
     }
-    
-    if (field === 'portNumber' && value) {
+
+    if (field === 'port' && value) {
       const port = parseInt(value);
       if (isNaN(port) || port < 1 || port > 65535) {
         error = 'Port must be between 1 and 65535';
       }
     }
-    
-    if (field === 'syncInterval' && value) {
-      const interval = parseInt(value);
-      if (isNaN(interval) || interval < 1) {
-        error = 'Sync interval must be at least 1 minute';
-      }
-    }
-    
-    if (field === 'connectionTimeout' && value) {
-      const timeout = parseInt(value);
-      if (isNaN(timeout) || timeout < 1) {
-        error = 'Timeout must be at least 1 second';
-      }
-    }
-    
-    setErrors({ ...errors, [field]: error });
+
+    setErrors(prev => ({ ...prev, [field]: error }));
     return error === '';
   };
 
+  const handleChange = (field, value) => {
+    setConfig(prev => ({ ...prev, [field]: value }));
+    if (touched[field]) {
+      validateField(field, value);
+    }
+  };
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    validateField(field, config[field]);
+  };
+
   const validateForm = () => {
+    const required = ['deviceId', 'connectionType', 'ipAddress', 'port', 'syncInterval', 'connectionStatus'];
+    let valid = true;
     const newErrors = {};
-    const requiredFields = ['connectionType', 'ipAddress', 'portNumber', 'communicationProtocol', 'syncMode'];
-    
-    requiredFields.forEach(field => {
+
+    required.forEach(field => {
       if (!config[field]) {
         newErrors[field] = 'This field is required';
+        valid = false;
       }
     });
-    
+
     if (config.ipAddress) {
       const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
       if (!ipPattern.test(config.ipAddress)) {
         newErrors.ipAddress = 'Invalid IP address format';
+        valid = false;
       }
     }
-    
-    if (config.portNumber) {
-      const port = parseInt(config.portNumber);
+
+    if (config.port) {
+      const port = parseInt(config.port);
       if (isNaN(port) || port < 1 || port > 65535) {
-        newErrors.portNumber = 'Port must be between 1 and 65535';
+        newErrors.port = 'Port must be between 1 and 65535';
+        valid = false;
       }
     }
-    
+
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return valid;
   };
 
   // ─── Actions ─────────────────────────────────────────────
-  const handleEdit = (device) => {
-    setEditingDevice(device);
-    setConfig({
-      deviceId: device.id,
-      connectionType: device.connectionType || 'TCP/IP',
-      ipAddress: device.ipAddress || '',
-      portNumber: device.portNumber || '',
-      communicationProtocol: device.communicationProtocol || 'TCP/IP',
-      syncMode: device.syncMode || 'Automatic',
-      syncInterval: device.syncInterval || 5,
-      retryCount: device.retryCount || 3,
-      retryInterval: device.retryInterval || 30,
-      connectionTimeout: device.connectionTimeout || 10,
-      enableAutoSync: device.enableAutoSync !== undefined ? device.enableAutoSync : true,
-      lastSyncTime: device.lastSyncTime || '',
-      nextSyncTime: device.nextSyncTime || '',
-      connectionStatus: device.connectionStatus || 'Disconnected'
-    });
+  const handleAddNew = () => {
+    setConfig(initialConfig);
+    setEditingId(null);
+    setErrors({});
+    setTouched({});
     setShowForm(true);
+  };
+
+  const handleEdit = (cfg) => {
+    setConfig({
+      deviceId: cfg.deviceId || '',
+      connectionType: cfg.connectionType || 'LAN',
+      ipAddress: cfg.ipAddress || '',
+      port: cfg.port || '',
+      username: cfg.username || '',
+      password: cfg.password || '',
+      syncInterval: cfg.syncInterval || '5',
+      connectionStatus: cfg.connectionStatus || 'Disconnected'
+    });
+    setEditingId(cfg.id);
+    setErrors({});
+    setTouched({});
+    setShowForm(true);
+  };
+
+  const handleBack = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setConfig(initialConfig);
+    setErrors({});
+    setTouched({});
+  };
+
+  const handleTestConnection = () => {
+    if (!config.ipAddress || !config.port) {
+      toast.warning('Validation Error', 'Please enter IP Address and Port first');
+      return;
+    }
+
+    setIsTesting(true);
+    setTimeout(() => {
+      setIsTesting(false);
+      const success = Math.random() > 0.3;
+      const status = success ? 'Connected' : 'Disconnected';
+      setConfig(prev => ({ ...prev, connectionStatus: status }));
+
+      if (success) {
+        toast.success('Connection Test', 'Device connected successfully!');
+      } else {
+        toast.error('Connection Test', 'Failed to connect to device');
+      }
+    }, 1500);
   };
 
   const handleSave = () => {
@@ -224,102 +221,28 @@ const DeviceConnectionConfig = () => {
     }
 
     const device = registeredDevices.find(d => d.id === Number(config.deviceId));
-    const updatedDevice = {
-      id: Number(config.deviceId),
-      deviceCode: device?.deviceCode || `DEV-${String(devices.length + 1).padStart(3, '0')}`,
-      deviceName: device?.deviceName || 'New Device',
-      vendor: device?.vendor || 'Unknown',
+    
+    const newConfig = {
+      id: editingId || Date.now(),
+      deviceId: Number(config.deviceId),
+      deviceCode: device?.deviceCode || 'DEV-000',
+      deviceName: device?.deviceName || 'Unknown',
       ...config
     };
 
-    if (editingDevice) {
-      setDevices(devices.map(d => d.id === Number(config.deviceId) ? updatedDevice : d));
-      toast.success('Success', 'Configuration updated successfully');
+    if (editingId) {
+      setConfigs(prev => prev.map(c => c.id === editingId ? newConfig : c));
+      toast.success('Success', 'Configuration updated successfully!');
     } else {
-      setDevices([...devices, updatedDevice]);
-      toast.success('Success', 'Device configuration added successfully');
+      setConfigs(prev => [...prev, newConfig]);
+      toast.success('Success', 'Configuration added successfully!');
     }
-    
-    setShowForm(false);
-    setEditingDevice(null);
-    resetForm();
-  };
 
-  const resetForm = () => {
-    setConfig({
-      deviceId: '',
-      connectionType: 'TCP/IP',
-      ipAddress: '',
-      portNumber: '',
-      communicationProtocol: 'TCP/IP',
-      syncMode: 'Automatic',
-      syncInterval: 5,
-      retryCount: 3,
-      retryInterval: 30,
-      connectionTimeout: 10,
-      enableAutoSync: true,
-      lastSyncTime: '',
-      nextSyncTime: '',
-      connectionStatus: 'Disconnected'
-    });
+    setShowForm(false);
+    setEditingId(null);
+    setConfig(initialConfig);
     setErrors({});
     setTouched({});
-  };
-
-  const handleTestConnection = () => {
-    if (!config.ipAddress || !config.portNumber) {
-      toast.warning('Validation Error', 'Please enter IP Address and Port first');
-      return;
-    }
-
-    setIsTesting(true);
-    setTimeout(() => {
-      setIsTesting(false);
-      const success = Math.random() > 0.3;
-      if (success) {
-        setConfig({ ...config, connectionStatus: 'Connected' });
-        toast.success('Connection Test', 'Device connected successfully!');
-        addLog('Device connection test successful', 'success');
-        if (editingDevice) {
-          setDevices(devices.map(d => 
-            d.id === Number(config.deviceId) ? { ...d, connectionStatus: 'Connected' } : d
-          ));
-        }
-      } else {
-        setConfig({ ...config, connectionStatus: 'Disconnected' });
-        toast.error('Connection Test', 'Failed to connect to device');
-        addLog('Device connection test failed', 'error');
-      }
-    }, 2000);
-  };
-
-  const handleSyncNow = () => {
-    if (config.connectionStatus !== 'Connected') {
-      toast.warning('Sync Error', 'Device is not connected. Please test connection first.');
-      return;
-    }
-
-    setIsSyncing(true);
-    setTimeout(() => {
-      setIsSyncing(false);
-      const now = new Date();
-      const formattedTime = now.toISOString().replace('T', ' ').slice(0, 19);
-      const nextSync = new Date(now.getTime() + config.syncInterval * 60000).toISOString().replace('T', ' ').slice(0, 19);
-      
-      setConfig({ 
-        ...config, 
-        lastSyncTime: formattedTime,
-        nextSyncTime: nextSync
-      });
-      toast.success('Sync Completed', 'Data synchronized successfully!');
-      addLog('Manual sync completed', 'success');
-    }, 2000);
-  };
-
-  const addLog = (message, type) => {
-    const now = new Date();
-    const timestamp = now.toISOString().replace('T', ' ').slice(0, 19);
-    setLogs([{ id: Date.now(), timestamp, message, type }, ...logs]);
   };
 
   // ─── Styles ──────────────────────────────────────────────
@@ -330,19 +253,15 @@ const DeviceConnectionConfig = () => {
     title: { fontSize: '22px', fontWeight: '700', color: '#1e293b', margin: 0 },
     subtitle: { fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' },
     iconBox: { width: '46px', height: '46px', background: 'linear-gradient(135deg, #9d174d, #be185d)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '20px' },
+    searchBox: { display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' },
+    searchInput: { padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', outline: 'none', flex: '1', minWidth: '200px', transition: 'all 0.3s ease' },
     formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' },
     field: { display: 'flex', flexDirection: 'column', gap: '4px' },
     label: { fontSize: '13px', fontWeight: '600', color: '#374151' },
     required: { color: '#ef4444', marginLeft: '2px' },
     input: { padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', outline: 'none', background: 'white', transition: 'all 0.3s ease' },
+    inputGroup: { display: 'flex', alignItems: 'center', border: '1.5px solid #e2e8f0', borderRadius: '8px', background: 'white', transition: 'all 0.3s ease' },
     error: { color: '#ef4444', fontSize: '11px', marginTop: '2px' },
-    table: { width: '100%', borderCollapse: 'collapse', fontSize: '13px' },
-    th: { padding: '12px 16px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: '#9d174d', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#faf5f7', borderBottom: '1.5px solid #e2e8f0' },
-    td: { padding: '12px 16px', borderBottom: '1px solid #f1f5f9' },
-    btnPrimary: { padding: '8px 20px', background: '#9d174d', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'all 0.3s ease' },
-    btnSecondary: { padding: '8px 20px', background: '#e2e8f0', color: '#374151', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'all 0.3s ease' },
-    btnSuccess: { padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'all 0.3s ease' },
-    btnInfo: { padding: '8px 20px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'all 0.3s ease' },
     statusBadge: (status) => ({
       padding: '4px 12px',
       borderRadius: '20px',
@@ -354,70 +273,23 @@ const DeviceConnectionConfig = () => {
       alignItems: 'center',
       gap: '6px',
     }),
-    readOnlyField: { background: '#f1f5f9', cursor: 'not-allowed' },
+    btnPrimary: { padding: '10px 24px', background: '#9d174d', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'all 0.3s ease' },
+    btnSecondary: { padding: '10px 24px', background: '#e2e8f0', color: '#374151', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'all 0.3s ease' },
+    btnSuccess: { padding: '10px 24px', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'all 0.3s ease' },
+    table: { width: '100%', borderCollapse: 'collapse', fontSize: '13px' },
+    th: { padding: '12px 16px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: '#9d174d', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#faf5f7', borderBottom: '1.5px solid #e2e8f0' },
+    td: { padding: '12px 16px', borderBottom: '1px solid #f1f5f9' },
+    editBtn: { padding: '6px 12px', background: '#fef3c7', color: '#92400e', border: 'none', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.3s ease' },
   };
 
   return (
     <div style={styles.container}>
       <style>{`
-        .config-input:focus {
-          border-color: #9d174d !important;
-          box-shadow: 0 0 0 3px rgba(157,23,77,0.1) !important;
-        }
-        .config-input.error {
-          border-color: #ef4444 !important;
-        }
-        .config-input.error:focus {
-          box-shadow: 0 0 0 3px rgba(239,68,68,0.1) !important;
-        }
-        .toggle-switch {
-          width: 40px;
-          height: 22px;
-          border-radius: 11px;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          position: relative;
-          border: none;
-        }
-        .toggle-switch::after {
-          content: '';
-          position: absolute;
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          background: white;
-          top: 2px;
-          left: 2px;
-          transition: all 0.3s ease;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
-        .toggle-switch.active {
-          background: #9d174d;
-        }
-        .toggle-switch.active::after {
-          left: 20px;
-        }
-        .toggle-switch.inactive {
-          background: #cbd5e1;
-        }
-        .toggle-switch.inactive::after {
-          left: 2px;
-        }
-        .log-entry {
-          padding: 8px 12px;
-          border-left: 3px solid;
-          margin-bottom: 4px;
-          background: #f8fafc;
-          border-radius: 4px;
-        }
-        .log-entry.success { border-color: #10b981; }
-        .log-entry.error { border-color: #ef4444; }
-        .log-entry.warning { border-color: #f59e0b; }
-        .log-entry.info { border-color: #3b82f6; }
-        .btn-loading {
-          opacity: 0.7;
-          cursor: not-allowed;
-        }
+        .config-input:focus { border-color: #9d174d !important; box-shadow: 0 0 0 3px rgba(157,23,77,0.1) !important; }
+        .config-input.error { border-color: #ef4444 !important; }
+        .config-input.error:focus { box-shadow: 0 0 0 3px rgba(239,68,68,0.1) !important; }
+        .input-group-focus:focus-within { border-color: #9d174d !important; box-shadow: 0 0 0 3px rgba(157,23,77,0.1) !important; }
+        .search-input:focus { border-color: #9d174d !important; box-shadow: 0 0 0 3px rgba(157,23,77,0.1) !important; }
       `}</style>
 
       {/* ─── HEADER ──────────────────────────────────────── */}
@@ -426,149 +298,156 @@ const DeviceConnectionConfig = () => {
           <div style={styles.iconBox}><FaPlug size={20} /></div>
           <div>
             <h1 style={styles.title}>Device Connection Configuration</h1>
-            <p style={styles.subtitle}>{devices.length} devices configured</p>
+            <p style={styles.subtitle}>{configs.length} configurations saved</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button style={styles.btnInfo} onClick={() => setShowLogs(!showLogs)}>
-            <FaHistory size={13} /> {showLogs ? 'Hide Logs' : 'View Logs'}
+        {!showForm ? (
+          <button style={styles.btnPrimary} onClick={handleAddNew}>
+            <FaPlus size={13} /> Add Configuration
           </button>
-          {!showForm && (
-            <button style={styles.btnPrimary} onClick={() => { resetForm(); setShowForm(true); setEditingDevice(null); }}>
-              <FaPlus size={13} /> Add Configuration
-            </button>
-          )}
-          {showForm && (
-            <button style={styles.btnSecondary} onClick={() => { setShowForm(false); setEditingDevice(null); resetForm(); }}>
-              Cancel
-            </button>
-          )}
-        </div>
+        ) : (
+          <button style={styles.btnSecondary} onClick={handleBack}>
+            <FaArrowLeft size={13} /> Back
+          </button>
+        )}
       </div>
+
+      {/* ─── SEARCH BAR ────────────────────────────────────── */}
+    {!showForm && (
+  <div className="emp-search-bar">
+    <div className="emp-search-wrap">
+      <FaSearch className="emp-search-icon" size={12} />
+      <input
+        className="emp-search-input"
+        type="text"
+        placeholder="Search by device code, name, IP, connection type, status or port..."
+        value={searchTerm}
+        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
+      />
+      {searchTerm && (
+        <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setCurrentPage(0); }}>
+          <FaTimes size={11} />
+        </button>
+      )}
+    </div>
+  </div>
+)}
 
       {/* ─── TABLE ─────────────────────────────────────────── */}
       {!showForm && (
         <div style={styles.card}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>#</th>
-                  <th style={styles.th}>Device Code</th>
-                  <th style={styles.th}>Device Name</th>
-                  <th style={styles.th}>Vendor</th>
-                  <th style={styles.th}>IP Address</th>
-                  <th style={styles.th}>Port</th>
-                  <th style={styles.th}>Connection Type</th>
-                  <th style={styles.th}>Protocol</th>
-                  <th style={styles.th}>Sync Mode</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={{ ...styles.th, textAlign: 'center' }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentDevices.map((device, idx) => (
-                  <tr key={device.id}>
-                    <td style={styles.td}>{startIndex + idx + 1}</td>
-                    <td style={{ ...styles.td, fontWeight: '600', color: '#9d174d' }}>{device.deviceCode}</td>
-                    <td style={styles.td}><strong>{device.deviceName}</strong></td>
-                    <td style={styles.td}>{device.vendor}</td>
-                    <td style={styles.td}>{device.ipAddress || '-'}</td>
-                    <td style={styles.td}>{device.portNumber || '-'}</td>
-                    <td style={styles.td}>
-                      <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '500', background: '#eef2ff', color: '#4f46e5' }}>
-                        {device.connectionType || '-'}
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '500', background: '#fce7f3', color: '#9d174d' }}>
-                        {device.communicationProtocol || '-'}
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '500', background: device.syncMode === 'Automatic' ? '#d1fae5' : '#fef3c7', color: device.syncMode === 'Automatic' ? '#065f46' : '#92400e' }}>
-                        {device.syncMode || '-'}
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={styles.statusBadge(device.connectionStatus)}>
-                        {device.connectionStatus === 'Connected' ? <FaCheckCircle size={12} /> : <FaExclamationCircle size={12} />}
-                        {device.connectionStatus || 'Unknown'}
-                      </span>
-                    </td>
-                    <td style={{ ...styles.td, textAlign: 'center' }}>
-                      <button
-                        style={{ padding: '6px 12px', background: '#fef3c7', color: '#92400e', border: 'none', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.3s ease' }}
-                        onClick={() => handleEdit(device)}
-                        title="Edit Configuration"
-                      >
-                        <FaEdit size={13} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ─── PAGINATION ────────────────────────────────── */}
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '10px' }}>
-              <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} devices
-              </span>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: currentPage === 0 ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: currentPage === 0 ? 0.5 : 1 }}
-                  disabled={currentPage === 0}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  ← Prev
-                </button>
-                
-                {getPaginationRange().map((pg, i) =>
-                  pg === '...' ? (
-                    <span key={i} style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
-                  ) : (
-                    <button
-                      key={pg}
-                      style={{ 
-                        padding: '6px 10px', 
-                        border: '1px solid #e5e7eb', 
-                        background: pg === currentPage ? '#9d174d' : 'white', 
-                        color: pg === currentPage ? 'white' : '#374151', 
-                        borderRadius: '6px', 
-                        cursor: 'pointer', 
-                        fontSize: '12px', 
-                        minWidth: '34px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onClick={() => setCurrentPage(pg)}
-                      onMouseEnter={(e) => {
-                        if (pg !== currentPage) {
-                          e.currentTarget.style.background = '#f1f5f9';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (pg !== currentPage) {
-                          e.currentTarget.style.background = 'white';
-                        }
-                      }}
-                    >
-                      {pg + 1}
-                    </button>
-                  )
-                )}
-                
-                <button
-                  style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: currentPage + 1 >= totalPages ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: currentPage + 1 >= totalPages ? 0.5 : 1 }}
-                  disabled={currentPage + 1 >= totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  Next →
-                </button>
-              </div>
+          {filteredConfigs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+              <FaServer size={48} style={{ color: '#cbd5e1', marginBottom: '16px' }} />
+              <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>No configurations found</h3>
+              <p style={{ fontSize: '14px', color: '#94a3b8' }}>Try adjusting your search criteria</p>
             </div>
+          ) : (
+            <>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>#</th>
+                      <th style={styles.th}>Device</th>
+                      <th style={styles.th}>Connection Type</th>
+                      <th style={styles.th}>IP Address</th>
+                      <th style={styles.th}>Port</th>
+                      <th style={styles.th}>Sync Interval</th>
+                      <th style={styles.th}>Status</th>
+                      <th style={{ ...styles.th, textAlign: 'center' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentConfigs.length > 0 ? (
+                      currentConfigs.map((cfg, idx) => (
+                        <tr key={cfg.id}>
+                          <td style={styles.td}>{startIndex + idx + 1}</td>
+                          <td style={{ ...styles.td, fontWeight: '600' }}>{cfg.deviceCode}</td>
+                          <td style={styles.td}>
+                            <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '500', background: '#eef2ff', color: '#4f46e5' }}>
+                              {cfg.connectionType}
+                            </span>
+                          </td>
+                          <td style={styles.td}>{cfg.ipAddress}</td>
+                          <td style={styles.td}>{cfg.port}</td>
+                          <td style={styles.td}>{cfg.syncInterval} min</td>
+                          <td style={styles.td}>
+                            <span style={styles.statusBadge(cfg.connectionStatus)}>
+                              {cfg.connectionStatus === 'Connected' ? <FaCheckCircle size={12} /> : <FaExclamationCircle size={12} />}
+                              {cfg.connectionStatus}
+                            </span>
+                          </td>
+                          <td style={{ ...styles.td, textAlign: 'center' }}>
+                            <button
+                              style={styles.editBtn}
+                              onClick={() => handleEdit(cfg)}
+                              title="Edit Configuration"
+                            >
+                              <FaEdit size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                          No configurations found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ─── PAGINATION ────────────────────────────────── */}
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '10px' }}>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                    Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} configurations
+                  </span>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: currentPage === 0 ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: currentPage === 0 ? 0.5 : 1 }}
+                      disabled={currentPage === 0}
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                    >
+                      ← Prev
+                    </button>
+                    {getPaginationRange().map((pg, i) =>
+                      pg === '...' ? (
+                        <span key={i} style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
+                      ) : (
+                        <button
+                          key={pg}
+                          style={{ 
+                            padding: '6px 10px', 
+                            border: '1px solid #e5e7eb', 
+                            background: pg === currentPage ? '#9d174d' : 'white', 
+                            color: pg === currentPage ? 'white' : '#374151', 
+                            borderRadius: '6px', 
+                            cursor: 'pointer', 
+                            fontSize: '12px', 
+                            minWidth: '34px',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onClick={() => setCurrentPage(pg)}
+                        >
+                          {pg + 1}
+                        </button>
+                      )
+                    )}
+                    <button
+                      style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: currentPage + 1 >= totalPages ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: currentPage + 1 >= totalPages ? 0.5 : 1 }}
+                      disabled={currentPage + 1 >= totalPages}
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -578,15 +457,11 @@ const DeviceConnectionConfig = () => {
         <div style={{ ...styles.card, borderColor: '#9d174d' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #e2e8f0' }}>
             <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#1e293b' }}>
-              {editingDevice ? `Edit Configuration - ${editingDevice.deviceCode}` : 'Add New Configuration'}
+              {editingId ? 'Edit Configuration' : 'Add New Configuration'}
             </h4>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '500', color: '#64748b' }}>Status:</span>
-              <span style={styles.statusBadge(config.connectionStatus)}>
-                {config.connectionStatus === 'Connected' ? <FaCheckCircle size={12} /> : <FaExclamationCircle size={12} />}
-                {config.connectionStatus}
-              </span>
-            </div>
+            <button style={styles.btnSecondary} onClick={handleBack}>
+              <FaTimes size={13} /> Cancel
+            </button>
           </div>
 
           <div style={styles.formGrid}>
@@ -594,19 +469,18 @@ const DeviceConnectionConfig = () => {
             <div style={styles.field}>
               <label style={styles.label}>Device <span style={styles.required}>*</span></label>
               <select
-                className="config-input"
+                className={`config-input ${errors.deviceId && touched.deviceId ? 'error' : ''}`}
                 style={styles.input}
                 value={config.deviceId}
                 onChange={(e) => handleChange('deviceId', e.target.value)}
-                disabled={!!editingDevice}
+                onBlur={() => handleBlur('deviceId')}
               >
                 <option value="">Select Device</option>
                 {registeredDevices.map(d => (
-                  <option key={d.id} value={d.id}>
-                    {d.deviceCode} - {d.deviceName} ({d.vendor})
-                  </option>
+                  <option key={d.id} value={d.id}>{d.deviceCode} - {d.deviceName}</option>
                 ))}
               </select>
+              {errors.deviceId && touched.deviceId && <div style={styles.error}>{errors.deviceId}</div>}
             </div>
 
             {/* Connection Type */}
@@ -639,194 +513,99 @@ const DeviceConnectionConfig = () => {
               {errors.ipAddress && touched.ipAddress && <div style={styles.error}>{errors.ipAddress}</div>}
             </div>
 
-            {/* Port Number */}
+            {/* Port */}
             <div style={styles.field}>
-              <label style={styles.label}>Port Number <span style={styles.required}>*</span></label>
+              <label style={styles.label}>Port <span style={styles.required}>*</span></label>
               <input
                 type="number"
-                className={`config-input ${errors.portNumber && touched.portNumber ? 'error' : ''}`}
+                className={`config-input ${errors.port && touched.port ? 'error' : ''}`}
                 style={styles.input}
                 placeholder="4370"
-                value={config.portNumber}
-                onChange={(e) => handleChange('portNumber', e.target.value)}
-                onBlur={() => handleBlur('portNumber')}
+                value={config.port}
+                onChange={(e) => handleChange('port', e.target.value)}
+                onBlur={() => handleBlur('port')}
               />
-              {errors.portNumber && touched.portNumber && <div style={styles.error}>{errors.portNumber}</div>}
+              {errors.port && touched.port && <div style={styles.error}>{errors.port}</div>}
             </div>
 
-            {/* Communication Protocol */}
+            {/* Username */}
             <div style={styles.field}>
-              <label style={styles.label}>Communication Protocol <span style={styles.required}>*</span></label>
-              <select
-                className={`config-input ${errors.communicationProtocol && touched.communicationProtocol ? 'error' : ''}`}
+              <label style={styles.label}>Username</label>
+              <input
+                type="text"
+                className="config-input"
                 style={styles.input}
-                value={config.communicationProtocol}
-                onChange={(e) => handleChange('communicationProtocol', e.target.value)}
-                onBlur={() => handleBlur('communicationProtocol')}
-              >
-                {communicationProtocols.map(protocol => <option key={protocol} value={protocol}>{protocol}</option>)}
-              </select>
-              {errors.communicationProtocol && touched.communicationProtocol && <div style={styles.error}>{errors.communicationProtocol}</div>}
+                placeholder="admin"
+                value={config.username}
+                onChange={(e) => handleChange('username', e.target.value)}
+              />
             </div>
 
-            {/* Sync Mode */}
+            {/* Password */}
             <div style={styles.field}>
-              <label style={styles.label}>Sync Mode <span style={styles.required}>*</span></label>
-              <select
-                className={`config-input ${errors.syncMode && touched.syncMode ? 'error' : ''}`}
-                style={styles.input}
-                value={config.syncMode}
-                onChange={(e) => handleChange('syncMode', e.target.value)}
-                onBlur={() => handleBlur('syncMode')}
-              >
-                {syncModes.map(mode => <option key={mode} value={mode}>{mode}</option>)}
-              </select>
-              {errors.syncMode && touched.syncMode && <div style={styles.error}>{errors.syncMode}</div>}
+              <label style={styles.label}>Password</label>
+              <div className="input-group-focus" style={{ ...styles.inputGroup, overflow: 'hidden' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="config-input"
+                  style={{ ...styles.input, border: 'none', flex: 1 }}
+                  placeholder="••••••••"
+                  value={config.password}
+                  onChange={(e) => handleChange('password', e.target.value)}
+                />
+                <button
+                  type="button"
+                  style={{ padding: '0 12px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '16px' }}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                </button>
+              </div>
             </div>
 
             {/* Sync Interval */}
             <div style={styles.field}>
               <label style={styles.label}>Sync Interval (Minutes) <span style={styles.required}>*</span></label>
-              <input
-                type="number"
+              <select
                 className={`config-input ${errors.syncInterval && touched.syncInterval ? 'error' : ''}`}
                 style={styles.input}
-                placeholder="5"
                 value={config.syncInterval}
                 onChange={(e) => handleChange('syncInterval', e.target.value)}
                 onBlur={() => handleBlur('syncInterval')}
-                disabled={config.syncMode === 'Manual'}
-              />
+              >
+                {syncIntervals.map(val => <option key={val} value={val}>{val} min</option>)}
+              </select>
               {errors.syncInterval && touched.syncInterval && <div style={styles.error}>{errors.syncInterval}</div>}
             </div>
 
-            {/* Retry Count */}
+            {/* Connection Status */}
             <div style={styles.field}>
-              <label style={styles.label}>Retry Count</label>
-              <input
-                type="number"
-                className="config-input"
+              <label style={styles.label}>Connection Status <span style={styles.required}>*</span></label>
+              <select
+                className={`config-input ${errors.connectionStatus && touched.connectionStatus ? 'error' : ''}`}
                 style={styles.input}
-                placeholder="3"
-                value={config.retryCount}
-                onChange={(e) => handleChange('retryCount', e.target.value)}
-              />
-            </div>
-
-            {/* Retry Interval */}
-            <div style={styles.field}>
-              <label style={styles.label}>Retry Interval (Seconds)</label>
-              <input
-                type="number"
-                className="config-input"
-                style={styles.input}
-                placeholder="30"
-                value={config.retryInterval}
-                onChange={(e) => handleChange('retryInterval', e.target.value)}
-              />
-            </div>
-
-            {/* Connection Timeout */}
-            <div style={styles.field}>
-              <label style={styles.label}>Connection Timeout (Seconds) <span style={styles.required}>*</span></label>
-              <input
-                type="number"
-                className={`config-input ${errors.connectionTimeout && touched.connectionTimeout ? 'error' : ''}`}
-                style={styles.input}
-                placeholder="10"
-                value={config.connectionTimeout}
-                onChange={(e) => handleChange('connectionTimeout', e.target.value)}
-                onBlur={() => handleBlur('connectionTimeout')}
-              />
-              {errors.connectionTimeout && touched.connectionTimeout && <div style={styles.error}>{errors.connectionTimeout}</div>}
-            </div>
-
-            {/* Enable Auto Sync - Toggle */}
-            <div style={styles.field}>
-              <label style={styles.label}>Enable Auto Sync</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
-                <button
-                  className={`toggle-switch ${config.enableAutoSync ? 'active' : 'inactive'}`}
-                  onClick={() => handleChange('enableAutoSync', !config.enableAutoSync)}
-                />
-                <span style={{ fontSize: '13px', fontWeight: '500', color: config.enableAutoSync ? '#065f46' : '#991b1b' }}>
-                  {config.enableAutoSync ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
-            </div>
-
-            {/* Last Sync Time - Read Only */}
-            <div style={styles.field}>
-              <label style={styles.label}>Last Sync Time</label>
-              <div style={{ ...styles.input, ...styles.readOnlyField, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FaClock size={14} style={{ color: '#94a3b8' }} />
-                <span>{config.lastSyncTime || 'Never'}</span>
-              </div>
-            </div>
-
-            {/* Next Sync Time - Read Only */}
-            <div style={styles.field}>
-              <label style={styles.label}>Next Sync Time</label>
-              <div style={{ ...styles.input, ...styles.readOnlyField, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FaClock size={14} style={{ color: '#94a3b8' }} />
-                <span>{config.nextSyncTime || 'Not scheduled'}</span>
-              </div>
+                value={config.connectionStatus}
+                onChange={(e) => handleChange('connectionStatus', e.target.value)}
+                onBlur={() => handleBlur('connectionStatus')}
+              >
+                {statusOptions.map(status => <option key={status} value={status}>{status}</option>)}
+              </select>
+              {errors.connectionStatus && touched.connectionStatus && <div style={styles.error}>{errors.connectionStatus}</div>}
             </div>
           </div>
 
           {/* ─── Buttons ────────────────────────────────────── */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
-            <button 
+            <button
               style={{ ...styles.btnSuccess, ...(isTesting ? { opacity: 0.7, cursor: 'not-allowed' } : {}) }}
               onClick={handleTestConnection}
               disabled={isTesting}
             >
               <FaFlask size={13} /> {isTesting ? 'Testing...' : 'Test Connection'}
             </button>
-            <button 
-              style={{ ...styles.btnInfo, ...(isSyncing ? { opacity: 0.7, cursor: 'not-allowed' } : {}) }}
-              onClick={handleSyncNow}
-              disabled={isSyncing}
-            >
-              <FaSync size={13} /> {isSyncing ? 'Syncing...' : 'Sync Now'}
-            </button>
             <button style={styles.btnPrimary} onClick={handleSave}>
-              <FaSave size={13} /> Save Configuration
+              <FaSave size={13} /> Save
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* ─── LOGS SECTION ──────────────────────────────────── */}
-      {showLogs && (
-        <div style={styles.card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#1e293b' }}>
-              <FaHistory size={14} style={{ marginRight: '8px' }} />
-              Connection Logs
-            </h4>
-            <button 
-              style={styles.btnSecondary}
-              onClick={() => setLogs([])}
-            >
-              Clear Logs
-            </button>
-          </div>
-          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-            {logs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                <p>No logs available</p>
-              </div>
-            ) : (
-              logs.map(log => (
-                <div key={log.id} className={`log-entry ${log.type}`}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                    <span style={{ fontWeight: '500', color: '#374151' }}>{log.message}</span>
-                    <span style={{ color: '#94a3b8' }}>{log.timestamp}</span>
-                  </div>
-                </div>
-              ))
-            )}
           </div>
         </div>
       )}
@@ -834,4 +613,4 @@ const DeviceConnectionConfig = () => {
   );
 };
 
-export default DeviceConnectionConfig; 
+export default DeviceConnectionConfig;
