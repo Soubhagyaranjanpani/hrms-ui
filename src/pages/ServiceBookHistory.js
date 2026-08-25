@@ -1237,4 +1237,4 @@ const ServiceBookSearch = ({ user, onCancel }) => {
   );
 };
 
-export default ServiceBookHistory;
+export default ServiceBookSearch;
