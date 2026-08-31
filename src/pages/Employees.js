@@ -634,7 +634,7 @@ const Employees = ({ user }) => {
     
     toast.success('Template Downloaded', 'Fill in the template and upload it back');
   };
-
+ 
   // ──────────────── FORM HANDLERS ─────────────────────────────────────
   const handleChange = (field, value) => {
     if (field === 'phone') value = value.replace(/\D/g, '').slice(0, 10);
@@ -661,8 +661,8 @@ const Employees = ({ user }) => {
     if (touched.departmentId) setErrors(prev => ({ ...prev, departmentId: 'This field is required' }));
   };
 
-  // ─── SUBMIT HANDLER ──────────────────────────────────────────────────
-  const handleSubmit = async (e) => {
+  // ─── SUBMIT HANDLER ───────────────────────────────────────── ─────────
+  const handleSubmit = async (e) => { 
     e.preventDefault();
 
     const allFields = [
@@ -1264,7 +1264,7 @@ const Employees = ({ user }) => {
   <div className="emp-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
     <span><FaGraduationCap style={{ marginRight: '8px' }} /> Educational Qualifications</span>
     {!showQualificationForm && (
-      <button type="button" className="emp-add-family-btn" onClick={() => { resetQualificationForm(); setShowQualificationForm(true); }}>
+      <button type="button" className="emp-add-btn" onClick={() => { resetQualificationForm(); setShowQualificationForm(true); }}>
         <FaPlus size={12} /> Add Qualification
       </button>
     )}
@@ -1378,7 +1378,7 @@ const Employees = ({ user }) => {
         <button type="button" onClick={resetQualificationForm} className="emp-cancel-family-btn">
           Cancel
         </button>
-        <button type="button" onClick={addOrUpdateQualification} className="emp-save-family-btn">
+        <button type="button" onClick={addOrUpdateQualification} className="emp-add-btn">
           <FaSave size={12} /> {editingQualificationIndex !== null ? 'Update' : 'Add'} Qualification
         </button>
       </div>
@@ -1438,7 +1438,7 @@ const Employees = ({ user }) => {
   <div className="emp-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
     <span><FaBriefcase style={{ marginRight: '8px' }} /> Work Experience</span>
     {!showExperienceForm && (
-      <button type="button" className="emp-add-family-btn" onClick={() => { resetExperienceForm(); setShowExperienceForm(true); }}>
+      <button type="button" className="emp-add-btn" onClick={() => { resetExperienceForm(); setShowExperienceForm(true); }}>
         <FaPlus size={12} /> Add Experience
       </button>
     )}
@@ -1496,7 +1496,7 @@ const Employees = ({ user }) => {
         <button type="button" onClick={resetExperienceForm} className="emp-cancel-family-btn">
           Cancel
         </button>
-        <button type="button" onClick={addOrUpdateExperience} className="emp-save-family-btn">
+        <button type="button" onClick={addOrUpdateExperience} className="emp-add-btn">
           <FaSave size={12} /> {editingExperienceIndex !== null ? 'Update' : 'Add'} Experience
         </button>
       </div>
@@ -1552,9 +1552,7 @@ const Employees = ({ user }) => {
                     <button type="button" onClick={() => editExperience(idx)} className="emp-act emp-act--edit" title="Edit">
                       <FaEdit size={12} />
                     </button>
-                    <button type="button" onClick={() => removeExperience(idx)} className="emp-act emp-act--del" title="Delete">
-                      <FaTrash size={12} />
-                    </button>
+                   
                   </div>
                 </td>
               </tr>
@@ -1658,7 +1656,7 @@ const Employees = ({ user }) => {
               <div className="emp-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span><FaChild style={{ marginRight: '8px' }} /> Nominee List</span>
                 {!showNomineeForm && (
-                  <button type="button" className="emp-add-family-btn" onClick={() => setShowNomineeForm(true)}>
+                  <button type="button" className="emp-add-btn" onClick={() => setShowNomineeForm(true)}>
                     <FaPlus size={12} /> Add Nominee
                   </button>
                 )}
@@ -1674,7 +1672,7 @@ const Employees = ({ user }) => {
                         <th>Relation</th>
                         <th>Phone No.</th>
                         <th style={{ width: '80px' }}>Actions</th>
-                      </tr>
+                      </tr> 
                     </thead>
                     <tbody>
                       {nomineeList.map((nominee, idx) => (
@@ -1688,9 +1686,7 @@ const Employees = ({ user }) => {
                               <button type="button" onClick={() => editNominee(idx)} className="emp-act emp-act--edit" title="Edit">
                                 <FaEdit size={12} />
                               </button>
-                              <button type="button" onClick={() => removeNominee(idx)} className="emp-act emp-act--del" title="Delete">
-                                <FaTrash size={12} />
-                              </button>
+                             
                             </div>
                           </td>
                         </tr>
@@ -1751,7 +1747,7 @@ const Employees = ({ user }) => {
                     <button type="button" onClick={resetNomineeForm} className="emp-cancel-family-btn">
                       Cancel
                     </button>
-                    <button type="button" onClick={addOrUpdateNominee} className="emp-save-family-btn">
+                    <button type="button" onClick={addOrUpdateNominee} className="emp-add-btn">
                       <FaSave size={12} /> {editingNomineeIndex !== null ? 'Update' : 'Add'} Nominee
                     </button>
                   </div>
