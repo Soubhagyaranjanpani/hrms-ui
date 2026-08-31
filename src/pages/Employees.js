@@ -1,10 +1,12 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FaSearch, FaEdit, FaTrash, FaUserPlus, FaTimes,
   FaArrowLeft, FaSave, FaExclamationCircle, FaUpload, FaDownload,
-  FaUserFriends, FaPlus, FaChild, FaVenusMars, FaGraduationCap, FaBriefcase
+  FaUserFriends, FaPlus, FaChild, FaVenusMars, FaGraduationCap, FaBriefcase,
+  FaPlusCircle, FaMinusCircle, FaUniversity, FaSchool
 } from 'react-icons/fa';
-import { toast } from '../components/Toast';
+import { toast } from '../components/Toast'; 
 import LoadingSpinner from '../components/LoadingSpinner';
 import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
 import axios from 'axios';
@@ -47,8 +49,7 @@ const RULES = {
   bankAccount: { required: false, pattern: /^\d{9,18}$/, patternMsg: '9-18 digits only' },
   uan: { required: false, pattern: /^\d{12}$/, patternMsg: '12 digits required' },
   pan: { required: false, pattern: /^[A-Z]{5}[0-9]{4}[A-Z]$/, patternMsg: 'Format: ABCDE1234F' },
-  /* NEW: Designation validation */
-  designationId: { required: true } // assuming it is required
+  designationId: { required: true }
 };
 
 const validate = (field, value, editMode = false) => {
@@ -69,7 +70,7 @@ const validate = (field, value, editMode = false) => {
 
 const validateAll = (formData, editMode) => {
   const errors = {};
-  const fields = ['name', 'email', 'phone', 'address', 'branchId', 'departmentId', 'roleId', 'gradeId', 'joiningDate', 'bankAccount', 'uan', 'pan', 'designationId']; /* NEW */
+  const fields = ['name', 'email', 'phone', 'address', 'branchId', 'departmentId', 'roleId', 'gradeId', 'joiningDate', 'bankAccount', 'uan', 'pan', 'designationId'];
   if (!editMode) fields.push('password');
   fields.forEach(f => {
     const err = validate(f, formData[f], editMode);
@@ -98,6 +99,17 @@ const RELATION_OPTIONS = [
   { value: 'OTHER', label: 'Other' }
 ];
 
+// Education Level Options
+const EDUCATION_LEVELS = [
+  { value: '10th', label: '10th Standard' },
+  { value: '12th', label: '12th Standard' },
+  { value: 'graduation', label: 'Graduation' },
+  { value: 'post_graduation', label: 'Post Graduation' },
+  { value: 'diploma', label: 'Diploma' },
+  { value: 'phd', label: 'PhD / Doctorate' },
+  { value: 'other', label: 'Other' }
+];
+
 const Employees = ({ user }) => {
   const [view, setView] = useState('list');
   const [editMode, setEditMode] = useState(false);
@@ -107,31 +119,27 @@ const Employees = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Local pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
 
-  // Client‑side search
   const [searchName, setSearchName] = useState('');
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
 
-  // Bulk upload states
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Family states (unchanged)
+  // Family states
   const [marriedStatus, setMarriedStatus] = useState('');
   const [childrenCount, setChildrenCount] = useState(0);
-  const [child1, setChild1] = useState('');
-  const [child2, setChild2] = useState('');
+  const [childrenNames, setChildrenNames] = useState([]);
   const [fatherName, setFatherName] = useState('');
   const [motherName, setMotherName] = useState('');
   
-  // Nominee list with serial numbers
+  // Nominee list
   const [nomineeList, setNomineeList] = useState([]);
   const [nomineeFormData, setNomineeFormData] = useState({
     serialNo: '',
@@ -142,31 +150,41 @@ const Employees = ({ user }) => {
   const [showNomineeForm, setShowNomineeForm] = useState(false);
   const [editingNomineeIndex, setEditingNomineeIndex] = useState(null);
 
-  // Qualification & Experience (unchanged)
-  const [qualifications, setQualifications] = useState({
-    tenth: { board: '', percentage: '', year: '' },
-    twelfth: { board: '', percentage: '', year: '' },
-    graduation: { university: '', degree: '', cgpa: '', percentage: '', year: '' }
+  // ─── EDUCATION QUALIFICATIONS AS TABLE ──────────────────────────────
+  const [qualifications, setQualifications] = useState([]);
+  const [editingQualificationIndex, setEditingQualificationIndex] = useState(null);
+  const [showQualificationForm, setShowQualificationForm] = useState(false);
+  const [qualificationFormData, setQualificationFormData] = useState({
+    level: '10th',
+    board: '',
+    percentage: '',
+    year: '',
+    university: '',
+    degree: '',
+    cgpa: ''
   });
-  const [experience, setExperience] = useState({
+
+  // ─── WORK EXPERIENCE AS TABLE ──────────────────────────────────────
+  const [experiences, setExperiences] = useState([]);
+  const [editingExperienceIndex, setEditingExperienceIndex] = useState(null);
+  const [showExperienceForm, setShowExperienceForm] = useState(false);
+  const [experienceFormData, setExperienceFormData] = useState({
     company: '',
     position: '',
     years: '',
     months: ''
   });
 
-  // ─── NEW: Designations state ──────────────────────────────────────────
+  // ─── Designations state ──────────────────────────────────────────────
   const [designations, setDesignations] = useState([]);
   const [loadingDesignations, setLoadingDesignations] = useState(false);
 
-  // ─── NEW: Fetch designations from the API ────────────────────────────
   const fetchDesignations = useCallback(async () => {
     setLoadingDesignations(true);
     try {
       const res = await axios.get(`${BASE_URL}/api/designations/list?flag=0`, axiosConfig);
-      console.log('Designation API response:', res.data); // debug
+      console.log('Designation API response:', res.data);
 
-      // Robust extraction of the array
       let rawData = res.data;
       let list = [];
       if (Array.isArray(rawData)) {
@@ -202,13 +220,13 @@ const Employees = ({ user }) => {
     }
   }, []);
 
-  // ─── Form state – added designationId ────────────────────────────────
+  // ─── Form state ──────────────────────────────────────────────────────
   const [formData, setFormData] = useState({
     name: '', email: '', password: '', phone: '',
     joiningDate: '', roleId: '', departmentId: '',
     branchId: '', gradeId: '', address: '', profilePicture: '',
     bankAccount: '', uan: '', pan: '',
-    designationId: '' // NEW
+    designationId: ''
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -253,7 +271,6 @@ const Employees = ({ user }) => {
     }
   }, []);
 
-  // Client‑side filtering
   const filteredEmployees = allEmployees.filter(emp => {
     const query = searchName.toLowerCase().trim();
     if (!query) return true;
@@ -266,25 +283,22 @@ const Employees = ({ user }) => {
     );
   });
 
-  // Local pagination
   const totalItems = filteredEmployees.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
   const currentEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
 
-  // Reset page when search changes
   useEffect(() => {
     setPage(0);
   }, [searchName]);
 
-  // Fetch data once on mount
   useEffect(() => {
     fetchEmployees();
     fetchBranches();
     fetchRoles();
     fetchAllDepartments();
     fetchGrades();
-    fetchDesignations(); // NEW: fetch designations on mount
+    fetchDesignations();
   }, []);
 
   const cleanName = (name) => {
@@ -339,7 +353,144 @@ const Employees = ({ user }) => {
     setDepartments(allDepartments.filter(d => d.branchId === parseInt(branchId)));
   };
 
-  // Nominee functions (unchanged)
+  // ─── CHILDREN NAMES HANDLER ──────────────────────────────────────────
+  useEffect(() => {
+    const currentLength = childrenNames.length;
+    if (childrenCount > currentLength) {
+      const newNames = [...childrenNames];
+      for (let i = currentLength; i < childrenCount; i++) {
+        newNames.push('');
+      }
+      setChildrenNames(newNames);
+    } else if (childrenCount < currentLength) {
+      setChildrenNames(childrenNames.slice(0, childrenCount));
+    }
+  }, [childrenCount]);
+
+  const handleChildNameChange = (index, value) => {
+    const updated = [...childrenNames];
+    updated[index] = value;
+    setChildrenNames(updated);
+  };
+
+  // ─── QUALIFICATION HANDLERS ──────────────────────────────────────────
+  const addOrUpdateQualification = () => {
+    if (!qualificationFormData.level) {
+      toast.warning('Validation', 'Please select education level');
+      return;
+    }
+    if (!qualificationFormData.year) {
+      toast.warning('Validation', 'Please enter passing year');
+      return;
+    }
+
+    const formData = { ...qualificationFormData };
+    
+    // For graduation and above, university and degree are required
+    if (['graduation', 'post_graduation', 'phd'].includes(formData.level)) {
+      if (!formData.university) {
+        toast.warning('Validation', 'Please enter university name');
+        return;
+      }
+      if (!formData.degree) {
+        toast.warning('Validation', 'Please enter degree name');
+        return;
+      }
+    } else {
+      // For 10th, 12th, diploma, other - board and percentage required
+      if (!formData.board) {
+        toast.warning('Validation', 'Please enter board name');
+        return;
+      }
+      if (!formData.percentage) {
+        toast.warning('Validation', 'Please enter percentage');
+        return;
+      }
+    }
+
+    if (editingQualificationIndex !== null) {
+      const updated = [...qualifications];
+      updated[editingQualificationIndex] = { ...formData };
+      setQualifications(updated);
+      toast.success('Success', 'Qualification updated successfully');
+    } else {
+      setQualifications([...qualifications, { ...formData }]);
+      toast.success('Success', 'Qualification added successfully');
+    }
+    resetQualificationForm();
+  };
+
+  const editQualification = (index) => {
+    setEditingQualificationIndex(index);
+    setQualificationFormData({ ...qualifications[index] });
+    setShowQualificationForm(true);
+  };
+
+  const removeQualification = (index) => {
+    setQualifications(qualifications.filter((_, i) => i !== index));
+    toast.success('Success', 'Qualification removed successfully');
+  };
+
+  const resetQualificationForm = () => {
+    setQualificationFormData({
+      level: '10th',
+      board: '',
+      percentage: '',
+      year: '',
+      university: '',
+      degree: '',
+      cgpa: ''
+    });
+    setEditingQualificationIndex(null);
+    setShowQualificationForm(false);
+  };
+
+  // ─── EXPERIENCE HANDLERS ─────────────────────────────────────────────
+  const addOrUpdateExperience = () => {
+    if (!experienceFormData.company) {
+      toast.warning('Validation', 'Please enter company name');
+      return;
+    }
+    if (!experienceFormData.position) {
+      toast.warning('Validation', 'Please enter position');
+      return;
+    }
+
+    if (editingExperienceIndex !== null) {
+      const updated = [...experiences];
+      updated[editingExperienceIndex] = { ...experienceFormData };
+      setExperiences(updated);
+      toast.success('Success', 'Experience updated successfully');
+    } else {
+      setExperiences([...experiences, { ...experienceFormData }]);
+      toast.success('Success', 'Experience added successfully');
+    }
+    resetExperienceForm();
+  };
+
+  const editExperience = (index) => {
+    setEditingExperienceIndex(index);
+    setExperienceFormData({ ...experiences[index] });
+    setShowExperienceForm(true);
+  };
+
+  const removeExperience = (index) => {
+    setExperiences(experiences.filter((_, i) => i !== index));
+    toast.success('Success', 'Experience removed successfully');
+  };
+
+  const resetExperienceForm = () => {
+    setExperienceFormData({
+      company: '',
+      position: '',
+      years: '',
+      months: ''
+    });
+    setEditingExperienceIndex(null);
+    setShowExperienceForm(false);
+  };
+
+  // ─── NOMINEE HANDLERS ────────────────────────────────────────────────
   const addOrUpdateNominee = () => {
     if (!nomineeFormData.name.trim()) {
       toast.warning('Validation', 'Please enter nominee name');
@@ -385,25 +536,7 @@ const Employees = ({ user }) => {
     setShowNomineeForm(false);
   };
 
-  // Qualification & Experience handlers (unchanged)
-  const handleQualificationChange = (level, field, value) => {
-    setQualifications(prev => ({
-      ...prev,
-      [level]: {
-        ...prev[level],
-        [field]: value
-      }
-    }));
-  };
-
-  const handleExperienceChange = (field, value) => {
-    setExperience(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  // ──────────────── BULK UPLOAD HANDLERS (unchanged) ────────────────
+  // ──────────────── BULK UPLOAD HANDLERS ──────────────────────────────
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -502,7 +635,7 @@ const Employees = ({ user }) => {
     toast.success('Template Downloaded', 'Fill in the template and upload it back');
   };
 
-  // ──────────────── All form handlers ────────────────
+  // ──────────────── FORM HANDLERS ─────────────────────────────────────
   const handleChange = (field, value) => {
     if (field === 'phone') value = value.replace(/\D/g, '').slice(0, 10);
     if (field === 'name' && /\d/.test(value)) return;
@@ -528,7 +661,7 @@ const Employees = ({ user }) => {
     if (touched.departmentId) setErrors(prev => ({ ...prev, departmentId: 'This field is required' }));
   };
 
-  // ─── Submit Handler (updated to include designationId) ──────────────
+  // ─── SUBMIT HANDLER ──────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -537,7 +670,7 @@ const Employees = ({ user }) => {
       'branchId', 'departmentId', 'roleId', 'gradeId',
       'joiningDate', 'address',
       'bankAccount', 'uan', 'pan',
-      'designationId' // NEW
+      'designationId'
     ];
 
     setTouched(allFields.reduce((a, f) => ({ ...a, [f]: true }), {}));
@@ -567,13 +700,12 @@ const Employees = ({ user }) => {
         bankAccount: formData.bankAccount,
         uan: formData.uan,
         pan: formData.pan,
-        designationId: parseInt(formData.designationId), // NEW: send ID
+        designationId: parseInt(formData.designationId),
         marriedStatus: marriedStatus,
         childrenCount: parseInt(childrenCount) || 0,
-        child1: child1,
-        child2: child2,
+        childrenNames: childrenNames.filter(name => name.trim() !== ''),
         qualifications: qualifications,
-        experience: experience,
+        experiences: experiences,
         fatherName: fatherName,
         motherName: motherName,
         nomineeList: nomineeList.map(n => ({
@@ -636,7 +768,7 @@ const Employees = ({ user }) => {
     } catch (err) { toast.error('Error', err.response?.data?.message || 'Failed to delete'); }
   };
 
-  // ─── Edit Handler (now also sets designationId) ─────────────────────
+  // ─── EDIT HANDLER ────────────────────────────────────────────────────
   const handleEdit = (emp) => {
     setSelectedEmployee(emp);
     const fd = {
@@ -645,18 +777,15 @@ const Employees = ({ user }) => {
       roleId: '', departmentId: '', branchId: '', gradeId: '',
       address: emp.address || '', profilePicture: emp.profilePicture || '',
       bankAccount: emp.bankAccount || '', uan: emp.uan || '', pan: emp.pan || '',
-      designationId: '' // will be set below
+      designationId: ''
     };
 
-    // Try to set designationId
     if (emp.designationId) {
       fd.designationId = emp.designationId;
     } else if (emp.designation) {
-      // If only name is available, find matching ID from designations list
       const match = designations.find(d => d.designationName === emp.designation);
       if (match) fd.designationId = match.id;
       else {
-        // If no match, leave empty and show warning (optional)
         toast.warning('Designation Mismatch', 'Could not find matching designation ID. Please reselect.');
       }
     }
@@ -682,10 +811,9 @@ const Employees = ({ user }) => {
     // Load family data
     setMarriedStatus(emp.marriedStatus || '');
     setChildrenCount(emp.childrenCount || 0);
-    setChild1(emp.child1 || '');
-    setChild2(emp.child2 || '');
+    setChildrenNames(emp.childrenNames || []);
     if (emp.qualifications) setQualifications(emp.qualifications);
-    if (emp.experience) setExperience(emp.experience);
+    if (emp.experiences) setExperiences(emp.experiences);
     setFatherName(emp.fatherName || '');
     setMotherName(emp.motherName || '');
     setNomineeList(emp.nomineeList || []);
@@ -697,24 +825,21 @@ const Employees = ({ user }) => {
       joiningDate: '', roleId: '', departmentId: '',
       branchId: '', gradeId: '', address: '',
       profilePicture: '', bankAccount: '', uan: '', pan: '',
-      designationId: '' // NEW
+      designationId: ''
     });
     setErrors({}); setTouched({});
     setEditMode(false); setSelectedEmployee(null);
     setMarriedStatus('');
     setChildrenCount(0);
-    setChild1('');
-    setChild2('');
-    setQualifications({
-      tenth: { board: '', percentage: '', year: '' },
-      twelfth: { board: '', percentage: '', year: '' },
-      graduation: { university: '', degree: '', cgpa: '', percentage: '', year: '' }
-    });
-    setExperience({ company: '', position: '', years: '', months: '' });
+    setChildrenNames([]);
+    setQualifications([]);
+    setExperiences([]);
     setFatherName('');
     setMotherName('');
     setNomineeList([]);
     resetNomineeForm();
+    resetQualificationForm();
+    resetExperienceForm();
   };
 
   const formatDate = (d) => {
@@ -753,6 +878,12 @@ const Employees = ({ user }) => {
     for (let i = left; i <= right; i++) range.push(i);
     if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
     return range;
+  };
+
+  // ─── HELPER: Get level display name ──────────────────────────────────
+  const getLevelLabel = (level) => {
+    const found = EDUCATION_LEVELS.find(l => l.value === level);
+    return found ? found.label : level;
   };
 
   if (loading && view === 'list' && allEmployees.length === 0) {
@@ -866,9 +997,7 @@ const Employees = ({ user }) => {
                             <button className="emp-act emp-act--edit" onClick={() => handleEdit(emp)} title="Edit">
                               <FaEdit size={12} />
                             </button>
-                            <button className="emp-act emp-act--del" onClick={() => confirmDelete(emp)} title="Delete">
-                              <FaTrash size={12} />
-                            </button>
+                           
                           </div>
                         </td>
                       </tr>
@@ -1049,7 +1178,6 @@ const Employees = ({ user }) => {
                   <FieldError msg={errors.departmentId} />
                 </div>
 
-                {/* ─── NEW: Dynamic Designation Dropdown ──────────────── */}
                 <div className={`emp-field-compact ${isFieldErr('designationId') ? 'has-error' : ''} ${isFieldOk('designationId') ? 'has-ok' : ''}`}>
                   <label className="required">Designation</label>
                   <select
@@ -1129,188 +1257,328 @@ const Employees = ({ user }) => {
               </div>
             </div>
 
-            {/* Qualification Section (unchanged) */}
             <div className="emp-divider" />
-            <div className="emp-form-section-compact">
-              <div className="emp-section-label">
-                <FaGraduationCap style={{ marginRight: '8px' }} /> Educational Qualifications
-              </div>
-              <div className="emp-form-section-compact" style={{ marginBottom: '20px' }}>
-                <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>10th Standard</div>
-                <div className="emp-form-grid-3col">
-                  <div className="emp-field-compact">
-                    <label>Board</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., CBSE, ICSE, State Board"
-                      value={qualifications.tenth.board}
-                      onChange={(e) => handleQualificationChange('tenth', 'board', e.target.value)}
-                    />
-                  </div>
-                  <div className="emp-field-compact">
-                    <label>Percentage (%)</label>
-                    <input
-                      type="number"
-                      placeholder="Enter percentage"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      value={qualifications.tenth.percentage}
-                      onChange={(e) => handleQualificationChange('tenth', 'percentage', e.target.value)}
-                    />
-                  </div>
-                  <div className="emp-field-compact">
-                    <label>Passing Year</label>
-                    <input
-                      type="number"
-                      placeholder="YYYY"
-                      min="1950"
-                      max="2026"
-                      value={qualifications.tenth.year}
-                      onChange={(e) => handleQualificationChange('tenth', 'year', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div className="emp-form-section-compact" style={{ marginBottom: '20px' }}>
-                <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>12th Standard</div>
-                <div className="emp-form-grid-3col">
-                  <div className="emp-field-compact">
-                    <label>Board</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., CBSE, ICSE, State Board"
-                      value={qualifications.twelfth.board}
-                      onChange={(e) => handleQualificationChange('twelfth', 'board', e.target.value)}
-                    />
-                  </div>
-                  <div className="emp-field-compact">
-                    <label>Percentage (%)</label>
-                    <input
-                      type="number"
-                      placeholder="Enter percentage"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      value={qualifications.twelfth.percentage}
-                      onChange={(e) => handleQualificationChange('twelfth', 'percentage', e.target.value)}
-                    />
-                  </div>
-                  <div className="emp-field-compact">
-                    <label>Passing Year</label>
-                    <input
-                      type="number"
-                      placeholder="YYYY"
-                      min="1950"
-                      max="2026"
-                      value={qualifications.twelfth.year}
-                      onChange={(e) => handleQualificationChange('twelfth', 'year', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
+{/* ─── EDUCATION QUALIFICATIONS ─── */}
+<div className="emp-form-section-compact">
+  <div className="emp-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <span><FaGraduationCap style={{ marginRight: '8px' }} /> Educational Qualifications</span>
+    {!showQualificationForm && (
+      <button type="button" className="emp-add-family-btn" onClick={() => { resetQualificationForm(); setShowQualificationForm(true); }}>
+        <FaPlus size={12} /> Add Qualification
+      </button>
+    )}
+  </div>
 
-              <div className="emp-form-section-compact">
-                <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>Graduation</div>
-                <div className="emp-form-grid-3col">
-                  <div className="emp-field-compact">
-                    <label>University</label>
-                    <input
-                      type="text"
-                      placeholder="University name"
-                      value={qualifications.graduation.university}
-                      onChange={(e) => handleQualificationChange('graduation', 'university', e.target.value)}
-                    />
-                  </div>
-                  <div className="emp-field-compact">
-                    <label>Degree</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., B.Tech, B.Sc, B.Com, BA"
-                      value={qualifications.graduation.degree}
-                      onChange={(e) => handleQualificationChange('graduation', 'degree', e.target.value)}
-                    />
-                  </div>
-                  <div className="emp-field-compact">
-                    <label>CGPA</label>
-                    <input
-                      type="number"
-                      placeholder="CGPA (0-10)"
-                      min="0"
-                      max="10"
-                      step="0.01"
-                      value={qualifications.graduation.cgpa}
-                      onChange={(e) => handleQualificationChange('graduation', 'cgpa', e.target.value)}
-                    />
-                  </div>
-                  <div className="emp-field-compact">
-                    <label>Passing Year</label>
-                    <input
-                      type="number"
-                      placeholder="YYYY"
-                      min="1950"
-                      max="2026"
-                      value={qualifications.graduation.year}
-                      onChange={(e) => handleQualificationChange('graduation', 'year', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
+  {/* QUALIFICATION FORM */}
+  {showQualificationForm && (
+    <div className="emp-family-form" style={{ marginTop: '12px', marginBottom: '20px' }}>
+      <div className="emp-family-form-header">
+        <h4>{editingQualificationIndex !== null ? 'Edit Qualification' : 'Add Qualification'}</h4>
+        <button type="button" onClick={resetQualificationForm} className="emp-close-form-btn">
+          <FaTimes />
+        </button>
+      </div>
+      <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div className="emp-field-compact">
+          <label className="required">Qualification Level</label>
+          <select
+            value={qualificationFormData.level}
+            onChange={(e) => setQualificationFormData({ ...qualificationFormData, level: e.target.value })}
+          >
+            {EDUCATION_LEVELS.map(level => (
+              <option key={level.value} value={level.value}>{level.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="emp-field-compact">
+          <label className="required">Passing Year</label>
+          <input
+            type="number"
+            placeholder="YYYY"
+            min="1950"
+            max="2026"
+            value={qualificationFormData.year}
+            onChange={(e) => setQualificationFormData({ ...qualificationFormData, year: e.target.value })}
+          />
+        </div>
+        
+        {['graduation', 'post_graduation', 'phd'].includes(qualificationFormData.level) ? (
+          <>
+            <div className="emp-field-compact">
+              <label className="required"><FaUniversity style={{ marginRight: '4px' }} /> University</label>
+              <input
+                type="text"
+                placeholder="University name"
+                value={qualificationFormData.university}
+                onChange={(e) => setQualificationFormData({ ...qualificationFormData, university: e.target.value })}
+              />
             </div>
-
-            {/* Experience Section (unchanged) */}
-            <div className="emp-divider" />
-            <div className="emp-form-section-compact">
-              <div className="emp-section-label">
-                <FaBriefcase style={{ marginRight: '8px' }} /> Work Experience
-              </div>
-              <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="emp-field-compact">
-                  <label>Company Name</label>
-                  <input
-                    type="text"
-                    placeholder="Last/Current company"
-                    value={experience.company}
-                    onChange={(e) => handleExperienceChange('company', e.target.value)}
-                  />
-                </div>
-                <div className="emp-field-compact">
-                  <label>Position / Designation</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Software Engineer, Manager"
-                    value={experience.position}
-                    onChange={(e) => handleExperienceChange('position', e.target.value)}
-                  />
-                </div>
-                <div className="emp-field-compact">
-                  <label>Years of Experience</label>
-                  <input
-                    type="number"
-                    placeholder="Years"
-                    min="0"
-                    max="50"
-                    value={experience.years}
-                    onChange={(e) => handleExperienceChange('years', e.target.value)}
-                  />
-                </div>
-                <div className="emp-field-compact">
-                  <label>Months of Experience</label>
-                  <input
-                    type="number"
-                    placeholder="Months (0-11)"
-                    min="0"
-                    max="11"
-                    value={experience.months}
-                    onChange={(e) => handleExperienceChange('months', e.target.value)}
-                  />
-                </div>
-              </div>
+            <div className="emp-field-compact">
+              <label className="required">Degree</label>
+              <input
+                type="text"
+                placeholder="e.g., B.Tech, M.Sc, PhD"
+                value={qualificationFormData.degree}
+                onChange={(e) => setQualificationFormData({ ...qualificationFormData, degree: e.target.value })}
+              />
             </div>
+            <div className="emp-field-compact">
+              <label>CGPA</label>
+              <input
+                type="number"
+                placeholder="CGPA (0-10)"
+                min="0"
+                max="10"
+                step="0.01"
+                value={qualificationFormData.cgpa}
+                onChange={(e) => setQualificationFormData({ ...qualificationFormData, cgpa: e.target.value })}
+              />
+            </div>
+            <div className="emp-field-compact">
+              <label>Percentage (%)</label>
+              <input
+                type="number"
+                placeholder="Percentage (optional)"
+                min="0"
+                max="100"
+                step="0.01"
+                value={qualificationFormData.percentage}
+                onChange={(e) => setQualificationFormData({ ...qualificationFormData, percentage: e.target.value })}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="emp-field-compact">
+              <label className="required"><FaSchool style={{ marginRight: '4px' }} /> Board</label>
+              <input
+                type="text"
+                placeholder="e.g., CBSE, ICSE, State Board"
+                value={qualificationFormData.board}
+                onChange={(e) => setQualificationFormData({ ...qualificationFormData, board: e.target.value })}
+              />
+            </div>
+            <div className="emp-field-compact">
+              <label className="required">Percentage (%)</label>
+              <input
+                type="number"
+                placeholder="Enter percentage"
+                min="0"
+                max="100"
+                step="0.01"
+                value={qualificationFormData.percentage}
+                onChange={(e) => setQualificationFormData({ ...qualificationFormData, percentage: e.target.value })}
+              />
+            </div>
+          </>
+        )}
+      </div>
+      <div className="emp-family-form-actions" style={{ marginTop: '16px' }}>
+        <button type="button" onClick={resetQualificationForm} className="emp-cancel-family-btn">
+          Cancel
+        </button>
+        <button type="button" onClick={addOrUpdateQualification} className="emp-save-family-btn">
+          <FaSave size={12} /> {editingQualificationIndex !== null ? 'Update' : 'Add'} Qualification
+        </button>
+      </div>
+    </div>
+  )}
 
-            {/* Family Information (unchanged) */}
+  {/* ─── QUALIFICATIONS TABLE ─── */}
+  {qualifications.length > 0 && (
+    <div className="emp-table-wrap" style={{ marginTop: showQualificationForm ? '20px' : '16px' }}>
+      <table className="emp-table" style={{ minWidth: '100%' }}>
+        <thead>
+          <tr>
+            <th style={{ width: '18%' }}>Level</th>
+            <th style={{ width: '27%' }}>Board / University</th>
+            <th style={{ width: '20%' }}>Degree / Class</th>
+            <th style={{ width: '20%' }}>Percentage / CGPA</th>
+            <th style={{ width: '15%' }}>Year</th>
+            <th style={{ width: '80px' }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {qualifications.map((item, idx) => (
+            <tr key={idx}>
+              <td><span className="emp-pill emp-pill--indigo">{getLevelLabel(item.level)}</span></td>
+              <td>{item.board || item.university || '—'}</td>
+              <td>{item.degree || '—'}</td>
+              <td>{item.cgpa ? `${item.cgpa} CGPA` : item.percentage ? `${item.percentage}%` : '—'}</td>
+              <td>{item.year}</td>
+              <td>
+                <div className="emp-actions" style={{ gap: '6px' }}>
+                  <button type="button" onClick={() => editQualification(idx)} className="emp-act emp-act--edit" title="Edit">
+                    <FaEdit size={12} />
+                  </button>
+                 
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+
+  {qualifications.length === 0 && !showQualificationForm && (
+    <div style={{ textAlign: 'center', padding: '30px 20px', color: '#9ca3af', fontSize: '14px' }}>
+      <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#d1d5db' }}>
+        Click "Add Qualification" to add your educational details
+      </p>
+    </div>
+  )}
+
+</div>
             <div className="emp-divider" />
+
+          {/* ─── WORK EXPERIENCE ─── */}
+<div className="emp-form-section-compact">
+  <div className="emp-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <span><FaBriefcase style={{ marginRight: '8px' }} /> Work Experience</span>
+    {!showExperienceForm && (
+      <button type="button" className="emp-add-family-btn" onClick={() => { resetExperienceForm(); setShowExperienceForm(true); }}>
+        <FaPlus size={12} /> Add Experience
+      </button>
+    )}
+  </div>
+
+  {/* ─── EXPERIENCE FORM  ─── */}
+  {showExperienceForm && (
+    <div className="emp-family-form" style={{ marginTop: '12px', marginBottom: '20px' }}>
+      <div className="emp-family-form-header">
+        <h4>{editingExperienceIndex !== null ? 'Edit Experience' : 'Add Experience'}</h4>
+        <button type="button" onClick={resetExperienceForm} className="emp-close-form-btn">
+          <FaTimes />
+        </button>
+      </div>
+      <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div className="emp-field-compact">
+          <label className="required">Company Name</label>
+          <input
+            type="text"
+            placeholder="Company name"
+            value={experienceFormData.company}
+            onChange={(e) => setExperienceFormData({ ...experienceFormData, company: e.target.value })}
+          />
+        </div>
+        <div className="emp-field-compact">
+          <label className="required">Position / Designation</label>
+          <input
+            type="text"
+            placeholder="e.g., Software Engineer, Manager"
+            value={experienceFormData.position}
+            onChange={(e) => setExperienceFormData({ ...experienceFormData, position: e.target.value })}
+          />
+        </div>
+        <div className="emp-field-compact">
+          <label className="required">Start Date</label>
+          <input
+            type="date"
+            value={experienceFormData.startDate}
+            onChange={(e) => setExperienceFormData({ ...experienceFormData, startDate: e.target.value })}
+          />
+        </div>
+        <div className="emp-field-compact">
+          <label>End Date</label>
+          <input
+            type="date"
+            value={experienceFormData.endDate}
+            onChange={(e) => setExperienceFormData({ ...experienceFormData, endDate: e.target.value })}
+          />
+          <small style={{ color: '#6b7280', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+            Leave empty if currently working
+          </small>
+        </div>
+      </div>
+      <div className="emp-family-form-actions" style={{ marginTop: '16px' }}>
+        <button type="button" onClick={resetExperienceForm} className="emp-cancel-family-btn">
+          Cancel
+        </button>
+        <button type="button" onClick={addOrUpdateExperience} className="emp-save-family-btn">
+          <FaSave size={12} /> {editingExperienceIndex !== null ? 'Update' : 'Add'} Experience
+        </button>
+      </div>
+    </div>
+  )}
+
+  {/* ─── EXPERIENCE TABLE ─── */}
+  {experiences.length > 0 && (
+    <div className="emp-table-wrap" style={{ marginTop: showExperienceForm ? '20px' : '16px' }}>
+      <table className="emp-table" style={{ minWidth: '100%' }}>
+        <thead>
+          <tr>
+            <th style={{ width: '25%' }}>Company</th>
+            <th style={{ width: '25%' }}>Position</th>
+            <th style={{ width: '20%' }}>Start Date</th>
+            <th style={{ width: '20%' }}>End Date</th>
+            <th style={{ width: '10%' }}>Duration</th>
+            <th style={{ width: '80px' }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {experiences.map((item, idx) => {
+            // Calculate duration
+            let duration = '';
+            if (item.startDate) {
+              const start = new Date(item.startDate);
+              const end = item.endDate ? new Date(item.endDate) : new Date();
+              const diffTime = Math.abs(end - start);
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              const years = Math.floor(diffDays / 365);
+              const months = Math.floor((diffDays % 365) / 30);
+              
+              if (years > 0) duration += `${years}y `;
+              if (months > 0) duration += `${months}m`;
+              if (!duration) duration = '1m';
+              
+              if (!item.endDate) duration += ' (Current)';
+            }
+            
+            return (
+              <tr key={idx}>
+                <td><strong>{item.company}</strong></td>
+                <td>{item.position}</td>
+                <td>{item.startDate ? new Date(item.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '—'}</td>
+                <td>{item.endDate ? new Date(item.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : 'Present'}</td>
+                <td>
+                  {duration ? (
+                    <span className="emp-pill emp-pill--teal">{duration}</span>
+                  ) : '—'}
+                </td>
+                <td>
+                  <div className="emp-actions" style={{ gap: '6px' }}>
+                    <button type="button" onClick={() => editExperience(idx)} className="emp-act emp-act--edit" title="Edit">
+                      <FaEdit size={12} />
+                    </button>
+                    <button type="button" onClick={() => removeExperience(idx)} className="emp-act emp-act--del" title="Delete">
+                      <FaTrash size={12} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  )}
+
+  {experiences.length === 0 && !showExperienceForm && (
+    <div style={{ textAlign: 'center', padding: '30px 20px', color: '#9ca3af', fontSize: '14px' }}>
+      <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#d1d5db' }}>
+        Click "Add Experience" to add your work history
+      </p>
+    </div>
+  )}
+
+ 
+</div>
+
+            <div className="emp-divider" />
+
+            {/* Family Information */}
             <div className="emp-form-section-compact">
               <div className="emp-section-label">
                 <FaUserFriends style={{ marginRight: '8px' }} /> Family Information
@@ -1359,33 +1627,33 @@ const Employees = ({ user }) => {
                   />
                 </div>
               </div>
-              <div className="emp-divider" />
-              <div className="emp-form-section-compact">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="emp-field-compact">
-                    <label>Child 1 Name</label>
-                    <input
-                      type="text"
-                      placeholder="Enter first child's name"
-                      value={child1}
-                      onChange={(e) => setChild1(e.target.value)}
-                    />
+
+              {/* Dynamic Children Names */}
+              {childrenCount > 0 && (
+                <div className="emp-form-section-compact" style={{ marginTop: '8px' }}>
+                  <div className="emp-section-label" style={{ fontSize: '14px', fontWeight: '600' }}>
+                    <FaChild style={{ marginRight: '8px' }} /> Children Names
                   </div>
-                  <div className="emp-field-compact">
-                    <label>Child 2 Name</label>
-                    <input
-                      type="text"
-                      placeholder="Enter second child's name"
-                      value={child2}
-                      onChange={(e) => setChild2(e.target.value)}
-                    />
+                  <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    {childrenNames.map((name, index) => (
+                      <div key={index} className="emp-field-compact">
+                        <label>Child {index + 1}</label>
+                        <input
+                          type="text"
+                          placeholder={`Enter child ${index + 1} name`}
+                          value={name}
+                          onChange={(e) => handleChildNameChange(index, e.target.value)}
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Nominee List Section (unchanged) */}
             <div className="emp-divider" />
+
+            {/* Nominee List Section */}
             <div className="emp-form-section-compact">
               <div className="emp-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span><FaChild style={{ marginRight: '8px' }} /> Nominee List</span>
@@ -1429,6 +1697,12 @@ const Employees = ({ user }) => {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {nomineeList.length === 0 && !showNomineeForm && (
+                <div style={{ textAlign: 'center', padding: '16px', color: '#666', fontSize: '14px' }}>
+                  No nominees added. Click "Add Nominee" to add.
                 </div>
               )}
 
