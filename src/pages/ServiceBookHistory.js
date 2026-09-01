@@ -38,7 +38,7 @@ const DetailCard = ({ icon, label, value, bg, badge, color }) => (
   </div>
 );
 
-const ServiceBookSearch = ({ user, onCancel }) => {
+const ServiceBookHistory = ({ user, onCancel }) => {
   // ─── Authentication helpers ───────────────────────────────
   const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
   const getAxiosConfig = () => ({
@@ -1237,4 +1237,4 @@ const ServiceBookSearch = ({ user, onCancel }) => {
   );
 };
 
-export default ServiceBookSearch;
+export default ServiceBookHistory;
