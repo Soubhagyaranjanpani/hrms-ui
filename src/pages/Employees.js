@@ -150,30 +150,169 @@ const Employees = ({ user }) => {
   const [showNomineeForm, setShowNomineeForm] = useState(false);
   const [editingNomineeIndex, setEditingNomineeIndex] = useState(null);
 
-  // ─── EDUCATION QUALIFICATIONS AS TABLE ──────────────────────────────
-  const [qualifications, setQualifications] = useState([]);
-  const [editingQualificationIndex, setEditingQualificationIndex] = useState(null);
-  const [showQualificationForm, setShowQualificationForm] = useState(false);
-  const [qualificationFormData, setQualificationFormData] = useState({
-    level: '10th',
-    board: '',
-    percentage: '',
+  
+// ─── STATE VARIABLES ───
+const [qualifications, setQualifications] = useState([]);
+  const [validationError, setValidationError] = useState(''); 
+const [showQualificationForm, setShowQualificationForm] = useState(false);
+const [editingQualificationIndex, setEditingQualificationIndex] = useState(null);
+const [qualificationFormData, setQualificationFormData] = useState({
+    level: '',
     year: '',
-    university: '',
     degree: '',
-    cgpa: ''
-  });
+    board: '',
+    university: '',
+    cgpa: '',
+    percentage: '',
+    grade: ''
+});
 
-  // ─── WORK EXPERIENCE AS TABLE ──────────────────────────────────────
-  const [experiences, setExperiences] = useState([]);
-  const [editingExperienceIndex, setEditingExperienceIndex] = useState(null);
-  const [showExperienceForm, setShowExperienceForm] = useState(false);
-  const [experienceFormData, setExperienceFormData] = useState({
+// ─── EDUCATION LEVELS ───
+const EDUCATION_LEVELS = [
+    { value: '10th', label: '10th / Matric' },
+    { value: '12th', label: '12th / Intermediate' },
+    { value: 'diploma', label: 'Diploma' },
+    { value: 'graduation', label: 'Graduation' },
+    { value: 'post_graduation', label: 'Post Graduation' },
+    { value: 'phd', label: 'PhD / Doctorate' }
+];
+
+// ─── ADD QUALIFICATION ───
+const addOrUpdateQualification = () => {
+    // Clear previous error
+    setValidationError('');
+
+    // Validation - Level
+    if (!qualificationFormData.level) {
+        setValidationError('Please select qualification level');
+        return;
+    }
+
+    // Validation - Year
+    if (!qualificationFormData.year) {
+        setValidationError('Please enter passing year');
+        return;
+    }
+
+    // Validation based on level
+    if (qualificationFormData.level === '10th' || qualificationFormData.level === '12th') {
+        if (!qualificationFormData.board) {
+            setValidationError('Please enter board name');
+            return;
+        }
+        if (!qualificationFormData.percentage) {
+            setValidationError('Please enter percentage');
+            return;
+        }
+    } else {
+        if (!qualificationFormData.degree) {
+            setValidationError('Please enter degree');
+            return;
+        }
+        if (!qualificationFormData.university) {
+            setValidationError('Please enter institution/university name');
+            return;
+        }
+        if (!qualificationFormData.cgpa) {
+            setValidationError('Please enter CGPA');
+            return;
+        }
+    }
+
+    // Add new qualification
+    setQualifications([...qualifications, qualificationFormData]);
+
+    // Clear form
+    setQualificationFormData({
+        level: '',
+        year: '',
+        degree: '',
+        board: '',
+        university: '',
+        cgpa: '',
+        percentage: '',
+        grade: ''
+    });
+
+    // Clear error
+    setValidationError('');
+};
+
+// ─── DELETE QUALIFICATION ───
+const deleteQualification = (index) => {
+    const updated = [...qualifications];
+    updated.splice(index, 1);
+    setQualifications(updated);
+};
+
+// ─── GET LEVEL LABEL ───
+const getLevelLabel = (levelValue) => {
+    const levelMap = {
+        '10th': '10th / Matric',
+        '12th': '12th / Intermediate',
+        'diploma': 'Diploma',
+        'graduation': 'Graduation',
+        'post_graduation': 'Post Graduation',
+        'phd': 'PhD / Doctorate'
+    };
+    return levelMap[levelValue] || levelValue;
+};
+
+ // ─── EXPERIENCE STATE ───
+const [experiences, setExperiences] = useState([]);
+const [experienceFormData, setExperienceFormData] = useState({
     company: '',
     position: '',
-    years: '',
-    months: ''
-  });
+    startDate: '',
+    endDate: ''
+});
+const [experienceError, setExperienceError] = useState('');
+
+// ─── ADD EXPERIENCE ───
+const addOrUpdateExperience = () => {
+    setExperienceError('');
+
+    if (!experienceFormData.company) {
+        setExperienceError('Please enter company name');
+        return;
+    }
+    if (!experienceFormData.position) {
+        setExperienceError('Please enter position');
+        return;
+    }
+    if (!experienceFormData.startDate) {
+        setExperienceError('Please select start date');
+        return;
+    }
+
+    setExperiences([...experiences, experienceFormData]);
+
+    setExperienceFormData({
+        company: '',
+        position: '',
+        startDate: '',
+        endDate: ''
+    });
+
+    setExperienceError('');
+};
+
+// ─── DELETE EXPERIENCE ───
+const deleteExperience = (index) => {
+    const updated = [...experiences];
+    updated.splice(index, 1);
+    setExperiences(updated);
+};
+
+// ─── RESET EXPERIENCE FORM ───
+const resetExperienceForm = () => {
+    setExperienceFormData({
+        company: '',
+        position: '',
+        startDate: '',
+        endDate: ''
+    });
+};
 
   // ─── Designations state ──────────────────────────────────────────────
   const [designations, setDesignations] = useState([]);
@@ -374,51 +513,51 @@ const Employees = ({ user }) => {
   };
 
   // ─── QUALIFICATION HANDLERS ──────────────────────────────────────────
-  const addOrUpdateQualification = () => {
-    if (!qualificationFormData.level) {
-      toast.warning('Validation', 'Please select education level');
-      return;
-    }
-    if (!qualificationFormData.year) {
-      toast.warning('Validation', 'Please enter passing year');
-      return;
-    }
+  // const addOrUpdateQualification = () => {
+  //   if (!qualificationFormData.level) {
+  //     toast.warning('Validation', 'Please select education level');
+  //     return;
+  //   }
+  //   if (!qualificationFormData.year) {
+  //     toast.warning('Validation', 'Please enter passing year');
+  //     return;
+  //   }
 
-    const formData = { ...qualificationFormData };
+  //   const formData = { ...qualificationFormData };
     
-    // For graduation and above, university and degree are required
-    if (['graduation', 'post_graduation', 'phd'].includes(formData.level)) {
-      if (!formData.university) {
-        toast.warning('Validation', 'Please enter university name');
-        return;
-      }
-      if (!formData.degree) {
-        toast.warning('Validation', 'Please enter degree name');
-        return;
-      }
-    } else {
-      // For 10th, 12th, diploma, other - board and percentage required
-      if (!formData.board) {
-        toast.warning('Validation', 'Please enter board name');
-        return;
-      }
-      if (!formData.percentage) {
-        toast.warning('Validation', 'Please enter percentage');
-        return;
-      }
-    }
+  //   // For graduation and above, university and degree are required
+  //   if (['graduation', 'post_graduation', 'phd'].includes(formData.level)) {
+  //     if (!formData.university) {
+  //       toast.warning('Validation', 'Please enter university name');
+  //       return;
+  //     }
+  //     if (!formData.degree) {
+  //       toast.warning('Validation', 'Please enter degree name');
+  //       return;
+  //     }
+  //   } else {
+  //     // For 10th, 12th, diploma, other - board and percentage required
+  //     if (!formData.board) {
+  //       toast.warning('Validation', 'Please enter board name');
+  //       return;
+  //     }
+  //     if (!formData.percentage) {
+  //       toast.warning('Validation', 'Please enter percentage');
+  //       return;
+  //     }
+  //   }
 
-    if (editingQualificationIndex !== null) {
-      const updated = [...qualifications];
-      updated[editingQualificationIndex] = { ...formData };
-      setQualifications(updated);
-      toast.success('Success', 'Qualification updated successfully');
-    } else {
-      setQualifications([...qualifications, { ...formData }]);
-      toast.success('Success', 'Qualification added successfully');
-    }
-    resetQualificationForm();
-  };
+  //   if (editingQualificationIndex !== null) {
+  //     const updated = [...qualifications];
+  //     updated[editingQualificationIndex] = { ...formData };
+  //     setQualifications(updated);
+  //     toast.success('Success', 'Qualification updated successfully');
+  //   } else {
+  //     setQualifications([...qualifications, { ...formData }]);
+  //     toast.success('Success', 'Qualification added successfully');
+  //   }
+  //   resetQualificationForm();
+  // };
 
   const editQualification = (index) => {
     setEditingQualificationIndex(index);
@@ -446,50 +585,16 @@ const Employees = ({ user }) => {
   };
 
   // ─── EXPERIENCE HANDLERS ─────────────────────────────────────────────
-  const addOrUpdateExperience = () => {
-    if (!experienceFormData.company) {
-      toast.warning('Validation', 'Please enter company name');
-      return;
-    }
-    if (!experienceFormData.position) {
-      toast.warning('Validation', 'Please enter position');
-      return;
-    }
+  
 
-    if (editingExperienceIndex !== null) {
-      const updated = [...experiences];
-      updated[editingExperienceIndex] = { ...experienceFormData };
-      setExperiences(updated);
-      toast.success('Success', 'Experience updated successfully');
-    } else {
-      setExperiences([...experiences, { ...experienceFormData }]);
-      toast.success('Success', 'Experience added successfully');
-    }
-    resetExperienceForm();
-  };
-
-  const editExperience = (index) => {
-    setEditingExperienceIndex(index);
-    setExperienceFormData({ ...experiences[index] });
-    setShowExperienceForm(true);
-  };
+  
 
   const removeExperience = (index) => {
     setExperiences(experiences.filter((_, i) => i !== index));
     toast.success('Success', 'Experience removed successfully');
   };
 
-  const resetExperienceForm = () => {
-    setExperienceFormData({
-      company: '',
-      position: '',
-      years: '',
-      months: ''
-    });
-    setEditingExperienceIndex(null);
-    setShowExperienceForm(false);
-  };
-
+  
   // ─── NOMINEE HANDLERS ────────────────────────────────────────────────
   const addOrUpdateNominee = () => {
     if (!nomineeFormData.name.trim()) {
@@ -881,10 +986,10 @@ const Employees = ({ user }) => {
   };
 
   // ─── HELPER: Get level display name ──────────────────────────────────
-  const getLevelLabel = (level) => {
-    const found = EDUCATION_LEVELS.find(l => l.value === level);
-    return found ? found.label : level;
-  };
+  // const getLevelLabel = (level) => {
+  //   const found = EDUCATION_LEVELS.find(l => l.value === level);
+  //   return found ? found.label : level;
+  // };
 
   if (loading && view === 'list' && allEmployees.length === 0) {
     return <LoadingSpinner message="Loading employees..." />;
@@ -1261,317 +1366,535 @@ const Employees = ({ user }) => {
 
 {/* ─── EDUCATION QUALIFICATIONS ─── */}
 <div className="emp-form-section-compact">
-  <div className="emp-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-    <span><FaGraduationCap style={{ marginRight: '8px' }} /> Educational Qualifications</span>
-    {!showQualificationForm && (
-      <button type="button" className="emp-add-btn" onClick={() => { resetQualificationForm(); setShowQualificationForm(true); }}>
-        <FaPlus size={12} /> Add Qualification
-      </button>
-    )}
-  </div>
+    {/* HEADER */}
+                  <div className="emp-section-label">
 
-  {/* QUALIFICATION FORM */}
-  {showQualificationForm && (
-    <div className="emp-family-form" style={{ marginTop: '12px', marginBottom: '20px' }}>
-      <div className="emp-family-form-header">
-        <h4>{editingQualificationIndex !== null ? 'Edit Qualification' : 'Add Qualification'}</h4>
-        <button type="button" onClick={resetQualificationForm} className="emp-close-form-btn">
-          <FaTimes />
-        </button>
-      </div>
-      <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-        <div className="emp-field-compact">
-          <label className="required">Qualification Level</label>
-          <select
-            value={qualificationFormData.level}
-            onChange={(e) => setQualificationFormData({ ...qualificationFormData, level: e.target.value })}
-          >
-            {EDUCATION_LEVELS.map(level => (
-              <option key={level.value} value={level.value}>{level.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="emp-field-compact">
-          <label className="required">Passing Year</label>
-          <input
-            type="number"
-            placeholder="YYYY"
-            min="1950"
-            max="2026"
-            value={qualificationFormData.year}
-            onChange={(e) => setQualificationFormData({ ...qualificationFormData, year: e.target.value })}
-          />
-        </div>
-        
-        {['graduation', 'post_graduation', 'phd'].includes(qualificationFormData.level) ? (
-          <>
-            <div className="emp-field-compact">
-              <label className="required"><FaUniversity style={{ marginRight: '4px' }} /> University</label>
-              <input
-                type="text"
-                placeholder="University name"
-                value={qualificationFormData.university}
-                onChange={(e) => setQualificationFormData({ ...qualificationFormData, university: e.target.value })}
-              />
-            </div>
-            <div className="emp-field-compact">
-              <label className="required">Degree</label>
-              <input
-                type="text"
-                placeholder="e.g., B.Tech, M.Sc, PhD"
-                value={qualificationFormData.degree}
-                onChange={(e) => setQualificationFormData({ ...qualificationFormData, degree: e.target.value })}
-              />
-            </div>
-            <div className="emp-field-compact">
-              <label>CGPA</label>
-              <input
-                type="number"
-                placeholder="CGPA (0-10)"
-                min="0"
-                max="10"
-                step="0.01"
-                value={qualificationFormData.cgpa}
-                onChange={(e) => setQualificationFormData({ ...qualificationFormData, cgpa: e.target.value })}
-              />
-            </div>
-            <div className="emp-field-compact">
-              <label>Percentage (%)</label>
-              <input
-                type="number"
-                placeholder="Percentage (optional)"
-                min="0"
-                max="100"
-                step="0.01"
-                value={qualificationFormData.percentage}
-                onChange={(e) => setQualificationFormData({ ...qualificationFormData, percentage: e.target.value })}
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="emp-field-compact">
-              <label className="required"><FaSchool style={{ marginRight: '4px' }} /> Board</label>
-              <input
-                type="text"
-                placeholder="e.g., CBSE, ICSE, State Board"
-                value={qualificationFormData.board}
-                onChange={(e) => setQualificationFormData({ ...qualificationFormData, board: e.target.value })}
-              />
-            </div>
-            <div className="emp-field-compact">
-              <label className="required">Percentage (%)</label>
-              <input
-                type="number"
-                placeholder="Enter percentage"
-                min="0"
-                max="100"
-                step="0.01"
-                value={qualificationFormData.percentage}
-                onChange={(e) => setQualificationFormData({ ...qualificationFormData, percentage: e.target.value })}
-              />
-            </div>
-          </>
-        )}
-      </div>
-      <div className="emp-family-form-actions" style={{ marginTop: '16px' }}>
-        <button type="button" onClick={resetQualificationForm} className="emp-cancel-family-btn">
-          Cancel
-        </button>
-        <button type="button" onClick={addOrUpdateQualification} className="emp-add-btn">
-          <FaSave size={12} /> {editingQualificationIndex !== null ? 'Update' : 'Add'} Qualification
-        </button>
-      </div>
+            <FaGraduationCap style={{ marginRight: '8px', }} />
+            EDUCATIONAL QUALIFICATIONS
+  
     </div>
-  )}
 
-  {/* ─── QUALIFICATIONS TABLE ─── */}
-  {qualifications.length > 0 && (
-    <div className="emp-table-wrap" style={{ marginTop: showQualificationForm ? '20px' : '16px' }}>
-      <table className="emp-table" style={{ minWidth: '100%' }}>
-        <thead>
-          <tr>
-            <th style={{ width: '18%' }}>Level</th>
-            <th style={{ width: '27%' }}>Board / University</th>
-            <th style={{ width: '20%' }}>Degree / Class</th>
-            <th style={{ width: '20%' }}>Percentage / CGPA</th>
-            <th style={{ width: '15%' }}>Year</th>
-            <th style={{ width: '80px' }}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {qualifications.map((item, idx) => (
-            <tr key={idx}>
-              <td><span className="emp-pill emp-pill--indigo">{getLevelLabel(item.level)}</span></td>
-              <td>{item.board || item.university || '—'}</td>
-              <td>{item.degree || '—'}</td>
-              <td>{item.cgpa ? `${item.cgpa} CGPA` : item.percentage ? `${item.percentage}%` : '—'}</td>
-              <td>{item.year}</td>
-              <td>
-                <div className="emp-actions" style={{ gap: '6px' }}>
-                  <button type="button" onClick={() => editQualification(idx)} className="emp-act emp-act--edit" title="Edit">
-                    <FaEdit size={12} />
-                  </button>
-                 
+    {/* EXISTING ROWS */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+        {qualifications.map((item, idx) => (
+            <div
+                key={idx}
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.2fr 1.5fr 1.5fr 1fr 1fr 50px',
+                    gap: '10px',
+                    padding: '10px 14px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb',
+                    alignItems: 'center'
+                }}
+            >
+                <span style={{
+                    padding: '2px 10px',
+                    borderRadius: '12px',
+                    backgroundColor: '#f0f9ff',
+                    color: '#0f0207',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    textAlign: 'center',
+                    width: 'fit-content'
+                }}>
+                    {getLevelLabel(item.level)}
+                </span>
+
+                <span style={{ fontSize: '13px', color: '#1e293b' }}>
+                    {item.level === '10th' || item.level === '12th' ? item.board || '—' : item.degree || '—'}
+                </span>
+
+                <span style={{ fontSize: '13px', color: '#475569' }}>
+                    {item.level === '10th' || item.level === '12th' ? '—' : (item.university || '—')}
+                </span>
+
+                <span style={{ fontSize: '13px', color: '#475569', textAlign: 'center' }}>
+                    {item.year || '—'}
+                </span>
+
+                <span style={{ fontSize: '13px', color: '#475569' }}>
+                    {item.level === '10th' || item.level === '12th'
+                        ? (item.percentage ? `${item.percentage}%` : '—')
+                        : (item.cgpa ? `${item.cgpa} CGPA` : '—')
+                    }
+                </span>
+
+                <button
+                    type="button"
+                    onClick={() => deleteQualification(idx)}
+                    style={{
+                        padding: '4px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.color = '#ef4444';
+                        e.currentTarget.style.backgroundColor = '#fef2f2';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.color = '#94a3b8';
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    title="Delete Row"
+                >
+                    <FaTrash size={14} />
+                </button>
+            </div>
+        ))}
+    </div>
+
+   
+    {/* NEW ROW FORM */}
+    <div style={{
+        display: 'flex',
+        gap: '10px',
+        padding: '10px 14px',
+        backgroundColor: '#ffffff',
+        borderRadius: '8px',
+        border: '2px solid #9d174d',
+        alignItems: 'center'
+    }}>
+        <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1.2fr 1.5fr 1.5fr 1fr 1fr',
+            gap: '10px',
+            flex: 1,
+            alignItems: 'center'
+        }}>
+            {/* Level */}
+            <select
+                value={qualificationFormData.level}
+                onChange={(e) => {
+                    setQualificationFormData({
+                        ...qualificationFormData,
+                        level: e.target.value,
+                        board: '',
+                        university: '',
+                        degree: '',
+                        cgpa: '',
+                        percentage: ''
+                    });
+                    setValidationError(''); 
+                }}
+                style={{
+                    padding: '8px 10px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    backgroundColor: '#fff',
+                    width: '100%'
+                }}
+            >
+                <option value="">Select Level</option>
+                {EDUCATION_LEVELS.map(level => (
+                    <option key={level.value} value={level.value}>{level.label}</option>
+                ))}
+            </select>
+
+            {/* Degree OR Board */}
+            {(qualificationFormData.level === '10th' || qualificationFormData.level === '12th') ? (
+                <input
+                    type="text"
+                    placeholder="Board (e.g., CBSE)"
+                    value={qualificationFormData.board || ''}
+                    onChange={(e) => setQualificationFormData({ ...qualificationFormData, board: e.target.value })}
+                    style={{
+                        padding: '8px 10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        width: '100%'
+                    }}
+                />
+            ) : (
+                <input
+                    type="text"
+                    placeholder="Degree (e.g., B.Tech)"
+                    value={qualificationFormData.degree || ''}
+                    onChange={(e) => setQualificationFormData({ ...qualificationFormData, degree: e.target.value })}
+                    style={{
+                        padding: '8px 10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        width: '100%'
+                    }}
+                />
+            )}
+
+            {/* Institution (Graduation only) */}
+            {(qualificationFormData.level !== '10th' && qualificationFormData.level !== '12th' && qualificationFormData.level !== '') ? (
+                <input
+                    type="text"
+                    placeholder="Institution / University"
+                    value={qualificationFormData.university || ''}
+                    onChange={(e) => setQualificationFormData({ ...qualificationFormData, university: e.target.value })}
+                    style={{
+                        padding: '8px 10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        width: '100%'
+                    }}
+                />
+            ) : (
+                <div style={{
+                    padding: '8px 10px',
+                    backgroundColor: '#f1f5f9',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: '#94a3b8',
+                    textAlign: 'center',
+                    border: '1px dashed #d1d5db'
+                }}>
+                    —
                 </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )}
+            )}
 
-  {qualifications.length === 0 && !showQualificationForm && (
-    <div style={{ textAlign: 'center', padding: '30px 20px', color: '#9ca3af', fontSize: '14px' }}>
-      <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#d1d5db' }}>
-        Click "Add Qualification" to add your educational details
-      </p>
-    </div>
-  )}
+            {/* Passing Year */}
+            <input
+                type="number"
+                placeholder="Passing Year"
+                min="1950"
+                max="2026"
+                value={qualificationFormData.year}
+                onChange={(e) => setQualificationFormData({ ...qualificationFormData, year: e.target.value })}
+                style={{
+                    padding: '8px 10px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    width: '100%'
+                }}
+            />
 
+            {/* Percentage OR CGPA */}
+            {(qualificationFormData.level === '10th' || qualificationFormData.level === '12th') ? (
+                <input
+                    type="number"
+                    placeholder="Percentage %"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={qualificationFormData.percentage || ''}
+                    onChange={(e) => setQualificationFormData({ ...qualificationFormData, percentage: e.target.value })}
+                    style={{
+                        padding: '8px 10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        width: '100%'
+                    }}
+                />
+            ) : (
+                <input
+                    type="number"
+                    placeholder="CGPA"
+                    min="0"
+                    max="10"
+                    step="0.01"
+                    value={qualificationFormData.cgpa || ''}
+                    onChange={(e) => setQualificationFormData({ ...qualificationFormData, cgpa: e.target.value })}
+                    style={{
+                        padding: '8px 10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        width: '100%'
+                    }}
+                />
+            )}
+        </div>
+
+        {/* ADD BUTTON */}
+        <button
+            type="button"
+            onClick={addOrUpdateQualification}
+            style={{
+                padding: '8px 20px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#9d174d',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
+                minWidth: '100px',
+                justifyContent: 'center'
+            }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#9d174d';
+                e.currentTarget.style.transform = 'scale(1.02)';
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#9d174d';
+                e.currentTarget.style.transform = 'scale(1)';
+            }}
+        >
+            <FaPlus size={12} /> Add
+        </button>
+    </div>
+ 
+    {/* VALIDATION ERRORS */}
+    {validationError && (
+        <div style={{
+            marginTop: '10px',
+            padding: '8px 14px',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '6px',
+            color: '#dc2626',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+        }}>
+            <span style={{ fontSize: '16px' }}>⚠️</span>
+            {validationError}
+        </div>
+    )}
 </div>
             <div className="emp-divider" />
 
-          {/* ─── WORK EXPERIENCE ─── */}
+{/* ─── WORK EXPERIENCE ─── */}
 <div className="emp-form-section-compact">
-  <div className="emp-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-    <span><FaBriefcase style={{ marginRight: '8px' }} /> Work Experience</span>
-    {!showExperienceForm && (
-      <button type="button" className="emp-add-btn" onClick={() => { resetExperienceForm(); setShowExperienceForm(true); }}>
-        <FaPlus size={12} /> Add Experience
-      </button>
-    )}
+  {/* ─── HEADER ─── */}
+  <div className="emp-section-label">
+    <FaBriefcase style={{ marginRight: '8px' }} /> 
+    WORK EXPERIENCE
   </div>
 
-  {/* ─── EXPERIENCE FORM  ─── */}
-  {showExperienceForm && (
-    <div className="emp-family-form" style={{ marginTop: '12px', marginBottom: '20px' }}>
-      <div className="emp-family-form-header">
-        <h4>{editingExperienceIndex !== null ? 'Edit Experience' : 'Add Experience'}</h4>
-        <button type="button" onClick={resetExperienceForm} className="emp-close-form-btn">
-          <FaTimes />
-        </button>
-      </div>
-      <div className="emp-form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-        <div className="emp-field-compact">
-          <label className="required">Company Name</label>
-          <input
-            type="text"
-            placeholder="Company name"
-            value={experienceFormData.company}
-            onChange={(e) => setExperienceFormData({ ...experienceFormData, company: e.target.value })}
-          />
+  {/* ─── EXISTING EXPERIENCE ROWS ─── */}
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+    {experiences.map((item, idx) => {
+      let duration = '';
+      if (item.startDate) {
+        const start = new Date(item.startDate);
+        const end = item.endDate ? new Date(item.endDate) : new Date();
+        const diffTime = Math.abs(end - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const years = Math.floor(diffDays / 365);
+        const months = Math.floor((diffDays % 365) / 30);
+        
+        if (years > 0) duration += `${years}y `;
+        if (months > 0) duration += `${months}m`;
+        if (!duration) duration = '1m';
+        if (!item.endDate) duration += ' (Current)';
+      }
+
+      return (
+        <div
+          key={idx}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1.5fr 1.2fr 1fr 1fr 0.8fr 50px',
+            gap: '10px',
+            padding: '10px 14px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px',
+            border: '1px solid #e5e7eb',
+            alignItems: 'center'
+          }}
+        >
+          <span style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>
+            {item.company || '—'}
+          </span>
+
+          <span style={{ fontSize: '13px', color: '#475569' }}>
+            {item.position || '—'}
+          </span>
+
+          <span style={{ fontSize: '12px', color: '#64748b' }}>
+            {item.startDate ? new Date(item.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '—'}
+          </span>
+
+          <span style={{ fontSize: '12px', color: '#64748b' }}>
+            {item.endDate ? new Date(item.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : 'Present'}
+          </span>
+
+          <span style={{
+            padding: '2px 10px',
+            borderRadius: '12px',
+            backgroundColor: '#d1fae5',
+            color: '#065f46',
+            fontSize: '11px',
+            fontWeight: '500',
+            textAlign: 'center'
+          }}>
+            {duration || '—'}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => deleteExperience(idx)}
+            style={{
+              padding: '4px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#ef4444';
+              e.currentTarget.style.backgroundColor = '#fef2f2';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = '#94a3b8';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+            title="Delete"
+          >
+            <FaTrash size={14} />
+          </button>
         </div>
-        <div className="emp-field-compact">
-          <label className="required">Position / Designation</label>
-          <input
-            type="text"
-            placeholder="e.g., Software Engineer, Manager"
-            value={experienceFormData.position}
-            onChange={(e) => setExperienceFormData({ ...experienceFormData, position: e.target.value })}
-          />
-        </div>
-        <div className="emp-field-compact">
-          <label className="required">Start Date</label>
-          <input
-            type="date"
-            value={experienceFormData.startDate}
-            onChange={(e) => setExperienceFormData({ ...experienceFormData, startDate: e.target.value })}
-          />
-        </div>
-        <div className="emp-field-compact">
-          <label>End Date</label>
-          <input
-            type="date"
-            value={experienceFormData.endDate}
-            onChange={(e) => setExperienceFormData({ ...experienceFormData, endDate: e.target.value })}
-          />
-          <small style={{ color: '#6b7280', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-            Leave empty if currently working
-          </small>
-        </div>
-      </div>
-      <div className="emp-family-form-actions" style={{ marginTop: '16px' }}>
-        <button type="button" onClick={resetExperienceForm} className="emp-cancel-family-btn">
-          Cancel
-        </button>
-        <button type="button" onClick={addOrUpdateExperience} className="emp-add-btn">
-          <FaSave size={12} /> {editingExperienceIndex !== null ? 'Update' : 'Add'} Experience
-        </button>
-      </div>
+      );
+    })}
+  </div>
+{/* ─── ADD EXPERIENCE ROW ─── */}
+<div style={{
+  display: 'flex',
+  gap: '10px',
+  padding: '10px 14px',
+  backgroundColor: '#ffffff',
+  borderRadius: '8px',
+  border: '2px solid #9d174d',
+  alignItems: 'center'
+}}>
+  <div style={{
+    display: 'grid',
+    gridTemplateColumns: '1.5fr 1.2fr 1.2fr 1.2fr', 
+    gap: '10px',
+    flex: 1,
+    alignItems: 'center'
+  }}>
+    <input
+      type="text"
+      placeholder="Company Name"
+      value={experienceFormData.company}
+      onChange={(e) => setExperienceFormData({ ...experienceFormData, company: e.target.value })}
+      style={{
+        padding: '8px 10px',
+        border: '1px solid #d1d5db',
+        borderRadius: '6px',
+        fontSize: '12px',
+        width: '100%'
+      }}
+    />
+
+    <input
+      type="text"
+      placeholder="Position"
+      value={experienceFormData.position}
+      onChange={(e) => setExperienceFormData({ ...experienceFormData, position: e.target.value })}
+      style={{
+        padding: '8px 10px',
+        border: '1px solid #d1d5db',
+        borderRadius: '6px',
+        fontSize: '12px',
+        width: '100%'
+      }}
+    />
+
+    <input
+      type="date"
+      value={experienceFormData.startDate}
+      onChange={(e) => setExperienceFormData({ ...experienceFormData, startDate: e.target.value })}
+      style={{
+        padding: '8px 10px',
+        border: '1px solid #d1d5db',
+        borderRadius: '6px',
+        fontSize: '12px',
+        width: '100%'
+      }}
+    />
+
+    <input
+      type="date"
+      value={experienceFormData.endDate}
+      onChange={(e) => setExperienceFormData({ ...experienceFormData, endDate: e.target.value })}
+      style={{
+        padding: '8px 10px',
+        border: '1px solid #d1d5db',
+        borderRadius: '6px',
+        fontSize: '12px',
+        width: '100%'
+      }}
+    />
+  </div>
+
+  {/* ADD BUTTON */}
+  <button
+    type="button"
+    onClick={addOrUpdateExperience}
+    style={{
+      padding: '8px 20px',
+      borderRadius: '6px',
+      border: 'none',
+      backgroundColor: '#9d174d',
+      color: '#fff',
+      cursor: 'pointer',
+      fontSize: '13px',
+      fontWeight: '500',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      transition: 'all 0.2s',
+      whiteSpace: 'nowrap',
+      minWidth: '100px',
+      justifyContent: 'center'
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.backgroundColor = '#9d174d';
+      e.currentTarget.style.transform = 'scale(1.02)';
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.backgroundColor = '#9d174d';
+      e.currentTarget.style.transform = 'scale(1)';
+    }}
+  >
+    <FaPlus size={12} /> Add
+  </button>
+</div>
+  {/* ─── EXPERIENCE ERROR ─── */}
+  {experienceError && (
+    <div style={{
+      marginTop: '10px',
+      padding: '8px 14px',
+      backgroundColor: '#fef2f2',
+      border: '1px solid #fecaca',
+      borderRadius: '6px',
+      color: '#dc2626',
+      fontSize: '13px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }}>
+      <span style={{ fontSize: '16px' }}>⚠️</span>
+      {experienceError}
     </div>
   )}
-
-  {/* ─── EXPERIENCE TABLE ─── */}
-  {experiences.length > 0 && (
-    <div className="emp-table-wrap" style={{ marginTop: showExperienceForm ? '20px' : '16px' }}>
-      <table className="emp-table" style={{ minWidth: '100%' }}>
-        <thead>
-          <tr>
-            <th style={{ width: '25%' }}>Company</th>
-            <th style={{ width: '25%' }}>Position</th>
-            <th style={{ width: '20%' }}>Start Date</th>
-            <th style={{ width: '20%' }}>End Date</th>
-            <th style={{ width: '10%' }}>Duration</th>
-            <th style={{ width: '80px' }}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {experiences.map((item, idx) => {
-            // Calculate duration
-            let duration = '';
-            if (item.startDate) {
-              const start = new Date(item.startDate);
-              const end = item.endDate ? new Date(item.endDate) : new Date();
-              const diffTime = Math.abs(end - start);
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              const years = Math.floor(diffDays / 365);
-              const months = Math.floor((diffDays % 365) / 30);
-              
-              if (years > 0) duration += `${years}y `;
-              if (months > 0) duration += `${months}m`;
-              if (!duration) duration = '1m';
-              
-              if (!item.endDate) duration += ' (Current)';
-            }
-            
-            return (
-              <tr key={idx}>
-                <td><strong>{item.company}</strong></td>
-                <td>{item.position}</td>
-                <td>{item.startDate ? new Date(item.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '—'}</td>
-                <td>{item.endDate ? new Date(item.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : 'Present'}</td>
-                <td>
-                  {duration ? (
-                    <span className="emp-pill emp-pill--teal">{duration}</span>
-                  ) : '—'}
-                </td>
-                <td>
-                  <div className="emp-actions" style={{ gap: '6px' }}>
-                    <button type="button" onClick={() => editExperience(idx)} className="emp-act emp-act--edit" title="Edit">
-                      <FaEdit size={12} />
-                    </button>
-                   
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  )}
-
-  {experiences.length === 0 && !showExperienceForm && (
-    <div style={{ textAlign: 'center', padding: '30px 20px', color: '#9ca3af', fontSize: '14px' }}>
-      <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#d1d5db' }}>
-        Click "Add Experience" to add your work history
-      </p>
-    </div>
-  )}
-
- 
 </div>
 
             <div className="emp-divider" />
