@@ -82,6 +82,10 @@ import AttendanceExceptions from './pages/AttendanceExceptions';
 import DeviceAuditTrail from './pages/DeviceAuditTrail';
 import DeviceHealthDashboard from './pages/DeviceHealthDashboard';
 import SynchronizationDashboard from './pages/SynchronizationDashboard';
+import Country from './Masters/Country';
+import State from './Masters/State';
+import City from './Masters/City';
+import WorkMode from './Masters/WorkMode';
 import { BiCurrentLocation } from 'react-icons/bi';
 
 
@@ -227,6 +231,10 @@ function App() {
           <Route path="DeviceHealthDashboard" element={<DeviceHealthDashboard user={currentUser}/>}/>
           <Route path="DeviceAuditTrail" element={<DeviceAuditTrail user={currentUser}/>}/>
           <Route path="SynchronizationDashboard" element={<SynchronizationDashboard user={currentUser}/>}/>
+          <Route path="Country" element={<Country user={currentUser}/>}/>
+          <Route path="State" element={<State user={currentUser}/>}/>
+          <Route path="City" element={<City user={currentUser}/>}/>
+          <Route path="WorkMode" element={<WorkMode user={currentUser}/>}/>
         </Route>
       </Routes>
     </Router>

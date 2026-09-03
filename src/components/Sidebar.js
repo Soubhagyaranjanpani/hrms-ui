@@ -131,6 +131,10 @@ const masterItems = [
   { path: '/designation', icon: <FaCheck />, label: 'Designation', roles: ['Admin'] },
   { path: '/leave', icon: <FaCalendarCheck />, label: 'Leave', roles: ['Admin'] },
   { path: '/skills', icon: <FaCalendarCheck />, label: 'Skill', roles: ['Admin'] },
+  {path: '/Country', icon: <FaMapMarker />, label: 'Country', roles: ['Admin'] },
+  {path: '/State', icon: <FaMapMarker />, label: 'State', roles: ['Admin'] },
+  {path: '/City', icon: <FaMapMarker />, label: 'City', roles: ['Admin'] },
+  {path: '/WorkMode', icon: <FaMapMarker />, label: 'Work Mode', roles: ['Admin'] },
     {
     icon: <FaDatabase />,
     label: 'Recruitment',
