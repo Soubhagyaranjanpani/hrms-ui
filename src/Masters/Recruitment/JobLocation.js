@@ -648,9 +648,7 @@ const JobLocationMaster = () => {
                     placeholder="Auto-generated"
                     style={{ fontSize: '14px', padding: '6px 12px', background: '#f3f4f6' }}
                   />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Auto-generated unique identifier
-                  </small>
+                 
                 </div>
 
                 {/* Location Name - Required */}
@@ -665,9 +663,7 @@ const JobLocationMaster = () => {
                     style={{ fontSize: '14px', padding: '6px 12px' }}
                   />
                   <FieldError msg={errors.locationName} />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Display name of the work location
-                  </small>
+                 
                 </div>
 
                 {/* Branch - Searchable Dropdown */}
@@ -759,45 +755,10 @@ const JobLocationMaster = () => {
                     )}
                   </div>
                   <FieldError msg={errors.branch} />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Maps the location to an organizational branch
-                  </small>
+                 
                 </div>
 
-                {/* City - Dropdown */}
-                <div className={`cert-field-compact ${touched.city && errors.city ? 'has-error' : ''}`}>
-                  <label className="required">City</label>
-                  <select
-                    value={formData.city}
-                    onChange={(e) => handleChange('city', e.target.value)}
-                    onBlur={() => handleBlur('city')}
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
-                  >
-                    <option value="">Select City</option>
-                    {cities.map(city => (
-                      <option key={city.value} value={city.value}>{city.label}</option>
-                    ))}
-                  </select>
-                  <FieldError msg={errors.city} />
-                </div>
-
-                {/* State - Dropdown */}
-                <div className={`cert-field-compact ${touched.state && errors.state ? 'has-error' : ''}`}>
-                  <label className="required">State</label>
-                  <select
-                    value={formData.state}
-                    onChange={(e) => handleChange('state', e.target.value)}
-                    onBlur={() => handleBlur('state')}
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
-                  >
-                    <option value="">Select State</option>
-                    {states.map(state => (
-                      <option key={state.value} value={state.value}>{state.label}</option>
-                    ))}
-                  </select>
-                  <FieldError msg={errors.state} />
-                </div>
-
+            
                 {/* Country - Dropdown */}
                 <div className={`cert-field-compact ${touched.country && errors.country ? 'has-error' : ''}`}>
                   <label className="required">Country</label>
@@ -813,6 +774,38 @@ const JobLocationMaster = () => {
                     ))}
                   </select>
                   <FieldError msg={errors.country} />
+                </div>
+    {/* State - Dropdown */}
+                <div className={`cert-field-compact ${touched.state && errors.state ? 'has-error' : ''}`}>
+                  <label className="required">State</label>
+                  <select
+                    value={formData.state}
+                    onChange={(e) => handleChange('state', e.target.value)}
+                    onBlur={() => handleBlur('state')}
+                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                  >
+                    <option value="">Select State</option>
+                    {states.map(state => (
+                      <option key={state.value} value={state.value}>{state.label}</option>
+                    ))}
+                  </select>
+                  <FieldError msg={errors.state} />
+                </div>
+   {/* City - Dropdown */}
+                <div className={`cert-field-compact ${touched.city && errors.city ? 'has-error' : ''}`}>
+                  <label className="required">City</label>
+                  <select
+                    value={formData.city}
+                    onChange={(e) => handleChange('city', e.target.value)}
+                    onBlur={() => handleBlur('city')}
+                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                  >
+                    <option value="">Select City</option>
+                    {cities.map(city => (
+                      <option key={city.value} value={city.value}>{city.label}</option>
+                    ))}
+                  </select>
+                  <FieldError msg={errors.city} />
                 </div>
 
                 {/* PIN Code - Numeric */}
@@ -831,9 +824,7 @@ const JobLocationMaster = () => {
                     maxLength="6"
                   />
                   <FieldError msg={errors.pinCode} />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Postal code of the work location (6 digits)
-                  </small>
+                  
                 </div>
 
                 {/* Work Mode - Dropdown */}
@@ -851,9 +842,7 @@ const JobLocationMaster = () => {
                     ))}
                   </select>
                   <FieldError msg={errors.workMode} />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Defines how employees will work from this location
-                  </small>
+                 
                 </div>
 
                 {/* Description - Text Area */}
@@ -872,9 +861,7 @@ const JobLocationMaster = () => {
                       width: '100%'
                     }}
                   />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Additional information about the work location
-                  </small>
+                
                 </div>
 
               </div>
@@ -927,9 +914,9 @@ const JobLocationMaster = () => {
                     <th>Location Code</th>
                     <th>Location Name</th>
                     <th>Branch</th>
-                    <th>City</th>
-                    <th>State</th>
                     <th>Country</th>
+                    <th>State</th>
+                    <th>City</th>
                     <th>PIN</th>
                     <th>Work Mode</th>
                     <th style={{ textAlign: 'center' }}>Status</th>
@@ -959,17 +946,18 @@ const JobLocationMaster = () => {
                             {item.branch}
                           </span>
                         </td>
-                        <td>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <FaCity size={11} style={{ color: '#6b7280' }} />
-                            {item.city}
-                          </span>
-                        </td>
-                        <td>{item.state}</td>
+                        
                         <td>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <FaGlobe size={11} style={{ color: '#6b7280' }} />
                             {item.country}
+                          </span>
+                        </td>
+                                                <td>{item.state}</td>
+<td>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <FaCity size={11} style={{ color: '#6b7280' }} />
+                            {item.city}
                           </span>
                         </td>
                         <td>
