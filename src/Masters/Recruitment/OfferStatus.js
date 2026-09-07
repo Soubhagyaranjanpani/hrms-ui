@@ -1,145 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   FaSave, FaTimes, FaPlus, FaSearch, FaEdit, FaTrash,
   FaArrowLeft, FaArrowRight, FaCheckCircle,
   FaTag, FaList, FaInfoCircle, FaClock
 } from 'react-icons/fa';
-
-// ============================================
-// TOAST NOTIFICATION
-// ============================================
-const showToast = (type, title, message) => {
-  const toastContainer = document.getElementById('toast-container') || createToastContainer();
-  const toast = document.createElement('div');
-  const colors = {
-    success: '#10b981',
-    error: '#ef4444',
-    warning: '#f59e0b',
-    info: '#3b82f6'
-  };
-  toast.className = `toast-notification toast-${type}`;
-  toast.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:${colors[type] || '#3b82f6'};color:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:300px;margin-bottom:8px;animation:slideIn 0.3s ease;">
-      <span style="font-weight:600;">${title}</span>
-      <span style="flex:1;">${message}</span>
-      <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:white;cursor:pointer;font-size:18px;">×</button>
-    </div>
-  `;
-  toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
-};
-
-const createToastContainer = () => {
-  const container = document.createElement('div');
-  container.id = 'toast-container';
-  container.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-width: 500px;
-  `;
-  document.body.appendChild(container);
-
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
-
-  return container;
-};
+import axios from 'axios';
+import { toast } from '../../components/Toast';
+import LoadingSpinner from '../../components/LoadingSpinner';
+import { BASE_URL, STORAGE_KEYS } from '../../config/api.config';
 
 const OfferStatusMaster = () => {
-  // ============================================
-  // STATE MANAGEMENT
-  // ============================================
-  const [statuses, setStatuses] = useState([
-    {
-      id: 1,
-      offerStatusCode: 'OFF001',
-      offerStatusName: 'Draft',
-      description: 'Initial draft status, offer is being prepared',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-15T10:30:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 2,
-      offerStatusCode: 'OFF002',
-      offerStatusName: 'Released',
-      description: 'Offer has been released to the candidate and is awaiting response',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-20T14:20:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 3,
-      offerStatusCode: 'OFF003',
-      offerStatusName: 'Pending Approval',
-      description: 'Offer is pending approval from the hiring manager',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-02-01T09:15:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 4,
-      offerStatusCode: 'OFF004',
-      offerStatusName: 'Accepted',
-      description: 'Candidate has accepted the offer',
-      status: 'Inactive',
-      createdBy: 'Admin',
-      createdDate: '2026-02-10T11:45:00Z',
-      modifiedBy: 'Admin',
-      modifiedDate: '2026-07-20T16:30:00Z'
-    },
-    {
-      id: 5,
-      offerStatusCode: 'OFF005',
-      offerStatusName: 'Declined',
-      description: 'Candidate has declined the offer',
-      status: 'Inactive',
-      createdBy: 'Admin',
-      createdDate: '2026-03-05T08:50:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 6,
-      offerStatusCode: 'OFF006',
-      offerStatusName: 'Withdrawn',
-      description: 'Offer has been withdrawn by the organization',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-04-12T13:10:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 7,
-      offerStatusCode: 'OFF007',
-      offerStatusName: 'On Hold',
-      description: 'Offer is temporarily on hold pending further review',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-05-18T08:30:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    }
-  ]);
-
+  // ─── State Management ──────────────────────────────────────
+  const [statuses, setStatuses] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingStatus, setEditingStatus] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -165,13 +39,61 @@ const OfferStatusMaster = () => {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  // ============================================
-  // FILTER & PAGINATION
-  // ============================================
+  // ─── Token helpers ─────────────────────────────────────────
+  const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  const getAxiosConfig = () => ({
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  const ensureToken = () => {
+    const token = getAuthToken();
+    if (!token) {
+      toast.error('Authentication Required', 'Please login to continue');
+      return false;
+    }
+    return true;
+  };
+
+  // ─── Fetch all offer statuses from API ─────────────────────
+  const fetchStatuses = useCallback(async () => {
+    if (!ensureToken()) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/fetchallOfferStatus`, getAxiosConfig());
+      const data = res.data; // Array of offer statuses
+      const mapped = data.map(item => ({
+        id: item.id,
+        offerStatusCode: item.statusCode,
+        offerStatusName: item.statusName,
+        description: item.description || '',
+        status: item.status === 'y' ? 'Active' : 'Inactive',
+        createdBy: item.lastChangeBy || null,
+        createdDate: item.lastchangeAt || null,
+        modifiedBy: null,
+        modifiedDate: null
+      }));
+      setStatuses(mapped);
+    } catch (err) {
+      console.error('Fetch offer statuses error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to fetch offer statuses');
+      setStatuses([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load data on mount
+  useEffect(() => {
+    fetchStatuses();
+  }, [fetchStatuses]);
+
+  // ─── Filter & pagination ───────────────────────────────────
   const filteredStatuses = statuses.filter(item => {
     const search = searchTerm.toLowerCase();
-    return item.offerStatusCode.toLowerCase().includes(search) ||
-      item.offerStatusName.toLowerCase().includes(search) ||
+    return item.offerStatusCode?.toLowerCase().includes(search) ||
+      item.offerStatusName?.toLowerCase().includes(search) ||
       (item.description && item.description.toLowerCase().includes(search));
   });
 
@@ -180,9 +102,7 @@ const OfferStatusMaster = () => {
   const startIndex = page * rowsPerPage;
   const currentStatuses = filteredStatuses.slice(startIndex, startIndex + rowsPerPage);
 
-  // ============================================
-  // UTILITY FUNCTIONS
-  // ============================================
+  // ─── Utility functions ─────────────────────────────────────
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -195,7 +115,8 @@ const OfferStatusMaster = () => {
   };
 
   const generateOfferStatusCode = () => {
-    const count = statuses.length + 1;
+    const maxId = statuses.reduce((max, item) => Math.max(max, item.id || 0), 0);
+    const count = maxId + 1;
     const prefix = 'OFF';
     const padded = String(count).padStart(3, '0');
     return `${prefix}${padded}`;
@@ -212,9 +133,7 @@ const OfferStatusMaster = () => {
     return range;
   };
 
-  // ============================================
-  // FORM FUNCTIONS
-  // ============================================
+  // ─── Form validation ───────────────────────────────────────
   const resetForm = () => {
     setFormData({
       offerStatusCode: generateOfferStatusCode(),
@@ -236,7 +155,6 @@ const OfferStatusMaster = () => {
 
   const validateField = (field, value) => {
     let error = '';
-
     if (field === 'offerStatusName') {
       if (!value) {
         error = 'Offer Status Name is required';
@@ -254,7 +172,6 @@ const OfferStatusMaster = () => {
         }
       }
     }
-
     setErrors(prev => ({ ...prev, [field]: error }));
     return error === '';
   };
@@ -267,13 +184,11 @@ const OfferStatusMaster = () => {
   const validateForm = () => {
     const fieldsToValidate = ['offerStatusName'];
     const newErrors = {};
-
     for (const field of fieldsToValidate) {
       if (!formData[field]) {
         newErrors[field] = 'This field is required';
       }
     }
-
     if (formData.offerStatusName) {
       if (formData.offerStatusName.length > 100) {
         newErrors.offerStatusName = 'Status Name must be 100 characters or less';
@@ -289,62 +204,59 @@ const OfferStatusMaster = () => {
         }
       }
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // ============================================
-  // CRUD OPERATIONS
-  // ============================================
-  const handleSubmit = (e) => {
+  // ─── CRUD Operations ───────────────────────────────────────
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!ensureToken()) return;
     if (!validateForm()) {
-      showToast('warning', 'Validation Error', 'Please fix the highlighted fields');
+      toast.warning('Validation Error', 'Please fix the highlighted fields');
       return;
     }
 
-    const statusData = {
-      offerStatusCode: formData.offerStatusCode,
-      offerStatusName: formData.offerStatusName,
-      description: formData.description || '',
-      status: formData.status
-    };
-
-    if (editingStatus) {
-      const updated = statuses.map(item =>
-        item.id === editingStatus.id
-          ? {
-            ...item,
-            ...statusData,
-            modifiedBy: 'Admin',
-            modifiedDate: new Date().toISOString()
-          }
-          : item
-      );
-      setStatuses(updated);
-      showToast('success', 'Success', 'Offer status updated successfully');
-    } else {
-      const newStatus = {
-        id: Date.now(),
-        ...statusData,
-        createdBy: 'Admin',
-        createdDate: new Date().toISOString(),
-        modifiedBy: null,
-        modifiedDate: null
+    setSubmitting(true);
+    try {
+      const payload = {
+        statusCode: formData.offerStatusCode,
+        statusName: formData.offerStatusName,
+        description: formData.description || '',
+        status: formData.status === 'Active' ? 'y' : 'n'
       };
-      setStatuses([newStatus, ...statuses]);
-      showToast('success', 'Success', 'Offer status added successfully');
-    }
 
-    resetForm();
-    setShowForm(false);
-    setPage(0);
+      if (editingStatus) {
+        await axios.put(
+          `${BASE_URL}/updateOfferStatus/${editingStatus.id}`,
+          payload,
+          getAxiosConfig()
+        );
+        toast.success('Success', 'Offer status updated successfully');
+      } else {
+        await axios.post(
+          `${BASE_URL}/saveOfferStatus`,
+          payload,
+          getAxiosConfig()
+        );
+        toast.success('Success', 'Offer status added successfully');
+      }
+
+      resetForm();
+      setShowForm(false);
+      setPage(0);
+      await fetchStatuses();
+    } catch (err) {
+      console.error('Submit error:', err);
+      toast.error('Error', err.response?.data?.message || 'Something went wrong');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEdit = (item) => {
     if (item.status === 'Inactive') {
-      showToast('warning', 'Cannot Edit', 'Inactive statuses cannot be edited');
+      toast.warning('Cannot Edit', 'Inactive statuses cannot be edited');
       return;
     }
     setEditingStatus(item);
@@ -362,48 +274,46 @@ const OfferStatusMaster = () => {
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
-    const isUsed = false; // Replace with actual check
-
-    if (isUsed) {
-      showToast('error', 'Cannot Delete', 'This status is already in use');
+  const confirmDelete = async () => {
+    if (!ensureToken()) return;
+    try {
+      // Since there is no dedicated delete endpoint, we deactivate by toggling status
+      await axios.put(
+        `${BASE_URL}/updateOfferStatusStatus/${deleteTarget.id}`,
+        null,
+        getAxiosConfig()
+      );
+      toast.success('Deactivated', `${deleteTarget.offerStatusName} has been deactivated`);
       setShowDeleteModal(false);
       setDeleteTarget(null);
-      return;
+      await fetchStatuses();
+    } catch (err) {
+      console.error('Deactivate error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to deactivate');
     }
-
-    const updated = statuses.filter(item => item.id !== deleteTarget.id);
-    setStatuses(updated);
-    showToast('success', 'Deleted', `${deleteTarget.offerStatusName} has been deleted`);
-    setShowDeleteModal(false);
-    setDeleteTarget(null);
   };
 
   const handleStatusToggle = (id, name, currentStatus) => {
     const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-    setStatusAction({
-      id,
-      name,
-      newStatus
-    });
+    setStatusAction({ id, name, newStatus });
     setShowStatusModal(true);
   };
 
-  const confirmStatusChange = () => {
-    const { id, newStatus } = statusAction;
-    const updated = statuses.map(item =>
-      item.id === id
-        ? {
-          ...item,
-          status: newStatus,
-          modifiedBy: 'Admin',
-          modifiedDate: new Date().toISOString()
-        }
-        : item
-    );
-    setStatuses(updated);
-    setShowStatusModal(false);
-    showToast('success', 'Status Updated', `${statusAction.name} is now ${newStatus}`);
+  const confirmStatusChange = async () => {
+    if (!ensureToken()) return;
+    try {
+      await axios.put(
+        `${BASE_URL}/updateOfferStatusStatus/${statusAction.id}`,
+        null,
+        getAxiosConfig()
+      );
+      toast.success('Status Updated', `${statusAction.name} is now ${statusAction.newStatus}`);
+      setShowStatusModal(false);
+      await fetchStatuses();
+    } catch (err) {
+      console.error('Status change error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to change status');
+    }
   };
 
   const handleCancelForm = () => {
@@ -422,9 +332,11 @@ const OfferStatusMaster = () => {
     setShowForm(false);
   };
 
-  // ============================================
-  // RENDER
-  // ============================================
+  // ─── Render ────────────────────────────────────────────────
+  if (loading && statuses.length === 0) {
+    return <LoadingSpinner message="Loading offer statuses..." />;
+  }
+
   return (
     <div className="cert-root">
       {/* Header */}
@@ -453,9 +365,7 @@ const OfferStatusMaster = () => {
       </div>
 
       {showForm ? (
-        /* ==========================================
-           FORM SECTION
-           ========================================== */
+        /* ─── FORM SECTION ─── */
         <div className="cert-form-wrap">
           <form onSubmit={handleSubmit} className="cert-form-compact">
             <div className="cert-form-section-compact">
@@ -495,7 +405,6 @@ const OfferStatusMaster = () => {
                   </small>
                 </div>
 
-            
                 {/* Description - Text Area */}
                 <div className="cert-field-compact" style={{ gridColumn: 'span 1' }}>
                   <label>Description</label>
@@ -525,21 +434,23 @@ const OfferStatusMaster = () => {
               <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>
                 <FaTimes size={12} /> Cancel
               </button>
-            
-              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <FaSave size={12} /> {editingStatus ? 'Update' : 'Save'}
+              <button type="submit" className="cert-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                {submitting ? (
+                  <><span className="cert-spinner" /> {editingStatus ? 'Updating…' : 'Saving…'}</>
+                ) : (
+                  <><FaSave size={12} /> {editingStatus ? 'Update' : 'Save'}</>
+                )}
               </button>
             </div>
           </form>
         </div>
       ) : (
-        /* ==========================================
-           TABLE SECTION
-           ========================================== */
+        /* ─── TABLE SECTION ─── */
         <>
           {/* Search Bar */}
           <div className="emp-search-bar">
             <div className="emp-search-wrap">
+              <FaSearch className="emp-search-icon" size={12} />
               <input
                 className="emp-search-input"
                 type="text"
@@ -554,7 +465,6 @@ const OfferStatusMaster = () => {
                 </button>
               )}
             </div>
-           
           </div>
 
           {/* Table */}
@@ -591,18 +501,14 @@ const OfferStatusMaster = () => {
                           <div
                             className="d-flex align-items-center justify-content-center gap-1"
                             style={{ cursor: 'pointer' }}
-                            onClick={() => handleStatusToggle(
-                              item.id,
-                              item.offerStatusName,
-                              item.status || 'Active'
-                            )}
+                            onClick={() => handleStatusToggle(item.id, item.offerStatusName, item.status)}
                           >
                             <div
                               style={{
                                 width: '28px',
                                 height: '16px',
                                 borderRadius: '50px',
-                                backgroundColor: (item.status || 'Active') === 'Active' ? '#9d174d' : '#d1d5db',
+                                backgroundColor: item.status === 'Active' ? '#9d174d' : '#d1d5db',
                                 position: 'relative',
                                 transition: '.2s'
                               }}
@@ -615,7 +521,7 @@ const OfferStatusMaster = () => {
                                   background: '#fff',
                                   position: 'absolute',
                                   top: '2px',
-                                  left: (item.status || 'Active') === 'Active' ? '14px' : '2px',
+                                  left: item.status === 'Active' ? '14px' : '2px',
                                   transition: '.2s'
                                 }}
                               />
@@ -624,14 +530,13 @@ const OfferStatusMaster = () => {
                               style={{
                                 fontSize: '11px',
                                 fontWeight: 500,
-                                color: (item.status || 'Active') === 'Active' ? '#9d174d' : '#94a3b8'
+                                color: item.status === 'Active' ? '#9d174d' : '#94a3b8'
                               }}
                             >
-                              {item.status || 'Active'}
+                              {item.status}
                             </span>
                           </div>
                         </td>
-                       
                         <td>
                           <div className="cert-actions" style={{ justifyContent: 'center' }}>
                             <button
@@ -646,14 +551,26 @@ const OfferStatusMaster = () => {
                             >
                               <FaEdit size={12} />
                             </button>
-                            
+                            <button
+                              className="cert-act cert-act--delete"
+                              onClick={() => handleDelete(item)}
+                              title="Deactivate"
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#dc3545'
+                              }}
+                            >
+                              <FaTrash size={12} />
+                            </button>
                           </div>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="7" className="text-center py-5" style={{ color: '#6b7280' }}>
+                      <td colSpan="6" className="text-center py-5" style={{ color: '#6b7280' }}>
                         No offer statuses found
                       </td>
                     </tr>
@@ -730,9 +647,7 @@ const OfferStatusMaster = () => {
         </>
       )}
 
-      {/* ==========================================
-          STATUS CHANGE MODAL
-          ========================================== */}
+      {/* ─── STATUS CHANGE MODAL ─── */}
       {showStatusModal && (
         <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
           <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
@@ -758,14 +673,53 @@ const OfferStatusMaster = () => {
         </div>
       )}
 
-     
+      {/* ─── DELETE (DEACTIVATE) MODAL ─── */}
+      {showDeleteModal && (
+        <div className="emp-modal-overlay" onClick={() => setShowDeleteModal(false)}>
+          <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="emp-modal-icon">🗑️</div>
+            <h3 className="emp-modal-title">Deactivate Offer Status</h3>
+            <p className="emp-modal-body">
+              Are you sure you want to deactivate <strong>{deleteTarget?.offerStatusName}</strong>?
+            </p>
+            <p className="emp-modal-warn">
+              The record will be set to inactive and cannot be edited until reactivated.
+            </p>
+            <div className="emp-modal-actions">
+              <button className="emp-modal-cancel" onClick={() => setShowDeleteModal(false)}>Cancel</button>
+              <button className="emp-modal-confirm" onClick={confirmDelete}>Deactivate</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .cert-table-row-hover:hover {
+          background-color: #f9fafb;
+          transition: background-color 0.2s ease;
+        }
+        .cert-spinner {
+          display: inline-block; width: 16px; height: 16px;
+          border: 2px solid rgba(255,255,255,0.3); border-radius: 50%;
+          border-top-color: #fff; animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .has-error input, .has-error textarea {
+          border-color: #dc3545 !important;
+          box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.25) !important;
+        }
+        .text-danger.small {
+          color: #dc3545;
+          font-size: 12px;
+          display: block;
+          margin-top: 4px;
+        }
+      `}</style>
     </div>
   );
 };
 
-// ============================================
-// FIELD ERROR COMPONENT
-// ============================================
+// ─── Field Error Component ────────────────────────────────────
 const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default OfferStatusMaster;
