@@ -1,188 +1,165 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  FaSave, FaTimes, FaPlus, FaSearch, FaEdit, FaTrash,
-  FaArrowLeft, FaArrowRight, FaCheckCircle, FaCircle,
-  FaTag, FaList, FaInfoCircle
+  FaSave, FaTimes, FaPlus, FaSearch, FaEdit,
+  FaArrowLeft, FaExclamationCircle
 } from 'react-icons/fa';
-
-// ============================================
-// TOAST NOTIFICATION
-// ============================================
-const showToast = (type, title, message) => {
-  const toastContainer = document.getElementById('toast-container') || createToastContainer();
-  const toast = document.createElement('div');
-  const colors = {
-    success: '#10b981',
-    error: '#ef4444',
-    warning: '#f59e0b',
-    info: '#3b82f6'
-  };
-  toast.className = `toast-notification toast-${type}`;
-  toast.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:${colors[type] || '#3b82f6'};color:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:300px;margin-bottom:8px;animation:slideIn 0.3s ease;">
-      <span style="font-weight:600;">${title}</span>
-      <span style="flex:1;">${message}</span>
-      <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:white;cursor:pointer;font-size:18px;">×</button>
-    </div>
-  `;
-  toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
-};
-
-const createToastContainer = () => {
-  const container = document.createElement('div');
-  container.id = 'toast-container';
-  container.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-width: 500px;
-  `;
-  document.body.appendChild(container);
-
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
-
-  return container;
-};
+import axios from 'axios';
+import { toast } from '../../components/Toast';
+import LoadingSpinner from '../../components/LoadingSpinner';
+import { BASE_URL, STORAGE_KEYS } from '../../config/api.config';
 
 const RejectionReasonMaster = () => {
   // ============================================
-  // STATE MANAGEMENT
+  // STATE
   // ============================================
-  const [reasons, setReasons] = useState([
-    {
-      id: 1,
-      reasonCode: 'RR001',
-      reasonName: 'Skill Gap',
-      reasonCategory: 'Technical',
-      description: 'Candidate lacks required technical skills for the position',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-15T10:30:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 2,
-      reasonCode: 'RR002',
-      reasonName: 'Salary Mismatch',
-      reasonCategory: 'Compensation',
-      description: 'Candidate salary expectation does not match budget',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-20T14:20:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 3,
-      reasonCode: 'RR003',
-      reasonName: 'Culture Fit',
-      reasonCategory: 'HR',
-      description: 'Candidate does not fit company culture',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-02-01T09:15:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 4,
-      reasonCode: 'RR004',
-      reasonName: 'Better Opportunity',
-      reasonCategory: 'Candidate Decision',
-      description: 'Candidate found better opportunity elsewhere',
-      status: 'Inactive',
-      createdBy: 'Admin',
-      createdDate: '2026-02-10T11:45:00Z',
-      modifiedBy: 'Admin',
-      modifiedDate: '2026-07-20T16:30:00Z'
-    },
-    {
-      id: 5,
-      reasonCode: 'RR005',
-      reasonName: 'Position Closed',
-      reasonCategory: 'Organization Decision',
-      description: 'Position has been closed due to budget constraints',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-03-05T08:50:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 6,
-      reasonCode: 'RR006',
-      reasonName: 'Experience Mismatch',
-      reasonCategory: 'Technical',
-      description: 'Candidate does not have required experience level',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-04-12T13:10:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    }
-  ]);
+  const [reasons, setReasons] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editingReason, setEditingReason] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
+  const [categories, setCategories] = useState([]);
+
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusAction, setStatusAction] = useState({
     id: null,
     name: '',
-    newStatus: ''
+    newStatus: '',
   });
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // Form state
+  // Form state (matches Backend DTO)
   const [formData, setFormData] = useState({
     reasonCode: '',
     reasonName: '',
     reasonCategory: '',
     description: '',
-    status: 'Active'
+    reasonCategoryId: '',
   });
 
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
   // ============================================
-  // CONSTANTS
+  // AUTH HELPERS
   // ============================================
-  const reasonCategories = [
-    { value: 'Technical', label: 'Technical' },
-    { value: 'HR', label: 'HR' },
-    { value: 'Compensation', label: 'Compensation' },
-    { value: 'Candidate Decision', label: 'Candidate Decision' },
-    { value: 'Organization Decision', label: 'Organization Decision' },
-    { value: 'Other', label: 'Other' }
-  ];
+  const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  const axiosConfig = {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      'Content-Type': 'application/json',
+    },
+  };
+
+  const ensureToken = () => {
+    if (!getAuthToken()) {
+      toast.error('Authentication Required', 'Please login to continue');
+      return false;
+    }
+    return true;
+  };
+
+
 
   // ============================================
-  // FILTER & PAGINATION
+  // FETCH
   // ============================================
-  const filteredReasons = reasons.filter(item => {
-    const search = searchTerm.toLowerCase();
-    return item.reasonCode.toLowerCase().includes(search) ||
-      item.reasonName.toLowerCase().includes(search) ||
-      item.reasonCategory.toLowerCase().includes(search) ||
-      (item.description && item.description.toLowerCase().includes(search));
-  });
+  const fetchReasons = useCallback(async () => {
+    if (!ensureToken()) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/recuirment/getAllRejectionReason`,
+        axiosConfig
+      );
+      const list = Array.isArray(res.data) ? res.data : (res.data?.response || []);
+
+      const mapped = list.map((item) => {
+        const isActive =
+          String(item.status ?? '').toLowerCase() === 'y' || item.status === true;
+        return {
+          id: item.id,
+          reasonCode: item.reasonCode || '',
+          reasonName: item.reasonName || '',
+          reasonCategory: item.reasonCategory || '',
+          reasonCategoryId: item.reasonCategoryId || '',
+          description: item.description || '',
+          status: isActive ? 'Active' : 'Inactive',
+          createdBy: item.createdBy || '—',
+          createdDate: item.createdDate || null,
+          modifiedBy: item.modifiedBy || null,
+          modifiedDate: item.modifiedDate || null,
+        };
+      });
+
+
+      setReasons(mapped);
+      console.log('🔵 dp:', reasons);
+      console.log('🔵 [fetchReasons] og:', res);
+    } catch (err) {
+      console.error('🔴 [fetchReasons] error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to fetch rejection reasons');
+      setReasons([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchCategory = useCallback(async () => {
+    if (!ensureToken()) return;
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/recuirment/getAllReasonCategory`,
+        axiosConfig
+      );
+
+      setCategories(res.data || []);
+
+    } catch (err) {
+      console.error('🔴 [fetchCategory] error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to fetch reason categories');
+      setCategories([]);
+    }
+  }, []);
+
+
+  useEffect(() => {
+    fetchReasons();
+    fetchCategory();
+  }, [fetchReasons, fetchCategory]);
+
+  // ============================================
+  // DEBOUNCED SEARCH
+  // ============================================
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(0);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // ============================================
+  // FILTERED + PAGINATED DATA
+  // ============================================
+  const filteredReasons = reasons
+    .filter((item) => {
+      const search = debouncedSearch.toLowerCase();
+      return (
+        item.reasonCode?.toLowerCase().includes(search) ||
+        item.reasonName?.toLowerCase().includes(search) ||
+        item.reasonCategory?.toLowerCase().includes(search) ||
+        (item.description && item.description.toLowerCase().includes(search))
+      );
+    })
+    .sort((a, b) => {
+      if (a.status === 'Active' && b.status === 'Inactive') return -1;
+      if (a.status === 'Inactive' && b.status === 'Active') return 1;
+      return 0;
+    });
 
   const totalItems = filteredReasons.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
@@ -190,47 +167,39 @@ const RejectionReasonMaster = () => {
   const currentReasons = filteredReasons.slice(startIndex, startIndex + rowsPerPage);
 
   // ============================================
-  // UTILITY FUNCTIONS
+  // UTILITIES
   // ============================================
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const generateReasonCode = () => {
-    const count = reasons.length + 1;
-    const prefix = 'RR';
-    const padded = String(count).padStart(3, '0');
-    return `${prefix}${padded}`;
-  };
+  const generateReasonCode = () =>
+    `RR${String(reasons.length + 1).padStart(3, '0')}`;
 
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
     const left = Math.max(0, page - delta);
     const right = Math.min(totalPages - 1, page + delta);
-    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+
+    if (left > 0) {
+      range.push(0);
+      if (left > 1) range.push('...');
+    }
     for (let i = left; i <= right; i++) range.push(i);
-    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
+    if (right < totalPages - 1) {
+      if (right < totalPages - 2) range.push('...');
+      range.push(totalPages - 1);
+    }
     return range;
   };
 
   // ============================================
-  // FORM FUNCTIONS
+  // FORM HANDLERS
   // ============================================
   const resetForm = () => {
     setFormData({
       reasonCode: generateReasonCode(),
       reasonName: '',
       reasonCategory: '',
+      reasonCategoryId: '',
       description: '',
-      status: 'Active'
     });
     setErrors({});
     setTouched({});
@@ -239,66 +208,52 @@ const RejectionReasonMaster = () => {
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
-    if (touched[field]) {
-      validateField(field, value);
-    }
+    if (touched[field]) validateField(field, value);
   };
 
   const validateField = (field, value) => {
     let error = '';
-
     if (field === 'reasonName') {
-      if (!value) {
-        error = 'Reason Name is required';
-      } else if (value.length > 100) {
-        error = 'Reason Name must be 100 characters or less';
-      } else if (/[^a-zA-Z0-9\s\-\.]/.test(value)) {
-        error = 'No special characters allowed';
-      } else {
-        const duplicate = reasons.some(item =>
-          item.reasonName.toLowerCase() === value.toLowerCase() &&
-          (!editingReason || item.id !== editingReason.id)
+      if (!value) error = 'Reason Name is required';
+      else if (value.length > 100) error = 'Must be 100 characters or less';
+      else if (/[^a-zA-Z0-9\s\-\.]/.test(value)) error = 'No special characters allowed';
+      else {
+        const duplicate = reasons.some(
+          (item) =>
+            item.reasonName.toLowerCase() === value.toLowerCase() &&
+            (!editingReason || item.id !== editingReason.id)
         );
-        if (duplicate) {
-          error = 'Reason Name must be unique';
-        }
+        if (duplicate) error = 'Reason Name must be unique';
       }
     } else if (field === 'reasonCategory' && !value) {
       error = 'Reason Category is required';
     }
-
-    setErrors(prev => ({ ...prev, [field]: error }));
-    return error === '';
+    setErrors((prev) => ({ ...prev, [field]: error }));
   };
 
   const handleBlur = (field) => {
-    setTouched(prev => ({ ...prev, [field]: true }));
+    setTouched((prev) => ({ ...prev, [field]: true }));
     validateField(field, formData[field]);
   };
 
   const validateForm = () => {
-    const fieldsToValidate = ['reasonName', 'reasonCategory'];
+    debugger;
     const newErrors = {};
-
-    for (const field of fieldsToValidate) {
-      if (!formData[field]) {
-        newErrors[field] = 'This field is required';
-      }
-    }
+    if (!formData.reasonName) newErrors.reasonName = 'This field is required';
+    if (!formData.reasonCategoryId) newErrors.reasonCategoryId= 'This field is required';
 
     if (formData.reasonName) {
       if (formData.reasonName.length > 100) {
-        newErrors.reasonName = 'Reason Name must be 100 characters or less';
+        newErrors.reasonName = 'Must be 100 characters or less';
       } else if (/[^a-zA-Z0-9\s\-\.]/.test(formData.reasonName)) {
         newErrors.reasonName = 'No special characters allowed';
       } else {
-        const duplicate = reasons.some(item =>
-          item.reasonName.toLowerCase() === formData.reasonName.toLowerCase() &&
-          (!editingReason || item.id !== editingReason.id)
+        const duplicate = reasons.some(
+          (item) =>
+            item.reasonName.toLowerCase() === formData.reasonName.toLowerCase() &&
+            (!editingReason || item.id !== editingReason.id)
         );
-        if (duplicate) {
-          newErrors.reasonName = 'Reason Name must be unique';
-        }
+        if (duplicate) newErrors.reasonName = 'Reason Name must be unique';
       }
     }
 
@@ -306,58 +261,75 @@ const RejectionReasonMaster = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  console.log('🔵 [formData]', formData);
+
   // ============================================
-  // CRUD OPERATIONS
+  // SUBMIT (Create / Update)
   // ============================================
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!ensureToken()) return;
     if (!validateForm()) {
-      showToast('warning', 'Validation Error', 'Please fix the highlighted fields');
+      toast.warning('Validation Error', 'Please fix the highlighted fields');
       return;
     }
 
-    const reasonData = {
-      reasonCode: formData.reasonCode,
-      reasonName: formData.reasonName,
-      reasonCategory: formData.reasonCategory,
-      description: formData.description || '',
-      status: formData.status
-    };
-
-    if (editingReason) {
-      const updated = reasons.map(item =>
-        item.id === editingReason.id
-          ? {
-            ...item,
-            ...reasonData,
-            modifiedBy: 'Admin',
-            modifiedDate: new Date().toISOString()
-          }
-          : item
-      );
-      setReasons(updated);
-      showToast('success', 'Success', 'Rejection reason updated successfully');
-    } else {
-      const newReason = {
-        id: Date.now(),
-        ...reasonData,
-        createdBy: 'Admin',
-        createdDate: new Date().toISOString(),
-        modifiedBy: null,
-        modifiedDate: null
+    setSubmitting(true);
+    try {
+      // ✅ Payload matches backend DTO
+      const payload = {
+        id: editingReason ? editingReason.id : 0,
+        reasonCode: formData.reasonCode,
+        reasonName: formData.reasonName.trim(),
+        reasonCategoryId: formData.reasonCategoryId,
+        // saveRejectionReason: 
+        description: formData.description?.trim() || '',
+        status: 'y',
       };
-      setReasons([newReason, ...reasons]);
-      showToast('success', 'Success', 'Rejection reason added successfully');
-    }
 
-    resetForm();
-    setShowForm(false);
-    setPage(0);
+      console.log('formdata: ', formData);
+
+      let res;
+      if (editingReason) {
+        res = await axios.put(
+          `${BASE_URL}/api/recuirment/updateRejectionReasonById/${editingReason.id}`,
+          payload,
+          axiosConfig
+        );
+      } else {
+        res = await axios.post(
+          `${BASE_URL}/api/recuirment/saveRejectionReason`,
+          payload,
+          axiosConfig
+        );
+      }
+
+      if (res.status === 200 || res.status === 201) {
+        toast.success(
+          'Success',
+          editingReason ? 'Rejection reason updated' : 'Rejection reason created'
+        );
+        resetForm();
+        setShowForm(false);
+        setPage(0);
+        fetchReasons();
+      } else {
+        throw new Error(res.data?.message || 'Operation failed');
+      }
+    } catch (err) {
+      console.error('🔴 [submit] error:', err);
+      toast.error(
+        'Error',
+        err.response?.data?.message || err.message || 'Something went wrong'
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEdit = (item) => {
     if (item.status === 'Inactive') {
-      showToast('warning', 'Cannot Edit', 'Inactive reasons cannot be edited');
+      toast.warning('Cannot Edit', 'Inactive reasons cannot be edited');
       return;
     }
     setEditingReason(item);
@@ -365,49 +337,15 @@ const RejectionReasonMaster = () => {
       reasonCode: item.reasonCode,
       reasonName: item.reasonName,
       reasonCategory: item.reasonCategory,
+      reasonCategoryId: Number(item.reasonCategoryId),
       description: item.description || '',
-      status: item.status
     });
     setShowForm(true);
   };
 
-  
-  
-  const handleStatusToggle = (id, name, currentStatus) => {
-    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-    setStatusAction({
-      id,
-      name,
-      newStatus
-    });
-    setShowStatusModal(true);
-  };
-
-  const confirmStatusChange = () => {
-    const { id, newStatus } = statusAction;
-    const updated = reasons.map(item =>
-      item.id === id
-        ? {
-          ...item,
-          status: newStatus,
-          modifiedBy: 'Admin',
-          modifiedDate: new Date().toISOString()
-        }
-        : item
-    );
-    setReasons(updated);
-    setShowStatusModal(false);
-    showToast('success', 'Status Updated', `${statusAction.name} is now ${newStatus}`);
-  };
-
-  const handleCancelForm = () => {
-    resetForm();
-    setShowForm(false);
-  };
-
   const handleAddNew = () => {
     resetForm();
-    setFormData(prev => ({ ...prev, reasonCode: generateReasonCode() }));
+    setFormData((prev) => ({ ...prev, reasonCode: generateReasonCode() }));
     setShowForm(true);
   };
 
@@ -417,11 +355,55 @@ const RejectionReasonMaster = () => {
   };
 
   // ============================================
-  // RENDER
+  // STATUS TOGGLE (via Update endpoint)
   // ============================================
+  const handleStatusToggle = (id, name, currentStatus) => {
+    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+    setStatusAction({ id, name, newStatus });
+    setShowStatusModal(true);
+  };
+
+  const confirmStatusChange = async () => {
+    if (!ensureToken()) return;
+    const { id, newStatus, name } = statusAction;
+    setLoading(true);
+    try {
+      const target = reasons.find((r) => r.id === id);
+      if (!target) throw new Error('Reason not found');
+
+
+      const res = await axios.put(
+        `${BASE_URL}/api/recuirment/updateRejectionReasonStatus/${id}`,
+        { status: newStatus === 'Active' ? 'y' : 'n' },
+        axiosConfig
+      );
+
+      if (res.status === 200) {
+        toast.success('Status Updated', `${name} is now ${newStatus}`);
+        fetchReasons();
+      } else {
+        throw new Error(res.data?.message || 'Failed to change status');
+      }
+    } catch (err) {
+      console.error('🔴 [statusToggle] error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to change status');
+    } finally {
+      setLoading(false);
+      setShowStatusModal(false);
+      setStatusAction({ id: null, name: '', newStatus: '' });
+    }
+  };
+
+  // ============================================
+  // RENDER GUARD
+  // ============================================
+  if (loading && !showForm && reasons.length === 0) {
+    return <LoadingSpinner message="Loading rejection reasons..." />;
+  }
+
   return (
     <div className="cert-root">
-      {/* Header */}
+      {/* HEADER */}
       <div className="cert-header">
         <div>
           <h1 className="cert-title">Rejection Reason Master</h1>
@@ -447,16 +429,13 @@ const RejectionReasonMaster = () => {
       </div>
 
       {showForm ? (
-        /* ==========================================
-           FORM SECTION
-           ========================================== */
+        /* ================= FORM ================= */
         <div className="cert-form-wrap">
           <form onSubmit={handleSubmit} className="cert-form-compact">
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Rejection Reason Details</div>
               <div className="cert-form-grid-3col">
 
-                {/* Reason Code - Auto */}
                 <div className="cert-field-compact">
                   <label>Reason Code</label>
                   <input
@@ -465,12 +444,11 @@ const RejectionReasonMaster = () => {
                     value={formData.reasonCode}
                     readOnly
                     placeholder="Auto-generated"
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                    style={{ fontSize: '14px', padding: '6px 12px', background: '#f8f9fc' }}
                   />
                   <small style={{ fontSize: '12px', color: '#6b7280' }}>Auto-generated</small>
                 </div>
 
-                {/* Reason Name - Required */}
                 <div className={`cert-field-compact ${touched.reasonName && errors.reasonName ? 'has-error' : ''}`}>
                   <label className="required">Reason Name</label>
                   <input
@@ -482,28 +460,36 @@ const RejectionReasonMaster = () => {
                     style={{ fontSize: '14px', padding: '6px 12px' }}
                   />
                   <FieldError msg={errors.reasonName} />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>Max 100 characters, no special characters</small>
+                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
+                    Max 100 characters, no special characters
+                  </small>
                 </div>
 
-                {/* Reason Category - Required */}
                 <div className={`cert-field-compact ${touched.reasonCategory && errors.reasonCategory ? 'has-error' : ''}`}>
                   <label className="required">Reason Category</label>
                   <select
-                    value={formData.reasonCategory}
-                    onChange={(e) => handleChange('reasonCategory', e.target.value)}
-                    onBlur={() => handleBlur('reasonCategory')}
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
-                  >
-                    <option value="">Select Category</option>
-                    {reasonCategories.map(cat => (
-                      <option key={cat.value} value={cat.value}>{cat.label}</option>
-                    ))}
-                  </select>
-                  <FieldError msg={errors.reasonCategory} />
+  value={formData.reasonCategoryId ?? ''}
+  onChange={(e) =>
+    handleChange(
+      'reasonCategoryId',
+      e.target.value === '' ? '' : Number(e.target.value)
+    )
+  }
+  onBlur={() => handleBlur('reasonCategoryId')}
+  style={{ fontSize: '14px', padding: '6px 12px' }}
+>
+  <option value="">Select Category</option>
+
+  {categories.map((cat) => (
+    <option key={cat.id} value={Number(cat.id)}>
+      {cat.reasonCategoryName}
+    </option>
+  ))}
+</select>
+                  <FieldError msg={errors.reasonCategoryId} />
                 </div>
 
-                {/* Description - Text Area */}
-                <div className="cert-field-compact" style={{ gridColumn: 'span 1' }}>
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
                   <label>Description</label>
                   <textarea
                     rows="2"
@@ -513,48 +499,49 @@ const RejectionReasonMaster = () => {
                     style={{ fontSize: '14px', padding: '6px 12px', resize: 'vertical', minHeight: '60px' }}
                   />
                 </div>
-
               </div>
             </div>
 
-            {/* Form Actions */}
             <div className="cert-form-actions">
-              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>
+              <button type="button" className="cert-cancel-btn" onClick={handleBackToList}>
                 <FaTimes size={12} /> Cancel
               </button>
-       
-              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <FaSave size={12} /> {editingReason ? 'Update' : 'Save'}
+              <button
+                type="submit"
+                className="cert-add-btn"
+                disabled={submitting}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                {submitting ? (
+                  <><span className="emp-spinner" /> Saving…</>
+                ) : (
+                  <><FaSave size={12} /> {editingReason ? 'Update' : 'Save'}</>
+                )}
               </button>
             </div>
           </form>
         </div>
       ) : (
-        /* ==========================================
-           TABLE SECTION
-           ========================================== */
+        /* ================= TABLE ================= */
         <>
-          {/* Search Bar */}
           <div className="emp-search-bar">
             <div className="emp-search-wrap">
+              <FaSearch className="emp-search-icon" size={12} />
               <input
                 className="emp-search-input"
                 type="text"
                 placeholder="Search by code, name, category or description..."
                 value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
-                style={{ fontSize: '14px', padding: '6px 12px' }}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
               {searchTerm && (
-                <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setPage(0); }}>
+                <button className="emp-search-clear" onClick={() => setSearchTerm('')}>
                   <FaTimes size={11} />
                 </button>
               )}
             </div>
-           
           </div>
 
-          {/* Table */}
           <div className="cert-table-card">
             <div className="cert-table-wrap">
               <table className="cert-table">
@@ -566,7 +553,7 @@ const RejectionReasonMaster = () => {
                     <th>Category</th>
                     <th>Description</th>
                     <th style={{ textAlign: 'center' }}>Status</th>
-                    <th style={{ width: '120px', textAlign: 'center' }}>Actions</th>
+                    <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -579,15 +566,13 @@ const RejectionReasonMaster = () => {
                             {item.reasonCode}
                           </span>
                         </td>
-                        <td>
-                          <strong>{item.reasonName}</strong>
-                        </td>
+                        <td><strong>{item.reasonName}</strong></td>
                         <td>
                           <span className="cert-status-badge" style={{
                             background: '#e0e7ff',
                             color: '#4f46e5',
                             fontSize: '12px',
-                            padding: '2px 10px'
+                            padding: '2px 10px',
                           }}>
                             {item.reasonCategory}
                           </span>
@@ -599,69 +584,53 @@ const RejectionReasonMaster = () => {
                           <div
                             className="d-flex align-items-center justify-content-center gap-1"
                             style={{ cursor: 'pointer' }}
-                            onClick={() => handleStatusToggle(
-                              item.id,
-                              item.reasonName,
-                              item.status || 'Active'
-                            )}
+                            onClick={() => handleStatusToggle(item.id, item.reasonName, item.status)}
                           >
-                            <div
-                              style={{
-                                width: '28px',
-                                height: '16px',
-                                borderRadius: '50px',
-                                backgroundColor: (item.status || 'Active') === 'Active' ? '#9d174d' : '#d1d5db',
-                                position: 'relative',
-                                transition: '.2s'
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  background: '#fff',
-                                  position: 'absolute',
-                                  top: '2px',
-                                  left: (item.status || 'Active') === 'Active' ? '14px' : '2px',
-                                  transition: '.2s'
-                                }}
-                              />
+                            <div style={{
+                              width: '28px',
+                              height: '16px',
+                              borderRadius: '50px',
+                              backgroundColor: item.status === 'Active' ? '#9d174d' : '#d1d5db',
+                              position: 'relative',
+                              transition: '.2s',
+                            }}>
+                              <div style={{
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '50%',
+                                background: '#fff',
+                                position: 'absolute',
+                                top: '2px',
+                                left: item.status === 'Active' ? '14px' : '2px',
+                                transition: '.2s',
+                              }} />
                             </div>
-                            <span
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 500,
-                                color: (item.status || 'Active') === 'Active' ? '#9d174d' : '#94a3b8'
-                              }}
-                            >
-                              {item.status || 'Active'}
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              color: item.status === 'Active' ? '#9d174d' : '#94a3b8',
+                            }}>
+                              {item.status}
                             </span>
                           </div>
                         </td>
-                        
                         <td>
                           <div className="cert-actions" style={{ justifyContent: 'center' }}>
                             <button
                               className="cert-act cert-act--edit"
                               onClick={() => handleEdit(item)}
-                              title={item.status === 'Inactive' ? 'Cannot edit inactive record' : 'Edit'}
                               disabled={item.status === 'Inactive'}
-                              style={{
-                                opacity: item.status === 'Inactive' ? 0.5 : 1,
-                                cursor: item.status === 'Inactive' ? 'not-allowed' : 'pointer'
-                              }}
+                              style={{ opacity: item.status === 'Inactive' ? 0.5 : 1 }}
                             >
                               <FaEdit size={12} />
                             </button>
-                           
                           </div>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="8" className="text-center py-5" style={{ color: '#6b7280' }}>
+                      <td colSpan="7" className="text-center py-5" style={{ color: '#6b7280' }}>
                         No rejection reasons found
                       </td>
                     </tr>
@@ -670,36 +639,24 @@ const RejectionReasonMaster = () => {
               </table>
             </div>
 
-            {/* Pagination */}
-            {totalPages > 0 && (
+            {totalItems > 0 && (
               <div className="cert-table-footer">
                 <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
                   Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} reasons
                 </div>
-
                 <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <button
                     className="cert-page-btn"
                     disabled={page === 0}
                     onClick={() => setPage(page - 1)}
-                    style={{
-                      padding: '6px 12px',
-                      border: '1px solid #e5e7eb',
-                      background: 'white',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    ← Prev
-                  </button>
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                  >← Prev</button>
                   {getPaginationRange().map((pg, i) =>
                     pg === '...' ? (
-                      <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
+                      <span key={i} style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
                     ) : (
                       <button
                         key={pg}
-                        className={`cert-page-num ${pg === page ? 'active' : ''}`}
                         onClick={() => setPage(pg)}
                         style={{
                           padding: '6px 10px',
@@ -709,28 +666,17 @@ const RejectionReasonMaster = () => {
                           borderRadius: '6px',
                           cursor: 'pointer',
                           fontSize: '12px',
-                          minWidth: '34px'
+                          minWidth: '34px',
                         }}
-                      >
-                        {pg + 1}
-                      </button>
+                      >{pg + 1}</button>
                     )
                   )}
                   <button
                     className="cert-page-btn"
                     disabled={page + 1 >= totalPages}
                     onClick={() => setPage(page + 1)}
-                    style={{
-                      padding: '6px 12px',
-                      border: '1px solid #e5e7eb',
-                      background: 'white',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    Next →
-                  </button>
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                  >Next →</button>
                 </div>
               </div>
             )}
@@ -738,9 +684,7 @@ const RejectionReasonMaster = () => {
         </>
       )}
 
-      {/* ==========================================
-          STATUS CHANGE MODAL
-          ========================================== */}
+      {/* STATUS CHANGE MODAL */}
       {showStatusModal && (
         <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
           <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
@@ -759,21 +703,25 @@ const RejectionReasonMaster = () => {
                 : 'This rejection reason will become available for selection.'}
             </p>
             <div className="emp-modal-actions">
-              <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>Cancel</button>
-              <button className="emp-modal-confirm" onClick={confirmStatusChange}>Confirm</button>
+              <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>
+                Cancel
+              </button>
+              <button className="emp-modal-confirm" onClick={confirmStatusChange}>
+                Confirm
+              </button>
             </div>
           </div>
         </div>
       )}
-
-      
     </div>
   );
 };
 
-// ============================================
-// FIELD ERROR COMPONENT
-// ============================================
-const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
+const FieldError = ({ msg }) =>
+  msg ? (
+    <span className="field-err">
+      <FaExclamationCircle size={10} /> {msg}
+    </span>
+  ) : null;
 
 export default RejectionReasonMaster;
