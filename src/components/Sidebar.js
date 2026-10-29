@@ -29,6 +29,8 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   const [documentsOpen, setDocumentsOpen] = useState(true);
   const [tasksOpen, setTasksOpen] = useState(true);
  const [subMenuOpen, setSubMenuOpen] = useState({});
+ const [loanOpen, setLoanOpen] = useState(true);
+ const toggleLoan = () => setLoanOpen(!loanOpen);
 
   const [userRole, setUserRole] = useState(null);
   useEffect(() => {
@@ -75,6 +77,12 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     {path: '/ServiceBookHistory',icon:<FaBook />,label:'Service Book History',roles:['Admin','Hr']},
     {path:'/AuditTrail',icon:<FaTrailer />,label:'Audit History',roles:['Admin','Hr']},
     {path: '/ServicebookReport',icon:<FaBook />,label:'Report',roles:['Admin','Hr']},
+  ];
+
+
+  const loanApplicationForm = [
+    { path: '/LoanApplicationForm', icon: <FaMoneyBillWave />, label: 'Apply for Loan', roles: ['Admin', 'Hr', 'Employee'] },
+    // { path: '/loan-status', icon: <FaSearch />, label: 'Check Loan Status', roles: ['Admin', 'Hr', 'Employee'] },
   ];
 
   // Attendance section items - separate from Employee
@@ -771,6 +779,80 @@ const masterItems = [
             </div>
           </li>
         )}
+
+        {/* ==================== LOAN & ADVANCE SECTION ==================== */}
+{hasAnyVisibleItems(loanApplicationForm) && !sidebarCollapsed && (
+  <li style={{ margin: '16px 10px 8px 10px' }}>
+    <div
+      onClick={toggleLoan}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '8px 10px',
+        color: 'var(--sidebar-heading)',
+        fontSize: '11px',
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+        cursor: 'pointer',
+        borderRadius: '8px',
+        transition: 'all 0.2s ease',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.color = 'var(--sidebar-text-active)';
+        e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.color = 'var(--sidebar-heading)';
+        e.currentTarget.style.background = 'transparent';
+      }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <FaMoneyBillWave size={12} />
+        <span>LOANS & ADVANCES</span>
+      </span>
+      {loanOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
+    </div>
+  </li>
+)}
+
+{/* Loan Items */}
+{(loanOpen || sidebarCollapsed) && (
+  <>
+    {loanApplicationForm.map((item, index) => (
+      hasAccess(item.roles) && (
+        <li key={`loan-${index}`} style={{ margin: '3px 10px' }}>
+          <NavLink
+            to={item.path}
+            title={sidebarCollapsed ? item.label : ''}
+            style={({ isActive }) => ({
+              display: 'flex',
+              alignItems: 'center',
+              gap: sidebarCollapsed ? '0' : '12px',
+              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+              padding: sidebarCollapsed ? '11px' : '11px 14px',
+              paddingLeft: sidebarCollapsed ? '11px' : '38px',
+              color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+              textDecoration: 'none',
+              borderRadius: '10px',
+              transition: 'all 0.2s ease',
+              background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+              borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+              fontSize: '14px',
+              fontWeight: isActive ? 600 : 400,
+              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+            })}
+          >
+            <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+            {!sidebarCollapsed && <span>{item.label}</span>}
+          </NavLink>
+        </li>
+      )
+    ))}
+  </>
+)}
 
         {/* Leave Items */}
         {(leaveOpen || sidebarCollapsed) && (
