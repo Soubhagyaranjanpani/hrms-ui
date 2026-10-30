@@ -1,260 +1,43 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  FaSave, FaTimes, FaPlus, FaSearch, FaEdit, FaTrash,
-  FaArrowLeft, FaArrowRight, FaCheckCircle,
-  FaTag, FaList, FaInfoCircle, FaClock, FaChevronDown,
-  FaTimesCircle, FaMapMarkerAlt, FaBuilding, FaCity,
-  FaGlobe, FaMapPin, FaBriefcase
+  FaSave, FaTimes, FaPlus, FaSearch, FaEdit,
+  FaArrowLeft, FaExclamationCircle, FaChevronDown, FaBuilding,
+  FaCity, FaGlobe
 } from 'react-icons/fa';
+import axios from 'axios';
+import { toast } from '../../components/Toast';
+import LoadingSpinner from '../../components/LoadingSpinner';
+import { BASE_URL, STORAGE_KEYS } from '../../config/api.config';
 
-// ============================================
-// TOAST NOTIFICATION
-// ============================================
-const showToast = (type, title, message) => {
-  const toastContainer = document.getElementById('toast-container') || createToastContainer();
-  const toast = document.createElement('div');
-  const colors = {
-    success: '#10b981',
-    error: '#ef4444',
-    warning: '#f59e0b',
-    info: '#3b82f6'
-  };
-  toast.className = `toast-notification toast-${type}`;
-  toast.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:${colors[type] || '#3b82f6'};color:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:300px;margin-bottom:8px;animation:slideIn 0.3s ease;">
-      <span style="font-weight:600;">${title}</span>
-      <span style="flex:1;">${message}</span>
-      <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:white;cursor:pointer;font-size:18px;">×</button>
-    </div>
-  `;
-  toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
-};
-
-const createToastContainer = () => {
-  const container = document.createElement('div');
-  container.id = 'toast-container';
-  container.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-width: 500px;
-  `;
-  document.body.appendChild(container);
-
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
-
-  return container;
-};
-
-// ============================================
-// MASTER DATA
-// ============================================
-const branches = [
-  { id: 'BR001', name: 'Noida Branch' },
-  { id: 'BR002', name: 'Gurgaon Branch' },
-  { id: 'BR003', name: 'Mumbai Branch' },
-  { id: 'BR004', name: 'Bangalore Branch' },
-  { id: 'BR005', name: 'Hyderabad Branch' },
-  { id: 'BR006', name: 'Chennai Branch' },
-  { id: 'BR007', name: 'Pune Branch' },
-  { id: 'BR008', name: 'Delhi Branch' }
-];
-
-const cities = [
-  { value: 'Mumbai', label: 'Mumbai' },
-  { value: 'Delhi', label: 'Delhi' },
-  { value: 'Bangalore', label: 'Bangalore' },
-  { value: 'Hyderabad', label: 'Hyderabad' },
-  { value: 'Chennai', label: 'Chennai' },
-  { value: 'Kolkata', label: 'Kolkata' },
-  { value: 'Pune', label: 'Pune' },
-  { value: 'Noida', label: 'Noida' },
-  { value: 'Gurgaon', label: 'Gurgaon' },
-  { value: 'Ahmedabad', label: 'Ahmedabad' }
-];
-
-const states = [
-  { value: 'Maharashtra', label: 'Maharashtra' },
-  { value: 'Delhi', label: 'Delhi' },
-  { value: 'Karnataka', label: 'Karnataka' },
-  { value: 'Telangana', label: 'Telangana' },
-  { value: 'Tamil Nadu', label: 'Tamil Nadu' },
-  { value: 'West Bengal', label: 'West Bengal' },
-  { value: 'Uttar Pradesh', label: 'Uttar Pradesh' },
-  { value: 'Haryana', label: 'Haryana' },
-  { value: 'Gujarat', label: 'Gujarat' }
-];
-
-const countries = [
-  { value: 'India', label: 'India' },
-  { value: 'USA', label: 'United States' },
-  { value: 'UK', label: 'United Kingdom' },
-  { value: 'Singapore', label: 'Singapore' },
-  { value: 'UAE', label: 'United Arab Emirates' },
-  { value: 'Canada', label: 'Canada' },
-  { value: 'Australia', label: 'Australia' },
-  { value: 'Germany', label: 'Germany' }
-];
-
-const workModes = [
-  { value: 'Onsite', label: 'Onsite' },
-  { value: 'Remote', label: 'Remote' },
-  { value: 'Hybrid', label: 'Hybrid' },
-  { value: 'Work from Home', label: 'Work from Home' },
-  { value: 'Flexible', label: 'Flexible' }
-];
 
 const JobLocationMaster = () => {
   // ============================================
-  // STATE MANAGEMENT
+  // STATE
   // ============================================
-  const [locations, setLocations] = useState([
-    {
-      id: 1,
-      locationCode: 'LOC001',
-      locationName: 'Noida Head Office',
-      branch: 'Noida Branch',
-      city: 'Noida',
-      state: 'Uttar Pradesh',
-      country: 'India',
-      pinCode: '201301',
-      workMode: 'Onsite',
-      description: 'Corporate headquarters for North India operations',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-15T10:30:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 2,
-      locationCode: 'LOC002',
-      locationName: 'Gurgaon Tech Park',
-      branch: 'Gurgaon Branch',
-      city: 'Gurgaon',
-      state: 'Haryana',
-      country: 'India',
-      pinCode: '122001',
-      workMode: 'Hybrid',
-      description: 'Technology hub for digital transformation projects',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-20T14:20:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 3,
-      locationCode: 'LOC003',
-      locationName: 'Mumbai Corporate Center',
-      branch: 'Mumbai Branch',
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      country: 'India',
-      pinCode: '400001',
-      workMode: 'Onsite',
-      description: 'Corporate center for Western India operations',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-02-01T09:15:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 4,
-      locationCode: 'LOC004',
-      locationName: 'Bangalore R&D Center',
-      branch: 'Bangalore Branch',
-      city: 'Bangalore',
-      state: 'Karnataka',
-      country: 'India',
-      pinCode: '560001',
-      workMode: 'Remote',
-      description: 'Research and development center for product innovation',
-      status: 'Inactive',
-      createdBy: 'Admin',
-      createdDate: '2026-02-10T11:45:00Z',
-      modifiedBy: 'Admin',
-      modifiedDate: '2026-07-20T16:30:00Z'
-    },
-    {
-      id: 5,
-      locationCode: 'LOC005',
-      locationName: 'Hyderabad Global Center',
-      branch: 'Hyderabad Branch',
-      city: 'Hyderabad',
-      state: 'Telangana',
-      country: 'India',
-      pinCode: '500001',
-      workMode: 'Hybrid',
-      description: 'Global delivery center for international clients',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-03-05T08:50:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 6,
-      locationCode: 'LOC006',
-      locationName: 'Chennai Development Center',
-      branch: 'Chennai Branch',
-      city: 'Chennai',
-      state: 'Tamil Nadu',
-      country: 'India',
-      pinCode: '600001',
-      workMode: 'Onsite',
-      description: 'Development center for South India operations',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-04-12T13:10:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 7,
-      locationCode: 'LOC007',
-      locationName: 'Pune IT Park',
-      branch: 'Pune Branch',
-      city: 'Pune',
-      state: 'Maharashtra',
-      country: 'India',
-      pinCode: '411001',
-      workMode: 'Work from Home',
-      description: 'IT park facility with flexible work arrangements',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-05-18T08:30:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    }
-  ]);
+  const [locations, setLocations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
+
+  const [branches, setBranches] = useState([]);
+  const [countries, setCountries] = useState([]);
+  const [states, setStates] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [workModes, setWorkModes] = useState([]);
+
+
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusAction, setStatusAction] = useState({
     id: null,
     name: '',
     newStatus: ''
   });
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
 
   // Branch Searchable Dropdown
   const [branchSearch, setBranchSearch] = useState('');
@@ -279,64 +62,190 @@ const JobLocationMaster = () => {
   const [touched, setTouched] = useState({});
 
   // ============================================
-  // FILTER & PAGINATION
+  // AUTH HELPERS
   // ============================================
-  const filteredLocations = locations.filter(item => {
-    const search = searchTerm.toLowerCase();
-    return item.locationCode.toLowerCase().includes(search) ||
-      item.locationName.toLowerCase().includes(search) ||
-      item.branch.toLowerCase().includes(search) ||
-      item.city.toLowerCase().includes(search) ||
-      item.state.toLowerCase().includes(search) ||
-      item.country.toLowerCase().includes(search) ||
-      item.pinCode.includes(search) ||
-      item.workMode.toLowerCase().includes(search) ||
-      (item.description && item.description.toLowerCase().includes(search));
-  });
-
-  const totalItems = filteredLocations.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage);
-  const startIndex = page * rowsPerPage;
-  const currentLocations = filteredLocations.slice(startIndex, startIndex + rowsPerPage);
-
-  // Branch filter for dropdown
-  const filteredBranches = branches.filter(branch =>
-    branch.name.toLowerCase().includes(branchSearch.toLowerCase())
-  );
-
-  // ============================================
-  // UTILITY FUNCTIONS
-  // ============================================
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  const axiosConfig = {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      'Content-Type': 'application/json'
+    }
   };
 
-  const generateLocationCode = () => {
-    const count = locations.length + 1;
-    const prefix = 'LOC';
-    const padded = String(count).padStart(3, '0');
-    return `${prefix}${padded}`;
+  const ensureToken = () => {
+    if (!getAuthToken()) {
+      toast.error('Authentication Required', 'Please login to continue');
+      return false;
+    }
+    return true;
   };
 
-  const getPaginationRange = () => {
-    const delta = 2;
-    const range = [];
-    const left = Math.max(0, page - delta);
-    const right = Math.min(totalPages - 1, page + delta);
-    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
-    for (let i = left; i <= right; i++) range.push(i);
-    if (right < totalPages - 1) { if (right < totalPages - 2) range.push('...'); range.push(totalPages - 1); }
-    return range;
-  };
+  // ============================================
+  // FETCH LOCATIONS
+  // ============================================
+  const fetchLocations = useCallback(async () => {
+    if (!ensureToken()) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/recuirment/getAllJobLocation`,
+        axiosConfig
+      );
+      const list = Array.isArray(res.data) ? res.data : (res.data?.response || []);
 
-  // Click outside handler for branch dropdown
+      const mapped = list.map((item) => {
+        const isActive =
+          String(item.status ?? '').toLowerCase() === 'y' ||
+          item.status === true ||
+          String(item.status ?? '').toLowerCase() === 'active';
+        return {
+          id: item.id,
+          locationCode: item.locationCode || '',
+          locationName: item.locationName || '',
+          branch: item.branch || item.branchName || '',
+          city: item.city || '',
+          state: item.state || '',
+          country: item.country || '',
+          pinCode: item.pinCode || '',
+          workMode: item.workMode || '',
+          description: item.description || '',
+          status: isActive ? 'Active' : 'Inactive',
+          createdBy: item.createdBy || '—',
+          createdDate: item.createdDate || null,
+          modifiedBy: item.modifiedBy || null,
+          modifiedDate: item.modifiedDate || null
+        };
+      });
+
+      setLocations(mapped);
+      console.log('🔵 [fetchLocations] response:', res);
+    } catch (err) {
+      console.error('🔴 [fetchLocations] error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to fetch job locations');
+      setLocations([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+
+
+  // dropdown
+
+  const fetchBranches = useCallback(async () => {
+    if (!ensureToken()) return;
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/branches/list?flag=1`,
+        axiosConfig
+      );
+
+      setBranches(res.data.response || []);
+
+    } catch (err) {
+      console.error('🔴 [fetchBranches] error:', err);
+      toast.error('Error', err.response?.response?.message || 'Failed to fetch branches');
+      setBranches([]);
+    }
+  }, []);
+
+
+  const fetchCountries = useCallback(async () => {
+    if (!ensureToken()) return;
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/recuirment/fetchallCountry`,
+        axiosConfig
+      );
+
+      setCountries(res.data || []);
+
+    } catch (err) {
+      console.error('🔴 [fetchCountries] error:', err);
+      toast.error('Error', err.response?.message || 'Failed to fetch countries');
+      setCountries([]);
+    }
+  }, []);
+
+  const fetchStates = useCallback(async (id) => {
+    if (!ensureToken()) return;
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/recuirment/getStateByCountryId/${id}`,
+        axiosConfig
+      );
+
+      setStates(res.data || []);
+
+    } catch (err) {
+      console.error('🔴 [fetchStates] error:', err);
+      toast.error('Error', err.response?.response?.message || 'Failed to fetch states');
+      setStates([]);
+    }
+  }, []);
+
+
+  const fetchCities = useCallback(async () => {
+    if (!ensureToken()) return;
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/recuirment/getAllCity`,
+        axiosConfig
+      );
+
+      setCities(res.data|| []);
+
+    } catch (err) {
+      console.error('🔴 [fetchCities] error:', err);
+      toast.error('Error', err.response?.response?.message || 'Failed to fetch cities');
+      setCities([]);
+    }
+  }, []);
+
+
+  const fetchWorkModes = useCallback(async () => {
+    if (!ensureToken()) return;
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/recuirment/getAllWorkMode`,
+        axiosConfig
+      );
+
+      setWorkModes(res.data || []);
+
+    } catch (err) {
+      console.error('🔴 [fetchWorkModes] error:', err);
+      toast.error('Error', err.response?.response?.message || 'Failed to fetch work modes');
+      setWorkModes([]);
+    }
+  }, []);
+
+
+  console.log('🔵 [formData]', formData);
+
+
+
+  useEffect(() => {
+    fetchLocations();
+    fetchBranches();
+    fetchCountries();
+    fetchWorkModes();
+  }, [fetchLocations, fetchBranches, fetchCountries,fetchWorkModes]);
+
+
+
+  // ============================================
+  // DEBOUNCED SEARCH
+  // ============================================
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(0);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Click outside for branch dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (branchRef.current && !branchRef.current.contains(event.target)) {
@@ -348,7 +257,57 @@ const JobLocationMaster = () => {
   }, []);
 
   // ============================================
-  // FORM FUNCTIONS
+  // FILTERED + PAGINATED
+  // ============================================
+  const filteredLocations = locations
+    .filter((item) => {
+      const search = debouncedSearch.toLowerCase();
+      return (
+        item.locationCode?.toLowerCase().includes(search) ||
+        item.locationName?.toLowerCase().includes(search) ||
+        item.branch?.toLowerCase().includes(search) ||
+        item.city?.toLowerCase().includes(search) ||
+        item.state?.toLowerCase().includes(search) ||
+        item.country?.toLowerCase().includes(search) ||
+        item.pinCode?.includes(search) ||
+        item.workMode?.toLowerCase().includes(search) ||
+        (item.description && item.description.toLowerCase().includes(search))
+      );
+    })
+    .sort((a, b) => {
+      if (a.status === 'Active' && b.status === 'Inactive') return -1;
+      if (a.status === 'Inactive' && b.status === 'Active') return 1;
+      return 0;
+    });
+
+  const totalItems = filteredLocations.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = page * rowsPerPage;
+  const currentLocations = filteredLocations.slice(startIndex, startIndex + rowsPerPage);
+
+
+  // ============================================
+  // UTILITIES
+  // ============================================
+  const generateLocationCode = () =>
+    `LOC${String(locations.length + 1).padStart(3, '0')}`;
+
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range = [];
+    const left = Math.max(0, page - delta);
+    const right = Math.min(totalPages - 1, page + delta);
+    if (left > 0) { range.push(0); if (left > 1) range.push('...'); }
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < totalPages - 1) {
+      if (right < totalPages - 2) range.push('...');
+      range.push(totalPages - 1);
+    }
+    return range;
+  };
+
+  // ============================================
+  // FORM HANDLERS
   // ============================================
   const resetForm = () => {
     setFormData({
@@ -371,9 +330,7 @@ const JobLocationMaster = () => {
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
-    if (touched[field]) {
-      validateField(field, value);
-    }
+    if (touched[field]) validateField(field, value);
   };
 
   const validateField = (field, value) => {
@@ -387,13 +344,12 @@ const JobLocationMaster = () => {
       } else if (/[^a-zA-Z0-9\s\-\.]/.test(value)) {
         error = 'No special characters allowed';
       } else {
-        const duplicate = locations.some(item =>
-          item.locationName.toLowerCase() === value.toLowerCase() &&
-          (!editingLocation || item.id !== editingLocation.id)
+        const duplicate = locations.some(
+          (item) =>
+            item.locationName.toLowerCase() === value.toLowerCase() &&
+            (!editingLocation || item.id !== editingLocation.id)
         );
-        if (duplicate) {
-          error = 'Location Name must be unique';
-        }
+        if (duplicate) error = 'Location Name must be unique';
       }
     } else if (field === 'branch' && !value) {
       error = 'Branch is required';
@@ -404,26 +360,24 @@ const JobLocationMaster = () => {
     } else if (field === 'country' && !value) {
       error = 'Country is required';
     } else if (field === 'pinCode') {
-      if (!value) {
-        error = 'PIN Code is required';
-      } else if (!/^\d{6}$/.test(value)) {
-        error = 'PIN Code must be exactly 6 digits';
-      }
+      if (!value) error = 'PIN Code is required';
+      else if (!/^\d{6}$/.test(value)) error = 'PIN Code must be exactly 6 digits';
     } else if (field === 'workMode' && !value) {
       error = 'Work Mode is required';
     }
 
-    setErrors(prev => ({ ...prev, [field]: error }));
-    return error === '';
+    setErrors((prev) => ({ ...prev, [field]: error }));
   };
 
   const handleBlur = (field) => {
-    setTouched(prev => ({ ...prev, [field]: true }));
+    setTouched((prev) => ({ ...prev, [field]: true }));
     validateField(field, formData[field]);
   };
 
   const validateForm = () => {
-    const fieldsToValidate = ['locationName', 'branch', 'city', 'state', 'country', 'pinCode', 'workMode'];
+    const fieldsToValidate = [
+      'locationName', 'branch', 'city', 'state', 'country', 'pinCode', 'workMode'
+    ];
     const newErrors = {};
 
     for (const field of fieldsToValidate) {
@@ -438,13 +392,12 @@ const JobLocationMaster = () => {
       } else if (/[^a-zA-Z0-9\s\-\.]/.test(formData.locationName)) {
         newErrors.locationName = 'No special characters allowed';
       } else {
-        const duplicate = locations.some(item =>
-          item.locationName.toLowerCase() === formData.locationName.toLowerCase() &&
-          (!editingLocation || item.id !== editingLocation.id)
+        const duplicate = locations.some(
+          (item) =>
+            item.locationName.toLowerCase() === formData.locationName.toLowerCase() &&
+            (!editingLocation || item.id !== editingLocation.id)
         );
-        if (duplicate) {
-          newErrors.locationName = 'Location Name must be unique';
-        }
+        if (duplicate) newErrors.locationName = 'Location Name must be unique';
       }
     }
 
@@ -457,62 +410,76 @@ const JobLocationMaster = () => {
   };
 
   // ============================================
-  // CRUD OPERATIONS
+  // SUBMIT (Create / Update)
   // ============================================
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!ensureToken()) return;
     if (!validateForm()) {
-      showToast('warning', 'Validation Error', 'Please fix the highlighted fields');
+      toast.warning('Validation Error', 'Please fix the highlighted fields');
       return;
     }
 
-    const locationData = {
-      locationCode: formData.locationCode,
-      locationName: formData.locationName,
-      branch: formData.branch,
-      city: formData.city,
-      state: formData.state,
-      country: formData.country,
-      pinCode: formData.pinCode,
-      workMode: formData.workMode,
-      description: formData.description || '',
-      status: formData.status
-    };
-
-    if (editingLocation) {
-      const updated = locations.map(item =>
-        item.id === editingLocation.id
-          ? {
-            ...item,
-            ...locationData,
-            modifiedBy: 'Admin',
-            modifiedDate: new Date().toISOString()
-          }
-          : item
-      );
-      setLocations(updated);
-      showToast('success', 'Success', 'Job location updated successfully');
-    } else {
-      const newLocation = {
-        id: Date.now(),
-        ...locationData,
-        createdBy: 'Admin',
-        createdDate: new Date().toISOString(),
-        modifiedBy: null,
-        modifiedDate: null
+    setSubmitting(true);
+    try {
+      // ✅ Payload matches backend DTO
+      const payload = {
+        id: editingLocation ? editingLocation.id : 0,
+        locationCode: formData.locationCode,
+        locationName: formData.locationName.trim(),
+        branchId: formData.branch,
+        cityId: formData.city,
+        stateId: formData.state,
+        countryId: formData.country,
+        pinCode: formData.pinCode,
+        workModeId: formData.workMode,
+        description: formData.description?.trim() || '',
+        status: 'y'
       };
-      setLocations([newLocation, ...locations]);
-      showToast('success', 'Success', 'Job location added successfully');
-    }
 
-    resetForm();
-    setShowForm(false);
-    setPage(0);
+      console.log('🔵 [submit] payload:', payload);
+
+      let res;
+      if (editingLocation) {
+        res = await axios.put(
+          `${BASE_URL}/api/recuirment/updateJobLocationById/${editingLocation.id}`,
+          payload,
+          axiosConfig
+        );
+      } else {
+        res = await axios.post(
+          `${BASE_URL}/api/recuirment/saveLocation`,
+          payload,
+          axiosConfig
+        );
+      }
+
+      if (res.status === 200 || res.status === 201) {
+        toast.success(
+          'Success',
+          editingLocation ? 'Job location updated successfully' : 'Job location created successfully'
+        );
+        resetForm();
+        setShowForm(false);
+        setPage(0);
+        fetchLocations();
+      } else {
+        throw new Error(res.data?.message || 'Operation failed');
+      }
+    } catch (err) {
+      console.error('🔴 [submit] error:', err);
+      toast.error(
+        'Error',
+        err.response?.data?.message || err.message || 'Something went wrong'
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEdit = (item) => {
     if (item.status === 'Inactive') {
-      showToast('warning', 'Cannot Edit', 'Inactive locations cannot be edited');
+      toast.warning('Cannot Edit', 'Inactive locations cannot be edited');
       return;
     }
     setEditingLocation(item);
@@ -532,63 +499,9 @@ const JobLocationMaster = () => {
     setShowForm(true);
   };
 
-  const handleDelete = (item) => {
-    setDeleteTarget(item);
-    setShowDeleteModal(true);
-  };
-
-  const confirmDelete = () => {
-    const isUsed = false; // Replace with actual check
-
-    if (isUsed) {
-      showToast('error', 'Cannot Delete', 'This location is already in use');
-      setShowDeleteModal(false);
-      setDeleteTarget(null);
-      return;
-    }
-
-    const updated = locations.filter(item => item.id !== deleteTarget.id);
-    setLocations(updated);
-    showToast('success', 'Deleted', `${deleteTarget.locationName} has been deleted`);
-    setShowDeleteModal(false);
-    setDeleteTarget(null);
-  };
-
-  const handleStatusToggle = (id, name, currentStatus) => {
-    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-    setStatusAction({
-      id,
-      name,
-      newStatus
-    });
-    setShowStatusModal(true);
-  };
-
-  const confirmStatusChange = () => {
-    const { id, newStatus } = statusAction;
-    const updated = locations.map(item =>
-      item.id === id
-        ? {
-          ...item,
-          status: newStatus,
-          modifiedBy: 'Admin',
-          modifiedDate: new Date().toISOString()
-        }
-        : item
-    );
-    setLocations(updated);
-    setShowStatusModal(false);
-    showToast('success', 'Status Updated', `${statusAction.name} is now ${newStatus}`);
-  };
-
-  const handleCancelForm = () => {
-    resetForm();
-    setShowForm(false);
-  };
-
   const handleAddNew = () => {
     resetForm();
-    setFormData(prev => ({ ...prev, locationCode: generateLocationCode() }));
+    setFormData((prev) => ({ ...prev, locationCode: generateLocationCode() }));
     setShowForm(true);
   };
 
@@ -598,11 +511,51 @@ const JobLocationMaster = () => {
   };
 
   // ============================================
-  // RENDER
+  // STATUS TOGGLE
   // ============================================
+  const handleStatusToggle = (id, name, currentStatus) => {
+    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+    setStatusAction({ id, name, newStatus });
+    setShowStatusModal(true);
+  };
+
+  const confirmStatusChange = async () => {
+    if (!ensureToken()) return;
+    const { id, newStatus, name } = statusAction;
+    setLoading(true);
+    try {
+      const res = await axios.put(
+        `${BASE_URL}/api/recuirment/updateJobLocationStatus/${id}`,
+        { status: newStatus === 'Active' ? 'y' : 'n' },
+        axiosConfig
+      );
+
+      if (res.status === 200) {
+        toast.success('Status Updated', `${name} is now ${newStatus}`);
+        fetchLocations();
+      } else {
+        throw new Error(res.data?.message || 'Failed to change status');
+      }
+    } catch (err) {
+      console.error('🔴 [statusToggle] error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to change status');
+    } finally {
+      setLoading(false);
+      setShowStatusModal(false);
+      setStatusAction({ id: null, name: '', newStatus: '' });
+    }
+  };
+
+  // ============================================
+  // RENDER GUARD
+  // ============================================
+  if (loading && !showForm && locations.length === 0) {
+    return <LoadingSpinner message="Loading job locations..." />;
+  }
+
   return (
     <div className="cert-root">
-      {/* Header */}
+      {/* HEADER */}
       <div className="cert-header">
         <div>
           <h1 className="cert-title">Job Location Master</h1>
@@ -628,9 +581,7 @@ const JobLocationMaster = () => {
       </div>
 
       {showForm ? (
-        /* ==========================================
-           FORM SECTION
-           ========================================== */
+        /* ================= FORM ================= */
         <div className="cert-form-wrap">
           <form onSubmit={handleSubmit} className="cert-form-compact">
             <div className="cert-form-section-compact">
@@ -648,10 +599,10 @@ const JobLocationMaster = () => {
                     placeholder="Auto-generated"
                     style={{ fontSize: '14px', padding: '6px 12px', background: '#f3f4f6' }}
                   />
-                 
+                  <small style={{ fontSize: '12px', color: '#6b7280' }}>Auto-generated</small>
                 </div>
 
-                {/* Location Name - Required */}
+                {/* Location Name */}
                 <div className={`cert-field-compact ${touched.locationName && errors.locationName ? 'has-error' : ''}`}>
                   <label className="required">Location Name</label>
                   <input
@@ -663,152 +614,111 @@ const JobLocationMaster = () => {
                     style={{ fontSize: '14px', padding: '6px 12px' }}
                   />
                   <FieldError msg={errors.locationName} />
-                 
+                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
+                    Max 100 characters, no special characters
+                  </small>
                 </div>
 
-                {/* Branch - Searchable Dropdown */}
-                <div className={`cert-field-compact ${touched.branch && errors.branch ? 'has-error' : ''}`} ref={branchRef}>
+                <div className={`cert-field-compact ${touched.locationName && errors.locationName ? 'has-error' : ''}`}>
                   <label className="required">Branch</label>
-                  <div style={{ position: 'relative' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        border: `1px solid ${touched.branch && errors.branch ? '#ef4444' : '#d1d5db'}`,
-                        borderRadius: '8px',
-                        padding: '0 12px',
-                        cursor: 'pointer',
-                        background: '#fff',
-                        minHeight: '38px'
-                      }}
-                      onClick={() => setShowBranchDropdown(!showBranchDropdown)}
-                    >
-                      <input
-                        type="text"
-                        placeholder="Search branch..."
-                        value={branchSearch}
-                        onChange={(e) => {
-                          setBranchSearch(e.target.value);
-                          setShowBranchDropdown(true);
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowBranchDropdown(!showBranchDropdown);
-                        }}
-                        style={{
-                          flex: 1,
-                          border: 'none',
-                          outline: 'none',
-                          fontSize: '14px',
-                          padding: '6px 0',
-                          background: 'transparent'
-                        }}
-                      />
-                      <FaChevronDown size={12} style={{ color: '#6b7280' }} />
-                    </div>
-                    {showBranchDropdown && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        background: '#fff',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '8px',
-                        marginTop: '4px',
-                        maxHeight: '200px',
-                        overflowY: 'auto',
-                        zIndex: 1000,
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                      }}>
-                        {filteredBranches.length > 0 ? (
-                          filteredBranches.map(branch => (
-                            <div
-                              key={branch.id}
-                              style={{
-                                padding: '8px 12px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                borderBottom: '1px solid #f3f4f6',
-                                background: formData.branch === branch.name ? '#fdf2f8' : 'transparent'
-                              }}
-                              onClick={() => {
-                                handleChange('branch', branch.name);
-                                setBranchSearch(branch.name);
-                                setShowBranchDropdown(false);
-                              }}
-                              onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
-                              onMouseLeave={(e) => e.target.style.background = formData.branch === branch.name ? '#fdf2f8' : 'transparent'}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <FaBuilding size={12} style={{ color: '#6b7280' }} />
-                                {branch.name}
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div style={{ padding: '8px 12px', color: '#6b7280', fontSize: '14px' }}>
-                            No branches found
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <select
+                    value={formData.branch ?? ''}
+                    onChange={(e) =>
+                      handleChange(
+                        'branch',
+                        e.target.value === '' ? '' : Number(e.target.value)
+                      )
+                    }
+                    onBlur={() => handleBlur('branch')}
+                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                  >
+                    <option value="">Select Branch</option>
+
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={Number(branch.id)}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
                   <FieldError msg={errors.branch} />
-                 
                 </div>
 
-            
-                {/* Country - Dropdown */}
-                <div className={`cert-field-compact ${touched.country && errors.country ? 'has-error' : ''}`}>
+                {/* Country */}
+                <div className={`cert-field-compact ${touched.locationName && errors.locationName ? 'has-error' : ''}`}>
                   <label className="required">Country</label>
                   <select
-                    value={formData.country}
-                    onChange={(e) => handleChange('country', e.target.value)}
+                    value={formData.country ?? ''}
+
+
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const country = value === '' ? '' : Number(value);
+
+                      handleChange('country', country);
+                      fetchStates(country);
+                    }}
                     onBlur={() => handleBlur('country')}
                     style={{ fontSize: '14px', padding: '6px 12px' }}
                   >
                     <option value="">Select Country</option>
-                    {countries.map(country => (
-                      <option key={country.value} value={country.value}>{country.label}</option>
+
+                    {countries.map((country) => (
+                      <option key={country.id} value={Number(country.id)}>
+                        {country.countryName}
+                      </option>
                     ))}
                   </select>
                   <FieldError msg={errors.country} />
                 </div>
-    {/* State - Dropdown */}
+
+                {/* State */}
                 <div className={`cert-field-compact ${touched.state && errors.state ? 'has-error' : ''}`}>
                   <label className="required">State</label>
                   <select
                     value={formData.state}
-                    onChange={(e) => handleChange('state', e.target.value)}
+
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const state = value === '' ? '' : Number(value);
+
+                      handleChange('state', state);
+                      fetchCities(state);
+                    }}
+
                     onBlur={() => handleBlur('state')}
                     style={{ fontSize: '14px', padding: '6px 12px' }}
                   >
                     <option value="">Select State</option>
-                    {states.map(state => (
-                      <option key={state.value} value={state.value}>{state.label}</option>
+                    {states.map((state) => (
+                      <option key={state.id} value={state.id}>{state.stateName}</option>
                     ))}
                   </select>
                   <FieldError msg={errors.state} />
                 </div>
-   {/* City - Dropdown */}
+
+                {/* City */}
                 <div className={`cert-field-compact ${touched.city && errors.city ? 'has-error' : ''}`}>
                   <label className="required">City</label>
                   <select
                     value={formData.city}
-                    onChange={(e) => handleChange('city', e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const city = value === '' ? '' : Number(value);
+
+                      handleChange('city', city);
+                    }}
                     onBlur={() => handleBlur('city')}
                     style={{ fontSize: '14px', padding: '6px 12px' }}
                   >
                     <option value="">Select City</option>
-                    {cities.map(city => (
-                      <option key={city.value} value={city.value}>{city.label}</option>
+                    {cities.map((city) => (
+                      <option key={city.id} value={city.id}>{city.cityName}</option>
                     ))}
                   </select>
                   <FieldError msg={errors.city} />
                 </div>
 
-                {/* PIN Code - Numeric */}
+                {/* PIN Code */}
                 <div className={`cert-field-compact ${touched.pinCode && errors.pinCode ? 'has-error' : ''}`}>
                   <label className="required">PIN Code</label>
                   <input
@@ -824,10 +734,9 @@ const JobLocationMaster = () => {
                     maxLength="6"
                   />
                   <FieldError msg={errors.pinCode} />
-                  
                 </div>
 
-                {/* Work Mode - Dropdown */}
+                {/* Work Mode */}
                 <div className={`cert-field-compact ${touched.workMode && errors.workMode ? 'has-error' : ''}`}>
                   <label className="required">Work Mode</label>
                   <select
@@ -837,15 +746,14 @@ const JobLocationMaster = () => {
                     style={{ fontSize: '14px', padding: '6px 12px' }}
                   >
                     <option value="">Select Work Mode</option>
-                    {workModes.map(mode => (
-                      <option key={mode.value} value={mode.value}>{mode.label}</option>
+                    {workModes.map((mode) => (
+                      <option key={mode.id} value={mode.id}>{mode.workModeName}</option>
                     ))}
                   </select>
                   <FieldError msg={errors.workMode} />
-                 
                 </div>
 
-                {/* Description - Text Area */}
+                {/* Description */}
                 <div className="cert-field-compact" style={{ gridColumn: 'span 1' }}>
                   <label>Description</label>
                   <textarea
@@ -853,15 +761,14 @@ const JobLocationMaster = () => {
                     placeholder="Enter description (optional)"
                     value={formData.description}
                     onChange={(e) => handleChange('description', e.target.value)}
-                    style={{ 
-                      fontSize: '14px', 
-                      padding: '6px 12px', 
-                      resize: 'vertical', 
+                    style={{
+                      fontSize: '14px',
+                      padding: '6px 12px',
+                      resize: 'vertical',
                       minHeight: '80px',
                       width: '100%'
                     }}
                   />
-                
                 </div>
 
               </div>
@@ -869,39 +776,45 @@ const JobLocationMaster = () => {
 
             {/* Form Actions */}
             <div className="cert-form-actions">
-              <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>
+              <button type="button" className="cert-cancel-btn" onClick={handleBackToList}>
                 <FaTimes size={12} /> Cancel
               </button>
-             
-              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <FaSave size={12} /> {editingLocation ? 'Update' : 'Save'}
+              <button
+                type="submit"
+                className="cert-add-btn"
+                disabled={submitting}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                {submitting ? (
+                  <><span className="emp-spinner" /> Saving…</>
+                ) : (
+                  <><FaSave size={12} /> {editingLocation ? 'Update' : 'Save'}</>
+                )}
               </button>
             </div>
           </form>
         </div>
       ) : (
-        /* ==========================================
-           TABLE SECTION
-           ========================================== */
+        /* ================= TABLE ================= */
         <>
           {/* Search Bar */}
           <div className="emp-search-bar">
             <div className="emp-search-wrap">
+              <FaSearch className="emp-search-icon" size={12} />
               <input
                 className="emp-search-input"
                 type="text"
                 placeholder="Search by code, name, branch, city, state, country, PIN..."
                 value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 style={{ fontSize: '14px', padding: '6px 12px' }}
               />
               {searchTerm && (
-                <button className="cert-search-clear" onClick={() => { setSearchTerm(''); setPage(0); }}>
+                <button className="emp-search-clear" onClick={() => setSearchTerm('')}>
                   <FaTimes size={11} />
                 </button>
               )}
             </div>
-            
           </div>
 
           {/* Table */}
@@ -933,9 +846,7 @@ const JobLocationMaster = () => {
                             {item.locationCode}
                           </span>
                         </td>
-                        <td>
-                          <strong>{item.locationName}</strong>
-                        </td>
+                        <td><strong>{item.locationName}</strong></td>
                         <td>
                           <span className="cert-status-badge" style={{
                             background: '#e0e7ff',
@@ -946,15 +857,14 @@ const JobLocationMaster = () => {
                             {item.branch}
                           </span>
                         </td>
-                        
                         <td>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <FaGlobe size={11} style={{ color: '#6b7280' }} />
                             {item.country}
                           </span>
                         </td>
-                                                <td>{item.state}</td>
-<td>
+                        <td>{item.state}</td>
+                        <td>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <FaCity size={11} style={{ color: '#6b7280' }} />
                             {item.city}
@@ -967,12 +877,12 @@ const JobLocationMaster = () => {
                         </td>
                         <td>
                           <span className="cert-status-badge" style={{
-                            background: item.workMode === 'Onsite' ? '#d1fae5' : 
-                                      item.workMode === 'Remote' ? '#fef3c7' :
-                                      item.workMode === 'Hybrid' ? '#e0e7ff' : '#fce4ec',
-                            color: item.workMode === 'Onsite' ? '#065f46' : 
-                                   item.workMode === 'Remote' ? '#92400e' :
-                                   item.workMode === 'Hybrid' ? '#4f46e5' : '#b91c1c',
+                            background: item.workMode === 'Onsite' ? '#d1fae5' :
+                              item.workMode === 'Remote' ? '#fef3c7' :
+                                item.workMode === 'Hybrid' ? '#e0e7ff' : '#fce4ec',
+                            color: item.workMode === 'Onsite' ? '#065f46' :
+                              item.workMode === 'Remote' ? '#92400e' :
+                                item.workMode === 'Hybrid' ? '#4f46e5' : '#b91c1c',
                             fontSize: '11px',
                             padding: '2px 10px',
                             borderRadius: '12px'
@@ -984,43 +894,33 @@ const JobLocationMaster = () => {
                           <div
                             className="d-flex align-items-center justify-content-center gap-1"
                             style={{ cursor: 'pointer' }}
-                            onClick={() => handleStatusToggle(
-                              item.id,
-                              item.locationName,
-                              item.status || 'Active'
-                            )}
+                            onClick={() => handleStatusToggle(item.id, item.locationName, item.status)}
                           >
-                            <div
-                              style={{
-                                width: '28px',
-                                height: '16px',
-                                borderRadius: '50px',
-                                backgroundColor: (item.status || 'Active') === 'Active' ? '#9d174d' : '#d1d5db',
-                                position: 'relative',
+                            <div style={{
+                              width: '28px',
+                              height: '16px',
+                              borderRadius: '50px',
+                              backgroundColor: item.status === 'Active' ? '#9d174d' : '#d1d5db',
+                              position: 'relative',
+                              transition: '.2s'
+                            }}>
+                              <div style={{
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '50%',
+                                background: '#fff',
+                                position: 'absolute',
+                                top: '2px',
+                                left: item.status === 'Active' ? '14px' : '2px',
                                 transition: '.2s'
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  background: '#fff',
-                                  position: 'absolute',
-                                  top: '2px',
-                                  left: (item.status || 'Active') === 'Active' ? '14px' : '2px',
-                                  transition: '.2s'
-                                }}
-                              />
+                              }} />
                             </div>
-                            <span
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 500,
-                                color: (item.status || 'Active') === 'Active' ? '#9d174d' : '#94a3b8'
-                              }}
-                            >
-                              {item.status || 'Active'}
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              color: item.status === 'Active' ? '#9d174d' : '#94a3b8'
+                            }}>
+                              {item.status}
                             </span>
                           </div>
                         </td>
@@ -1038,7 +938,6 @@ const JobLocationMaster = () => {
                             >
                               <FaEdit size={12} />
                             </button>
-                           
                           </div>
                         </td>
                       </tr>
@@ -1055,12 +954,11 @@ const JobLocationMaster = () => {
             </div>
 
             {/* Pagination */}
-            {totalPages > 0 && (
+            {totalItems > 0 && (
               <div className="cert-table-footer">
                 <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
                   Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} locations
                 </div>
-
                 <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <button
                     className="cert-page-btn"
@@ -1079,11 +977,10 @@ const JobLocationMaster = () => {
                   </button>
                   {getPaginationRange().map((pg, i) =>
                     pg === '...' ? (
-                      <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
+                      <span key={i} style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
                     ) : (
                       <button
                         key={pg}
-                        className={`cert-page-num ${pg === page ? 'active' : ''}`}
                         onClick={() => setPage(pg)}
                         style={{
                           padding: '6px 10px',
@@ -1122,9 +1019,7 @@ const JobLocationMaster = () => {
         </>
       )}
 
-      {/* ==========================================
-          STATUS CHANGE MODAL
-          ========================================== */}
+      {/* STATUS CHANGE MODAL */}
       {showStatusModal && (
         <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
           <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
@@ -1143,13 +1038,16 @@ const JobLocationMaster = () => {
                 : 'This location will become available for recruitment and HR operations.'}
             </p>
             <div className="emp-modal-actions">
-              <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>Cancel</button>
-              <button className="emp-modal-confirm" onClick={confirmStatusChange}>Confirm</button>
+              <button className="emp-modal-cancel" onClick={() => setShowStatusModal(false)}>
+                Cancel
+              </button>
+              <button className="emp-modal-confirm" onClick={confirmStatusChange}>
+                Confirm
+              </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };
@@ -1157,6 +1055,11 @@ const JobLocationMaster = () => {
 // ============================================
 // FIELD ERROR COMPONENT
 // ============================================
-const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
+const FieldError = ({ msg }) =>
+  msg ? (
+    <span className="field-err">
+      <FaExclamationCircle size={10} /> {msg}
+    </span>
+  ) : null;
 
 export default JobLocationMaster;

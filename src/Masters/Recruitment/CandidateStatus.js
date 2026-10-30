@@ -1,10 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FaSave, FaTimes, FaPlus, FaSearch, FaEdit, FaTrash,
   FaArrowLeft, FaArrowRight, FaCheckCircle, FaCircle,
   FaFlag, FaPalette, FaList, FaTag, FaInfoCircle
 } from 'react-icons/fa';
+import axios from 'axios';
+import { toast } from '../../components/Toast';
+import LoadingSpinner from '../../components/LoadingSpinner';
+import { BASE_URL, STORAGE_KEYS } from '../../config/api.config';
+
 
 // Simple toast notification function
 const showToast = (type, title, message) => {
@@ -59,179 +64,21 @@ const CandidateStatusMaster = () => {
   // ============================================
   // STATE MANAGEMENT
   // ============================================
-  const [statuses, setStatuses] = useState([
-    {
-      id: 1,
-      statusCode: 'STA001',
-      statusName: 'Applied',
-      displayOrder: 1,
-      finalStatus: false,
-      statusColor: '#3b82f6',
-      statusCategory: 'Application',
-      description: 'Candidate has submitted application',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-15T10:30:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 2,
-      statusCode: 'STA002',
-      statusName: 'Under Review',
-      displayOrder: 2,
-      finalStatus: false,
-      statusColor: '#8b5cf6',
-      statusCategory: 'Screening',
-      description: 'Application is being reviewed by HR',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-20T14:20:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 3,
-      statusCode: 'STA003',
-      statusName: 'Shortlisted',
-      displayOrder: 3,
-      finalStatus: false,
-      statusColor: '#f59e0b',
-      statusCategory: 'Screening',
-      description: 'Candidate has been shortlisted for interview',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-02-01T09:15:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 4,
-      statusCode: 'STA004',
-      statusName: 'Interview Scheduled',
-      displayOrder: 4,
-      finalStatus: false,
-      statusColor: '#06b6d4',
-      statusCategory: 'Interview',
-      description: 'Interview has been scheduled',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-02-10T11:45:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 5,
-      statusCode: 'STA005',
-      statusName: 'Interview Completed',
-      displayOrder: 5,
-      finalStatus: false,
-      statusColor: '#14b8a6',
-      statusCategory: 'Interview',
-      description: 'Interview process has been completed',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-02-15T13:20:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 6,
-      statusCode: 'STA006',
-      statusName: 'Selected',
-      displayOrder: 6,
-      finalStatus: false,
-      statusColor: '#22c55e',
-      statusCategory: 'Decision',
-      description: 'Candidate has been selected',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-03-01T10:00:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 7,
-      statusCode: 'STA007',
-      statusName: 'Offer Released',
-      displayOrder: 7,
-      finalStatus: false,
-      statusColor: '#8b5cf6',
-      statusCategory: 'Offer',
-      description: 'Offer letter has been released',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-03-10T14:30:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 8,
-      statusCode: 'STA008',
-      statusName: 'Offer Accepted',
-      displayOrder: 8,
-      finalStatus: false,
-      statusColor: '#10b981',
-      statusCategory: 'Offer',
-      description: 'Candidate has accepted the offer',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-03-20T09:45:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 9,
-      statusCode: 'STA009',
-      statusName: 'Joined',
-      displayOrder: 9,
-      finalStatus: true,
-      statusColor: '#065f46',
-      statusCategory: 'Onboarding',
-      description: 'Candidate has joined the organization',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-04-01T11:00:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 10,
-      statusCode: 'STA010',
-      statusName: 'Rejected',
-      displayOrder: 10,
-      finalStatus: true,
-      statusColor: '#ef4444',
-      statusCategory: 'Decision',
-      description: 'Candidate has been rejected',
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-02-20T16:00:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 11,
-      statusCode: 'STA011',
-      statusName: 'Withdrawn',
-      displayOrder: 11,
-      finalStatus: true,
-      statusColor: '#6b7280',
-      statusCategory: 'Withdrawal',
-      description: 'Candidate has withdrawn the application',
-      status: 'Inactive',
-      createdBy: 'Admin',
-      createdDate: '2026-03-15T15:00:00Z',
-      modifiedBy: 'Admin',
-      modifiedDate: '2026-07-20T16:30:00Z'
-    }
-  ]);
+
+  const [statuses, setStatuses] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editingStatus, setEditingStatus] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
+
+  const [statusCategories, setStatusCategories] = useState([]);
+  const [finalStatus, setFinalStatus] = useState([]);
+
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusAction, setStatusAction] = useState({
     id: null,
@@ -241,7 +88,13 @@ const CandidateStatusMaster = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  // Category Searchable Dropdown
+  const [categorySearch, setCategorySearch] = useState('');
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const categoryRef = useRef(null);
+
   // Form state
+
   const [formData, setFormData] = useState({
     statusCode: '',
     statusName: '',
@@ -257,24 +110,142 @@ const CandidateStatusMaster = () => {
   const [touched, setTouched] = useState({});
 
   // ============================================
+  // AUTH HELPERS
+  // ============================================
+  const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  const axiosConfig = {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  const ensureToken = () => {
+    if (!getAuthToken()) {
+      toast.error('Authentication Required', 'Please login to continue');
+      return false;
+    }
+    return true;
+  };
+
+  // ============================================
+  // FETCH STATUS
+  // ============================================
+  const fetchStatuses = useCallback(async () => {
+    if (!ensureToken()) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/recuirment/getAllCandidateStatus`,
+        axiosConfig
+      );
+      const list = Array.isArray(res.data) ? res.data : (res.data?.response || []);
+
+      const mapped = list.map((item) => {
+        const isActive =
+          String(item.status ?? '').toLowerCase() === 'y' ||
+          item.status === true ||
+          String(item.status ?? '').toLowerCase() === 'active';
+        return {
+          id: item.id,
+          statusCode: item.statusCode || '',
+          statusName: item.statusName || '',
+          statusColor: item.statusColor || '#3b82f6',
+          displayOrder: item.displayOrder || '',
+          finalStatus: item.finalStatus || false,
+          statusCategory: item.statusCategory || '',
+          description: item.description || '',
+          status: isActive ? 'Active' : 'Inactive',
+          createdBy: item.createdBy || '—',
+          createdDate: item.createdDate || null,
+          modifiedBy: item.modifiedBy || null,
+          modifiedDate: item.modifiedDate || null
+        };
+      });
+
+      setStatuses(mapped);
+      console.log('🔵 [fetchStatuses] response:', res);
+    } catch (err) {
+      console.error('🔴 [fetchStatuses] error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to fetch job statuses');
+      setStatuses([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+
+  //DROPDOWN
+  const fetchCategories = useCallback(async () => {
+    if (!ensureToken()) return;
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/recuirment/getAllStatusCategory`,
+        axiosConfig
+      );
+
+      setStatusCategories(res.data || []);
+
+    } catch (err) {
+      console.error('🔴 [fetchCategories] error:', err);
+      toast.error('Error', err.response?.response?.message || 'Failed to fetch categories');
+      setStatusCategories([]);
+    }
+  }, []);
+
+  console.log('🔵 [formData]', formData);
+
+
+
+  useEffect(() => {
+    fetchStatuses();
+    fetchCategories();
+  }, [fetchStatuses, fetchCategories]);
+
+  // ============================================
+  // DEBOUNCED SEARCH
+  // ============================================
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(0);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Click outside for category dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (categoryRef.current && !categoryRef.current.contains(event.target)) {
+        setShowCategoryDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+
+
+
+  // ============================================
   // STATUS CATEGORY OPTIONS
   // ============================================
-  const statusCategories = [
-    { value: 'Application', label: 'Application' },
-    { value: 'Screening', label: 'Screening' },
-    { value: 'Interview', label: 'Interview' },
-    { value: 'Decision', label: 'Decision' },
-    { value: 'Offer', label: 'Offer' },
-    { value: 'Onboarding', label: 'Onboarding' },
-    { value: 'Withdrawal', label: 'Withdrawal' },
-    { value: 'Other', label: 'Other' }
-  ];
+  // const statusCategories = [
+  //   { value: 'Application', label: 'Application' },
+  //   { value: 'Screening', label: 'Screening' },
+  //   { value: 'Interview', label: 'Interview' },
+  //   { value: 'Decision', label: 'Decision' },
+  //   { value: 'Offer', label: 'Offer' },
+  //   { value: 'Onboarding', label: 'Onboarding' },
+  //   { value: 'Withdrawal', label: 'Withdrawal' },
+  //   { value: 'Other', label: 'Other' }
+  // ];
 
   // ============================================
   // PRESET COLOR OPTIONS
   // ============================================
   const presetColors = [
-    '#3b82f6', '#8b5cf6', '#f59e0b', '#06b6d4', 
+    '#3b82f6', '#8b5cf6', '#f59e0b', '#06b6d4',
     '#14b8a6', '#22c55e', '#10b981', '#065f46',
     '#ef4444', '#dc2626', '#6b7280', '#4b5563',
     '#f97316', '#ec4899', '#6366f1', '#0ea5e9'
@@ -284,11 +255,15 @@ const CandidateStatusMaster = () => {
   // FILTERED DATA
   // ============================================
   const filteredStatuses = statuses.filter(item => {
-    const search = searchTerm.toLowerCase();
+    const search = debouncedSearch.toLowerCase();
     return item.statusCode.toLowerCase().includes(search) ||
       item.statusName.toLowerCase().includes(search) ||
       item.statusCategory.toLowerCase().includes(search) ||
       (item.description && item.description.toLowerCase().includes(search));
+  }).sort((a, b) => {
+    if (a.status === 'Active' && b.status === 'Inactive') return -1;
+    if (a.status === 'Inactive' && b.status === 'Active') return 1;
+    return 0;
   });
 
   const totalItems = filteredStatuses.length;
@@ -487,49 +462,91 @@ const CandidateStatusMaster = () => {
   // ============================================
   // CRUD OPERATIONS
   // ============================================
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!ensureToken()) return;
     if (!validateForm()) {
-      showToast('warning', 'Validation Error', 'Please fix the highlighted fields');
+      toast.warning('Validation Error', 'Please fix the highlighted fields');
       return;
     }
+    setSubmitting(true);
+    try {
+      const Payload = {
+        id: editingStatus ? editingStatus.id : 0,
+        statusCode: formData.statusCode,
+        statusName: formData.statusName.trim(),
+        displayOrder: formData.displayOrder,
+        finalStatus: formData.finalStatus ? 'y' : 'n',
+        statusColor: formData.statusColor,
+        statusCategoryId: formData.statusCategory,
+        description: formData.description || '',
+        status: formData.status
+      };
 
-    const statusData = {
-      statusCode: formData.statusCode,
-      statusName: formData.statusName,
-      displayOrder: Number(formData.displayOrder),
-      finalStatus: formData.finalStatus,
-      statusColor: formData.statusColor,
-      statusCategory: formData.statusCategory,
-      description: formData.description || '',
-      status: formData.status
+      console.log('🔵 [submit] payload:', Payload);
+
+      let res;
+      if (editingStatus) {
+        res = await axios.put(
+          `${BASE_URL}/api/recuirment/updateCandidateStatusById/${editingStatus.id}`,
+          Payload,
+          axiosConfig
+        );
+      } else {
+        res = await axios.post(
+          `${BASE_URL}/api/recuirment/saveCandidateStatus`,
+          Payload,
+          axiosConfig
+        );
+      }
+      if (res.status === 200 || res.status === 201) {
+        toast.success('Success',
+          editingStatus ? 'Candidate status updated successfully' : 'Candidate status added successfully'
+        );
+
+        resetForm();
+        setShowForm(false);
+        setPage(0);
+        fetchStatuses();
+      } else {
+        throw new Error(res.data?.message || 'Operation failed');
+      }
+    } catch (err) {
+      console.error('🔴 [submit] error:', err);
+      toast.error(
+        'Error',
+        err.response?.data?.message || err.message || 'Something went wrong'
+      );
+    } finally {
+      setSubmitting(false);
     };
 
-    if (editingStatus) {
-      const updated = statuses.map(item =>
-        item.id === editingStatus.id
-          ? {
-            ...item,
-            ...statusData,
-            modifiedBy: 'Admin',
-            modifiedDate: new Date().toISOString()
-          }
-          : item
-      );
-      setStatuses(updated);
-      showToast('success', 'Success', 'Candidate status updated successfully');
-    } else {
-      const newStatus = {
-        id: Date.now(),
-        ...statusData,
-        createdBy: 'Admin',
-        createdDate: new Date().toISOString(),
-        modifiedBy: null,
-        modifiedDate: null
-      };
-      setStatuses([newStatus, ...statuses]);
-      showToast('success', 'Success', 'Candidate status added successfully');
-    }
+
+    // if (editingStatus) {
+    //   const updated = statuses.map(item =>
+    //     item.id === editingStatus.id
+    //       ? {
+    //         ...item,
+    //         ...statusData,
+    //         modifiedBy: 'Admin',
+    //         modifiedDate: new Date().toISOString()
+    //       }
+    //       : item
+    //   );
+    //   setStatuses(updated);
+    //   showToast('success', 'Success', 'Candidate status updated successfully');
+    // } else {
+    //   const newStatus = {
+    //     id: Date.now(),
+    //     ...statusData,
+    //     createdBy: 'Admin',
+    //     createdDate: new Date().toISOString(),
+    //     modifiedBy: null,
+    //     modifiedDate: null
+    //   };
+    //   setStatuses([newStatus, ...statuses]);
+    //   showToast('success', 'Success', 'Candidate status added successfully');
+    // }
 
     resetForm();
     setShowForm(false);
@@ -581,46 +598,38 @@ const CandidateStatusMaster = () => {
   // STATUS TOGGLE
   // ============================================
   const handleStatusToggle = (id, name, currentStatus) => {
-    if (!id) {
-      showToast('error', 'Error', 'Invalid record ID');
-      return;
-    }
-
     const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-    
-    setStatusAction({
-      id: id,
-      name: name || 'Record',
-      newStatus: newStatus
-    });
+    setStatusAction({ id, name, newStatus });
     setShowStatusModal(true);
   };
 
-  const confirmStatusChange = () => {
-    if (!statusAction.id) {
-      showToast('error', 'Error', 'Invalid record ID');
-      setShowStatusModal(false);
-      return;
-    }
-
+  const confirmStatusChange = async () => {
+    if (!ensureToken()) return;
     const { id, newStatus, name } = statusAction;
+    setLoading(true);
+    try {
+      const res = await axios.put(
+        `${BASE_URL}/api/recuirment/updateStatusOfCandidateStatus/${id}`,
+        { status: newStatus === 'Active' ? 'y' : 'n' },
+        axiosConfig
+      );
 
-    const updated = statuses.map(item =>
-      item.id === id
-        ? {
-          ...item,
-          status: newStatus,
-          modifiedBy: 'Admin',
-          modifiedDate: new Date().toISOString()
-        }
-        : item
-    );
-    setStatuses(updated);
-    
-    showToast('success', 'Status Updated', `${name} is now ${newStatus}`);
-    setShowStatusModal(false);
-    setStatusAction({ id: null, newStatus: null, name: '' });
+      if (res.status === 200) {
+        toast.success('Status Updated', `${name} is now ${newStatus}`);
+        fetchStatuses();
+      } else {
+        throw new Error(res.data?.message || 'Failed to change status');
+      }
+    } catch (err) {
+      console.error('🔴 [statusToggle] error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to change status');
+    } finally {
+      setLoading(false);
+      setShowStatusModal(false);
+      setStatusAction({ id: null, name: '', newStatus: '' });
+    }
   };
+
 
   const handleCancelForm = () => {
     resetForm();
@@ -718,7 +727,7 @@ const CandidateStatusMaster = () => {
                 </div>
 
                 {/* Final Status */}
-                <div className="cert-field-compact">
+                 <div className="cert-field-compact">
                   <label>Final Status</label>
                   <select
                     value={formData.finalStatus}
@@ -730,6 +739,7 @@ const CandidateStatusMaster = () => {
                   </select>
                   <small style={{ fontSize: '12px', color: '#6b7280' }}>Is this a final status?</small>
                 </div>
+
 
                 {/* Status Color */}
                 <div className="cert-field-compact">
@@ -773,13 +783,13 @@ const CandidateStatusMaster = () => {
                   <label className="required">Status Category</label>
                   <select
                     value={formData.statusCategory}
-                    onChange={(e) => handleChange('statusCategory', e.target.value)}
+                    onChange={(e) => handleChange('statusCategory', Number(e.target.value))}
                     onBlur={() => handleBlur('statusCategory')}
                     style={{ fontSize: '14px', padding: '6px 12px' }}
                   >
                     <option value="">Select Category</option>
                     {statusCategories.map(cat => (
-                      <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      <option key={cat.id} value={cat.id}>{cat.categoryName}</option>
                     ))}
                   </select>
                   <FieldError msg={errors.statusCategory} />
@@ -797,7 +807,7 @@ const CandidateStatusMaster = () => {
                   />
                 </div>
 
-              
+
               </div>
             </div>
 
@@ -806,7 +816,7 @@ const CandidateStatusMaster = () => {
               <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>
                 <FaTimes size={12} /> Cancel
               </button>
-              
+
               <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                 <FaSave size={12} /> {editingStatus ? 'Update' : 'Save'}
               </button>
@@ -836,7 +846,7 @@ const CandidateStatusMaster = () => {
                 </button>
               )}
             </div>
-           
+
           </div>
 
           {/* Table */}
@@ -984,7 +994,7 @@ const CandidateStatusMaster = () => {
                             >
                               <FaEdit size={12} />
                             </button>
-                           
+
                           </div>
                         </td>
                       </tr>
@@ -1072,8 +1082,8 @@ const CandidateStatusMaster = () => {
           STATUS CHANGE MODAL
           ========================================== */}
       {showStatusModal && (
-        <div 
-          className="emp-modal-overlay" 
+        <div
+          className="emp-modal-overlay"
           onClick={() => {
             setShowStatusModal(false);
             setStatusAction({ id: null, newStatus: null, name: '' });
@@ -1091,8 +1101,8 @@ const CandidateStatusMaster = () => {
             zIndex: 9999
           }}
         >
-          <div 
-            className="emp-modal" 
+          <div
+            className="emp-modal"
             onClick={(e) => e.stopPropagation()}
             style={{
               background: 'white',
@@ -1103,7 +1113,7 @@ const CandidateStatusMaster = () => {
               boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
             }}
           >
-            <div 
+            <div
               className="emp-modal-icon"
               style={{
                 fontSize: '48px',
@@ -1113,7 +1123,7 @@ const CandidateStatusMaster = () => {
             >
               {statusAction.newStatus === 'Active' ? '✅' : '⛔'}
             </div>
-            <h3 
+            <h3
               className="emp-modal-title"
               style={{
                 fontSize: '18px',
@@ -1125,7 +1135,7 @@ const CandidateStatusMaster = () => {
             >
               Confirm Status Change
             </h3>
-            <p 
+            <p
               className="emp-modal-body"
               style={{
                 fontSize: '14px',
@@ -1141,7 +1151,7 @@ const CandidateStatusMaster = () => {
               </strong>{' '}
               <strong>{statusAction.name || 'this record'}</strong>?
             </p>
-            <p 
+            <p
               className="emp-modal-warn"
               style={{
                 fontSize: '13px',
@@ -1157,7 +1167,7 @@ const CandidateStatusMaster = () => {
                 ? 'Inactive statuses cannot be used in recruitment process.'
                 : 'This status will become available for selection.'}
             </p>
-            <div 
+            <div
               className="emp-modal-actions"
               style={{
                 display: 'flex',
@@ -1205,7 +1215,7 @@ const CandidateStatusMaster = () => {
         </div>
       )}
 
-         
+
     </div>
   );
 };
