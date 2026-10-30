@@ -98,6 +98,13 @@ const Department = () => {
     }
     return true;
   };
+    useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchName);
+      setPage(0);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [searchName]);
 
   const fetchBranches = async () => {
     setLoadingBranches(true);
@@ -114,19 +121,14 @@ const Department = () => {
     }
   };
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setDebouncedSearch(searchName);
-      setPage(0);
-    }, 500);
-    return () => clearTimeout(t);
-  }, [searchName]);
+
 
   const fetchDepartments = useCallback(async () => {
     if (!ensureToken()) return;
     setLoading(true);
     try {
       const res = await axios.get(`${BASE_URL}/departments/list?flag=0`, axiosConfig);
+      
       if (res.data?.response && Array.isArray(res.data.response)) {
         const mapped = res.data.response.map((d) => ({
           id: d.id,

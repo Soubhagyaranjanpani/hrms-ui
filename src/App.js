@@ -88,6 +88,7 @@ import City from './Masters/City';
 import WorkMode from './Masters/WorkMode';
 import LoanApplicationForm from './Loan_Advance/LoanApplicationForm';
 import { BiCurrentLocation } from 'react-icons/bi';
+import MyLoans from './Loan_Advance/MyLoan';
 
 
 
@@ -237,6 +238,7 @@ function App() {
           <Route path="City" element={<City user={currentUser}/>}/>
           <Route path="WorkMode" element={<WorkMode user={currentUser}/>}/>
           <Route path="LoanApplicationForm" element={<LoanApplicationForm user={currentUser}/>}/>
+          <Route path ="MyLoan" element={<MyLoans user={currentUser}/>}/>
         </Route>
       </Routes>
     </Router>
