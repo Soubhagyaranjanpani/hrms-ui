@@ -1,142 +1,140 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  FaSave, FaTimes, FaPlus, FaSearch, FaEye,
-  FaArrowLeft, FaExclamationCircle, FaMoneyBillWave,
-  FaCalendarAlt, FaPercent
+  FaPlus, FaSearch, FaTimes, FaEye, FaBan, FaPaperclip, FaArrowLeft,
+  FaMoneyBillWave, FaCalendarAlt, FaWallet, FaCheckCircle
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 // ============================================
-// STATIC MOCK DATA (logged-in employee only)
+// STATIC MOCK DATA (logged-in employee: Rahul Sharma)
 // ============================================
-const CURRENT_EMP = {
-  empId: 'EMP-1042',
-  empName: 'Rahul Sharma',
-  department: 'Engineering',
-  grade: 'M2',
-  netSalary: 85000
-};
+const CURRENT_EMP = { empId: 'EMP-1042', empName: 'Rahul Sharma', department: 'Engineering', grade: 'M2', netSalary: 85000 };
 
-const STATIC_LOANS = [
+const STATIC_MY_LOANS = [
   {
-    id: 1, loanRef: 'LN-0087', loanType: 'Salary Advance', amount: 50000, tenure: 5,
-    emi: 10000, purpose: 'Medical emergency at home', requestedDisburse: '2025-11-01',
-    preferredRecovery: 'Payroll Deduction', attachment: 'medical_bill.pdf',
-    disbursedOn: '2025-11-01', balance: 30000, paidEmis: 2, status: 'Active', rejectReason: ''
+    id: 1, loanRef: 'LN-0087', loanType: 'Salary Advance', amount: 50000, tenure: 5, emi: 10000,
+    purpose: 'Medical emergency at home', appliedOn: '2025-10-20', requestedDisburse: '2025-11-01',
+    disbursedOn: '2025-11-01', preferredRecovery: 'Payroll Deduction', attachment: 'medical_bill.pdf',
+    paidEmis: 2, balance: 30000, status: 'Active', nextEmiDate: '2026-01-01',
+    chain: [
+      { role: 'Reporting Manager', status: 'Approved', date: '2025-10-21' },
+      { role: 'HR Head', status: 'Approved', date: '2025-10-23' },
+      { role: 'Finance', status: 'Approved', date: '2025-10-28' }
+    ]
   },
   {
-    id: 2, loanRef: 'LN-0091', loanType: 'Personal Loan', amount: 20000, tenure: 4,
-    emi: 5000, purpose: 'Home repair', requestedDisburse: '2025-10-25',
-    preferredRecovery: 'Payroll Deduction', attachment: 'quotation.pdf',
-    disbursedOn: null, balance: 0, paidEmis: 0, status: 'Pending Approval', rejectReason: ''
+    id: 2, loanRef: 'LN-0091', loanType: 'Personal Loan', amount: 20000, tenure: 4, emi: 5000,
+    purpose: 'Home repair', appliedOn: '2025-10-22', requestedDisburse: '2025-10-25',
+    disbursedOn: null, preferredRecovery: 'Payroll Deduction', attachment: 'quotation.pdf',
+    paidEmis: 0, balance: 0, status: 'Pending Approval', nextEmiDate: null,
+    chain: [
+      { role: 'Reporting Manager', status: 'Pending', date: null },
+      { role: 'HR Head', status: 'Waiting', date: null },
+      { role: 'Finance', status: 'Waiting', date: null }
+    ]
   },
   {
-    id: 3, loanRef: 'LN-0062', loanType: 'Emergency Loan', amount: 15000, tenure: 3,
-    emi: 5000, purpose: 'Travel emergency', requestedDisburse: '2025-09-10',
-    preferredRecovery: 'Payroll Deduction', attachment: 'travel_receipt.pdf',
-    disbursedOn: null, balance: 0, paidEmis: 0, status: 'Rejected',
-    rejectReason: 'Existing active advance must be cleared before a new emergency loan.'
+    id: 3, loanRef: 'LN-0062', loanType: 'Emergency Loan', amount: 15000, tenure: 3, emi: 5000,
+    purpose: 'Travel emergency', appliedOn: '2025-09-05', requestedDisburse: '2025-09-10',
+    disbursedOn: null, preferredRecovery: 'Payroll Deduction', attachment: 'travel_receipt.pdf',
+    paidEmis: 0, balance: 0, status: 'Rejected', nextEmiDate: null,
+    rejectionReason: 'Supporting document was not clear. Please re-apply with a valid receipt.',
+    chain: [
+      { role: 'Reporting Manager', status: 'Approved', date: '2025-09-06' },
+      { role: 'HR Head', status: 'Rejected', date: '2025-09-08' },
+      { role: 'Finance', status: 'Closed', date: null }
+    ]
   },
   {
-    id: 4, loanRef: 'LN-0055', loanType: 'Salary Advance', amount: 25000, tenure: 5,
-    emi: 5000, purpose: 'Family function', requestedDisburse: '2025-04-01',
-    preferredRecovery: 'Payroll Deduction', attachment: 'family_event.jpg',
-    disbursedOn: '2025-04-01', balance: 0, paidEmis: 5, status: 'Closed', rejectReason: ''
+    id: 4, loanRef: 'LN-0031', loanType: 'Salary Advance', amount: 10000, tenure: 2, emi: 5000,
+    purpose: 'School admission fees', appliedOn: '2025-05-02', requestedDisburse: '2025-05-05',
+    disbursedOn: '2025-05-05', preferredRecovery: 'Payroll Deduction', attachment: 'fees.pdf',
+    paidEmis: 2, balance: 0, status: 'Closed', nextEmiDate: null,
+    chain: [
+      { role: 'Reporting Manager', status: 'Approved', date: '2025-05-03' },
+      { role: 'HR Head', status: 'Approved', date: '2025-05-03' },
+      { role: 'Finance', status: 'Approved', date: '2025-05-04' }
+    ]
   },
   {
-    id: 5, loanRef: 'LN-0098', loanType: 'Personal Loan', amount: 30000, tenure: 6,
-    emi: 5000, purpose: 'Education fees', requestedDisburse: '2025-11-15',
-    preferredRecovery: 'Bank Transfer', attachment: 'fees_receipt.pdf',
-    disbursedOn: null, balance: 0, paidEmis: 0, status: 'Draft', rejectReason: ''
-  },
-  {
-    id: 6, loanRef: 'LN-0099', loanType: 'Emergency Loan', amount: 10000, tenure: 2,
-    emi: 5000, purpose: 'Vehicle repair', requestedDisburse: '2025-11-05',
-    preferredRecovery: 'Payroll Deduction', attachment: '—',
-    disbursedOn: null, balance: 0, paidEmis: 0, status: 'Approved', rejectReason: ''
-  },
-  {
-    id: 7, loanRef: 'LN-0100', loanType: 'Personal Loan', amount: 12000, tenure: 3,
-    emi: 4000, purpose: 'Applied by mistake', requestedDisburse: '2025-10-30',
-    preferredRecovery: 'Payroll Deduction', attachment: '—',
-    disbursedOn: null, balance: 0, paidEmis: 0, status: 'Cancelled', rejectReason: ''
+    id: 5, loanRef: 'LN-0098', loanType: 'Personal Loan', amount: 30000, tenure: 6, emi: 5000,
+    purpose: 'Laptop purchase', appliedOn: '2025-10-28', requestedDisburse: '2025-11-20',
+    disbursedOn: null, preferredRecovery: 'Bank Transfer', attachment: '',
+    paidEmis: 0, balance: 0, status: 'Draft', nextEmiDate: null,
+    chain: [
+      { role: 'Reporting Manager', status: 'Waiting', date: null },
+      { role: 'HR Head', status: 'Waiting', date: null },
+      { role: 'Finance', status: 'Waiting', date: null }
+    ]
   }
 ];
 
-const LOAN_TYPES = ['Salary Advance', 'Personal Loan', 'Emergency Loan'];
-const RECOVERY_MODES = ['Payroll Deduction', 'Bank Transfer'];
-const STATUSES = ['Draft', 'Pending Approval', 'Approved', 'Active', 'Closed', 'Rejected', 'Cancelled'];
-
-const EMPTY_FORM = {
-  loanRef: '', loanType: '', amount: '', tenure: '', purpose: '',
-  requestedDisburse: '', preferredRecovery: 'Payroll Deduction', attachment: ''
-};
+const STATUS_TABS = ['All', 'Active', 'Pending Approval', 'Draft', 'Closed', 'Rejected'];
 
 // ============================================
 // HELPERS
 // ============================================
-const formatDate = (d) => {
-  if (!d) return '—';
-  const dt = new Date(d);
-  const day = String(dt.getDate()).padStart(2, '0');
-  const mon = dt.toLocaleString('en-GB', { month: 'short' });
-  return `${day}-${mon}-${String(dt.getFullYear()).slice(-2)}`;
-};
-
-const formatMoney = (n) => `₹ ${Number(n).toLocaleString('en-IN')}`;
+const fmt = (n) => `₹ ${Number(n || 0).toLocaleString()}`;
+const fmtDate = (d) =>
+  d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 const getStatusColor = (status) => {
   switch (status) {
     case 'Active': return { bg: '#d1fae5', color: '#065f46' };
-    case 'Approved': return { bg: '#dbeafe', color: '#1e40af' };
     case 'Pending Approval': return { bg: '#fef3c7', color: '#92400e' };
     case 'Closed': return { bg: '#e5e7eb', color: '#374151' };
     case 'Rejected': return { bg: '#fee2e2', color: '#b91c1c' };
-    case 'Cancelled': return { bg: '#f3e8ff', color: '#6b21a8' };
     case 'Draft': return { bg: '#e0e7ff', color: '#4f46e5' };
     default: return { bg: '#f3f4f6', color: '#6b7280' };
   }
 };
 
-const FieldError = ({ msg }) =>
-  msg ? (
-    <span className="field-err">
-      <FaExclamationCircle size={10} /> {msg}
-    </span>
-  ) : null;
+const getStageColor = (status) => {
+  switch (status) {
+    case 'Approved': return { bg: '#d1fae5', color: '#065f46' };
+    case 'Pending': return { bg: '#fef3c7', color: '#92400e' };
+    case 'Rejected': return { bg: '#fee2e2', color: '#b91c1c' };
+    default: return { bg: '#f3f4f6', color: '#6b7280' };
+  }
+};
+
+// Builds the EMI schedule for an active / closed loan
+const buildSchedule = (loan) => {
+  if (!loan.disbursedOn) return [];
+  const start = new Date(loan.disbursedOn);
+  return Array.from({ length: loan.tenure }, (_, i) => {
+    const d = new Date(start.getFullYear(), start.getMonth() + i + 1, 1);
+    return {
+      no: i + 1,
+      dueDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`,
+      amount: loan.emi,
+      status: i < loan.paidEmis ? 'Paid' : 'Upcoming'
+    };
+  });
+};
 
 // ============================================
 // COMPONENT
 // ============================================
-const MyLoans = () => {
+const MyLoansScreen = ({ onNewApplication }) => {
   const [loans, setLoans] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
-  const [showForm, setShowForm] = useState(false);
-  const [editingLoan, setEditingLoan] = useState(null);
-
-  // Filters + search
-  const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusTab, setStatusTab] = useState('All');
   const [page, setPage] = useState(0);
-  const rowsPerPage = 5;
+  const [rowsPerPage] = useState(5);
 
-  // Modals: { mode: 'view' | 'reason', loan }
-  const [modal, setModal] = useState(null);
+  const [viewLoan, setViewLoan] = useState(null);
+  const [cancelLoan, setCancelLoan] = useState(null);
 
-  const [formData, setFormData] = useState(EMPTY_FORM);
-  const [errors, setErrors] = useState({});
-  const [touched, setTouched] = useState({});
-
-  // ---------- fetch (static simulation) ----------
+  // ---------- simulate fetch ----------
   const fetchLoans = useCallback(() => {
     setLoading(true);
     setTimeout(() => {
-      setLoans([...STATIC_LOANS]);
+      setLoans([...STATIC_MY_LOANS]);
       setLoading(false);
     }, 300);
   }, []);
@@ -145,30 +143,36 @@ const MyLoans = () => {
 
   // ---------- debounced search ----------
   useEffect(() => {
-    const t = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-      setPage(0);
-    }, 500);
+    const t = setTimeout(() => { setDebouncedSearch(searchTerm); setPage(0); }, 500);
     return () => clearTimeout(t);
   }, [searchTerm]);
+
+  // ---------- summary ----------
+  const activeLoans = loans.filter((l) => l.status === 'Active');
+  const totalOutstanding = activeLoans.reduce((s, l) => s + l.balance, 0);
+  const monthlyEmi = activeLoans.reduce((s, l) => s + l.emi, 0);
+  const maxEligible = CURRENT_EMP.netSalary * 0.5;
+  const availableLimit = Math.max(maxEligible - totalOutstanding, 0);
+  const nextEmi = activeLoans.map((l) => l.nextEmiDate).filter(Boolean).sort()[0];
 
   // ---------- filter + paginate ----------
   const filteredLoans = loans.filter((item) => {
     const s = debouncedSearch.toLowerCase();
     const matchSearch =
-      !s ||
       item.loanRef.toLowerCase().includes(s) ||
       item.loanType.toLowerCase().includes(s) ||
-      item.status.toLowerCase().includes(s);
-    const matchStatus = !statusFilter || item.status === statusFilter;
-    const matchType = !typeFilter || item.loanType === typeFilter;
-    return matchSearch && matchStatus && matchType;
+      item.status.toLowerCase().includes(s) ||
+      (item.purpose || '').toLowerCase().includes(s);
+    const matchTab = statusTab === 'All' || item.status === statusTab;
+    return matchSearch && matchTab;
   });
 
   const totalItems = filteredLoans.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
   const currentLoans = filteredLoans.slice(startIndex, startIndex + rowsPerPage);
+
+  const countFor = (tab) => (tab === 'All' ? loans.length : loans.filter((l) => l.status === tab).length);
 
   const getPaginationRange = () => {
     const delta = 2;
@@ -184,185 +188,45 @@ const MyLoans = () => {
     return range;
   };
 
-  // ---------- utilities ----------
-  const generateLoanRef = () => `LN-${String(loans.length + 100).padStart(4, '0')}`;
-
-  const calculateEmi = (amount, tenure) => {
-    const a = Number(amount) || 0;
-    const t = Number(tenure) || 0;
-    return t > 0 ? Math.round(a / t) : 0;
+  // ---------- cancel application ----------
+  const confirmCancel = () => {
+    setLoans((prev) => prev.filter((l) => l.id !== cancelLoan.id));
+    toast.success('Cancelled', `${cancelLoan.loanRef} application cancelled`);
+    setCancelLoan(null);
+    setViewLoan(null);
+    setPage(0);
   };
 
-  const maxEligible = CURRENT_EMP.netSalary * 0.5;
-  const emiPreview = calculateEmi(formData.amount, formData.tenure);
+  const canCancel = (l) => l.status === 'Pending Approval' || l.status === 'Draft';
 
-  // ---------- form handlers ----------
-  const resetForm = () => {
-    setFormData({ ...EMPTY_FORM, loanRef: generateLoanRef() });
-    setErrors({});
-    setTouched({});
-    setEditingLoan(null);
-  };
-
-  const validateField = (field, value) => {
-    let error = '';
-    if (field === 'loanType' && !value) error = 'Loan Type is required';
-    else if (field === 'amount') {
-      if (!value) error = 'Loan Amount is required';
-      else if (Number(value) <= 0) error = 'Amount must be greater than zero';
-      else if (Number(value) > maxEligible) error = 'Amount exceeds 50% of net salary limit';
-    } else if (field === 'tenure') {
-      if (!value) error = 'Tenure is required';
-      else if (Number(value) < 1 || Number(value) > 12) error = 'Tenure must be between 1 and 12 months';
-    } else if (field === 'purpose' && !value) error = 'Purpose is required';
-    else if (field === 'requestedDisburse' && !value) error = 'Requested disbursement date is required';
-    setErrors((prev) => ({ ...prev, [field]: error }));
-  };
-
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (touched[field]) validateField(field, value);
-  };
-
-  const handleBlur = (field) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    validateField(field, formData[field]);
-  };
-
-  const validateForm = () => {
-    const required = ['loanType', 'amount', 'tenure', 'purpose', 'requestedDisburse'];
-    const newErrors = {};
-    required.forEach((f) => { if (!formData[f]) newErrors[f] = 'This field is required'; });
-    if (formData.amount && Number(formData.amount) > maxEligible)
-      newErrors.amount = 'Amount exceeds 50% of net salary limit';
-    if (formData.tenure && (Number(formData.tenure) < 1 || Number(formData.tenure) > 12))
-      newErrors.tenure = 'Tenure must be between 1 and 12 months';
-    setErrors(newErrors);
-    setTouched(Object.fromEntries(required.map((f) => [f, true])));
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const buildLoan = (status) => ({
-    id: editingLoan ? editingLoan.id : Date.now(),
-    loanRef: formData.loanRef,
-    loanType: formData.loanType,
-    amount: Number(formData.amount),
-    tenure: Number(formData.tenure),
-    emi: calculateEmi(formData.amount, formData.tenure),
-    purpose: formData.purpose,
-    requestedDisburse: formData.requestedDisburse,
-    preferredRecovery: formData.preferredRecovery,
-    attachment: formData.attachment || '—',
-    disbursedOn: null,
-    balance: 0,
-    paidEmis: 0,
-    status,
-    rejectReason: ''
-  });
-
-  const saveLoan = (status, message) => {
-    setSubmitting(true);
-    setTimeout(() => {
-      const loan = buildLoan(status);
-      if (editingLoan) {
-        setLoans((prev) => prev.map((l) => (l.id === editingLoan.id ? { ...l, ...loan } : l)));
-      } else {
-        setLoans((prev) => [loan, ...prev]);
-      }
-      toast.success('Success', message);
-      resetForm();
-      setShowForm(false);
-      setPage(0);
-      setSubmitting(false);
-    }, 500);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      toast.warning('Validation Error', 'Please fix the highlighted fields');
-      return;
-    }
-    saveLoan('Pending Approval', editingLoan ? 'Loan application updated successfully' : 'Loan application submitted successfully');
-  };
-
-  const handleSaveDraft = () => {
-    if (!formData.loanType) {
-      setErrors((p) => ({ ...p, loanType: 'Loan Type is required' }));
-      setTouched((p) => ({ ...p, loanType: true }));
-      toast.warning('Validation Error', 'Select a loan type to save a draft');
-      return;
-    }
-    saveLoan('Draft', 'Draft saved');
-  };
-
-  const handleAddNew = () => {
-    resetForm();
-    setShowForm(true);
-  };
-
-  // Draft loans reopen in the form; others open the view modal
-  const handleView = (item) => {
-    if (item.status === 'Draft') {
-      setEditingLoan(item);
-      setFormData({
-        loanRef: item.loanRef, loanType: item.loanType, amount: item.amount,
-        tenure: item.tenure, purpose: item.purpose, requestedDisburse: item.requestedDisburse,
-        preferredRecovery: item.preferredRecovery, attachment: item.attachment === '—' ? '' : item.attachment
-      });
-      setErrors({});
-      setTouched({});
-      setShowForm(true);
-      return;
-    }
-    setModal({ mode: item.status === 'Rejected' ? 'reason' : 'view', loan: item });
-  };
-
-  const handleBackToList = () => {
-    resetForm();
-    setShowForm(false);
-  };
-
-  const handleCancelLoan = (loan) => {
-    setLoans((prev) => prev.map((l) => (l.id === loan.id ? { ...l, status: 'Cancelled' } : l)));
-    toast.success('Cancelled', `${loan.loanRef} has been cancelled`);
-    setModal(null);
-  };
-
-  const clearFilters = () => {
-    setStatusFilter('');
-    setTypeFilter('');
-    setSearchTerm('');
-  };
-
-  // ---------- render guard ----------
-  if (loading && !showForm && loans.length === 0) {
-    return <LoadingSpinner message="Loading loans..." />;
-  }
-
-  const actionLabel = (status) => (status === 'Rejected' ? 'View reason' : status === 'Draft' ? 'Edit' : 'View');
-  const hasFilters = statusFilter || typeFilter || searchTerm;
+  if (loading && loans.length === 0) return <LoadingSpinner message="Loading your loans..." />;
 
   return (
     <div className="cert-root">
       {/* HEADER */}
       <div className="cert-header">
         <div>
-          <h1 className="cert-title">
-            Loans &amp; Advances <span style={{ color: '#9ca3af', fontWeight: 400 }}>&gt;</span> My Loans
-          </h1>
-          <p className="cert-subtitle">Track your loan applications, EMIs and outstanding balance</p>
+          <h1 className="cert-title">{viewLoan ? `Loan ${viewLoan.loanRef}` : 'My Loans'}</h1>
+          <p className="cert-subtitle">
+            {viewLoan
+              ? 'Loan details, approval status and repayment schedule'
+              : `${CURRENT_EMP.empName} (${CURRENT_EMP.empId}) · Track your applications, balances and repayments`}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!showForm ? (
-            <button className="cert-add-btn" onClick={handleAddNew}>
-              <FaPlus size={13} /> New Application
+          {!viewLoan && (
+            <button
+              className="cert-add-btn"
+              onClick={() => (onNewApplication ? onNewApplication() : toast.success('Info', 'Opens New Loan Application'))}
+            >
+              <FaPlus size={13} /> New Loan Application
             </button>
-          ) : (
+          )}
+          {viewLoan && (
             <button
               type="button"
               className="cert-back-btn"
-              onClick={handleBackToList}
+              onClick={() => setViewLoan(null)}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
             >
               <FaArrowLeft size={12} /> Back
@@ -371,238 +235,189 @@ const MyLoans = () => {
         </div>
       </div>
 
-      {showForm ? (
-        /* ================= FORM ================= */
+      {viewLoan ? (
+        /* ================= DETAIL (full page) ================= */
         <div className="cert-form-wrap">
-          <form onSubmit={handleSubmit} className="cert-form-compact">
-            {/* EMPLOYEE DETAILS (READ-ONLY) */}
+          <div className="cert-form-compact">
+            {/* LOAN DETAILS (READ-ONLY) */}
             <div className="cert-form-section-compact" style={{ marginBottom: '16px' }}>
-              <div className="cert-section-label">Employee Details</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="cert-section-label">Loan Details</div>
+                <span
+                  style={{
+                    background: getStatusColor(viewLoan.status).bg,
+                    color: getStatusColor(viewLoan.status).color,
+                    fontSize: '11px', padding: '3px 10px', borderRadius: '12px', fontWeight: 500
+                  }}
+                >
+                  {viewLoan.status}
+                </span>
+              </div>
               <div className="cert-form-grid-3col">
                 {[
-                  ['Employee ID', CURRENT_EMP.empId],
-                  ['Name', CURRENT_EMP.empName],
-                  ['Department', CURRENT_EMP.department],
-                  ['Grade', CURRENT_EMP.grade],
-                  ['Net Salary (Monthly)', formatMoney(CURRENT_EMP.netSalary)],
-                  ['Loan Ref No.', formData.loanRef]
-                ].map(([label, value]) => (
-                  <div className="cert-field-compact" key={label}>
-                    <label>{label}</label>
+                  ['Loan Ref No.', viewLoan.loanRef],
+                  ['Loan Type', viewLoan.loanType],
+                  ['Loan Amount', fmt(viewLoan.amount)],
+                  ['Tenure', `${viewLoan.tenure} months`],
+                  ['EMI per month', fmt(viewLoan.emi)],
+                  ['Interest', '0% (advance)'],
+                  ['Applied On', fmtDate(viewLoan.appliedOn)],
+                  ['Requested Disburse Date', fmtDate(viewLoan.requestedDisburse)],
+                  ['Disbursed On', fmtDate(viewLoan.disbursedOn)],
+                  ['Preferred Recovery', viewLoan.preferredRecovery],
+                  ['Balance', fmt(viewLoan.balance)],
+                  ['EMIs Paid', `${viewLoan.paidEmis} of ${viewLoan.tenure}`]
+                ].map(([k, v]) => (
+                  <div className="cert-field-compact" key={k}>
+                    <label>{k}</label>
                     <input
                       type="text"
                       className="form-control bg-light"
-                      value={value}
+                      value={v}
                       readOnly
                       style={{
                         fontSize: '14px', padding: '6px 12px', background: '#f3f4f6',
-                        fontFamily: label === 'Loan Ref No.' ? 'monospace' : undefined
+                        fontFamily: k === 'Loan Ref No.' ? 'monospace' : undefined
                       }}
                     />
                   </div>
                 ))}
-              </div>
-            </div>
-
-            {/* LOAN REQUEST */}
-            <div className="cert-form-section-compact">
-              <div className="cert-section-label">Loan Request</div>
-              <div className="cert-form-grid-3col">
-                <div className={`cert-field-compact ${touched.loanType && errors.loanType ? 'has-error' : ''}`}>
-                  <label className="required">Loan Type</label>
-                  <select
-                    value={formData.loanType}
-                    onChange={(e) => handleChange('loanType', e.target.value)}
-                    onBlur={() => handleBlur('loanType')}
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
-                  >
-                    <option value="">Select Loan Type</option>
-                    {LOAN_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <FieldError msg={errors.loanType} />
-                </div>
-
-                <div className={`cert-field-compact ${touched.amount && errors.amount ? 'has-error' : ''}`}>
-                  <label className="required">Loan Amount (₹)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g., 50000"
-                    value={formData.amount}
-                    onChange={(e) => handleChange('amount', e.target.value)}
-                    onBlur={() => handleBlur('amount')}
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
-                  />
-                  <FieldError msg={errors.amount} />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Max Eligible: {formatMoney(maxEligible)} (50% of net salary)
-                  </small>
-                </div>
-
-                <div className={`cert-field-compact ${touched.tenure && errors.tenure ? 'has-error' : ''}`}>
-                  <label className="required">Tenure (months)</label>
-                  <input
-                    type="number"
-                    placeholder="1 - 12 months"
-                    value={formData.tenure}
-                    onChange={(e) => handleChange('tenure', e.target.value)}
-                    onBlur={() => handleBlur('tenure')}
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
-                    min="1"
-                    max="12"
-                  />
-                  <FieldError msg={errors.tenure} />
-                </div>
-
-                <div className={`cert-field-compact ${touched.requestedDisburse && errors.requestedDisburse ? 'has-error' : ''}`}>
-                  <label className="required">Requested Disburse Date</label>
-                  <input
-                    type="date"
-                    value={formData.requestedDisburse}
-                    onChange={(e) => handleChange('requestedDisburse', e.target.value)}
-                    onBlur={() => handleBlur('requestedDisburse')}
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
-                  />
-                  <FieldError msg={errors.requestedDisburse} />
-                </div>
-
-                <div className="cert-field-compact">
-                  <label>Preferred Recovery</label>
-                  <select
-                    value={formData.preferredRecovery}
-                    onChange={(e) => handleChange('preferredRecovery', e.target.value)}
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
-                  >
-                    {RECOVERY_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-
-                <div className="cert-field-compact">
-                  <label>Attach Document</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., medical_bill.pdf"
-                    value={formData.attachment}
-                    onChange={(e) => handleChange('attachment', e.target.value)}
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
-                  />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Medical bill / quotation / receipt (static demo)
-                  </small>
-                </div>
-
-                <div
-                  className={`cert-field-compact ${touched.purpose && errors.purpose ? 'has-error' : ''}`}
-                  style={{ gridColumn: 'span 3' }}
-                >
-                  <label className="required">Purpose / Reason</label>
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label>Purpose / Reason</label>
                   <textarea
                     rows="2"
-                    placeholder="Describe the reason for this loan..."
-                    value={formData.purpose}
-                    onChange={(e) => handleChange('purpose', e.target.value)}
-                    onBlur={() => handleBlur('purpose')}
-                    style={{ fontSize: '14px', padding: '6px 12px', resize: 'vertical', minHeight: '70px', width: '100%' }}
+                    readOnly
+                    value={viewLoan.purpose}
+                    style={{ fontSize: '14px', padding: '6px 12px', width: '100%', background: '#f3f4f6', minHeight: '56px' }}
                   />
-                  <FieldError msg={errors.purpose} />
+                </div>
+                <div className="cert-field-compact" style={{ gridColumn: 'span 3' }}>
+                  <label>Attachment</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+                    <FaPaperclip size={12} style={{ color: '#6b7280' }} />
+                    <span>{viewLoan.attachment || '—'}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* LIVE EMI PREVIEW */}
-            <div
-              className="cert-form-section-compact"
-              style={{ marginTop: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}
-            >
-              <div className="cert-section-label" style={{ color: '#065f46' }}>Live EMI Preview</div>
-              <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', fontSize: '13px', marginTop: '4px' }}>
-                <div>
-                  <FaMoneyBillWave size={12} style={{ color: '#059669', marginRight: '6px' }} />
-                  <strong>EMI per month:</strong>{' '}
-                  <span style={{ color: '#065f46', fontWeight: 600 }}>{formatMoney(emiPreview)}</span>
-                </div>
-                <div>
-                  <FaPercent size={12} style={{ color: '#059669', marginRight: '6px' }} />
-                  <strong>Interest:</strong>{' '}
-                  <span style={{ color: '#065f46', fontWeight: 600 }}>0% (advance)</span>
-                </div>
-                <div>
-                  <FaCalendarAlt size={12} style={{ color: '#059669', marginRight: '6px' }} />
-                  <strong>Tenure:</strong>{' '}
-                  <span style={{ color: '#065f46', fontWeight: 600 }}>{formData.tenure || 0} months</span>
-                </div>
+            {viewLoan.status === 'Rejected' && viewLoan.rejectionReason && (
+              <div style={{ padding: '10px 14px', background: '#fee2e2', color: '#b91c1c', borderRadius: '6px', fontSize: '13px', marginBottom: '16px' }}>
+                <strong>Rejection reason:</strong> {viewLoan.rejectionReason}
+              </div>
+            )}
+
+            {/* APPROVAL STATUS */}
+            <div className="cert-form-section-compact" style={{ marginBottom: '16px' }}>
+              <div className="cert-section-label">Approval Status</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px' }}>
+                {viewLoan.chain.map((s, i) => {
+                  const c = getStageColor(s.status);
+                  return (
+                    <div
+                      key={s.role}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
+                    >
+                      <strong>{i + 1}. {s.role}</strong>
+                      <span>
+                        {s.date && <small style={{ color: '#6b7280', marginRight: 8 }}>{fmtDate(s.date)}</small>}
+                        <span style={{ background: c.bg, color: c.color, fontSize: '11px', padding: '3px 10px', borderRadius: '12px', fontWeight: 500 }}>
+                          {s.status}
+                        </span>
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
+
+            {/* EMI SCHEDULE */}
+            {viewLoan.disbursedOn && (
+              <div className="cert-form-section-compact" style={{ marginBottom: '16px' }}>
+                <div className="cert-section-label">EMI Schedule</div>
+                <table className="cert-table" style={{ fontSize: '13px' }}>
+                  <thead>
+                    <tr>
+                      <th>EMI #</th>
+                      <th>Due Date</th>
+                      <th>Amount (₹)</th>
+                      <th style={{ textAlign: 'center' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {buildSchedule(viewLoan).map((r) => (
+                      <tr key={r.no}>
+                        <td>{r.no}</td>
+                        <td>{fmtDate(r.dueDate)}</td>
+                        <td>{fmt(r.amount)}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span
+                            style={{
+                              background: r.status === 'Paid' ? '#d1fae5' : '#f3f4f6',
+                              color: r.status === 'Paid' ? '#065f46' : '#6b7280',
+                              fontSize: '11px', padding: '2px 10px', borderRadius: '12px'
+                            }}
+                          >
+                            {r.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {/* Form Actions */}
             <div className="cert-form-actions" style={{ marginTop: '16px' }}>
-              <button type="button" className="cert-cancel-btn" onClick={handleBackToList}>
-                <FaTimes size={12} /> Cancel
+              <button type="button" className="cert-cancel-btn" onClick={() => setViewLoan(null)}>
+                <FaArrowLeft size={12} /> Back to list
               </button>
-              <button
-                type="button"
-                className="cert-cancel-btn"
-                onClick={handleSaveDraft}
-                disabled={submitting}
-              >
-                <FaSave size={12} /> Save as Draft
-              </button>
-              <button
-                type="submit"
-                className="cert-add-btn"
-                disabled={submitting}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                {submitting ? (
-                  <><span className="emp-spinner" /> Saving…</>
-                ) : (
-                  <><FaSave size={12} /> {editingLoan ? 'Update & Submit' : 'Submit Application'}</>
-                )}
-              </button>
+              {canCancel(viewLoan) && (
+                <button
+                  type="button"
+                  className="cert-add-btn"
+                  onClick={() => setCancelLoan(viewLoan)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <FaBan size={12} /> Cancel Application
+                </button>
+              )}
             </div>
-          </form>
+          </div>
         </div>
       ) : (
         /* ================= LIST ================= */
         <>
-          {/* Filters + Search */}
-          <div
-            className="emp-search-bar"
-            style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}
-          >
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <select
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-                style={{ fontSize: '14px', padding: '6px 12px', border: '1px solid #e5e7eb', borderRadius: '6px', background: 'white' }}
-              >
-                <option value="">All Status</option>
-                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <select
-                value={typeFilter}
-                onChange={(e) => { setTypeFilter(e.target.value); setPage(0); }}
-                style={{ fontSize: '14px', padding: '6px 12px', border: '1px solid #e5e7eb', borderRadius: '6px', background: 'white' }}
-              >
-                <option value="">All Loan Types</option>
-                {LOAN_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-              {hasFilters && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  style={{ fontSize: '13px', color: '#9d174d', background: 'none', border: 'none', cursor: 'pointer' }}
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
+          {/* SUMMARY CARDS */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+            {[
+              { icon: <FaWallet size={14} />, label: 'Outstanding Balance', value: fmt(totalOutstanding), sub: `${activeLoans.length} active loan(s)`, bg: '#fef3c7', color: '#92400e' },
+              { icon: <FaMoneyBillWave size={14} />, label: 'Monthly EMI', value: fmt(monthlyEmi), sub: 'Deducted from payroll', bg: '#e0e7ff', color: '#4f46e5' },
+              { icon: <FaCalendarAlt size={14} />, label: 'Next EMI Date', value: fmtDate(nextEmi), sub: 'Payroll cycle', bg: '#fce7f3', color: '#9d174d' },
+              { icon: <FaCheckCircle size={14} />, label: 'Available Limit', value: fmt(availableLimit), sub: `of ${fmt(maxEligible)} (50% net salary)`, bg: '#d1fae5', color: '#065f46' }
+            ].map((c) => (
+              <div key={c.label} className="cert-table-card" style={{ padding: '14px 16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: c.bg, color: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {c.icon}
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6b7280' }}>{c.label}</div>
+                  <div style={{ fontSize: '18px', fontWeight: 600, color: '#111827' }}>{c.value}</div>
+                  <div style={{ fontSize: '11px', color: '#6b7280' }}>{c.sub}</div>
+                </div>
+              </div>
+            ))}
+          </div>
 
+          {/* Search Bar */}
+          <div className="emp-search-bar">
             <div className="emp-search-wrap">
               <FaSearch className="emp-search-icon" size={12} />
               <input
                 className="emp-search-input"
                 type="text"
-                placeholder="Search by ref no, type, status..."
+                placeholder="Search by loan ref, type, purpose, status..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{ fontSize: '14px', padding: '6px 12px' }}
@@ -615,6 +430,27 @@ const MyLoans = () => {
             </div>
           </div>
 
+          {/* Status tabs */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '12px 0' }}>
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => { setStatusTab(tab); setPage(0); }}
+                style={{
+                  padding: '5px 14px',
+                  fontSize: '12px',
+                  borderRadius: '16px',
+                  border: '1px solid #e5e7eb',
+                  cursor: 'pointer',
+                  background: statusTab === tab ? '#9d174d' : 'white',
+                  color: statusTab === tab ? 'white' : '#374151'
+                }}
+              >
+                {tab} ({countFor(tab)})
+              </button>
+            ))}
+          </div>
+
           {/* Table */}
           <div className="cert-table-card">
             <div className="cert-table-wrap">
@@ -623,80 +459,66 @@ const MyLoans = () => {
                   <tr>
                     <th style={{ width: '50px' }}>#</th>
                     <th>Ref No.</th>
-                    <th>Type</th>
+                    <th>Loan Type</th>
+                    <th>Applied On</th>
                     <th>Amount (₹)</th>
                     <th>EMI (₹)</th>
-                    <th>Disbursed</th>
+                    <th>Repayment</th>
                     <th>Balance (₹)</th>
                     <th style={{ textAlign: 'center' }}>Status</th>
+                    <th style={{ width: '90px', textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {currentLoans.length > 0 ? (
                     currentLoans.map((item, idx) => {
                       const sc = getStatusColor(item.status);
-                      const isActive = item.status === 'Active';
+                      const pct = item.tenure ? Math.round((item.paidEmis / item.tenure) * 100) : 0;
                       return (
                         <tr key={item.id} className="cert-table-row-hover">
                           <td className="text-center">{startIndex + idx + 1}</td>
                           <td>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 500, fontSize: '13px' }}>
-                              {item.loanRef}
-                            </span>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 500, fontSize: '13px' }}>{item.loanRef}</span>
                           </td>
                           <td>
-                            <span style={{
-                              background: '#e0e7ff', color: '#4f46e5', fontSize: '12px',
-                              padding: '2px 10px', borderRadius: '12px', whiteSpace: 'nowrap'
-                            }}>
+                            <span style={{ background: '#e0e7ff', color: '#4f46e5', fontSize: '12px', padding: '2px 10px', borderRadius: '12px' }}>
                               {item.loanType}
                             </span>
                           </td>
-                          <td><span style={{ fontWeight: 600 }}>{formatMoney(item.amount)}</span></td>
-                          <td>{formatMoney(item.emi)}</td>
-                          <td>{formatDate(item.disbursedOn)}</td>
+                          <td>{fmtDate(item.appliedOn)}</td>
+                          <td><span style={{ fontWeight: 600 }}>{fmt(item.amount)}</span></td>
+                          <td>{fmt(item.emi)}</td>
+                          <td style={{ minWidth: '120px' }}>
+                            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '3px' }}>
+                              {item.paidEmis} of {item.tenure} EMIs paid
+                            </div>
+                            <div style={{ height: '6px', background: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${pct}%`, height: '100%', background: '#059669' }} />
+                            </div>
+                          </td>
                           <td>
-                            {isActive ? (
-                              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontWeight: 600, color: '#b45309' }}>{formatMoney(item.balance)}</span>
-                                <small style={{ fontSize: '11px', color: '#6b7280' }}>
-                                  ({item.paidEmis} of {item.tenure})
-                                </small>
-                              </div>
-                            ) : item.status === 'Closed' ? (
-                              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ color: '#6b7280' }}>{formatMoney(0)}</span>
-                                <small style={{ fontSize: '11px', color: '#6b7280' }}>
-                                  ({item.paidEmis} of {item.tenure})
-                                </small>
-                              </div>
-                            ) : (
-                              <span style={{ color: '#6b7280' }}>—</span>
-                            )}
+                            <span style={{ fontWeight: item.balance > 0 ? 600 : 400, color: item.balance > 0 ? '#b45309' : '#6b7280' }}>
+                              {fmt(item.balance)}
+                            </span>
                           </td>
                           <td style={{ textAlign: 'center' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                              <span
-                                className="cert-status-badge"
-                                style={{
-                                  background: sc.bg, color: sc.color, fontSize: '11px',
-                                  padding: '3px 10px', borderRadius: '12px', fontWeight: 500,
-                                  display: 'inline-flex', alignItems: 'center', gap: '5px'
-                                }}
-                              >
-                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: sc.color }} />
-                                {item.status}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleView(item)}
-                                style={{
-                                  background: 'none', border: 'none', cursor: 'pointer', color: '#9d174d',
-                                  fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: 0
-                                }}
-                              >
-                                <FaEye size={11} /> {actionLabel(item.status)}
+                            <span
+                              className="cert-status-badge"
+                              style={{ background: sc.bg, color: sc.color, fontSize: '11px', padding: '3px 10px', borderRadius: '12px', fontWeight: 500 }}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="cert-actions" style={{ justifyContent: 'center', gap: '6px' }}>
+                              <button className="cert-act cert-act--edit" title="View details" onClick={() => setViewLoan(item)}>
+                                <FaEye size={12} />
                               </button>
+                              {canCancel(item) && (
+                                <button className="cert-act cert-act--delete" title="Cancel application" onClick={() => setCancelLoan(item)}>
+                                  <FaBan size={12} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -704,8 +526,8 @@ const MyLoans = () => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan="8" className="text-center py-5" style={{ color: '#6b7280' }}>
-                        No loan applications found
+                      <td colSpan="10" className="text-center py-5" style={{ color: '#6b7280' }}>
+                        No loans found
                       </td>
                     </tr>
                   )}
@@ -730,7 +552,7 @@ const MyLoans = () => {
                   </button>
                   {getPaginationRange().map((pg, i) =>
                     pg === '...' ? (
-                      <span key={`dots-${i}`} style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
+                      <span key={i} style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
                     ) : (
                       <button
                         key={pg}
@@ -761,59 +583,19 @@ const MyLoans = () => {
         </>
       )}
 
-      {/* VIEW / REJECTION REASON MODAL */}
-      {modal && (
-        <div className="emp-modal-overlay" onClick={() => setModal(null)}>
-          <div className="emp-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, textAlign: 'left' }}>
-            <h3 className="emp-modal-title">
-              {modal.mode === 'reason' ? 'Rejection Reason' : 'Loan Details'} — {modal.loan.loanRef}
-            </h3>
-
-            {modal.mode === 'reason' ? (
-              <>
-                <p className="emp-modal-body">
-                  {modal.loan.rejectReason || 'No reason was provided.'}
-                </p>
-                <p className="emp-modal-warn">
-                  You can submit a new application once the issue above is resolved.
-                </p>
-              </>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px', fontSize: '13px', margin: '12px 0' }}>
-                {[
-                  ['Loan Type', modal.loan.loanType],
-                  ['Status', modal.loan.status],
-                  ['Amount', formatMoney(modal.loan.amount)],
-                  ['EMI', formatMoney(modal.loan.emi)],
-                  ['Tenure', `${modal.loan.tenure} months`],
-                  ['Recovery', modal.loan.preferredRecovery],
-                  ['Requested Disburse', formatDate(modal.loan.requestedDisburse)],
-                  ['Disbursed On', formatDate(modal.loan.disbursedOn)],
-                  ['Paid EMIs', `${modal.loan.paidEmis} of ${modal.loan.tenure}`],
-                  ['Balance', modal.loan.balance ? formatMoney(modal.loan.balance) : '—'],
-                  ['Attachment', modal.loan.attachment || '—']
-                ].map(([k, v]) => (
-                  <div key={k}>
-                    <div style={{ color: '#6b7280', fontSize: '12px' }}>{k}</div>
-                    <div style={{ fontWeight: 500 }}>{v}</div>
-                  </div>
-                ))}
-                <div style={{ gridColumn: 'span 2' }}>
-                  <div style={{ color: '#6b7280', fontSize: '12px' }}>Purpose</div>
-                  <div style={{ fontWeight: 500 }}>{modal.loan.purpose}</div>
-                </div>
-              </div>
-            )}
-
+      {/* ================= CANCEL CONFIRM MODAL ================= */}
+      {cancelLoan && (
+        <div className="emp-modal-overlay" onClick={() => setCancelLoan(null)}>
+          <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="emp-modal-icon">⛔</div>
+            <h3 className="emp-modal-title">Cancel Application</h3>
+            <p className="emp-modal-body">
+              Are you sure you want to cancel <strong>{cancelLoan.loanRef}</strong> ({cancelLoan.loanType}, {fmt(cancelLoan.amount)})?
+            </p>
+            <p className="emp-modal-warn">This will withdraw your request. You can apply again later.</p>
             <div className="emp-modal-actions">
-              {modal.loan.status === 'Pending Approval' && (
-                <button className="emp-modal-cancel" onClick={() => handleCancelLoan(modal.loan)}>
-                  Cancel Loan
-                </button>
-              )}
-              <button className="emp-modal-confirm" onClick={() => setModal(null)}>
-                Close
-              </button>
+              <button className="emp-modal-cancel" onClick={() => setCancelLoan(null)}>Keep</button>
+              <button className="emp-modal-confirm" onClick={confirmCancel}>Cancel Application</button>
             </div>
           </div>
         </div>
@@ -822,4 +604,4 @@ const MyLoans = () => {
   );
 };
 
-export default MyLoans;
+export default MyLoansScreen;

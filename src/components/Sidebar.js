@@ -83,6 +83,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   const loanApplicationForm = [
     { path: '/LoanApplicationForm', icon: <FaMoneyBillWave />, label: 'Apply for Loan', roles: ['Admin', 'Hr', 'Employee'] },
     { path: '/MyLoan', icon: <FaMoneyBillWave />, label: 'My Loans', roles: ['Admin', 'Hr', 'Employee'] },
+    {path: '/LoanApproval', icon: <FaMoneyBillWave />, label: 'Loan Approval', roles: ['Admin', 'Hr']},
     // { path: '/loan-status', icon: <FaSearch />, label: 'Check Loan Status', roles: ['Admin', 'Hr', 'Employee'] },
   ];
 
