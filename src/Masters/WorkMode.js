@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   FaSearch, FaEdit, FaArrowLeft, FaSave, FaExclamationCircle,
   FaUserPlus, FaTimes, FaTrash
 } from "react-icons/fa";
+import axios from "axios";
 import { toast } from "../components/Toast";
+import { BASE_URL, STORAGE_KEYS  } from "../config/api.config";
+
+
 
 /* ─── Validation Rules ─── */
 const RULES = {
@@ -45,22 +49,15 @@ const CharCount = ({ value, max }) => {
   );
 };
 
-// ─── DUMMY DATA ───
-const INITIAL_WORK_MODES = [
-  { id: 1, workModeName: "Work From Office", status: "y" },
-  { id: 2, workModeName: "Work From Home", status: "y" },
-  { id: 3, workModeName: "Hybrid", status: "y" },
-  { id: 4, workModeName: "Remote", status: "n" },
-  { id: 5, workModeName: "Flexible", status: "y" },
-  { id: 6, workModeName: "On-Site", status: "n" },
-];
+
 
 const WorkMode = () => {
+
   const [view, setView] = useState("list");
   const [editMode, setEditMode] = useState(false);
   const [selectedWorkMode, setSelectedWorkMode] = useState(null);
 
-  const [workModes, setWorkModes] = useState(INITIAL_WORK_MODES);
+  const [workModes, setWorkModes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -76,14 +73,55 @@ const WorkMode = () => {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
+  // ─── AUTH TOKEN & AXIOS CONFIG ───
+  const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  const axiosConfig = {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      "Content-Type": "application/json",
+    }
+  }
+
+  const ensureToken = () => {
+    const token = getAuthToken();
+    if (!token) {
+      toast.error("Authentication Required", "Please login to continue");
+      return false;
+    }
+    return true;
+  }
+
+  const fetchWorkModes = useCallback(async () => {
+    if (!ensureToken()) return;
+    setLoading(true);
+    try {
+      const response = await axios.get(`${BASE_URL}/api/recuirment/getAllWorkMode`, axiosConfig);
+      setWorkModes(response.data);
+    } catch (error) {
+      toast.error("Error", "Failed to fetch work modes");
+    } finally {
+      setLoading(false);
+    }
+  }, [axiosConfig]);
+
+
+
+  useEffect(() => {
+    fetchWorkModes();
+  }, []);
+
+
+
+
   // ─── SEARCH DEBOUNCE ───
-  useState(() => {
-    const t = setTimeout(() => {
-      setDebouncedSearch(searchName);
-      setPage(0);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        setDebouncedSearch(searchName);
+        setPage(0);
     }, 500);
-    return () => clearTimeout(t);
-  }, [searchName]);
+
+    return () => clearTimeout(timer);
+}, [searchName]);
 
   // ─── FILTER + SORT ───
   const filteredWorkModes = workModes
@@ -124,46 +162,60 @@ const WorkMode = () => {
   };
 
   // ─── CRUD OPERATIONS ───
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const errName = validate("workModeName", formData.workModeName);
+
     setTouched({ workModeName: true });
     setErrors({ workModeName: errName });
+
     if (errName) {
       toast.warning("Validation Error", "Please fix the highlighted fields");
       return;
     }
 
-    setSubmitting(true);
-    setTimeout(() => {
-      const nameTrimmed = formData.workModeName.trim();
+    const payload = {
+      workModeName :formData.workModeName.trim(),
+      status: "y"
+    }
 
-      if (editMode) {
-        // Update
-        const updated = workModes.map((w) =>
-          w.id === selectedWorkMode.id
-            ? { ...w, workModeName: nameTrimmed }
-            : w
-        );
-        setWorkModes(updated);
-        toast.success("Success", "Work Mode updated");
-      } else {
-        // Create
-        const newId = Math.max(...workModes.map(w => w.id)) + 1;
-        const newWorkMode = {
-          id: newId,
-          workModeName: nameTrimmed,
-          status: "y",
-        };
-        setWorkModes([...workModes, newWorkMode]);
-        toast.success("Success", "Work Mode created");
+    setSubmitting(true);
+
+    try{
+
+      if(editMode){
+
+        const response = await axios.put(`${BASE_URL}/api/recuirment/updateWorkModeById/${selectedWorkMode.id}`,
+        payload,
+        axiosConfig
+      ); 
+
+      toast.success("Success", "Work Mode updated successfully");
+
+      }else{
+        const response = await axios.post(`${BASE_URL}/api/recuirment/saveWorkMode`,
+        payload,
+        axiosConfig
+      );
+
+      toast.success("Success", "Work Mode created successfully");
+
       }
 
+      await fetchWorkModes();
       resetForm();
       setView("list");
+
+    }catch(error){
+      console.log("Error submitting form:", error);
+  
+    toast.error("Work Mode API Error", error.response?.data || error);
+
+    }finally{
       setSubmitting(false);
-    }, 500);
+    }
+    
   };
 
   const handleEdit = (workMode) => {
@@ -192,11 +244,23 @@ const WorkMode = () => {
 
   const confirmStatusChange = () => {
     const { id, newStatus } = statusAction;
-    const updated = workModes.map((w) =>
-      w.id === id ? { ...w, status: newStatus } : w
-    );
-    setWorkModes(updated);
-    toast.success("Status Updated", "Work Mode status changed");
+    try{
+      const response = axios.put(`${BASE_URL}/api/recuirment/updateWorkModeStatus/${id}`,null, axiosConfig);
+      if(response.status === 200){
+        toast.success("Status Updated", "Work Mode status changed");
+        fetchWorkModes();
+      }else{
+         throw new Error("Failed to update status");
+      }
+    }catch(error){
+      console.log("Error changing status:", error);
+     toast.success("Status Updated", "State status changed");
+    }finally{
+      setLoading(false);
+      setShowStatusModal(false);
+      setStatusAction({ id: null, newStatus: null, name: "" });
+    }
+
     setShowStatusModal(false);
     setStatusAction({ id: null, newStatus: null, name: "" });
   };
@@ -365,7 +429,7 @@ const WorkMode = () => {
                               >
                                 <FaEdit size={12} />
                               </button>
-                             
+
                             </div>
                           </td>
                         </tr>
