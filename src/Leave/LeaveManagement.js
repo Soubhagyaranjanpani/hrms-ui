@@ -93,7 +93,7 @@ const fetchLeaveTypes = useCallback(async () => {
     setLeaveTypes(types);
 
     if (types.length === 0) {
-      toast.warning('No Leave Types', 'No leave types available');
+      toast.warning('No ', 'No leave types available');
     }
 
   } catch (error) {
