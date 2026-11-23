@@ -90,6 +90,7 @@ import LoanApplicationForm from './Loan_Advance/LoanApplicationForm';
 import { BiCurrentLocation } from 'react-icons/bi';
 import MyLoans from './Loan_Advance/MyLoan';
 import LoanApproval from './Loan_Advance/Loan _Approval';
+import ClientSiteWork from './pages/ClientSiteWork';
 
 
 
@@ -241,6 +242,12 @@ function App() {
           <Route path="LoanApplicationForm" element={<LoanApplicationForm user={currentUser}/>}/>
           <Route path ="MyLoan" element={<MyLoans user={currentUser}/>}/>
           <Route path="LoanApproval" element={<LoanApproval user={currentUser}/>}/>
+          <Route path="client-site-work" element={<ClientSiteWork user={currentUser}/>}/>
+          <Route path="ClientSiteWork" element={<ClientSiteWork user={currentUser}/>}/>
+          <Route path="client-site-verification" element={<ClientSiteWork user={currentUser}/>}/>
+          <Route path="client-verification" element={<ClientSiteWork user={currentUser}/>}/>
+          <Route path="ClientVerification" element={<ClientSiteWork user={currentUser}/>}/>
+          <Route path="client-site-approvals" element={<ClientSiteWork user={currentUser} defaultTab="approvals"/>}/>
         </Route>
       </Routes>
     </Router>

@@ -43,6 +43,7 @@ const Layout = ({ user, onLogout }) => {
     <div className="d-flex">
       {/* Sidebar Component */}
       <Sidebar 
+        user={user}
         sidebarCollapsed={sidebarCollapsed}
         sidebarOpen={sidebarOpen}
         isMobile={isMobile}

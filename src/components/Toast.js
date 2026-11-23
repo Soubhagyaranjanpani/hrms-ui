@@ -3,6 +3,8 @@ import './Toast.css';
 
 // ─── Event bus (singleton) ────────────────────────────────────────────────────
 let subscribers = [];
+let lastToastTime = 0;
+let lastToastKey = '';
 
 export const toast = {
   success: (title, message, options = {}) => emit({ type: 'success', title, message, ...options }),
@@ -12,7 +14,21 @@ export const toast = {
 };
 
 function emit(payload) {
-  subscribers.forEach((cb) => cb({ ...payload, id: Date.now() + Math.random() }));
+  const now = Date.now();
+  const key = `${payload.type}_${payload.title}_${payload.message}`;
+
+  // Prevent duplicate emissions on rapid double-clicks/submits within 400ms
+  if (key === lastToastKey && now - lastToastTime < 400) {
+    return;
+  }
+  lastToastKey = key;
+  lastToastTime = now;
+
+  if (subscribers.length === 0) return;
+  // Always emit to ONLY ONE active container (the latest mounted one)
+  // to guarantee modal popups never appear twice across the entire application
+  const activeSubscriber = subscribers[subscribers.length - 1];
+  activeSubscriber({ ...payload, id: now + Math.random() });
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -152,7 +168,9 @@ export function ToastContainer() {
   }, []);
 
   useEffect(() => {
-    subscribers.push(add);
+    if (!subscribers.includes(add)) {
+      subscribers.push(add);
+    }
     return () => { subscribers = subscribers.filter((s) => s !== add); };
   }, [add]);
 

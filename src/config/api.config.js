@@ -116,7 +116,13 @@ export const API_ENDPOINTS = {
   REPORT_DOWNLOAD_EXCEL: `${BASE_URL}/api/reports/download/excel`,
   REPORT_DOWNLOAD_PDF: `${BASE_URL}/api/reports/download/pdf`,
 
-
+  // ── Client Site Verification ────────────────
+  CLIENT_VERIFICATION_APPLY: `${BASE_URL}/api/employee-verification/apply`,
+  CLIENT_VERIFICATION_PENDING_COUNT: `${BASE_URL}/api/employee-verification/pending-count`,
+  CLIENT_VERIFICATION_REVIEW: (id) => `${BASE_URL}/api/employee-verification/review/${id}`,
+  CLIENT_VERIFICATION_REQUESTS: `${BASE_URL}/api/employee-verification/requests`,
+  CLIENT_VERIFICATION_MY: `${BASE_URL}/api/employee-verification/my`,
+  CLIENT_VERIFICATION_ALL: `${BASE_URL}/api/employee-verification/all`,
 };
 
 
