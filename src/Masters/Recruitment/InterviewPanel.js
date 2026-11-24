@@ -1,213 +1,76 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  FaSave, FaTimes, FaPlus, FaSearch, FaEdit, FaTrash,
-  FaArrowLeft, FaArrowRight, FaCheckCircle,
-  FaTag, FaList, FaInfoCircle, FaClock, FaChevronDown,
-  FaTimesCircle, FaUser, FaUsers, FaUserTie
+  FaSave, FaTimes, FaPlus, FaEdit,
+  FaArrowLeft, FaChevronDown,
+  FaTimesCircle, FaUser, FaUserTie
 } from 'react-icons/fa';
+import axios from 'axios';
+import { toast } from '../../components/Toast';
+import { BASE_URL, STORAGE_KEYS } from '../../config/api.config';
 
 // ============================================
-// TOAST NOTIFICATION
+// TOAST NOTIFICATION (fallback helper, unused but kept)
 // ============================================
 const showToast = (type, title, message) => {
   const toastContainer = document.getElementById('toast-container') || createToastContainer();
-  const toast = document.createElement('div');
-  const colors = {
-    success: '#10b981',
-    error: '#ef4444',
-    warning: '#f59e0b',
-    info: '#3b82f6'
-  };
-  toast.className = `toast-notification toast-${type}`;
-  toast.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:${colors[type] || '#3b82f6'};color:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:300px;margin-bottom:8px;animation:slideIn 0.3s ease;">
+  const el = document.createElement('div');
+  const colors = { success: '#10b981', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' };
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:${colors[type] || '#3b82f6'};color:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:300px;margin-bottom:8px;">
       <span style="font-weight:600;">${title}</span>
       <span style="flex:1;">${message}</span>
-      <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:white;cursor:pointer;font-size:18px;">×</button>
-    </div>
-  `;
-  toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
+      <button onclick="this.parentElement.remove()" style="background:none;border:none;color:white;cursor:pointer;font-size:18px;">×</button>
+    </div>`;
+  toastContainer.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
 };
 
 const createToastContainer = () => {
-  const container = document.createElement('div');
-  container.id = 'toast-container';
-  container.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-width: 500px;
-  `;
-  document.body.appendChild(container);
-
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
-
-  return container;
+  const c = document.createElement('div');
+  c.id = 'toast-container';
+  c.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:500px;';
+  document.body.appendChild(c);
+  return c;
 };
-
-// ============================================
-// EMPLOYEE DATA (Mock)
-// ============================================
-const employees = [
-  { id: 'EMP101', name: 'Rahul Sharma', designation: 'Technical Lead', department: 'IT' },
-  { id: 'EMP102', name: 'Priya Patel', designation: 'Senior Developer', department: 'IT' },
-  { id: 'EMP103', name: 'Amit Kumar', designation: 'HR Manager', department: 'HR' },
-  { id: 'EMP104', name: 'Neha Singh', designation: 'Recruitment Lead', department: 'HR' },
-  { id: 'EMP105', name: 'Vikram Reddy', designation: 'Finance Manager', department: 'Finance' },
-  { id: 'EMP106', name: 'Sneha Joshi', designation: 'Senior Analyst', department: 'Finance' },
-  { id: 'EMP107', name: 'Ravi Desai', designation: 'Engineering Manager', department: 'IT' },
-  { id: 'EMP108', name: 'Ananya Mehta', designation: 'Product Manager', department: 'Product' },
-  { id: 'EMP109', name: 'Karan Singh', designation: 'QA Lead', department: 'IT' },
-  { id: 'EMP110', name: 'Meera Iyer', designation: 'UX Designer', department: 'Design' }
-];
-
-const departments = [
-  { value: 'IT', label: 'IT' },
-  { value: 'HR', label: 'HR' },
-  { value: 'Finance', label: 'Finance' },
-  { value: 'Product', label: 'Product' },
-  { value: 'Design', label: 'Design' },
-  { value: 'Operations', label: 'Operations' }
-];
 
 const InterviewPanelMaster = () => {
   // ============================================
-  // STATE MANAGEMENT
+  // STATE
   // ============================================
-  const [panels, setPanels] = useState([
-    {
-      id: 1,
-      panelCode: 'PNL001',
-      panelName: 'Java Technical Panel',
-      department: 'IT',
-      primaryInterviewer: 'EMP102 - Rahul Sharma',
-      secondaryInterviewer: 'EMP104 - Neha Singh',
-      panelMembers: ['EMP101 - Priya Patel', 'EMP107 - Ravi Desai', 'EMP109 - Karan Singh'],
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-15T10:30:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 2,
-      panelCode: 'PNL002',
-      panelName: 'HR Interview Panel',
-      department: 'HR',
-      primaryInterviewer: 'EMP103 - Amit Kumar',
-      secondaryInterviewer: null,
-      panelMembers: ['EMP104 - Neha Singh'],
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-20T14:20:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 3,
-      panelCode: 'PNL003',
-      panelName: 'Frontend Development Panel',
-      department: 'IT',
-      primaryInterviewer: 'EMP101 - Priya Patel',
-      secondaryInterviewer: 'EMP109 - Karan Singh',
-      panelMembers: ['EMP107 - Ravi Desai', 'EMP110 - Meera Iyer'],
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-02-01T09:15:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 4,
-      panelCode: 'PNL004',
-      panelName: 'Finance & Analytics Panel',
-      department: 'Finance',
-      primaryInterviewer: 'EMP105 - Vikram Reddy',
-      secondaryInterviewer: 'EMP106 - Sneha Joshi',
-      panelMembers: ['EMP106 - Sneha Joshi'],
-      status: 'Inactive',
-      createdBy: 'Admin',
-      createdDate: '2026-02-10T11:45:00Z',
-      modifiedBy: 'Admin',
-      modifiedDate: '2026-07-20T16:30:00Z'
-    },
-    {
-      id: 5,
-      panelCode: 'PNL005',
-      panelName: 'Product Management Panel',
-      department: 'Product',
-      primaryInterviewer: 'EMP108 - Ananya Mehta',
-      secondaryInterviewer: null,
-      panelMembers: ['EMP103 - Amit Kumar', 'EMP101 - Priya Patel'],
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-03-05T08:50:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    {
-      id: 6,
-      panelCode: 'PNL006',
-      panelName: 'Design & UX Panel',
-      department: 'Design',
-      primaryInterviewer: 'EMP110 - Meera Iyer',
-      secondaryInterviewer: 'EMP102 - Rahul Sharma',
-      panelMembers: ['EMP101 - Priya Patel'],
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-04-12T13:10:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    }
-  ]);
+  const [panels, setPanels] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editingPanel, setEditingPanel] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
+
+  const [departments, setDepartments] = useState([]);
+  const [employees, setEmployees] = useState([]); // ✅ single source
+
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [statusAction, setStatusAction] = useState({
-    id: null,
-    name: '',
-    newStatus: ''
-  });
+  const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus: '' });
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   // Dropdown states
-  const [primarySearch, setPrimarySearch] = useState('');
-  const [showPrimaryDropdown, setShowPrimaryDropdown] = useState(false);
-  const primaryRef = useRef(null);
-
-  const [secondarySearch, setSecondarySearch] = useState('');
-  const [showSecondaryDropdown, setShowSecondaryDropdown] = useState(false);
-  const secondaryRef = useRef(null);
+  const departmentRef = useRef(null);
 
   const [memberSearch, setMemberSearch] = useState('');
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const memberRef = useRef(null);
 
-  // Form state
+  // Form state — stores IDs
   const [formData, setFormData] = useState({
     panelCode: '',
     panelName: '',
-    department: '',
-    primaryInterviewer: '',
-    secondaryInterviewer: '',
-    panelMembers: [],
+    department: '',            // department id
+    primaryInterviewer: '',    // employee id
+    secondaryInterviewer: '',  // employee id
+    panelMembers: [],          // employee ids
     status: 'Active'
   });
 
@@ -215,16 +78,151 @@ const InterviewPanelMaster = () => {
   const [touched, setTouched] = useState({});
 
   // ============================================
+  // AUTH
+  // ============================================
+  const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  const axiosConfig = {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  const ensureToken = () => {
+    if (!getAuthToken()) {
+      toast.error('Authentication Required', 'Please login to continue');
+      return false;
+    }
+    return true;
+  };
+
+  // ============================================
+  // FETCH PANELS
+  // ============================================
+  const fetchPanels = useCallback(async () => {
+    if (!ensureToken()) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(
+        `${BASE_URL}/api/recuirment/getAllInterviewPanel`,
+        axiosConfig
+      );
+      const list = Array.isArray(res.data) ? res.data : (res.data?.response || []);
+
+      const mapped = list.map((item) => {
+        const isActive =
+          String(item.status ?? '').toLowerCase() === 'y' ||
+          item.status === true ||
+          String(item.status ?? '').toLowerCase() === 'active';
+        return {
+          id: item.id,
+          panelCode: item.panelCode || '',
+          panelName: item.panelName || '',
+          departmentId: item.departmentId ?? '',
+          department: item.department || '',
+          primaryInterviewerId: item.primaryInterviewerId ?? '',
+          secondaryInterviewerId: item.secondaryInterviewerId ?? '',
+          panelMembersIds: item.panelMembersId || [],
+          // legacy name fields for fallback display
+          primaryInterviewer: item.primaryInterviewer || '',
+          secondaryInterviewer: item.secondaryInterviewer || '',
+          panelMembers: item.panelMembers || [],
+          status: isActive ? 'Active' : 'Inactive',
+          createdBy: item.createdBy || '—',
+          createdDate: item.createdDate || null,
+          modifiedBy: item.modifiedBy || null,
+          modifiedDate: item.modifiedDate || null
+        };
+      });
+
+      setPanels(mapped);
+    } catch (err) {
+      console.error('🔴 [fetchPanels] error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to fetch interview panels');
+      setPanels([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // ============================================
+  // FETCH DEPARTMENTS
+  // ============================================
+  const fetchDepartments = useCallback(async () => {
+    if (!ensureToken()) return;
+    try {
+      const response = await axios.get(`${BASE_URL}/departments/list?flag=1`, axiosConfig);
+      setDepartments(response.data.response || []);
+    } catch (error) {
+      console.error('[fetchDepartments] error:', error);
+      toast.error('Error', error.response?.data?.message || 'Failed to fetch departments');
+      setDepartments([]);
+    }
+  }, []);
+
+  // ============================================
+  // FETCH EMPLOYEES (single source for all dropdowns)
+  // ============================================
+  const fetchEmployees = useCallback(async () => {
+    if (!ensureToken()) return;
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/api/employees?isActive=true&page=0&size=100`,
+        axiosConfig
+      );
+      console.log('🔵 [fetchEmployees] raw:', response.data);
+      setEmployees(response.data.response?.content || []);
+    } catch (error) {
+      console.error('[fetchEmployees] error:', error);
+      toast.error('Error', error.response?.data?.message || 'Failed to fetch employees');
+      setEmployees([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDepartments();
+    fetchEmployees();
+    fetchPanels();
+  }, [fetchDepartments, fetchEmployees, fetchPanels]);
+
+  // ============================================
+  // HELPERS
+  // ============================================
+  const getNameById = (id) => {
+    if (!id && id !== 0) return '—';
+    const emp = employees.find(e => String(e.id) === String(id));
+    return emp?.name || `#${id}`;
+  };
+
+  // Returns [{ id, name }] excluding provided ids
+  const getEmployeeOptions = (search, excludeIds = []) => {
+    const q = (search || '').toLowerCase().trim();
+    return employees
+      .filter(emp => {
+        const matches = !q || emp.name?.toLowerCase().includes(q);
+        const notExcluded = !excludeIds.some(x => String(x) === String(emp.id));
+        return matches && notExcluded;
+      })
+      .map(emp => ({ id: emp.id, name: emp.name }));
+  };
+
+  // ============================================
   // FILTER & PAGINATION
   // ============================================
   const filteredPanels = panels.filter(item => {
-    const search = searchTerm.toLowerCase();
-    return item.panelCode.toLowerCase().includes(search) ||
-      item.panelName.toLowerCase().includes(search) ||
-      item.department.toLowerCase().includes(search) ||
-      (item.primaryInterviewer && item.primaryInterviewer.toLowerCase().includes(search)) ||
-      (item.secondaryInterviewer && item.secondaryInterviewer.toLowerCase().includes(search)) ||
-      (item.panelMembers && item.panelMembers.some(m => m.toLowerCase().includes(search)));
+    const s = searchTerm.toLowerCase();
+    const primaryName = getNameById(item.primaryInterviewerId || item.primaryInterviewer);
+    const secondaryName = getNameById(item.secondaryInterviewerId || item.secondaryInterviewer);
+    const memberNames = (item.panelMembersIds || item.panelMembers || []).map(getNameById).join(' ');
+
+    return (
+      item.panelCode.toLowerCase().includes(s) ||
+      item.panelName.toLowerCase().includes(s) ||
+      (item.department || '').toLowerCase().includes(s) ||
+      primaryName.toLowerCase().includes(s) ||
+      secondaryName.toLowerCase().includes(s) ||
+      memberNames.toLowerCase().includes(s)
+    );
   });
 
   const totalItems = filteredPanels.length;
@@ -233,24 +231,11 @@ const InterviewPanelMaster = () => {
   const currentPanels = filteredPanels.slice(startIndex, startIndex + rowsPerPage);
 
   // ============================================
-  // UTILITY FUNCTIONS
+  // UTILITIES
   // ============================================
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   const generatePanelCode = () => {
     const count = panels.length + 1;
-    const prefix = 'PNL';
-    const padded = String(count).padStart(3, '0');
-    return `${prefix}${padded}`;
+    return `PNL${String(count).padStart(3, '0')}`;
   };
 
   const getPaginationRange = () => {
@@ -264,33 +249,14 @@ const InterviewPanelMaster = () => {
     return range;
   };
 
-  // Filter employee options
-  const getEmployeeOptions = (search, excludeSelected = []) => {
-    return employees
-      .filter(emp => {
-        const displayName = `${emp.id} - ${emp.name}`;
-        const matchesSearch = displayName.toLowerCase().includes(search.toLowerCase());
-        const notExcluded = !excludeSelected.includes(displayName);
-        return matchesSearch && notExcluded;
-      })
-      .map(emp => `${emp.id} - ${emp.name}`);
-  };
-
-  // Click outside handlers
+  // Click outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (primaryRef.current && !primaryRef.current.contains(event.target)) {
-        setShowPrimaryDropdown(false);
-      }
-      if (secondaryRef.current && !secondaryRef.current.contains(event.target)) {
-        setShowSecondaryDropdown(false);
-      }
-      if (memberRef.current && !memberRef.current.contains(event.target)) {
-        setShowMemberDropdown(false);
-      }
+    const handler = (e) => {
+      if (memberRef.current && !memberRef.current.contains(e.target)) setShowMemberDropdown(false);
+      if (departmentRef.current && !departmentRef.current.contains(e.target)) { /* no-op */ }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   // ============================================
@@ -309,45 +275,35 @@ const InterviewPanelMaster = () => {
     setErrors({});
     setTouched({});
     setEditingPanel(null);
-    setPrimarySearch('');
-    setSecondarySearch('');
     setMemberSearch('');
+    setShowMemberDropdown(false);
   };
 
   const handleChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
-    if (touched[field]) {
-      validateField(field, value);
-    }
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (touched[field]) validateField(field, value);
   };
 
   const validateField = (field, value) => {
     let error = '';
-
     if (field === 'panelName') {
-      if (!value) {
-        error = 'Panel Name is required';
-      } else if (value.length > 100) {
-        error = 'Panel Name must be 100 characters or less';
-      } else if (/[^a-zA-Z0-9\s\-\.]/.test(value)) {
-        error = 'No special characters allowed';
-      } else {
-        const duplicate = panels.some(item =>
+      if (!value) error = 'Panel Name is required';
+      else if (value.length > 100) error = 'Panel Name must be 100 characters or less';
+      else if (/[^a-zA-Z0-9\s\-\.]/.test(value)) error = 'No special characters allowed';
+      else {
+        const dup = panels.some(item =>
           item.panelName.toLowerCase() === value.toLowerCase() &&
           (!editingPanel || item.id !== editingPanel.id)
         );
-        if (duplicate) {
-          error = 'Panel Name must be unique';
-        }
+        if (dup) error = 'Panel Name must be unique';
       }
     } else if (field === 'department' && !value) {
       error = 'Department is required';
     } else if (field === 'primaryInterviewer' && !value) {
       error = 'Primary Interviewer is required';
-    } else if (field === 'panelMembers' && value.length === 0) {
+    } else if (field === 'panelMembers' && (!value || value.length === 0)) {
       error = 'At least one Panel Member is required';
     }
-
     setErrors(prev => ({ ...prev, [field]: error }));
     return error === '';
   };
@@ -358,100 +314,96 @@ const InterviewPanelMaster = () => {
   };
 
   const validateForm = () => {
-    const fieldsToValidate = ['panelName', 'department', 'primaryInterviewer', 'panelMembers'];
     const newErrors = {};
-
-    for (const field of fieldsToValidate) {
-      if (!formData[field] || (field === 'panelMembers' && formData[field].length === 0)) {
-        newErrors[field] = field === 'panelMembers' ? 'At least one Panel Member is required' : 'This field is required';
+    const fields = ['panelName', 'department', 'primaryInterviewer', 'panelMembers'];
+    for (const f of fields) {
+      if (!formData[f] || (f === 'panelMembers' && formData[f].length === 0)) {
+        newErrors[f] = f === 'panelMembers' ? 'At least one Panel Member is required' : 'This field is required';
       }
     }
-
     if (formData.panelName) {
-      if (formData.panelName.length > 100) {
-        newErrors.panelName = 'Panel Name must be 100 characters or less';
-      } else if (/[^a-zA-Z0-9\s\-\.]/.test(formData.panelName)) {
-        newErrors.panelName = 'No special characters allowed';
-      } else {
-        const duplicate = panels.some(item =>
+      if (formData.panelName.length > 100) newErrors.panelName = 'Panel Name must be 100 characters or less';
+      else if (/[^a-zA-Z0-9\s\-\.]/.test(formData.panelName)) newErrors.panelName = 'No special characters allowed';
+      else {
+        const dup = panels.some(item =>
           item.panelName.toLowerCase() === formData.panelName.toLowerCase() &&
           (!editingPanel || item.id !== editingPanel.id)
         );
-        if (duplicate) {
-          newErrors.panelName = 'Panel Name must be unique';
-        }
+        if (dup) newErrors.panelName = 'Panel Name must be unique';
       }
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   // ============================================
-  // PANEL MEMBER FUNCTIONS
+  // PANEL MEMBERS
   // ============================================
-  const toggleMember = (member) => {
+  const toggleMember = (id) => {
     const current = formData.panelMembers;
-    const updated = current.includes(member)
-      ? current.filter(m => m !== member)
-      : [...current, member];
+    const updated = current.some(x => String(x) === String(id))
+      ? current.filter(m => String(m) !== String(id))
+      : [...current, id];
     handleChange('panelMembers', updated);
   };
 
-  const removeMember = (member) => {
-    const updated = formData.panelMembers.filter(m => m !== member);
-    handleChange('panelMembers', updated);
+  const removeMember = (id) => {
+    handleChange('panelMembers', formData.panelMembers.filter(m => String(m) !== String(id)));
   };
 
   // ============================================
-  // CRUD OPERATIONS
+  // CRUD
   // ============================================
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!ensureToken()) return;
     if (!validateForm()) {
       showToast('warning', 'Validation Error', 'Please fix the highlighted fields');
       return;
     }
-
-    const panelData = {
-      panelCode: formData.panelCode,
-      panelName: formData.panelName,
-      department: formData.department,
-      primaryInterviewer: formData.primaryInterviewer,
-      secondaryInterviewer: formData.secondaryInterviewer || null,
-      panelMembers: formData.panelMembers,
-      status: formData.status
-    };
-
-    if (editingPanel) {
-      const updated = panels.map(item =>
-        item.id === editingPanel.id
-          ? {
-            ...item,
-            ...panelData,
-            modifiedBy: 'Admin',
-            modifiedDate: new Date().toISOString()
-          }
-          : item
-      );
-      setPanels(updated);
-      showToast('success', 'Success', 'Interview panel updated successfully');
-    } else {
-      const newPanel = {
-        id: Date.now(),
-        ...panelData,
-        createdBy: 'Admin',
-        createdDate: new Date().toISOString(),
-        modifiedBy: null,
-        modifiedDate: null
+    setSubmitting(true);
+    try {
+      const payload = {
+        id: editingPanel ? editingPanel.id : 0,
+        panelCode: formData.panelCode,
+        panelName: formData.panelName,
+        departmentId: Number(formData.department),
+        primaryInterviewerId: Number(formData.primaryInterviewer),
+        secondaryInterviewerId: formData.secondaryInterviewer ? Number(formData.secondaryInterviewer) : null,
+        panelMembersIds: formData.panelMembers.map(Number),
+        status: 'y'
       };
-      setPanels([newPanel, ...panels]);
-      showToast('success', 'Success', 'Interview panel added successfully');
-    }
 
-    resetForm();
-    setShowForm(false);
-    setPage(0);
+      let res;
+      if (editingPanel) {
+        res = await axios.put(
+          `${BASE_URL}/api/recuirment/updateInterviewPanel/${editingPanel.id}`,
+          payload,
+          axiosConfig
+        );
+      } else {
+        res = await axios.post(
+          `${BASE_URL}/api/recuirment/createInterviewPanel`,
+          payload,
+          axiosConfig
+        );
+      }
+
+      if (res.status === 200 || res.status === 201) {
+        toast.success('Success', editingPanel ? 'Interview panel updated successfully' : 'Interview panel created successfully');
+        resetForm();
+        setShowForm(false);
+        setPage(0);
+        fetchPanels();
+      } else {
+        throw new Error(res.data?.message || 'Operation failed');
+      }
+    } catch (err) {
+      console.error('🔴 [submit] error:', err);
+      toast.error('Error', err.response?.data?.message || err.message || 'Something went wrong');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEdit = (item) => {
@@ -463,14 +415,13 @@ const InterviewPanelMaster = () => {
     setFormData({
       panelCode: item.panelCode,
       panelName: item.panelName,
-      department: item.department,
-      primaryInterviewer: item.primaryInterviewer || '',
-      secondaryInterviewer: item.secondaryInterviewer || '',
-      panelMembers: item.panelMembers || [],
-      status: item.status
+      department: item.departmentId ?? '',
+      primaryInterviewer: item.primaryInterviewerId ?? '',
+      secondaryInterviewer: item.secondaryInterviewerId ?? '',
+      panelMembers: item.panelMembersIds ?? [],
+      status: 'Active'
     });
-    setPrimarySearch(item.primaryInterviewer || '');
-    setSecondarySearch(item.secondaryInterviewer || '');
+
     setShowForm(true);
   };
 
@@ -480,15 +431,7 @@ const InterviewPanelMaster = () => {
   };
 
   const confirmDelete = () => {
-    const isUsed = false; // Replace with actual check
-
-    if (isUsed) {
-      showToast('error', 'Cannot Delete', 'This panel is already in use');
-      setShowDeleteModal(false);
-      setDeleteTarget(null);
-      return;
-    }
-
+    if (!ensureToken()) return;
     const updated = panels.filter(item => item.id !== deleteTarget.id);
     setPanels(updated);
     showToast('success', 'Deleted', `${deleteTarget.panelName} has been deleted`);
@@ -497,36 +440,46 @@ const InterviewPanelMaster = () => {
   };
 
   const handleStatusToggle = (id, name, currentStatus) => {
-    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
     setStatusAction({
       id,
       name,
-      newStatus
+      newStatus: currentStatus === 'Active' ? 'Inactive' : 'Active'
     });
     setShowStatusModal(true);
   };
 
-  const confirmStatusChange = () => {
-    const { id, newStatus } = statusAction;
-    const updated = panels.map(item =>
-      item.id === id
-        ? {
-          ...item,
-          status: newStatus,
-          modifiedBy: 'Admin',
-          modifiedDate: new Date().toISOString()
-        }
-        : item
-    );
-    setPanels(updated);
-    setShowStatusModal(false);
-    showToast('success', 'Status Updated', `${statusAction.name} is now ${newStatus}`);
+  const confirmStatusChange = async () => {
+    if (!ensureToken()) return;
+    const { id, newStatus, name } = statusAction;
+    setLoading(true);
+    try {
+      const target = panels.find((r) => r.id === id);
+      if (!target) throw new Error('Panel not found');
+
+
+      const res = await axios.put(
+        `${BASE_URL}/api/recuirment/updateInterviewPanelStatus/${id}`,
+        { status: newStatus === 'Active' ? 'y' : 'n' },
+        axiosConfig
+      );
+
+      if (res.status === 200) {
+        toast.success('Status Updated', `${name} is now ${newStatus}`);
+        fetchPanels();
+      } else {
+        throw new Error(res.data?.message || 'Failed to change status');
+      }
+    } catch (err) {
+      console.error('🔴 [statusToggle] error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to change status');
+    } finally {
+      setLoading(false);
+      setShowStatusModal(false);
+      setStatusAction({ id: null, name: '', newStatus: '' });
+    }
   };
 
-  const handleCancelForm = () => {
-    resetForm();
-    setShowForm(false);
-  };
+  const handleCancelForm = () => { resetForm(); setShowForm(false); };
 
   const handleAddNew = () => {
     resetForm();
@@ -534,122 +487,7 @@ const InterviewPanelMaster = () => {
     setShowForm(true);
   };
 
-  const handleBackToList = () => {
-    resetForm();
-    setShowForm(false);
-  };
-
-  // ============================================
-  // SEARCHABLE DROPDOWN COMPONENT
-  // ============================================
-  const SearchableDropdown = ({
-    value,
-    searchValue,
-    setSearchValue,
-    showDropdown,
-    setShowDropdown,
-    options,
-    onSelect,
-    placeholder,
-    label,
-    error,
-    touched,
-    excludeSelected = [],
-    dropdownRef
-  }) => {
-    const filteredOptions = options
-      .filter(opt => opt.toLowerCase().includes(searchValue.toLowerCase()))
-      .filter(opt => !excludeSelected.includes(opt));
-
-    return (
-      <div className={`cert-field-compact ${touched && error ? 'has-error' : ''}`} ref={dropdownRef}>
-        <label>{label}</label>
-        <div style={{ position: 'relative' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              border: `1px solid ${touched && error ? '#ef4444' : '#d1d5db'}`,
-              borderRadius: '8px',
-              padding: '0 12px',
-              cursor: 'pointer',
-              background: '#fff',
-              minHeight: '38px'
-            }}
-            onClick={() => setShowDropdown(!showDropdown)}
-          >
-            <input
-              type="text"
-              placeholder={placeholder}
-              value={searchValue}
-              onChange={(e) => {
-                setSearchValue(e.target.value);
-                setShowDropdown(true);
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowDropdown(!showDropdown);
-              }}
-              style={{
-                flex: 1,
-                border: 'none',
-                outline: 'none',
-                fontSize: '14px',
-                padding: '6px 0',
-                background: 'transparent'
-              }}
-            />
-            <FaChevronDown size={12} style={{ color: '#6b7280' }} />
-          </div>
-          {showDropdown && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              background: '#fff',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              marginTop: '4px',
-              maxHeight: '200px',
-              overflowY: 'auto',
-              zIndex: 1000,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-            }}>
-              {filteredOptions.length > 0 ? (
-                filteredOptions.map(option => (
-                  <div
-                    key={option}
-                    style={{
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderBottom: '1px solid #f3f4f6',
-                      background: value === option ? '#fdf2f8' : 'transparent'
-                    }}
-                    onClick={() => {
-                      onSelect(option);
-                      setSearchValue(option);
-                      setShowDropdown(false);
-                    }}
-                    onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
-                    onMouseLeave={(e) => e.target.style.background = value === option ? '#fdf2f8' : 'transparent'}
-                  >
-                    {option}
-                  </div>
-                ))
-              ) : (
-                <div style={{ padding: '8px 12px', color: '#6b7280', fontSize: '14px' }}>
-                  No options found
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <FieldError msg={error} />
-      </div>
-    );
-  };
+  const handleBackToList = () => { resetForm(); setShowForm(false); };
 
   // ============================================
   // RENDER
@@ -682,32 +520,27 @@ const InterviewPanelMaster = () => {
       </div>
 
       {showForm ? (
-        /* ==========================================
-           FORM SECTION
-           ========================================== */
+        /* ================= FORM ================= */
         <div className="cert-form-wrap">
           <form onSubmit={handleSubmit} className="cert-form-compact">
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Interview Panel Details</div>
               <div className="cert-form-grid-3col">
 
-                {/* Panel Code - Auto */}
+                {/* Panel Code */}
                 <div className="cert-field-compact">
                   <label className="required">Panel Code</label>
                   <input
                     type="text"
-                    className="form-control bg-light"
                     value={formData.panelCode}
                     readOnly
                     placeholder="Auto-generated"
                     style={{ fontSize: '14px', padding: '6px 12px', background: '#f3f4f6' }}
                   />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Auto-generated unique identifier
-                  </small>
+                  <small style={{ fontSize: '12px', color: '#6b7280' }}>Auto-generated unique identifier</small>
                 </div>
 
-                {/* Panel Name - Required */}
+                {/* Panel Name */}
                 <div className={`cert-field-compact ${touched.panelName && errors.panelName ? 'has-error' : ''}`}>
                   <label className="required">Panel Name</label>
                   <input
@@ -719,12 +552,10 @@ const InterviewPanelMaster = () => {
                     style={{ fontSize: '14px', padding: '6px 12px' }}
                   />
                   <FieldError msg={errors.panelName} />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Display name used while assigning interview panels
-                  </small>
+                  <small style={{ fontSize: '12px', color: '#6b7280' }}>Display name used while assigning interview panels</small>
                 </div>
 
-                {/* Department - Required */}
+                {/* Department */}
                 <div className={`cert-field-compact ${touched.department && errors.department ? 'has-error' : ''}`}>
                   <label className="required">Department</label>
                   <select
@@ -735,110 +566,101 @@ const InterviewPanelMaster = () => {
                   >
                     <option value="">Select Department</option>
                     {departments.map(dept => (
-                      <option key={dept.value} value={dept.value}>{dept.label}</option>
+                      <option key={dept.id} value={Number(dept.id)}>{dept.name}</option>
                     ))}
                   </select>
                   <FieldError msg={errors.department} />
                 </div>
 
-                {/* Primary Interviewer - Required */}
-                <SearchableDropdown
-                  value={formData.primaryInterviewer}
-                  searchValue={primarySearch}
-                  setSearchValue={setPrimarySearch}
-                  showDropdown={showPrimaryDropdown}
-                  setShowDropdown={setShowPrimaryDropdown}
-                  options={getEmployeeOptions(primarySearch, [formData.secondaryInterviewer, ...formData.panelMembers])}
-                  onSelect={(val) => handleChange('primaryInterviewer', val)}
-                  placeholder="Search employee..."
-                  label="Primary Interviewer"
-                  error={errors.primaryInterviewer}
-                  touched={touched.primaryInterviewer}
-                  dropdownRef={primaryRef}
-                />
+                {/* Primary Interviewer - Native Select */}
+                <div className={`cert-field-compact ${touched.primaryInterviewer && errors.primaryInterviewer ? 'has-error' : ''}`}>
+                  <label className="required">Primary Interviewer</label>
+                  <select
+                    value={formData.primaryInterviewer}
+                    onChange={(e) => handleChange('primaryInterviewer', e.target.value)}
+                    onBlur={() => handleBlur('primaryInterviewer')}
+                    style={{ fontSize: '14px', padding: '6px 12px', width: '100%', borderRadius: '8px', border: '1px solid #d1d5db' }}
+                  >
+                    <option value="">Select Primary Interviewer</option>
+                    {employees
+                      .filter(emp => 
+                        String(emp.id) !== String(formData.secondaryInterviewer) && 
+                        !formData.panelMembers.some(m => String(m) === String(emp.id))
+                      )
+                      .map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.name}</option>
+                      ))
+                    }
+                  </select>
+                  <FieldError msg={errors.primaryInterviewer} />
+                </div>
 
-                {/* Secondary Interviewer - Optional */}
-                <SearchableDropdown
-                  value={formData.secondaryInterviewer}
-                  searchValue={secondarySearch}
-                  setSearchValue={setSecondarySearch}
-                  showDropdown={showSecondaryDropdown}
-                  setShowDropdown={setShowSecondaryDropdown}
-                  options={getEmployeeOptions(secondarySearch, [formData.primaryInterviewer, ...formData.panelMembers])}
-                  onSelect={(val) => handleChange('secondaryInterviewer', val)}
-                  placeholder="Search employee..."
-                  label="Secondary Interviewer (Optional)"
-                  error={errors.secondaryInterviewer}
-                  touched={touched.secondaryInterviewer}
-                  dropdownRef={secondaryRef}
-                />
+                {/* Secondary Interviewer - Native Select */}
+                <div className={`cert-field-compact ${touched.secondaryInterviewer && errors.secondaryInterviewer ? 'has-error' : ''}`}>
+                  <label>Secondary Interviewer (Optional)</label>
+                  <select
+                    value={formData.secondaryInterviewer}
+                    onChange={(e) => handleChange('secondaryInterviewer', e.target.value)}
+                    onBlur={() => handleBlur('secondaryInterviewer')}
+                    style={{ fontSize: '14px', padding: '6px 12px', width: '100%', borderRadius: '8px', border: '1px solid #d1d5db' }}
+                  >
+                    <option value="">Select Secondary Interviewer</option>
+                    {employees
+                      .filter(emp => 
+                        String(emp.id) !== String(formData.primaryInterviewer) && 
+                        !formData.panelMembers.some(m => String(m) === String(emp.id))
+                      )
+                      .map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.name}</option>
+                      ))
+                    }
+                  </select>
+                  <FieldError msg={errors.secondaryInterviewer} />
+                </div>
 
-                {/* Panel Members - Multi-select */}
-                <div className={`cert-field-compact ${touched.panelMembers && errors.panelMembers ? 'has-error' : ''}`} ref={memberRef} style={{ gridColumn: 'span 1' }}>
+                {/* Panel Members (multi-select, IDs) */}
+                <div className={`cert-field-compact ${touched.panelMembers && errors.panelMembers ? 'has-error' : ''}`} ref={memberRef}>
                   <label className="required">Panel Members</label>
                   <div style={{ position: 'relative' }}>
                     <div
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: '4px',
+                        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px',
                         border: `1px solid ${touched.panelMembers && errors.panelMembers ? '#ef4444' : '#d1d5db'}`,
-                        borderRadius: '8px',
-                        padding: '4px 8px',
-                        cursor: 'pointer',
-                        background: '#fff',
-                        minHeight: '38px'
+                        borderRadius: '8px', padding: '4px 8px', background: '#fff', minHeight: '38px',
+                        cursor: 'pointer'
                       }}
                       onClick={() => setShowMemberDropdown(!showMemberDropdown)}
                     >
                       {formData.panelMembers.length > 0 ? (
-                        formData.panelMembers.map(member => (
+                        formData.panelMembers.map(memberId => (
                           <span
-                            key={member}
+                            key={memberId}
                             style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              background: '#fdf2f8',
-                              color: '#9d174d',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '500'
+                              display: 'inline-flex', alignItems: 'center', gap: '4px',
+                              background: '#fdf2f8', color: '#9d174d',
+                              padding: '2px 8px', borderRadius: '4px',
+                              fontSize: '12px', fontWeight: '500'
                             }}
                           >
-                            {member.split(' - ')[1] || member}
+                            {getNameById(memberId)}
                             <FaTimesCircle
                               size={12}
                               style={{ cursor: 'pointer' }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeMember(member);
-                              }}
+                              onClick={(e) => { e.stopPropagation(); removeMember(memberId); }}
                             />
                           </span>
                         ))
                       ) : (
-                        <span style={{ color: '#9ca3af', fontSize: '14px' }}>
-                          Select panel members...
-                        </span>
+                        <span style={{ color: '#9ca3af', fontSize: '14px' }}>Select panel members...</span>
                       )}
                       <FaChevronDown size={12} style={{ color: '#6b7280', marginLeft: 'auto' }} />
                     </div>
+
                     {showMemberDropdown && (
                       <div style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        background: '#fff',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '8px',
-                        marginTop: '4px',
-                        maxHeight: '200px',
-                        overflowY: 'auto',
-                        zIndex: 1000,
+                        position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff',
+                        border: '1px solid #d1d5db', borderRadius: '8px', marginTop: '4px',
+                        maxHeight: '200px', overflowY: 'auto', zIndex: 1000,
                         boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                       }}>
                         <div style={{ padding: '8px 12px', borderBottom: '1px solid #f3f4f6' }}>
@@ -847,80 +669,62 @@ const InterviewPanelMaster = () => {
                             placeholder="Search members..."
                             value={memberSearch}
                             onChange={(e) => setMemberSearch(e.target.value)}
-                            style={{
-                              width: '100%',
-                              border: 'none',
-                              outline: 'none',
-                              fontSize: '14px',
-                              padding: '4px 0'
-                            }}
                             onClick={(e) => e.stopPropagation()}
+                            style={{ width: '100%', border: 'none', outline: 'none', fontSize: '14px', padding: '4px 0' }}
                           />
                         </div>
+
                         {getEmployeeOptions(memberSearch, [formData.primaryInterviewer, formData.secondaryInterviewer])
-                          .filter(opt => !formData.panelMembers.includes(opt))
-                          .map(option => (
+                          .filter(opt => !formData.panelMembers.some(m => String(m) === String(opt.id)))
+                          .map(opt => (
                             <div
-                              key={option}
+                              key={opt.id}
                               style={{
-                                padding: '8px 12px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
+                                padding: '8px 12px', cursor: 'pointer', fontSize: '14px',
+                                display: 'flex', alignItems: 'center', gap: '8px',
                                 borderBottom: '1px solid #f3f4f6'
                               }}
-                              onClick={() => toggleMember(option)}
-                              onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
-                              onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                              onClick={() => toggleMember(opt.id)}
+                              onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                             >
                               <input
                                 type="checkbox"
-                                checked={formData.panelMembers.includes(option)}
-                                onChange={() => {}}
+                                checked={formData.panelMembers.some(m => String(m) === String(opt.id))}
+                                onChange={() => { }}
                                 style={{ cursor: 'pointer' }}
                               />
-                              {option}
+                              {opt.name}
                             </div>
                           ))}
+
                         {getEmployeeOptions(memberSearch, [formData.primaryInterviewer, formData.secondaryInterviewer])
-                          .filter(opt => !formData.panelMembers.includes(opt)).length === 0 && (
-                          <div style={{ padding: '8px 12px', color: '#6b7280', fontSize: '14px' }}>
-                            No members found
-                          </div>
-                        )}
+                          .filter(opt => !formData.panelMembers.some(m => String(m) === String(opt.id))).length === 0 && (
+                            <div style={{ padding: '8px 12px', color: '#6b7280', fontSize: '14px' }}>No members found</div>
+                          )}
                       </div>
                     )}
                   </div>
                   <FieldError msg={errors.panelMembers} />
-                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Additional interviewers participating in the panel
-                  </small>
+                  <small style={{ fontSize: '12px', color: '#6b7280' }}>Additional interviewers participating in the panel</small>
                 </div>
 
-           
               </div>
             </div>
 
-            {/* Form Actions */}
             <div className="cert-form-actions">
               <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>
                 <FaTimes size={12} /> Cancel
               </button>
-            
-              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <FaSave size={12} /> {editingPanel ? 'Update' : 'Save'}
+              <button type="submit" className="cert-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FaSave size={12} /> {submitting ? 'Saving...' : (editingPanel ? 'Update' : 'Save')}
               </button>
             </div>
           </form>
         </div>
       ) : (
-        /* ==========================================
-           TABLE SECTION
-           ========================================== */
+        /* ================= TABLE ================= */
         <>
-          {/* Search Bar */}
           <div className="emp-search-bar">
             <div className="emp-search-wrap">
               <input
@@ -937,10 +741,8 @@ const InterviewPanelMaster = () => {
                 </button>
               )}
             </div>
-           
           </div>
 
-          {/* Table */}
           <div className="cert-table-card">
             <div className="cert-table-wrap">
               <table className="cert-table">
@@ -958,39 +760,34 @@ const InterviewPanelMaster = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentPanels.length > 0 ? (
-                    currentPanels.map((item, idx) => (
+                  {currentPanels.length > 0 ? currentPanels.map((item, idx) => {
+                    const memberIds = item.panelMembersIds?.length ? item.panelMembersIds : (item.panelMembers || []);
+                    return (
                       <tr key={item.id} className="cert-table-row-hover">
                         <td className="text-center">{startIndex + idx + 1}</td>
                         <td>
-                          <span style={{ fontFamily: 'monospace', fontWeight: '500', fontSize: '13px' }}>
-                            {item.panelCode}
-                          </span>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 500, fontSize: '13px' }}>{item.panelCode}</span>
                         </td>
+                        <td><strong>{item.panelName}</strong></td>
                         <td>
-                          <strong>{item.panelName}</strong>
-                        </td>
-                        <td>
-                          <span className="cert-status-badge" style={{
-                            background: '#e0e7ff',
-                            color: '#4f46e5',
-                            fontSize: '12px',
-                            padding: '2px 10px'
+                          <span style={{
+                            background: '#e0e7ff', color: '#4f46e5',
+                            fontSize: '12px', padding: '2px 10px', borderRadius: '10px'
                           }}>
-                            {item.department}
+                            {item.department || getNameById(item.departmentId)}
                           </span>
                         </td>
                         <td>
                           <span style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <FaUserTie size={12} style={{ color: '#9d174d' }} />
-                            {item.primaryInterviewer?.split(' - ')[1] || item.primaryInterviewer}
+                            {getNameById(item.primaryInterviewerId || item.primaryInterviewer)}
                           </span>
                         </td>
                         <td>
-                          {item.secondaryInterviewer ? (
+                          {(item.secondaryInterviewerId || item.secondaryInterviewer) ? (
                             <span style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <FaUser size={12} style={{ color: '#6b7280' }} />
-                              {item.secondaryInterviewer.split(' - ')[1]}
+                              {getNameById(item.secondaryInterviewerId || item.secondaryInterviewer)}
                             </span>
                           ) : (
                             <span style={{ color: '#9ca3af', fontSize: '12px' }}>—</span>
@@ -998,71 +795,46 @@ const InterviewPanelMaster = () => {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                            {(item.panelMembers || []).map(member => (
+                            {memberIds.map(id => (
                               <span
-                                key={member}
+                                key={id}
                                 style={{
-                                  background: '#fdf2f8',
-                                  color: '#9d174d',
-                                  fontSize: '10px',
-                                  padding: '1px 8px',
-                                  borderRadius: '10px',
-                                  fontWeight: '500'
+                                  background: '#fdf2f8', color: '#9d174d',
+                                  fontSize: '10px', padding: '1px 8px',
+                                  borderRadius: '10px', fontWeight: 500
                                 }}
                               >
-                                {member.split(' - ')[1] || member}
+                                {getNameById(id)}
                               </span>
                             ))}
-                            {(!item.panelMembers || item.panelMembers.length === 0) && (
-                              <span style={{ color: '#9ca3af', fontSize: '12px' }}>—</span>
-                            )}
+                            {memberIds.length === 0 && <span style={{ color: '#9ca3af', fontSize: '12px' }}>—</span>}
                           </div>
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <div
-                            className="d-flex align-items-center justify-content-center gap-1"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => handleStatusToggle(
-                              item.id,
-                              item.panelName,
-                              item.status || 'Active'
-                            )}
+                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                            onClick={() => handleStatusToggle(item.id, item.panelName, item.status || 'Active')}
                           >
-                            <div
-                              style={{
-                                width: '28px',
-                                height: '16px',
-                                borderRadius: '50px',
-                                backgroundColor: (item.status || 'Active') === 'Active' ? '#9d174d' : '#d1d5db',
-                                position: 'relative',
+                            <div style={{
+                              width: '28px', height: '16px', borderRadius: '50px',
+                              backgroundColor: (item.status || 'Active') === 'Active' ? '#9d174d' : '#d1d5db',
+                              position: 'relative', transition: '.2s'
+                            }}>
+                              <div style={{
+                                width: '12px', height: '12px', borderRadius: '50%',
+                                background: '#fff', position: 'absolute', top: '2px',
+                                left: (item.status || 'Active') === 'Active' ? '14px' : '2px',
                                 transition: '.2s'
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  background: '#fff',
-                                  position: 'absolute',
-                                  top: '2px',
-                                  left: (item.status || 'Active') === 'Active' ? '14px' : '2px',
-                                  transition: '.2s'
-                                }}
-                              />
+                              }} />
                             </div>
-                            <span
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 500,
-                                color: (item.status || 'Active') === 'Active' ? '#9d174d' : '#94a3b8'
-                              }}
-                            >
+                            <span style={{
+                              fontSize: '11px', fontWeight: 500,
+                              color: (item.status || 'Active') === 'Active' ? '#9d174d' : '#94a3b8'
+                            }}>
                               {item.status || 'Active'}
                             </span>
                           </div>
                         </td>
-                        
                         <td>
                           <div className="cert-actions" style={{ justifyContent: 'center' }}>
                             <button
@@ -1077,12 +849,11 @@ const InterviewPanelMaster = () => {
                             >
                               <FaEdit size={12} />
                             </button>
-                           
                           </div>
                         </td>
                       </tr>
-                    ))
-                  ) : (
+                    );
+                  }) : (
                     <tr>
                       <td colSpan="10" className="text-center py-5" style={{ color: '#6b7280' }}>
                         No interview panels found
@@ -1093,46 +864,31 @@ const InterviewPanelMaster = () => {
               </table>
             </div>
 
-            {/* Pagination */}
             {totalPages > 0 && (
               <div className="cert-table-footer">
                 <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
                   Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} panels
                 </div>
-
                 <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <button
-                    className="cert-page-btn"
                     disabled={page === 0}
                     onClick={() => setPage(page - 1)}
-                    style={{
-                      padding: '6px 12px',
-                      border: '1px solid #e5e7eb',
-                      background: 'white',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
                   >
                     ← Prev
                   </button>
                   {getPaginationRange().map((pg, i) =>
                     pg === '...' ? (
-                      <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
+                      <span key={i} style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
                     ) : (
                       <button
                         key={pg}
-                        className={`cert-page-num ${pg === page ? 'active' : ''}`}
                         onClick={() => setPage(pg)}
                         style={{
-                          padding: '6px 10px',
-                          border: '1px solid #e5e7eb',
+                          padding: '6px 10px', border: '1px solid #e5e7eb',
                           background: pg === page ? '#9d174d' : 'white',
                           color: pg === page ? 'white' : '#374151',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          minWidth: '34px'
+                          borderRadius: '6px', cursor: 'pointer', fontSize: '12px', minWidth: '34px'
                         }}
                       >
                         {pg + 1}
@@ -1140,17 +896,9 @@ const InterviewPanelMaster = () => {
                     )
                   )}
                   <button
-                    className="cert-page-btn"
                     disabled={page + 1 >= totalPages}
                     onClick={() => setPage(page + 1)}
-                    style={{
-                      padding: '6px 12px',
-                      border: '1px solid #e5e7eb',
-                      background: 'white',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
                   >
                     Next →
                   </button>
@@ -1161,15 +909,11 @@ const InterviewPanelMaster = () => {
         </>
       )}
 
-      {/* ==========================================
-          STATUS CHANGE MODAL
-          ========================================== */}
+      {/* STATUS MODAL */}
       {showStatusModal && (
         <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
           <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="emp-modal-icon">
-              {statusAction.newStatus === 'Active' ? '✅' : '⛔'}
-            </div>
+            <div className="emp-modal-icon">{statusAction.newStatus === 'Active' ? '✅' : '⛔'}</div>
             <h3 className="emp-modal-title">Confirm Status Change</h3>
             <p className="emp-modal-body">
               Are you sure you want to{' '}
@@ -1188,15 +932,11 @@ const InterviewPanelMaster = () => {
           </div>
         </div>
       )}
-
-     
     </div>
   );
 };
 
-// ============================================
-// FIELD ERROR COMPONENT
-// ============================================
+// FIELD ERROR
 const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default InterviewPanelMaster;
