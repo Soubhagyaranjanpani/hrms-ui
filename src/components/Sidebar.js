@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  FaTachometerAlt, FaUsers, FaCalendarCheck, FaMoneyBillWave,
+  FaTachometerAlt, FaUsers, FaCalendarCheck, FaCalendarAlt, FaMoneyBillWave,
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog,
   FaBuilding, FaSitemap,FaPlus,FaBriefcase ,
@@ -184,8 +184,10 @@ const Sidebar = ({ user, sidebarCollapsed, sidebarOpen, isMobile, onItemClick, o
     { path: '/attendance-dashboard', icon: <FaChartLine />, label: 'Attendance Dashboard', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/attendance-summary', icon: <FaChartPie />, label: 'Attendance Summary', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/attendance', icon: <FaCalendarCheck />, label: 'Mark Attendance', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/my-shift', icon: <FaClock />, label: 'My Shift', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/client-site-work', icon: <FaMapMarker />, label: 'Client Site Work', roles: ['Admin', 'Hr', 'Manager', 'Employee'], showBadge: true },
-    { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy', roles: ['Admin', 'Hr'] },
+    { path: '/roster-management', icon: <FaCalendarAlt />, label: 'Roster Management', roles: ['Hr'] },
+    { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy', roles: ['Hr'] },
     
 {
   icon: <FaCog />,

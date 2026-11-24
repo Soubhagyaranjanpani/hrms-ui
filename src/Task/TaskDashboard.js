@@ -89,13 +89,43 @@ export default function TaskDashboard({ user }) {
   const navigate    = useNavigate();
   const currentUser = user || getUser();
 
+  const getNormalizedRole = () => {
+    try {
+      const uData = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA) || '{}');
+      const raw = localStorage.getItem(STORAGE_KEYS.ROLE) ||
+                  localStorage.getItem('roleName') ||
+                  localStorage.getItem('role') ||
+                  localStorage.getItem('userRole') ||
+                  currentUser?.role ||
+                  currentUser?.roleName ||
+                  currentUser?.role?.name ||
+                  uData?.role ||
+                  uData?.roleName ||
+                  uData?.role?.name;
+      if (raw) {
+        let s = typeof raw === 'object' ? (raw.name || raw.roleName || raw.role || '') : String(raw);
+        if (s.toUpperCase().startsWith('ROLE_')) s = s.substring(5);
+        const up = s.toUpperCase().replace(/[\s_-]+/g, '');
+        if (up === 'ADMIN' || up === 'ADMINISTRATOR' || up === 'SUPERADMIN') return 'Admin';
+        if (up === 'HR' || up === 'HUMANRESOURCE' || up === 'HUMANRESOURCES' || up === 'HROFFICER' || up === 'HRMANAGER') return 'Hr';
+        if (up === 'MANAGER') return 'Manager';
+        return 'Employee';
+      }
+    } catch {}
+    return 'Employee';
+  };
+
+  const userRole = getNormalizedRole();
+  const isEmployee = userRole === 'Employee';
+
   const [tasks,   setTasks]   = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const res  = await fetch(API_ENDPOINTS.GET_ALL_TASKS, { headers: getAuthHeaders() });
+        const url = isEmployee ? API_ENDPOINTS.GET_MY_TASKS : API_ENDPOINTS.GET_ALL_TASKS;
+        const res = await fetch(url, { headers: getAuthHeaders() });
         const data = await res.json();
         
         if (!res.ok) {
@@ -179,9 +209,11 @@ export default function TaskDashboard({ user }) {
             <FaChartBar />
           </div>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: "'Sora',sans-serif", letterSpacing: '-0.01em' }}>Task Dashboard</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: "'Sora',sans-serif", letterSpacing: '-0.01em' }}>
+              {isEmployee ? 'My Task Dashboard' : 'Task Dashboard'}
+            </h1>
             <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
-              Welcome back, {currentUser?.name || currentUser?.firstName || 'User'} · {new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+              Welcome back, {currentUser?.name || currentUser?.firstName || 'User'} · {isEmployee ? 'Showing your individual tasks' : 'Team Overview'} · {new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
             </p>
           </div>
         </div>
@@ -202,7 +234,7 @@ export default function TaskDashboard({ user }) {
 
       {/* Stats Row – all 5 cards now have centered content */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 16 }}>
-        <StatCard label="Total Tasks"      value={stats.total}   icon={<FaTasks size={13} />}       iconBg="#ede9fe" iconColor="var(--accent-indigo)" sub="All tasks"         onClick={() => navigate('/TaskList')} />
+        <StatCard label={isEmployee ? "My Tasks" : "Total Tasks"} value={stats.total} icon={<FaTasks size={13} />} iconBg="#ede9fe" iconColor="var(--accent-indigo)" sub={isEmployee ? "Assigned to me" : "All tasks"} onClick={() => navigate('/TaskList')} />
         <StatCard label="Pending Approval" value={stats.pending} icon={<FaClock size={13} />}        iconBg="#fef3c7" iconColor="var(--accent-amber)"  sub="Awaiting review"  onClick={() => navigate('/TaskList')} />
         <StatCard label="In Progress"      value={stats.active}  icon={<FaSpinner size={13} />}      iconBg="#dbeafe" iconColor="#1d4ed8"              sub="Currently active" onClick={() => navigate('/TaskList')} />
         <StatCard label="In Review"        value={stats.review}  icon={<FaSearch size={13} />}       iconBg="#f3e8ff" iconColor="#7c3aed"              sub="Under review"     onClick={() => navigate('/TaskList')} />

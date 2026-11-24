@@ -1,11 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaSearch, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaClock, FaEye, FaUmbrellaBeach, FaRegCalendarAlt, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
-import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
+import { FaSearch, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaClock, FaEye, FaUmbrellaBeach, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { BASE_URL, API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
 import { toast, ToastContainer } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ShiftPunchWidget from '../components/ShiftPunchWidget';
+import {
+  getUnifiedTodayAttendance,
+  calculateShiftAttendance,
+  getShiftByCode,
+  format12Hour
+} from '../utils/rosterUtils';
 
-const MyAttendance = () => {
+const normalizeDate = (d) => {
+  if (!d) return '';
+  if (Array.isArray(d) && d.length >= 3) {
+    const y = d[0];
+    const m = String(d[1]).padStart(2, '0');
+    const day = String(d[2]).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  if (typeof d === 'number') {
+    const dateObj = new Date(d);
+    if (!isNaN(dateObj.getTime())) {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+  }
+  const s = String(d).trim();
+  if (s.includes('T')) return s.split('T')[0];
+  if (s.includes(' ')) return s.split(' ')[0];
+  if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(s)) {
+    const parts = s.split(/[-/]/);
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return s;
+};
+
+const normalizeStatus = (status, checkIn) => {
+  const s = String(status || '').toUpperCase().trim();
+  if (s === 'PRESENT' || s === 'HALF_DAY' || s === 'LEAVE' || s === 'ABSENT' || s === 'WEEKEND' || s === 'HOLIDAY') {
+    return s;
+  }
+  if (s === 'CHECKED_IN' || s === 'ON_DUTY') return 'PRESENT';
+  if (checkIn && checkIn !== '--:--') return 'PRESENT';
+  return s || (checkIn ? 'PRESENT' : 'PENDING');
+};
+
+const getTodayStr = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const MyAttendance = ({ user }) => {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -14,12 +66,70 @@ const MyAttendance = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  const getAuthConfig = () => ({
-    headers: { 
-      Authorization: `Bearer ${localStorage.getItem(STORAGE_KEYS.JWT_TOKEN)}`,
-      'Content-Type': 'application/json'
-    }
+  // ── Employee Joining Date Detection ──────────────────────────
+  const [joiningDate, setJoiningDate] = useState(() => {
+    try {
+      const direct = localStorage.getItem('employee_joining_date') || 
+                     localStorage.getItem('joiningDate') || 
+                     localStorage.getItem('dateOfJoining');
+      if (direct) return normalizeDate(direct);
+
+      const uData = JSON.parse(localStorage.getItem('userData') || '{}');
+      const uDate = uData.joiningDate || uData.dateOfJoining || uData.doj || uData.appointment?.joiningDate;
+      if (uDate) return normalizeDate(uDate);
+    } catch {}
+    return null;
   });
+
+  useEffect(() => {
+    const fetchEmployeeJoiningDate = async () => {
+      try {
+        const empId = localStorage.getItem(STORAGE_KEYS.EMPLOYEE_ID);
+        const token = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+        if (!empId || !token) return;
+        const res = await axios.get(`${BASE_URL}/api/employee-profile/full/${empId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const profile = res.data?.response;
+        const doj = profile?.joiningDate || profile?.dateOfJoining || profile?.appointment?.joiningDate;
+        if (doj) {
+          const cleanDoj = normalizeDate(doj);
+          setJoiningDate(cleanDoj);
+          localStorage.setItem('employee_joining_date', cleanDoj);
+        }
+      } catch (err) {}
+    };
+    fetchEmployeeJoiningDate();
+  }, []);
+
+  const getAuthConfig = () => {
+    const rawToken = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN) || 
+                     localStorage.getItem('jwtToken') || 
+                     localStorage.getItem('token');
+    const token = rawToken ? (rawToken.startsWith('Bearer ') ? rawToken : `Bearer ${rawToken}`) : '';
+    return {
+      headers: { 
+        Authorization: token,
+        'Content-Type': 'application/json'
+      }
+    };
+  };
+
+  const parseAttendanceRecords = (data) => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.response)) return data.response;
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data.content)) return data.content;
+    if (Array.isArray(data.response?.response)) return data.response.response;
+    if (Array.isArray(data.response?.data)) return data.response.data;
+    if (Array.isArray(data.response?.content)) return data.response.content;
+    if (typeof data.response === 'object' && data.response !== null) {
+      const vals = Object.values(data.response);
+      if (vals.length > 0 && (vals[0]?.date || vals[0]?.attendanceDate)) return vals;
+    }
+    return [];
+  };
 
   const formatTime = (timeString) => {
     if (!timeString) return '--:--';
@@ -34,6 +144,182 @@ const MyAttendance = () => {
     }
   };
 
+  const mergeOnSiteAttendance = (baseRecords) => {
+    let recordsList = [...(baseRecords || [])];
+    try {
+      const onSiteStored = JSON.parse(localStorage.getItem('hrms_onsite_attendance') || '[]');
+      const clientVerifications = JSON.parse(localStorage.getItem('hrms_client_verifications') || '[]');
+      const currentEmp = (localStorage.getItem(STORAGE_KEYS.USERNAME) || localStorage.getItem('username') || '').trim().toLowerCase();
+      const currentEmpId = String(localStorage.getItem(STORAGE_KEYS.EMPLOYEE_ID) || localStorage.getItem('employeeId') || '').trim();
+      let userData = {};
+      try { userData = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA) || '{}'); } catch {}
+      const userEmail = String(userData.email || '').trim().toLowerCase();
+      const userName = String(userData.name || '').trim().toLowerCase();
+      const userEmpId = String(userData.id || userData.employeeId || '').trim();
+
+      const matchUser = (emp, empId, name) => {
+        const e = String(emp || '').trim().toLowerCase();
+        const id = String(empId || '').trim();
+        const n = String(name || '').trim().toLowerCase();
+
+        if (!e && !id && !n) return true;
+        if (currentEmp) {
+          if (e === currentEmp) return true;
+          if (e && (e.startsWith(currentEmp) || currentEmp.startsWith(e))) return true;
+          const currentPrefix = currentEmp.split('@')[0];
+          if (currentPrefix && (e === currentPrefix || e.startsWith(currentPrefix) || currentPrefix.startsWith(e))) return true;
+        }
+        if (userEmail) {
+          if (e === userEmail) return true;
+          const emailPrefix = userEmail.split('@')[0];
+          if (emailPrefix && (e === emailPrefix || e.startsWith(emailPrefix) || emailPrefix.startsWith(e))) return true;
+        }
+        if (currentEmpId && currentEmpId !== 'null' && currentEmpId !== 'undefined' && id && id === currentEmpId) return true;
+        if (userEmpId && userEmpId !== 'null' && userEmpId !== 'undefined' && id && id === userEmpId) return true;
+        if (userName && n && (n === userName || n.includes(userName) || userName.includes(n))) return true;
+        return false;
+      };
+
+      const approvedDatesMap = {};
+      onSiteStored.forEach(r => {
+        if (matchUser(r.employee, r.employeeId, r.employeeName) && r.date) {
+          const normD = normalizeDate(r.date);
+          approvedDatesMap[normD] = {
+            ...r,
+            date: normD
+          };
+        }
+      });
+
+      clientVerifications.forEach(v => {
+        const isApproved = v.status === 'APPROVED' || v.status === 'ON_SITE_APPROVED';
+        if (isApproved && matchUser(v.submittedBy, v.employeeId, v.submittedByName)) {
+          const vDates = Array.isArray(v.dates) && v.dates.length > 0
+            ? v.dates
+            : (v.date ? [v.date] : (v.visitDate ? [v.visitDate] : []));
+          vDates.forEach(d => {
+            const normD = normalizeDate(d);
+            if (!approvedDatesMap[normD]) {
+              approvedDatesMap[normD] = {
+                id: `verification-${v.id}-${normD}`,
+                date: normD,
+                status: 'PRESENT',
+                onSite: true,
+                workingHours: 9,
+                checkIn: '09:00:00',
+                checkOut: '18:00:00',
+                clientName: v.clientName,
+              };
+            }
+          });
+        }
+      });
+
+      Object.values(approvedDatesMap).forEach(onSiteRec => {
+        const existingIdx = recordsList.findIndex(r => r.date === onSiteRec.date);
+        if (existingIdx >= 0) {
+          recordsList[existingIdx].status = 'PRESENT';
+          recordsList[existingIdx].workingHours = recordsList[existingIdx].workingHours || 9;
+          recordsList[existingIdx].checkIn = recordsList[existingIdx].checkIn || '09:00:00';
+          recordsList[existingIdx].checkOut = recordsList[existingIdx].checkOut || '18:00:00';
+          recordsList[existingIdx].onSite = true;
+          recordsList[existingIdx].clientName = onSiteRec.clientName;
+        } else {
+          recordsList.push({
+            id: onSiteRec.id || `onsite-${onSiteRec.date}`,
+            date: onSiteRec.date,
+            checkIn: onSiteRec.checkIn || '09:00:00',
+            checkOut: onSiteRec.checkOut || '18:00:00',
+            workingHours: onSiteRec.workingHours || 9,
+            status: 'PRESENT',
+            onSite: true,
+            clientName: onSiteRec.clientName,
+          });
+        }
+      });
+    } catch (err) {}
+    return recordsList;
+  };
+
+  const mergeLocalAndShiftAttendance = (baseRecords) => {
+    let list = [...(baseRecords || [])];
+    try {
+      // 1. Merge today's unified punch
+      const todayRecord = getUnifiedTodayAttendance();
+      if (todayRecord && todayRecord.date && (todayRecord.checkIn || todayRecord.checkOut)) {
+        const normToday = normalizeDate(todayRecord.date);
+        const existingIdx = list.findIndex(r => normalizeDate(r.date || r.attendanceDate || r.punchDate || r.checkInDate) === normToday);
+        const shiftObj = getShiftByCode(todayRecord.shiftCode || 'GS');
+        const calc = calculateShiftAttendance({
+          checkIn: todayRecord.checkIn,
+          checkOut: todayRecord.checkOut,
+          shift: shiftObj,
+          breakMinutes: shiftObj.breakMinutes || 0
+        });
+
+        const todayMerged = {
+          id: `today-${normToday}`,
+          date: normToday,
+          checkIn: todayRecord.checkIn,
+          checkOut: todayRecord.checkOut,
+          hours: calc.workingHours || todayRecord.workingHours || 0,
+          workingHours: calc.workingHours || todayRecord.workingHours || 0,
+          status: calc.status,
+          statusLabel: calc.statusLabel,
+          shiftCode: todayRecord.shiftCode || shiftObj.code,
+          shiftName: todayRecord.shiftName || shiftObj.name,
+          overtimeHours: calc.overtimeHours || todayRecord.overtimeHours || 0,
+          isLate: calc.isLate,
+          lateMinutes: calc.lateMinutes,
+          isEarlyExit: calc.isEarlyExit,
+          earlyExitMinutes: calc.earlyExitMinutes
+        };
+
+        if (existingIdx >= 0) {
+          list[existingIdx] = { ...list[existingIdx], ...todayMerged };
+        } else {
+          list.push(todayMerged);
+        }
+      }
+
+      // 2. Merge local attendance logs
+      const logs = JSON.parse(localStorage.getItem('hrms_attendance_logs') || '[]');
+      logs.forEach(logRec => {
+        if (logRec && logRec.date && (logRec.checkIn || logRec.checkOut)) {
+          const normD = normalizeDate(logRec.date);
+          const exIdx = list.findIndex(r => normalizeDate(r.date || r.attendanceDate || r.punchDate || r.checkInDate) === normD);
+          if (exIdx === -1) {
+            const shiftObj = getShiftByCode(logRec.shiftCode || 'GS');
+            const calc = calculateShiftAttendance({
+              checkIn: logRec.checkIn,
+              checkOut: logRec.checkOut,
+              shift: shiftObj,
+              breakMinutes: shiftObj.breakMinutes || 0
+            });
+            list.push({
+              id: `log-${normD}`,
+              date: normD,
+              checkIn: logRec.checkIn,
+              checkOut: logRec.checkOut,
+              hours: calc.workingHours || logRec.workingHours || 0,
+              workingHours: calc.workingHours || logRec.workingHours || 0,
+              status: calc.status,
+              statusLabel: calc.statusLabel,
+              shiftCode: logRec.shiftCode || shiftObj.code,
+              shiftName: logRec.shiftName || shiftObj.name,
+              overtimeHours: calc.overtimeHours || 0,
+              isLate: calc.isLate,
+              lateMinutes: calc.lateMinutes
+            });
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('Error merging local shift attendance:', e);
+    }
+    return list;
+  };
+
   const fetchAttendance = async (showRefreshMessage = false) => {
     if (showRefreshMessage) {
       setRefreshing(true);
@@ -42,20 +328,55 @@ const MyAttendance = () => {
     }
     
     try {
-      const response = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
-      const attendanceData = response.data?.response || [];
+      let rawRecords = [];
+      try {
+        const response = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
+        rawRecords = parseAttendanceRecords(response.data);
+      } catch (err) {
+        console.warn('GET_MY_ATTENDANCE failed, attempting dashboard fallback:', err);
+      }
+
+      // If /my returned no records, attempt fallback to /dashboard endpoint
+      if (rawRecords.length === 0) {
+        try {
+          const dashRes = await axios.get(API_ENDPOINTS.GET_DASHBOARD, {
+            params: { month: selectedMonth + 1, year: selectedYear },
+            ...getAuthConfig()
+          });
+          rawRecords = parseAttendanceRecords(dashRes.data);
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      const attendanceData = mergeLocalAndShiftAttendance(mergeOnSiteAttendance(rawRecords));
       
-      const transformedData = attendanceData.map(record => ({
-        id: record.id,
-        date: record.date,
-        checkIn: record.checkIn,
-        checkOut: record.checkOut,
-        hours: record.workingHours || 0,
-        status: record.status,
-        overtimeHours: record.overtimeHours || 0,
-        leaveType: record.leaveType || null,
-        employeeName: record.employeeName
-      }));
+      const transformedData = attendanceData.map(record => {
+        const rawDate = record.date || record.attendanceDate || record.punchDate || record.checkInDate;
+        const normDate = normalizeDate(rawDate);
+        const checkIn = record.checkIn || record.inTime || record.punchIn;
+        const checkOut = record.checkOut || record.outTime || record.punchOut;
+        const status = normalizeStatus(record.status || record.attendanceStatus, checkIn);
+
+        return {
+          id: record.id,
+          date: normDate,
+          checkIn,
+          checkOut,
+          hours: record.workingHours !== undefined ? record.workingHours : (record.hours || 0),
+          status,
+          statusLabel: record.statusLabel,
+          shiftCode: record.shiftCode || 'GS',
+          shiftName: record.shiftName || 'General Shift',
+          overtimeHours: record.overtimeHours || record.overtime || 0,
+          isLate: record.isLate,
+          lateMinutes: record.lateMinutes,
+          leaveType: record.leaveType || null,
+          employeeName: record.employeeName || record.name,
+          onSite: record.onSite,
+          clientName: record.clientName
+        };
+      });
       
       setRecords(transformedData);
       
@@ -74,6 +395,22 @@ const MyAttendance = () => {
 
   useEffect(() => {
     fetchAttendance();
+
+    const handleSync = () => {
+      fetchAttendance();
+    };
+
+    window.addEventListener('hrms_client_verification_updated', handleSync);
+    window.addEventListener('hrms_attendance_updated', handleSync);
+    window.addEventListener('hrms_today_punches_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener('hrms_client_verification_updated', handleSync);
+      window.removeEventListener('hrms_attendance_updated', handleSync);
+      window.removeEventListener('hrms_today_punches_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
   }, []);
 
   // Sync current month with selected month/year
@@ -98,7 +435,8 @@ const MyAttendance = () => {
   };
 
   const getAttendanceForDate = (dateStr) => {
-    return records.find(record => record.date === dateStr);
+    const target = normalizeDate(dateStr);
+    return records.find(record => normalizeDate(record.date) === target);
   };
 
   const isFutureDate = (dateStr) => {
@@ -113,16 +451,31 @@ const MyAttendance = () => {
     if (isFutureDate(dateStr)) return '';
     
     const record = getAttendanceForDate(dateStr);
+    const hasWorked = record && (
+      record.status === 'PRESENT' || 
+      record.status === 'HALF_DAY' || 
+      record.status === 'LEAVE' || 
+      record.onSite ||
+      Boolean(record.checkIn)
+    );
+
+    // If date is before joining date AND record is not marked present/leave, show as blank
+    if (joiningDate && normalizeDate(dateStr) < normalizeDate(joiningDate) && !hasWorked) {
+      return '';
+    }
+    
     if (!record) return '';
     
+    const status = normalizeStatus(record.status, record.checkIn);
+
     // Apply status filter to calendar view
     if (statusFilter !== 'all') {
-      if (record.status?.toLowerCase() !== statusFilter.toLowerCase()) {
+      if (status.toLowerCase() !== statusFilter.toLowerCase()) {
         return '';
       }
     }
     
-    switch(record.status) {
+    switch(status) {
       case 'PRESENT': return 'calendar-day-present';
       case 'ABSENT': return 'calendar-day-absent';
       case 'LEAVE': return 'calendar-day-leave';
@@ -133,8 +486,18 @@ const MyAttendance = () => {
   };
 
   const getStatusTooltip = (dateStr) => {
-    if (isFutureDate(dateStr)) return 'Future date - No data yet';
     const record = getAttendanceForDate(dateStr);
+    const hasWorked = record && (
+      record.status === 'PRESENT' || 
+      record.status === 'HALF_DAY' || 
+      record.status === 'LEAVE' || 
+      record.onSite ||
+      Boolean(record.checkIn)
+    );
+    if (joiningDate && normalizeDate(dateStr) < normalizeDate(joiningDate) && !hasWorked) {
+      return 'Not Joined Yet';
+    }
+    if (isFutureDate(dateStr)) return 'Future date - No data yet';
     if (!record) return 'No record';
     if (record.status === 'LEAVE' && record.leaveType) {
       return `${record.status} (${record.leaveType})`;
@@ -150,7 +513,7 @@ const MyAttendance = () => {
     const month = currentMonth.getMonth();
     const daysInMonth = getDaysInMonth(year, month);
     const firstDay = getFirstDayOfMonth(year, month);
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayStr();
     
     const days = [];
     // Add empty cells for days before month starts
@@ -193,18 +556,34 @@ const MyAttendance = () => {
 
   // Calculate summary stats for the selected month/year
   const monthRecords = records.filter(record => {
+    if (!record || !record.date) return false;
+    const norm = normalizeDate(record.date);
+    if (!norm) return false;
+    const parts = norm.split('-');
+    if (parts.length >= 2) {
+      return (parseInt(parts[1], 10) - 1) === selectedMonth && parseInt(parts[0], 10) === selectedYear;
+    }
     const recordDate = new Date(record.date);
     return recordDate.getMonth() === selectedMonth && recordDate.getFullYear() === selectedYear;
   });
   
-  const workingDaysRecords = monthRecords.filter(r => r.status !== 'WEEKEND');
+  // Calculate attendance metrics: keep present/halfday/leave records, and exclude pre-joining absents
+  const activeRecords = monthRecords.filter(r => {
+    if (!joiningDate) return true;
+    const normDate = normalizeDate(r.date);
+    const normJoin = normalizeDate(joiningDate);
+    const status = normalizeStatus(r.status, r.checkIn);
+    if (status === 'PRESENT' || status === 'HALF_DAY' || status === 'LEAVE' || r.onSite || r.checkIn) return true;
+    return normDate >= normJoin;
+  });
+  const workingDaysRecords = activeRecords.filter(r => normalizeStatus(r.status, r.checkIn) !== 'WEEKEND');
   
   const summary = {
     total: workingDaysRecords.length,
-    present: workingDaysRecords.filter(r => r.status === 'PRESENT').length,
-    absent: workingDaysRecords.filter(r => r.status === 'ABSENT').length,
-    halfDay: workingDaysRecords.filter(r => r.status === 'HALF_DAY').length,
-    leave: workingDaysRecords.filter(r => r.status === 'LEAVE').length,
+    present: workingDaysRecords.filter(r => normalizeStatus(r.status, r.checkIn) === 'PRESENT').length,
+    absent: workingDaysRecords.filter(r => normalizeStatus(r.status, r.checkIn) === 'ABSENT').length,
+    halfDay: workingDaysRecords.filter(r => normalizeStatus(r.status, r.checkIn) === 'HALF_DAY').length,
+    leave: workingDaysRecords.filter(r => normalizeStatus(r.status, r.checkIn) === 'LEAVE').length,
     totalHours: workingDaysRecords.reduce((sum, r) => sum + (r.hours || 0), 0).toFixed(1)
   };
 
@@ -224,8 +603,11 @@ const MyAttendance = () => {
 
         <div className="attendance-header">
           <h1>My Attendance History</h1>
-          <p>View and track all your attendance records</p>
+          <p>View and track all your attendance records and monthly calendar</p>
         </div>
+
+        {/* ── Shift Punch Widget ── */}
+        <ShiftPunchWidget user={user} embeddedMode={true} />
 
         {/* Summary Cards - Compact */}
         <div className="summary-grid" style={{ 
@@ -492,6 +874,91 @@ const MyAttendance = () => {
             </div>
           </div>
         )}
+
+        {/* Attendance Table Card */}
+        <div className="attendance-table-card" style={{ marginTop: '24px', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>
+              Daily Attendance &amp; Shift Log
+            </h3>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              {monthRecords.length} recorded shift{monthRecords.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-surface, #f8fafc)', borderBottom: '1px solid var(--border-light, #e2e8f0)', color: 'var(--text-muted, #64748b)' }}>
+                  <th style={{ padding: '12px 16px', fontWeight: '600' }}>Date</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '600' }}>Shift</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '600' }}>Check In</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '600' }}>Check Out</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '600' }}>Hours</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '600' }}>Overtime</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '600' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No attendance records for {monthNames[selectedMonth]} {selectedYear}. Use the Check-in button above to clock in!
+                    </td>
+                  </tr>
+                ) : (
+                  monthRecords
+                    .slice()
+                    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+                    .map((r, i) => (
+                      <tr key={r.id || i} style={{ borderBottom: '1px solid var(--border-light, #f1f5f9)' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                          {r.date}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontSize: '11px',
+                            fontWeight: '700'
+                          }}>
+                            {r.shiftCode || 'GS'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', color: r.checkIn ? '#059669' : '#94a3b8' }}>
+                          {r.checkIn ? format12Hour(r.checkIn) : '--:--'}
+                          {r.isLate && <span style={{ fontSize: '10px', color: '#dc2626', marginLeft: '4px' }}>({r.lateMinutes}m late)</span>}
+                        </td>
+                        <td style={{ padding: '12px 16px', color: r.checkOut ? '#dc2626' : '#94a3b8' }}>
+                          {r.checkOut ? format12Hour(r.checkOut) : '--:--'}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                          {r.hours > 0 ? `${Number(r.hours).toFixed(1)} hrs` : '--'}
+                        </td>
+                        <td style={{ padding: '12px 16px', color: r.overtimeHours > 0 ? '#10b981' : '#94a3b8', fontWeight: r.overtimeHours > 0 ? '700' : '400' }}>
+                          {r.overtimeHours > 0 ? `+${Number(r.overtimeHours).toFixed(1)} hrs` : '0.0 hrs'}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            background: r.status === 'PRESENT' ? '#ecfdf5' : r.status === 'HALF_DAY' ? '#fffbeb' : r.status === 'LEAVE' ? '#f5f3ff' : '#fee2e2',
+                            color: r.status === 'PRESENT' ? '#065f46' : r.status === 'HALF_DAY' ? '#92400e' : r.status === 'LEAVE' ? '#5b21b6' : '#991b1b'
+                          }}>
+                            {r.statusLabel || r.status || 'PENDING'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </>
   );

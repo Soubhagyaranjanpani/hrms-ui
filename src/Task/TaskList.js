@@ -70,9 +70,38 @@ export default function TaskList({ user }) {
   const navigate    = useNavigate();
   const currentUser = user || getUser();
 
+  const getNormalizedRole = () => {
+    try {
+      const uData = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA) || '{}');
+      const raw = localStorage.getItem(STORAGE_KEYS.ROLE) ||
+                  localStorage.getItem('roleName') ||
+                  localStorage.getItem('role') ||
+                  localStorage.getItem('userRole') ||
+                  currentUser?.role ||
+                  currentUser?.roleName ||
+                  currentUser?.role?.name ||
+                  uData?.role ||
+                  uData?.roleName ||
+                  uData?.role?.name;
+      if (raw) {
+        let s = typeof raw === 'object' ? (raw.name || raw.roleName || raw.role || '') : String(raw);
+        if (s.toUpperCase().startsWith('ROLE_')) s = s.substring(5);
+        const up = s.toUpperCase().replace(/[\s_-]+/g, '');
+        if (up === 'ADMIN' || up === 'ADMINISTRATOR' || up === 'SUPERADMIN') return 'Admin';
+        if (up === 'HR' || up === 'HUMANRESOURCE' || up === 'HUMANRESOURCES' || up === 'HROFFICER' || up === 'HRMANAGER') return 'Hr';
+        if (up === 'MANAGER') return 'Manager';
+        return 'Employee';
+      }
+    } catch {}
+    return 'Employee';
+  };
+
+  const userRole = getNormalizedRole();
+  const isEmployee = userRole === 'Employee';
+
   const [tasks,        setTasks]        = useState([]);
   const [loading,      setLoading]      = useState(true);
-  const [filterSource, setFilterSource] = useState('all'); // 'all' | 'mine'
+  const [filterSource, setFilterSource] = useState(isEmployee ? 'mine' : 'all'); // 'all' | 'mine'
 
   const [view,           setView]           = useState('table');
   const [filterStatus,   setFilterStatus]   = useState('All');
@@ -107,7 +136,7 @@ export default function TaskList({ user }) {
     const fetchTasks = async () => {
       setLoading(true);
       try {
-        const url = filterSource === 'mine'
+        const url = (isEmployee || filterSource === 'mine')
           ? API_ENDPOINTS.GET_MY_TASKS
           : API_ENDPOINTS.GET_ALL_TASKS;
 
@@ -180,7 +209,9 @@ export default function TaskList({ user }) {
             <FaTasks />
           </div>
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, fontFamily: "'Sora',sans-serif", letterSpacing: '-0.02em' }}>Task List</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, fontFamily: "'Sora',sans-serif", letterSpacing: '-0.02em' }}>
+              {isEmployee ? 'My Tasks' : 'Task List'}
+            </h1>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
               {loading ? 'Loading…' : `${filtered.length} task${filtered.length !== 1 ? 's' : ''} found`}
             </p>
@@ -194,18 +225,24 @@ export default function TaskList({ user }) {
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 18 }}>
-        {/* Assign filter — triggers new API fetch */}
-        <select
-          className="tl-sel"
-          value={filterSource}
-          onChange={e => {
-            setFilterSource(e.target.value);
-            setFilterStatus('All');
-          }}
-        >
-          <option value="all">All Tasks</option>
-          <option value="mine">Assigned to Me</option>
-        </select>
+        {/* Assign filter — triggers new API fetch (Admin/HR/Manager only) */}
+        {!isEmployee ? (
+          <select
+            className="tl-sel"
+            value={filterSource}
+            onChange={e => {
+              setFilterSource(e.target.value);
+              setFilterStatus('All');
+            }}
+          >
+            <option value="all">All Tasks</option>
+            <option value="mine">Assigned to Me</option>
+          </select>
+        ) : (
+          <div style={{ background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 9, border: '1.5px solid var(--border-medium)', fontSize: 12, fontWeight: 600, color: 'var(--accent-indigo)' }}>
+            Assigned to Me
+          </div>
+        )}
 
         <select className="tl-sel" value={filterStatus}   onChange={e => setFilterStatus(e.target.value)}>
           {STATUSES_FILTER.map(s => <option key={s}>{s}</option>)}

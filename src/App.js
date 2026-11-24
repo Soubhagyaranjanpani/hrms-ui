@@ -25,6 +25,8 @@ import Designation from './Masters/Designation';
 import AttendancePolicy from './pages/AttendancePolicy';
 import AttendanceDashboard from './pages/AttendanceDashboard';
 import AttendanceSummary from './pages/AttendanceSummary';
+import RosterManagement from './pages/RosterManagement';
+import MyRoster from './pages/MyRoster';
 import Profile from './pages/Profile';
 import TaskDashboard from './Task/TaskDashboard';
 import CreateTask from './Task/CreateTask';
@@ -180,6 +182,11 @@ function App() {
           <Route path="attendance-policy" element={<AttendancePolicy user={currentUser} />} />
           <Route path="attendance-dashboard" element={<AttendanceDashboard user={currentUser} />} />
           <Route path="attendance-summary" element={<AttendanceSummary user={currentUser} />} />
+          <Route path="roster-management" element={<RosterManagement user={currentUser} />} />
+          <Route path="my-shift" element={<MyRoster user={currentUser} />} />
+          <Route path="MyShift" element={<MyRoster user={currentUser} />} />
+          <Route path="my-roster" element={<MyRoster user={currentUser} />} />
+          <Route path="MyRoster" element={<MyRoster user={currentUser} />} />
           <Route path="profile" element={<Profile user={currentUser} />} />
           <Route path="approvedLeaves" element={<ApprovedLeaves user={currentUser} />} />
           <Route path="leavePolicy" element={<LeavePolicy user={currentUser} />} />

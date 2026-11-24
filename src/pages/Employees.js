@@ -8,7 +8,7 @@ import {
 } from 'react-icons/fa';
 import { toast } from '../components/Toast'; 
 import LoadingSpinner from '../components/LoadingSpinner';
-import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
+import { BASE_URL, STORAGE_KEYS, API_ENDPOINTS } from '../config/api.config';
 import axios from 'axios';
 
 /* ─── Validation Rules ─── */
@@ -120,7 +120,7 @@ const Employees = ({ user }) => {
   const [submitting, setSubmitting] = useState(false);
 
   const [page, setPage] = useState(0);
-  const [rowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(100);
 
   const [searchName, setSearchName] = useState('');
 
@@ -392,16 +392,69 @@ const resetExperienceForm = () => {
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
     try {
+      let rawList = [];
+      const seenRawIds = new Set();
+      const addRawEmployees = (items) => {
+        if (!Array.isArray(items)) return;
+        items.forEach(item => {
+          if (item && item.id !== undefined && item.id !== null) {
+            const k = String(item.id);
+            if (!seenRawIds.has(k)) {
+              seenRawIds.add(k);
+              rawList.push(item);
+            }
+          }
+        });
+      };
+
       const res = await axios.get(`${BASE_URL}/api/employees?page=0&size=1000`, axiosConfig);
-      if (res.data?.status === 200 && res.data?.response) {
-        const cleaned = (res.data.response.content || []).map(emp => ({
-          ...emp,
-          name: cleanName(emp.name)
-        }));
-        setAllEmployees(cleaned);
-      } else {
-        setAllEmployees([]);
+      const respObj = res.data?.response || res.data;
+      if (respObj) {
+        const page0Content = respObj.content || (Array.isArray(respObj) ? respObj : (Array.isArray(res.data) ? res.data : []));
+        addRawEmployees(page0Content);
+
+        const totalPages = respObj.totalPages || (respObj.totalElements ? Math.ceil(respObj.totalElements / (respObj.size || 10)) : 1);
+        if (totalPages > 1) {
+          const pagePromises = [];
+          for (let p = 1; p < totalPages; p++) {
+            pagePromises.push(
+              axios.get(`${BASE_URL}/api/employees?page=${p}&size=1000`, axiosConfig)
+                .then(r => r.data?.response?.content || r.data?.content || (Array.isArray(r.data?.response) ? r.data.response : []))
+                .catch(() => [])
+            );
+          }
+          const allOtherPages = await Promise.all(pagePromises);
+          allOtherPages.forEach(pContent => addRawEmployees(pContent));
+        } else if (rawList.length <= 15) {
+          // Probe additional pages in case size was capped without totalPages
+          for (let p = 1; p <= 10; p++) {
+            try {
+              const nextRes = await axios.get(`${BASE_URL}/api/employees?page=${p}&size=1000`, axiosConfig);
+              const nextObj = nextRes.data?.response || nextRes.data;
+              const nextContent = nextObj?.content || (Array.isArray(nextObj) ? nextObj : []);
+              if (!nextContent || nextContent.length === 0) break;
+              const prevCount = rawList.length;
+              addRawEmployees(nextContent);
+              if (rawList.length === prevCount || nextObj?.last === true) break;
+            } catch {
+              break;
+            }
+          }
+        }
       }
+
+      // Merge employee dropdown records if any were omitted
+      try {
+        const dropRes = await axios.get(API_ENDPOINTS.EMPLOYEE_DROPDOWN, axiosConfig);
+        const dropData = dropRes.data?.response || dropRes.data?.data || (Array.isArray(dropRes.data) ? dropRes.data : []);
+        addRawEmployees(dropData);
+      } catch {}
+
+      const cleaned = rawList.map(emp => ({
+        ...emp,
+        name: cleanName(emp.name || `${emp.firstName || ''} ${emp.lastName || ''}`.trim())
+      }));
+      setAllEmployees(cleaned);
     } catch (err) {
       toast.error('Error', err.response?.data?.message || 'Failed to fetch employees');
       setAllEmployees([]);
@@ -414,11 +467,13 @@ const resetExperienceForm = () => {
     const query = searchName.toLowerCase().trim();
     if (!query) return true;
     return (
-      emp.name?.toLowerCase().includes(query) ||
-      emp.email?.toLowerCase().includes(query) ||
-      emp.departmentName?.toLowerCase().includes(query) ||
-      emp.roleName?.toLowerCase().includes(query) ||
-      emp.branchName?.toLowerCase().includes(query)
+      (emp.name && emp.name.toLowerCase().includes(query)) ||
+      (emp.email && emp.email.toLowerCase().includes(query)) ||
+      (emp.employeeCode && emp.employeeCode.toLowerCase().includes(query)) ||
+      (emp.departmentName && emp.departmentName.toLowerCase().includes(query)) ||
+      (emp.designation && emp.designation.toLowerCase().includes(query)) ||
+      (emp.roleName && emp.roleName.toLowerCase().includes(query)) ||
+      (emp.branchName && emp.branchName.toLowerCase().includes(query))
     );
   });
 
@@ -974,6 +1029,108 @@ const resetExperienceForm = () => {
   const isFieldOk = (f) => touched[f] && !errors[f] && (typeof formData[f] === 'string' ? formData[f].trim() : formData[f]);
   const isFieldErr = (f) => touched[f] && !!errors[f];
 
+  const getNormalizedRole = () => {
+    try {
+      const uData = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA) || '{}');
+      const raw = localStorage.getItem(STORAGE_KEYS.ROLE) ||
+                  localStorage.getItem('roleName') ||
+                  localStorage.getItem('role') ||
+                  localStorage.getItem('userRole') ||
+                  user?.role ||
+                  user?.roleName ||
+                  user?.role?.name ||
+                  uData?.role ||
+                  uData?.roleName ||
+                  uData?.role?.name;
+      if (raw) {
+        let str = typeof raw === 'object' ? (raw.name || raw.roleName || raw.role || '') : String(raw);
+        if (str.toUpperCase().startsWith('ROLE_')) str = str.substring(5);
+        const up = str.toUpperCase().replace(/[\s_-]+/g, '');
+        if (up === 'ADMIN' || up === 'ADMINISTRATOR' || up === 'SUPERADMIN') return 'Admin';
+        if (up === 'HR' || up === 'HUMANRESOURCE' || up === 'HUMANRESOURCES' || up === 'HROFFICER' || up === 'HRMANAGER') return 'Hr';
+        if (up === 'MANAGER') return 'Manager';
+        return 'Employee';
+      }
+    } catch {}
+    return 'Employee';
+  };
+
+  const isEmployee = getNormalizedRole() === 'Employee';
+
+  if (isEmployee) {
+    return (
+      <div style={{
+        minHeight: '80vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+        background: '#f8fafc',
+        fontFamily: "'DM Sans', sans-serif"
+      }}>
+        <div style={{
+          maxWidth: '500px',
+          width: '100%',
+          background: '#ffffff',
+          borderRadius: '16px',
+          border: '1px solid #fee2e2',
+          padding: '40px 30px',
+          textAlign: 'center',
+          boxShadow: '0 10px 25px -5px rgba(220, 38, 38, 0.08)'
+        }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            background: '#fee2e2',
+            color: '#dc2626',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '28px',
+            marginBottom: '20px'
+          }}>
+            <FaExclamationCircle />
+          </div>
+          <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', marginBottom: '8px', fontFamily: "'Sora', sans-serif" }}>
+            Access Restricted
+          </h2>
+          <div style={{
+            display: 'inline-block',
+            background: '#fef2f2',
+            color: '#991b1b',
+            border: '1px solid #fecaca',
+            borderRadius: '20px',
+            padding: '4px 14px',
+            fontSize: '12px',
+            fontWeight: '700',
+            marginBottom: '16px'
+          }}>
+            Restricted Directory
+          </div>
+          <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.6, marginBottom: '24px' }}>
+            Employees do not have access to view or manage the company-wide employee directory.
+          </p>
+          <button
+            onClick={() => window.location.href = '/dashboard'}
+            style={{
+              background: '#6B1E2E',
+              color: '#ffffff',
+              border: 'none',
+              padding: '10px 24px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
@@ -1122,26 +1279,52 @@ const resetExperienceForm = () => {
               </table>
             </div>
 
-            {totalPages > 1 && (
-              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span className="emp-page-info">
+            {totalItems > 0 && (
+              <div className="emp-pagination" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', padding: '12px 16px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <span className="emp-page-info" style={{ color: '#475569', fontSize: '13px', fontWeight: 500 }}>
                     Showing {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} employees
                   </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>Per page:</span>
+                    <select
+                      value={rowsPerPage >= 1000 ? 1000 : rowsPerPage}
+                      onChange={(e) => {
+                        setRowsPerPage(Number(e.target.value));
+                        setPage(0);
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '12px',
+                        background: '#fff',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={1000}>All ({totalItems})</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="emp-page-controls">
-                  <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
-                  {getPaginationRange().map((pg, i) =>
-                    pg === '...' ? (
-                      <span key={`dots-${i}`} className="emp-page-dots">…</span>
-                    ) : (
-                      <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
-                        {pg + 1}
-                      </button>
-                    )
-                  )}
-                  <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
-                </div>
+                {totalPages > 1 && (
+                  <div className="emp-page-controls">
+                    <button className="emp-page-btn" disabled={page === 0} onClick={() => setPage(page - 1)}>← Prev</button>
+                    {getPaginationRange().map((pg, i) =>
+                      pg === '...' ? (
+                        <span key={`dots-${i}`} className="emp-page-dots">…</span>
+                      ) : (
+                        <button key={pg} className={`emp-page-num ${pg === page ? 'active' : ''}`} onClick={() => setPage(pg)}>
+                          {pg + 1}
+                        </button>
+                      )
+                    )}
+                    <button className="emp-page-btn" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next →</button>
+                  </div>
+                )}
               </div>
             )}
           </div>

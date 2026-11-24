@@ -37,8 +37,20 @@ export const API_ENDPOINTS = {
 
   // ── Policy ──────────────────────────────────
   GET_ACTIVE_POLICY: `${BASE_URL}/api/policies/attendance/active`,
+  GET_ALL_POLICIES: `${BASE_URL}/api/policies/attendance`,
   CREATE_POLICY: `${BASE_URL}/api/policies/attendance`,
+  UPDATE_POLICY: (id) => `${BASE_URL}/api/policies/attendance/${id}`,
+  DELETE_POLICY: (id) => `${BASE_URL}/api/policies/attendance/${id}`,
   ACTIVATE_POLICY: (id) => `${BASE_URL}/api/policies/attendance/activate/${id}`,
+
+  // ── Shift Master & Policies ───────────────────
+  GET_SHIFTS: `${BASE_URL}/api/shifts`,
+  CREATE_SHIFT: `${BASE_URL}/api/shifts`,
+  UPDATE_SHIFT: (id) => `${BASE_URL}/api/shifts/${id}`,
+  DELETE_SHIFT: (id) => `${BASE_URL}/api/shifts/${id}`,
+  GET_SHIFT_SETTINGS: `${BASE_URL}/api/shifts/settings`,
+  UPDATE_SHIFT_SETTINGS: `${BASE_URL}/api/shifts/settings`,
+  GET_MY_SHIFT: `${BASE_URL}/api/shifts/my-shift`,
 
   // ── Leave ───────────────────────────────────
   APPLY_LEAVE: `${BASE_URL}/api/leaves/apply`,

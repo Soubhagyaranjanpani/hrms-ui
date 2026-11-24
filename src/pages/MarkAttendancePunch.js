@@ -9,6 +9,12 @@ import {
 } from 'react-icons/fa';
 import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
 import { toast } from '../components/Toast';
+import {
+  getCurrentUserTodayShift,
+  calculateShiftAttendance,
+  syncAttendanceRecord,
+  getUnifiedTodayAttendance
+} from '../utils/rosterUtils';
 import './MarkAttendance.css';
 
 // Corporate Office reference coordinates (DLF Cyber City / Tech Park)
@@ -119,29 +125,25 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
   // 1. Initial Load of Today's Punch State from LocalStorage and Backend
   const loadTodayPunchState = useCallback(() => {
     const todayStr = getTodayKey();
-    const storedPunches = localStorage.getItem('hrms_today_punches');
-    if (storedPunches) {
-      try {
-        const parsed = JSON.parse(storedPunches);
-        if (parsed.date === todayStr) {
-          setTodayRecord(parsed);
-          setWorkMode(parsed.workMode || 'OFFICE');
-          if (parsed.selfieUrl) {
-            setCapturedSelfie(parsed.selfieUrl);
-          }
-          return;
-        }
-      } catch (err) {
-        console.error('Failed to parse today punches', err);
+    const unified = getUnifiedTodayAttendance();
+    if (unified && unified.date === todayStr && (unified.checkIn || unified.checkOut)) {
+      setTodayRecord(unified);
+      setWorkMode(unified.workMode || 'OFFICE');
+      if (unified.selfieUrl) {
+        setCapturedSelfie(unified.selfieUrl);
       }
+      return;
     }
 
     // Default empty record for today
+    const activeShift = getCurrentUserTodayShift();
     setTodayRecord({
       date: todayStr,
       status: 'IDLE',
       checkIn: null,
       checkOut: null,
+      shiftCode: activeShift.code,
+      shiftName: activeShift.name,
       onBreak: false,
       breakStartTime: null,
       totalBreakSeconds: 0,
@@ -328,11 +330,21 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
       console.log('Backend check-in sync notice (proceeding with local verified record):', err.message);
     }
 
+    const activeShift = getCurrentUserTodayShift();
+    const calc = calculateShiftAttendance({
+      checkIn: timeStr,
+      checkOut: null,
+      shift: activeShift
+    });
+
     // Construct local state
     const newRecord = {
       date: todayStr,
       employee: currentUserName,
-      status: 'WORKING',
+      status: calc.status,
+      statusLabel: calc.statusLabel,
+      shiftCode: activeShift.code,
+      shiftName: activeShift.name,
       checkIn: timeStr,
       checkOut: null,
       workMode,
@@ -340,6 +352,9 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
       breakStartTime: null,
       totalBreakSeconds: 0,
       workingHours: 0,
+      overtimeHours: 0,
+      isLate: calc.isLate,
+      lateMinutes: calc.lateMinutes,
       selfieUrl: capturedSelfie,
       location: {
         address: geoState.address,
@@ -355,23 +370,19 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
           time: timeStr,
           mode: workMode,
           location: geoState.address,
-          note: punchNote || 'Shift Started'
+          note: punchNote || `Shift Started (${activeShift.name})`
         }
       ]
     };
 
     setTodayRecord(newRecord);
-    localStorage.setItem('hrms_today_punches', JSON.stringify(newRecord));
+    syncAttendanceRecord(newRecord, true);
 
-    // Also sync to global history
-    syncToGlobalAttendance(newRecord);
-
-    toast.success('Punch In Recorded!', `Clocked in at ${formatTimeOnly(now)} (${workMode})`);
+    const lateNotice = calc.isLate ? ` (Late by ${calc.lateMinutes}m)` : '';
+    toast.success('Punch In Recorded!', `Clocked in at ${formatTimeOnly(now)} (${workMode}, Shift: ${activeShift.name})${lateNotice}`);
     setLoading(false);
     stopCamera();
 
-    // Notify listeners
-    window.dispatchEvent(new Event('hrms_attendance_updated'));
     if (onAttendanceChange) onAttendanceChange();
   };
 
@@ -488,6 +499,14 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
       console.log('Backend check-out notice (saved to verified local audit):', err.message);
     }
 
+    const activeShift = getCurrentUserTodayShift();
+    const calc = calculateShiftAttendance({
+      checkIn: todayRecord.checkIn,
+      checkOut: timeStr,
+      shift: activeShift,
+      breakMinutes: Math.round(finalBreakSecs / 60)
+    });
+
     const updatedPunches = [
       ...(todayRecord.punches || []),
       {
@@ -502,26 +521,30 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
 
     const completedRecord = {
       ...todayRecord,
-      status: totalWorkingHours >= 4.5 ? (totalWorkingHours >= 8.0 ? 'PRESENT' : 'HALF_DAY') : 'PRESENT',
+      status: calc.status,
+      statusLabel: calc.statusLabel,
+      shiftCode: activeShift.code,
+      shiftName: activeShift.name,
       checkOut: timeStr,
       onBreak: false,
       breakStartTime: null,
       totalBreakSeconds: finalBreakSecs,
-      workingHours: totalWorkingHours,
+      workingHours: calc.workingHours,
+      overtimeHours: calc.overtimeHours,
+      isEarlyExit: calc.isEarlyExit,
+      earlyExitMinutes: calc.earlyExitMinutes,
       punches: updatedPunches
     };
 
     setTodayRecord(completedRecord);
-    localStorage.setItem('hrms_today_punches', JSON.stringify(completedRecord));
-
-    // Sync to global logs
-    syncToGlobalAttendance(completedRecord);
+    syncAttendanceRecord(completedRecord, true);
 
     setShowClockOutModal(false);
     setLoading(false);
 
-    toast.success('Shift Completed!', `Clocked out at ${formatTimeOnly(now)}. Total productive: ${totalWorkingHours} hrs.`);
-    window.dispatchEvent(new Event('hrms_attendance_updated'));
+    const statusText = calc.status === 'HALF_DAY' ? 'Half Day' : 'Full Day';
+    const otNotice = calc.overtimeHours > 0 ? ` (+${calc.overtimeHours}h OT)` : '';
+    toast.success('Shift Completed!', `Clocked out at ${formatTimeOnly(now)}. Total productive: ${calc.workingHours} hrs (${statusText})${otNotice}.`);
     if (onAttendanceChange) onAttendanceChange();
   };
 

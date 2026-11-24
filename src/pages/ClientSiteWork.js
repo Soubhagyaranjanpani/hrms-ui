@@ -493,10 +493,24 @@ const ClientSiteWork = ({ user, defaultTab, embedded = false, onBackToAttendance
       }
 
       // Automatically register attendance as PRESENT in hrms_onsite_attendance
-      const visitDates = approveModalItem.dates || [];
+      const rawDates = Array.isArray(approveModalItem.dates) && approveModalItem.dates.length > 0
+        ? approveModalItem.dates
+        : (approveModalItem.date ? [approveModalItem.date] : (approveModalItem.visitDate ? [approveModalItem.visitDate] : []));
+      const visitDates = rawDates.map(d => {
+        if (!d) return '';
+        if (Array.isArray(d) && d.length >= 3) {
+          return `${d[0]}-${String(d[1]).padStart(2, '0')}-${String(d[2]).padStart(2, '0')}`;
+        }
+        const s = String(d).trim();
+        if (s.includes('T')) return s.split('T')[0];
+        if (s.includes(' ')) return s.split(' ')[0];
+        return s;
+      }).filter(Boolean);
+
       const empIdent = (approveModalItem.submittedBy || 'employee').toLowerCase();
       const meta = getEmployeeMeta(approveModalItem);
       const empName = meta?.displayName || meta?.name || approveModalItem.submittedByName || empIdent;
+      const empId = meta?.id || approveModalItem.employeeId || approveModalItem.id;
 
       try {
         const existingOnSite = JSON.parse(localStorage.getItem(STORAGE_ONSITE_KEY) || '[]');
@@ -505,6 +519,7 @@ const ClientSiteWork = ({ user, defaultTab, embedded = false, onBackToAttendance
           verificationId: approveModalItem.id,
           employee: empIdent,
           employeeName: empName,
+          employeeId: empId,
           date: dateStr,
           status: 'PRESENT',
           onSite: true,
