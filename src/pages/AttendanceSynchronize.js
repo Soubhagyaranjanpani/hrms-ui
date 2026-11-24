@@ -797,4 +797,4 @@ const AttendanceSynchronization = () => {
   );
 };
 
-export default AttendanceSynchronization;  
+export default AttendanceSynchronization;

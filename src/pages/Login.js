@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash, FaChartLine, FaUsers, FaCalendarAlt, FaShieldAlt, FaRocket, FaArrowRight, FaCheckCircle } from 'react-icons/fa';
-import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
+import { BASE_URL, API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
 import { toast } from '../components/Toast';
 import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
 
@@ -51,14 +51,43 @@ const Login = ({ onLogin }) => {
 
       const { jwtToken, username, employeeId, roleName } = data.response;
 
+      // Detect role robustly from response or token
+      let resolvedRole = roleName || data.response?.role || (Array.isArray(data.response?.roles) ? data.response.roles[0] : null);
+      if (!resolvedRole && jwtToken && jwtToken.includes('.')) {
+        try {
+          const payload = JSON.parse(atob(jwtToken.split('.')[1]));
+          const tr = payload.role || payload.roles || payload.roleName || payload.authorities || payload.auth;
+          if (Array.isArray(tr)) resolvedRole = tr[0];
+          else if (tr) resolvedRole = tr;
+        } catch {}
+      }
+      if (!resolvedRole) resolvedRole = 'EMPLOYEE';
+
       // Save to localStorage
       localStorage.setItem(STORAGE_KEYS.JWT_TOKEN, jwtToken);
       localStorage.setItem(STORAGE_KEYS.EMPLOYEE_ID, employeeId);
       localStorage.setItem(STORAGE_KEYS.USERNAME, username);
-      
-      // Save role directly from API response (no fallback)
-      if (roleName) {
-        localStorage.setItem(STORAGE_KEYS.ROLE, roleName.toUpperCase());
+      localStorage.setItem(STORAGE_KEYS.ROLE, String(resolvedRole).toUpperCase());
+      localStorage.setItem('roleName', String(resolvedRole).toUpperCase());
+      localStorage.setItem('role', String(resolvedRole).toUpperCase());
+
+      // Save joining date if returned, or fetch profile in background to cache DOJ
+      const rawJoiningDate = data.response?.joiningDate || data.response?.dateOfJoining || data.response?.appointment?.joiningDate || data.response?.doj;
+      if (rawJoiningDate) {
+        localStorage.setItem('employee_joining_date', String(rawJoiningDate).split('T')[0]);
+      } else if (employeeId && jwtToken) {
+        fetch(`${BASE_URL}/api/employee-profile/full/${employeeId}`, {
+          headers: { Authorization: `Bearer ${jwtToken}` }
+        })
+          .then(r => r.json())
+          .then(pData => {
+            const profile = pData?.response || pData;
+            const foundDoj = profile?.joiningDate || profile?.dateOfJoining || profile?.appointment?.joiningDate;
+            if (foundDoj) {
+              localStorage.setItem('employee_joining_date', String(foundDoj).split('T')[0]);
+            }
+          })
+          .catch(() => {});
       }
 
       if (rememberMe) {
@@ -72,9 +101,10 @@ const Login = ({ onLogin }) => {
         id: employeeId,
         email: username,
         name: username.split('@')[0],
-        role: roleName ? roleName.toUpperCase() : null,
+        role: String(resolvedRole).toUpperCase(),
         avatar: username[0].toUpperCase(),
         jwtToken,
+        joiningDate: rawJoiningDate ? String(rawJoiningDate).split('T')[0] : undefined,
       };
       
       localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));

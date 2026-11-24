@@ -3,11 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import {
   FaUsers, FaTasks, FaRupeeSign, FaStar,
   FaUserPlus, FaLayerGroup, FaRobot, FaChevronRight, FaCircle,
-  FaUser, FaCheckCircle, FaClock, FaTrophy, FaSync
+  FaUser, FaCheckCircle, FaClock, FaTrophy, FaSync, FaCalendarAlt, FaFileAlt
 } from 'react-icons/fa';
 import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
 import axios from 'axios';
 import LoadingSpinner from '../components/LoadingSpinner';
+import {
+  getUnifiedTodayAttendance,
+  getCurrentUserTodayShift,
+  getStoredShifts,
+  format12Hour
+} from '../utils/rosterUtils';
 
 /* ─── helpers ──────────────────────────────────────────────────── */
 
@@ -152,11 +158,68 @@ export default function Dashboard({ user }) {
 
   const s = d || {};
   const fname = clean(s.loggedInUserName || cu?.name || '').split(' ')[0] || 'there';
-  const role  = s.loggedInUserRole || cu?.roleName || '';
+
+  const getNormalizedRole = () => {
+    try {
+      const uData = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA) || '{}');
+      const raw = s.loggedInUserRole ||
+                  localStorage.getItem(STORAGE_KEYS.ROLE) ||
+                  localStorage.getItem('roleName') ||
+                  localStorage.getItem('role') ||
+                  localStorage.getItem('userRole') ||
+                  cu?.role ||
+                  cu?.roleName ||
+                  cu?.role?.name ||
+                  uData?.role ||
+                  uData?.roleName ||
+                  uData?.role?.name;
+      if (raw) {
+        let str = typeof raw === 'object' ? (raw.name || raw.roleName || raw.role || '') : String(raw);
+        if (str.toUpperCase().startsWith('ROLE_')) str = str.substring(5);
+        const up = str.toUpperCase().replace(/[\s_-]+/g, '');
+        if (up === 'ADMIN' || up === 'ADMINISTRATOR' || up === 'SUPERADMIN') return 'Admin';
+        if (up === 'HR' || up === 'HUMANRESOURCE' || up === 'HUMANRESOURCES' || up === 'HROFFICER' || up === 'HRMANAGER') return 'Hr';
+        if (up === 'MANAGER') return 'Manager';
+        return 'Employee';
+      }
+    } catch {}
+    return 'Employee';
+  };
+
+  const userRole = getNormalizedRole();
+  const isEmployee = userRole === 'Employee';
+  const role  = s.loggedInUserRole || cu?.roleName || userRole;
   const today = s.currentDate || ts.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const month = s.currentMonth || ts.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
   const hr    = ts.getHours();
   const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+
+  // ── Unified Shift & Attendance Interconnection ──
+  const [todayAttendance, setTodayAttendance] = useState(() => getUnifiedTodayAttendance());
+  const activeShift = useMemo(() => {
+    const shifts = getStoredShifts();
+    const code = todayAttendance?.shiftCode;
+    if (code) {
+      const found = shifts.find(sh => sh.code === code);
+      if (found) return found;
+    }
+    return getCurrentUserTodayShift();
+  }, [todayAttendance]);
+
+  useEffect(() => {
+    const handleSync = (e) => {
+      const rec = e?.detail || getUnifiedTodayAttendance();
+      setTodayAttendance(rec);
+    };
+    window.addEventListener('hrms_attendance_updated', handleSync);
+    window.addEventListener('hrms_today_punches_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('hrms_attendance_updated', handleSync);
+      window.removeEventListener('hrms_today_punches_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
   const tasks = s.recentTasks        || [];
   const emps  = s.recentEmployees    || [];
@@ -214,7 +277,54 @@ export default function Dashboard({ user }) {
   const payrollTotal    = (s.processedPayrollCount || 0) + (s.pendingPayrollCount || 0);
   const payrollPct      = payrollTotal > 0 ? Math.round(((s.processedPayrollCount || 0) / payrollTotal) * 100) : 0;
 
-  const kpis = [
+  const kpis = isEmployee ? [
+    {
+      label:  'My Tasks',
+      value:  TC.total,
+      sub:    TC.overdue > 0 ? `⚠ ${TC.overdue} overdue` : `${TC.completed} completed`,
+      trend:  `${completionRate}% completion rate`,
+      pct:    completionRate,
+      icon:   <FaTasks size={18} />, route: '/TaskList',
+    },
+    {
+      label:  'My Attendance',
+      value:  todayAttendance.checkOut
+        ? `${todayAttendance.workingHours || 0}h`
+        : todayAttendance.checkIn
+        ? 'On Duty'
+        : 'Not In',
+      sub:    todayAttendance.checkOut
+        ? (todayAttendance.status === 'HALF_DAY' ? 'Half Day Present' : 'Full Day Present')
+        : todayAttendance.checkIn
+        ? `In at ${format12Hour(todayAttendance.checkIn)}`
+        : `${activeShift.code} (${format12Hour(activeShift.startTime)} - ${format12Hour(activeShift.endTime)})`,
+      trend:  todayAttendance.isLate
+        ? `⚠️ Late by ${todayAttendance.lateMinutes}m`
+        : todayAttendance.checkOut
+        ? (todayAttendance.overtimeHours > 0 ? `OT: +${todayAttendance.overtimeHours}h` : 'Shift Completed')
+        : `${activeShift.name}`,
+      pct:    todayAttendance.checkOut
+        ? Math.min(100, Math.round(((todayAttendance.workingHours || 0) / (activeShift.durationHours || 8)) * 100))
+        : todayAttendance.checkIn ? 50 : 0,
+      icon:   <FaClock size={18} />, route: '/attendance-dashboard',
+    },
+    {
+      label:  'Apply Leave',
+      value:  'Leaves',
+      sub:    'Vacation & Time Off',
+      trend:  'Balance & Requests',
+      pct:    85,
+      icon:   <FaCalendarAlt size={18} />, route: '/leaves',
+    },
+    {
+      label:  'My Performance',
+      value:  (s.avgPerformanceRating || 0) > 0 ? `${s.avgPerformanceRating.toFixed(1)}/5` : perf.length > 0 ? `${perf[0].rating?.toFixed(1)}/5` : '—',
+      sub:    'Review & Appraisals',
+      trend:  'Goal tracking',
+      pct:    (s.avgPerformanceRating || 0) > 0 ? (s.avgPerformanceRating / 5) * 100 : 80,
+      icon:   <FaStar size={18} />, route: '/Performance',
+    },
+  ] : [
     {
       label:  'Total Employees',
       value:  s.totalEmployees || 0,
@@ -292,12 +402,17 @@ export default function Dashboard({ user }) {
         </div>
 
         <div style={{ display: 'flex', gap: 7 }}>
-          {[
+          {(isEmployee ? [
+            { l: 'My Tasks',      i: <FaTasks size={11} />,       p: '/TaskList' },
+            { l: 'My Attendance', i: <FaClock size={11} />,       p: '/attendance-dashboard' },
+            { l: 'Apply Leave',   i: <FaCalendarAlt size={11} />, p: '/leaves' },
+            { l: 'Documents',     i: <FaFileAlt size={11} />,     p: '/documents' },
+          ] : [
             { l: 'Employees', i: <FaUsers size={11} />,     p: '/Employees' },
             { l: 'Tasks',     i: <FaTasks size={11} />,     p: '/TaskDashboard' },
             { l: 'Payroll',   i: <FaRupeeSign size={10} />, p: '/payroll' },
             { l: 'Reviews',   i: <FaStar size={10} />,      p: '/Performance' },
-          ].map(m => (
+          ]).map(m => (
             <button key={m.l} className="nb" onClick={() => navigate(m.p)}>{m.i} {m.l}</button>
           ))}
         </div>
@@ -333,9 +448,9 @@ export default function Dashboard({ user }) {
         {/* TASKS */}
         <div className="card">
           <CardHeader
-            title="Recent Tasks"
+            title={isEmployee ? "My Recent Tasks" : "Recent Tasks"}
             sub={`${TC.inProgress} active · ${TC.inReview} in review · ${TC.overdue} overdue`}
-            btnLabel="All Tasks"
+            btnLabel={isEmployee ? "My Tasks" : "All Tasks"}
             onBtn={() => navigate('/TaskList')}
           />
           <div style={{ padding: '8px 16px 10px', display: 'flex', gap: 5, flexWrap: 'wrap', borderBottom: `1px solid ${C.border}` }}>
@@ -503,30 +618,71 @@ export default function Dashboard({ user }) {
       {/* ═══ ROW 2 — Employees / Depts / Payroll ═══════════════════ */}
       <div className="a4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
 
-        {/* RECENT EMPLOYEES */}
+        {/* RECENT EMPLOYEES / INDIVIDUAL EMPLOYEE PROFILE */}
         <div className="card">
-          <CardHeader title="Recent Joins" sub={`${s.totalEmployees || 0} total · ${s.newHiresThisMonth || 0} this month`} btnLabel="All Employees" onBtn={() => navigate('/Employees')} />
-          {emps.length === 0 ? (
-            <div style={{ padding: '24px 16px', textAlign: 'center', color: C.text3, fontSize: 12 }}>No employees yet</div>
-          ) : emps.map((e, i) => (
-            <React.Fragment key={e.id || i}>
-              <div className="rh" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', transition: 'background .1s' }}>
-                <Av name={e.name} sz={34} r={8} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</div>
-                  <div style={{ fontSize: 10.5, color: C.text3, marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
-                    {e.role && <span style={{ background: BRAND_L, color: BRAND, padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>{e.role}</span>}
-                    {e.department && <span>{e.department}</span>}
+          {isEmployee ? (
+            <>
+              <CardHeader title="My Employment Details" sub="Individual Staff Profile" />
+              <div style={{ padding: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                  <Av name={cu?.name || s.loggedInUserName || fname} sz={44} r={10} />
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: C.text1 }}>
+                      {clean(s.loggedInUserName || cu?.name || fname)}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.text3, marginTop: 2 }}>
+                      Employee Code: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{cu?.employeeCode || cu?.code || 'EMP-INDIVIDUAL'}</span>
+                    </div>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 10, color: C.text3 }}>{e.joinedDate}</div>
-                  <div style={{ fontSize: 9, color: C.text3, fontFamily: 'monospace', marginTop: 2 }}>{e.employeeCode}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12 }}>
+                  <div style={{ background: C.bg, padding: '10px 12px', borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, color: C.text3, fontWeight: 600, textTransform: 'uppercase' }}>Department</div>
+                    <div style={{ fontWeight: 600, marginTop: 2, color: C.text1 }}>{cu?.department?.name || cu?.department || 'Operations'}</div>
+                  </div>
+                  <div style={{ background: C.bg, padding: '10px 12px', borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, color: C.text3, fontWeight: 600, textTransform: 'uppercase' }}>Role</div>
+                    <div style={{ fontWeight: 600, marginTop: 2, color: C.text1 }}>{role || 'Team Member'}</div>
+                  </div>
+                  <div style={{ background: C.bg, padding: '10px 12px', borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, color: C.text3, fontWeight: 600, textTransform: 'uppercase' }}>Branch Location</div>
+                    <div style={{ fontWeight: 600, marginTop: 2, color: C.text1 }}>{cu?.branch?.name || cu?.branch || 'Main HQ'}</div>
+                  </div>
+                  <div style={{ background: C.bg, padding: '10px 12px', borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, color: C.text3, fontWeight: 600, textTransform: 'uppercase' }}>Shift Assignment</div>
+                    <div style={{ fontWeight: 600, marginTop: 2, color: BRAND }}>
+                      {activeShift.name} ({activeShift.code}) · {format12Hour(activeShift.startTime)} – {format12Hour(activeShift.endTime)}
+                    </div>
+                  </div>
                 </div>
               </div>
-              {i < emps.length - 1 && <HR />}
-            </React.Fragment>
-          ))}
+            </>
+          ) : (
+            <>
+              <CardHeader title="Recent Joins" sub={`${s.totalEmployees || 0} total · ${s.newHiresThisMonth || 0} this month`} btnLabel="All Employees" onBtn={() => navigate('/Employees')} />
+              {emps.length === 0 ? (
+                <div style={{ padding: '24px 16px', textAlign: 'center', color: C.text3, fontSize: 12 }}>No employees yet</div>
+              ) : emps.map((e, i) => (
+                <React.Fragment key={e.id || i}>
+                  <div className="rh" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', transition: 'background .1s' }}>
+                    <Av name={e.name} sz={34} r={8} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</div>
+                      <div style={{ fontSize: 10.5, color: C.text3, marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        {e.role && <span style={{ background: BRAND_L, color: BRAND, padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>{e.role}</span>}
+                        {e.department && <span>{e.department}</span>}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 10, color: C.text3 }}>{e.joinedDate}</div>
+                      <div style={{ fontSize: 9, color: C.text3, fontFamily: 'monospace', marginTop: 2 }}>{e.employeeCode}</div>
+                    </div>
+                  </div>
+                  {i < emps.length - 1 && <HR />}
+                </React.Fragment>
+              ))}
+            </>
+          )}
         </div>
 
         {/* DEPARTMENTS */}
@@ -581,12 +737,17 @@ export default function Dashboard({ user }) {
 
       {/* ═══ QUICK ACTIONS ═════════════════════════════════════════ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginTop: 10 }}>
-        {[
+        {(isEmployee ? [
+          { t: 'Attendance Dashboard', sub: 'Check-in & check-out daily',                             ico: <FaClock size={13}/>,      cardBg:'linear-gradient(135deg,#065F46,#059669)', p:'/attendance-dashboard', cta:'Open' },
+          { t: 'My Task List',         sub: `${TC.inProgress || 0} active tasks assigned to you`,    ico: <FaTasks size={13}/>,      cardBg:'linear-gradient(135deg,#1D4ED8,#3B82F6)', p:'/TaskList',             cta:'View' },
+          { t: 'Apply For Leave',      sub: 'Submit vacation or medical leaves',                      ico: <FaCalendarAlt size={13}/>,cardBg:'linear-gradient(135deg,#5B21B6,#7C3AED)', p:'/leaves',               cta:'Apply' },
+          { t: 'My Documents',         sub: 'Access documents and company files',                     ico: <FaFileAlt size={13}/>,    cardBg:`linear-gradient(135deg,${BRAND},#9B3347)`, p:'/documents',           cta:'Browse' },
+        ] : [
           { t: 'Salary Setup',        sub: 'Set employee CTC & allowances',                          ico: <FaLayerGroup size={13}/>, cardBg:'linear-gradient(135deg,#5B21B6,#7C3AED)', p:'/salary-structure', cta:'Configure' },
           { t: 'Run Payroll',         sub: `${s.pendingPayrollCount || 0} records need processing`,  ico: <FaRupeeSign size={13}/>,  cardBg:'linear-gradient(135deg,#065F46,#059669)', p:'/payroll',       cta:'Process' },
           { t: 'Task Manager',        sub: `${TC.inProgress || 0} tasks currently active`,           ico: <FaTasks size={13}/>,     cardBg:'linear-gradient(135deg,#1D4ED8,#3B82F6)', p:'/TaskList',         cta:'Manage' },
           { t: 'Performance Reviews', sub: `${s.totalReviewsThisQuarter || 0} reviews this quarter`, ico: <FaStar size={13}/>,      cardBg:`linear-gradient(135deg,${BRAND},#9B3347)`, p:'/Performance',      cta:'Review' },
-        ].map(m => (
+        ]).map(m => (
           <div key={m.t} className="cc" onClick={() => navigate(m.p)}
             style={{ background: m.cardBg, borderRadius: 10, padding: '13px 16px', display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer', transition: 'transform .15s, box-shadow .15s' }}
             onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,.18)'; }}

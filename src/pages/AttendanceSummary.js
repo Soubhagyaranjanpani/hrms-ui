@@ -4,6 +4,12 @@ import { FaChartPie, FaCalendarAlt, FaTrophy, FaClock, FaCheckCircle, FaTimesCir
 import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
 import { toast, ToastContainer } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
+import {
+  getUnifiedTodayAttendance,
+  calculateShiftAttendance,
+  getShiftByCode,
+  format12Hour
+} from '../utils/rosterUtils';
 
 const AttendanceSummary = () => {
   const [summary, setSummary] = useState(null);
@@ -13,39 +19,279 @@ const AttendanceSummary = () => {
   const [monthlyRecords, setMonthlyRecords] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  const getAuthConfig = () => ({
-    headers: { 
-      Authorization: `Bearer ${localStorage.getItem(STORAGE_KEYS.JWT_TOKEN)}`,
-      'Content-Type': 'application/json'
+  const getAuthConfig = () => {
+    const rawToken = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN) || 
+                     localStorage.getItem('jwtToken') || 
+                     localStorage.getItem('token');
+    const token = rawToken ? (rawToken.startsWith('Bearer ') ? rawToken : `Bearer ${rawToken}`) : '';
+    return {
+      headers: { 
+        Authorization: token,
+        'Content-Type': 'application/json'
+      }
+    };
+  };
+
+  const parseAttendanceRecords = (data) => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.response)) return data.response;
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data.content)) return data.content;
+    if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.response?.response)) return data.response.response;
+    if (Array.isArray(data.response?.data)) return data.response.data;
+    if (Array.isArray(data.response?.content)) return data.response.content;
+    if (Array.isArray(data.data?.response)) return data.data.response;
+    if (typeof data.response === 'object' && data.response !== null) {
+      const vals = Object.values(data.response);
+      if (vals.length > 0 && (vals[0]?.date || vals[0]?.attendanceDate || vals[0]?.punchDate)) return vals;
     }
-  });
+    return [];
+  };
+
+  const normalizeDate = (d) => {
+    if (!d) return '';
+    if (Array.isArray(d) && d.length >= 3) {
+      const y = d[0];
+      const m = String(d[1]).padStart(2, '0');
+      const day = String(d[2]).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+    if (typeof d === 'number') {
+      const dateObj = new Date(d);
+      if (!isNaN(dateObj.getTime())) {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+    }
+    const s = String(d).trim();
+    if (s.includes('T')) return s.split('T')[0];
+    if (s.includes(' ')) return s.split(' ')[0];
+    if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(s)) {
+      const parts = s.split(/[-/]/);
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return s;
+  };
+
+  const normalizeStatus = (status, checkIn, isApproved) => {
+    const s = String(status || '').toUpperCase().trim();
+    if (s === 'PRESENT' || s === 'HALF_DAY' || s === 'LEAVE' || s === 'ABSENT' || s === 'WEEKEND' || s === 'HOLIDAY') {
+      return s;
+    }
+    if (s === 'APPROVED' || s === 'REGULARIZED' || s === 'APPROVED_PRESENT' || isApproved === true || isApproved === 1) {
+      return 'PRESENT';
+    }
+    if (s === 'APPROVED_LEAVE') return 'LEAVE';
+    if (s === 'APPROVED_HALF_DAY') return 'HALF_DAY';
+    if (s === 'CHECKED_IN' || s === 'ON_DUTY') return 'PRESENT';
+    if (checkIn && checkIn !== '--:--') return 'PRESENT';
+    return s || (checkIn ? 'PRESENT' : 'PENDING');
+  };
+
+  const getTodayStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getClientSiteApprovedRecords = () => {
+    try {
+      const onSiteStored = JSON.parse(localStorage.getItem('hrms_onsite_attendance') || '[]');
+      const clientVerifications = JSON.parse(localStorage.getItem('hrms_client_verifications') || '[]');
+      const currentEmp = (localStorage.getItem(STORAGE_KEYS.USERNAME) || localStorage.getItem('username') || '').trim().toLowerCase();
+      const currentEmpId = String(localStorage.getItem(STORAGE_KEYS.EMPLOYEE_ID) || localStorage.getItem('employeeId') || '').trim();
+      let userData = {};
+      try { userData = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA) || '{}'); } catch {}
+      const userEmail = String(userData.email || '').trim().toLowerCase();
+      const userName = String(userData.name || '').trim().toLowerCase();
+      const userEmpId = String(userData.id || userData.employeeId || '').trim();
+
+      const matchUser = (emp, empId, name) => {
+        const e = String(emp || '').trim().toLowerCase();
+        const id = String(empId || '').trim();
+        const n = String(name || '').trim().toLowerCase();
+
+        if (!e && !id && !n) return true;
+        if (currentEmp) {
+          if (e === currentEmp) return true;
+          if (e && (e.startsWith(currentEmp) || currentEmp.startsWith(e))) return true;
+          const currentPrefix = currentEmp.split('@')[0];
+          if (currentPrefix && (e === currentPrefix || e.startsWith(currentPrefix) || currentPrefix.startsWith(e))) return true;
+        }
+        if (userEmail) {
+          if (e === userEmail) return true;
+          const emailPrefix = userEmail.split('@')[0];
+          if (emailPrefix && (e === emailPrefix || e.startsWith(emailPrefix) || emailPrefix.startsWith(e))) return true;
+        }
+        if (currentEmpId && currentEmpId !== 'null' && currentEmpId !== 'undefined' && id && id === currentEmpId) return true;
+        if (userEmpId && userEmpId !== 'null' && userEmpId !== 'undefined' && id && id === userEmpId) return true;
+        if (userName && n && (n === userName || n.includes(userName) || userName.includes(n))) return true;
+        return false;
+      };
+
+      const map = {};
+
+      // 1. From hrms_onsite_attendance
+      onSiteStored.forEach(r => {
+        if (matchUser(r.employee, r.employeeId, r.employeeName) && r.date) {
+          const normD = normalizeDate(r.date);
+          map[normD] = {
+            id: r.id || `onsite-${normD}`,
+            date: normD,
+            status: 'PRESENT',
+            checkIn: r.checkIn || '09:00:00',
+            checkOut: r.checkOut || '18:00:00',
+            workingHours: r.workingHours !== undefined ? Number(r.workingHours) : 9.0,
+            onSite: true,
+            isApproved: true,
+            clientName: r.clientName || 'Client Site Work',
+            remarks: r.remarks || 'Client Site Visit Approved by HR'
+          };
+        }
+      });
+
+      // 2. From hrms_client_verifications
+      clientVerifications.forEach(v => {
+        const isApproved = v.status === 'APPROVED' || v.status === 'ON_SITE_APPROVED';
+        if (isApproved && matchUser(v.submittedBy, v.employeeId, v.submittedByName)) {
+          const vDates = Array.isArray(v.dates) && v.dates.length > 0
+            ? v.dates
+            : (v.date ? [v.date] : (v.visitDate ? [v.visitDate] : []));
+          vDates.forEach(d => {
+            const normD = normalizeDate(d);
+            if (!map[normD]) {
+              map[normD] = {
+                id: `verification-${v.id}-${normD}`,
+                date: normD,
+                status: 'PRESENT',
+                checkIn: '09:00:00',
+                checkOut: '18:00:00',
+                workingHours: 9.0,
+                onSite: true,
+                isApproved: true,
+                clientName: v.clientName || 'Client Site Work',
+                remarks: v.remarks || 'Client Site Visit Approved by HR'
+              };
+            }
+          });
+        }
+      });
+
+      return Object.values(map);
+    } catch (e) {
+      console.warn('Error reading approved client site records:', e);
+      return [];
+    }
+  };
 
   const fetchSummary = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(API_ENDPOINTS.GET_SUMMARY, {
-        params: { month, year },
-        ...getAuthConfig()
-      });
-      
-      const summaryData = response.data?.response;
-      
-      if (summaryData) {
-        setSummary({
-          presentDays: summaryData.presentDays || 0,
-          absentDays: summaryData.absentDays || 0,
-          leaveDays: summaryData.leaveDays || 0,
-          halfDays: summaryData.halfDays || 0,
-          totalWorkingHours: summaryData.totalWorkingHours || 0,
-          totalWorkingDays: (summaryData.presentDays || 0) + 
-                           (summaryData.absentDays || 0) + 
-                           (summaryData.leaveDays || 0) + 
-                           (summaryData.halfDays || 0)
+      let basePresent = 0;
+      let baseAbsent = 0;
+      let baseLeave = 0;
+      let baseHalf = 0;
+      let baseHours = 0;
+      let rawRecords = [];
+
+      try {
+        const response = await axios.get(API_ENDPOINTS.GET_SUMMARY, {
+          params: { month, year },
+          ...getAuthConfig()
         });
-        
-      } else {
-        setSummary(null);
+        const summaryData = response.data?.response || response.data?.data || response.data;
+        if (summaryData) {
+          basePresent = Number(summaryData.presentDays || 0);
+          baseAbsent = Number(summaryData.absentDays || 0);
+          baseLeave = Number(summaryData.leaveDays || 0);
+          baseHalf = Number(summaryData.halfDays || 0);
+          baseHours = Number(summaryData.totalWorkingHours || 0);
+        }
+      } catch (err) {
+        console.warn('Backend GET_SUMMARY error, computing from client records:', err);
       }
+
+      // Fetch raw records to check which dates are already marked present
+      try {
+        const myRes = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
+        rawRecords = parseAttendanceRecords(myRes.data);
+      } catch (e) {}
+
+      if (rawRecords.length === 0) {
+        try {
+          const dashRes = await axios.get(API_ENDPOINTS.GET_DASHBOARD, {
+            params: { month, year },
+            ...getAuthConfig()
+          });
+          rawRecords = parseAttendanceRecords(dashRes.data);
+        } catch (e) {}
+      }
+
+      // Read client site approved dates for the selected month and year
+      const approvedOnSite = getClientSiteApprovedRecords();
+      const monthStr = String(month).padStart(2, '0');
+      const yearStr = String(year);
+
+      let additionalPresent = 0;
+      let additionalHours = 0;
+
+      approvedOnSite.forEach(onSiteRec => {
+        const [y, m] = (onSiteRec.date || '').split('-');
+        if (y === yearStr && m === monthStr) {
+          // Check if already recorded as PRESENT in backend raw records
+          const backendRec = rawRecords.find(r => normalizeDate(r.date || r.attendanceDate || r.punchDate) === onSiteRec.date);
+          const alreadyPresentInBackend = backendRec && (
+            normalizeStatus(backendRec.status || backendRec.attendanceStatus, backendRec.checkIn) === 'PRESENT' ||
+            (backendRec.checkIn && backendRec.checkIn !== '--:--')
+          );
+
+          if (!alreadyPresentInBackend) {
+            additionalPresent += 1;
+            additionalHours += (onSiteRec.workingHours !== undefined ? Number(onSiteRec.workingHours) : 9.0);
+          }
+        }
+      });
+
+      // Merge today's unified punch if within selected month/year
+      const todayRec = getUnifiedTodayAttendance();
+      if (todayRec && todayRec.date && todayRec.checkIn) {
+        const [ty, tm] = todayRec.date.split('-');
+        if (ty === yearStr && tm === monthStr) {
+          const inBackend = rawRecords.find(r => normalizeDate(r.date || r.attendanceDate || r.punchDate) === todayRec.date);
+          const alreadyMarked = inBackend && (
+            normalizeStatus(inBackend.status || inBackend.attendanceStatus, inBackend.checkIn) === 'PRESENT' ||
+            (inBackend.checkIn && inBackend.checkIn !== '--:--')
+          );
+          if (!alreadyMarked) {
+            if (todayRec.status === 'HALF_DAY') {
+              baseHalf += 1;
+            } else {
+              additionalPresent += 1;
+            }
+            additionalHours += Number(todayRec.workingHours || 0);
+          }
+        }
+      }
+
+      const finalPresent = basePresent + additionalPresent;
+      const finalAbsent = Math.max(0, baseAbsent - additionalPresent);
+      const finalHours = baseHours + additionalHours;
+      const totalDays = finalPresent + finalAbsent + baseLeave + baseHalf;
+
+      setSummary({
+        presentDays: finalPresent,
+        absentDays: finalAbsent,
+        leaveDays: baseLeave,
+        halfDays: baseHalf,
+        totalWorkingHours: finalHours,
+        totalWorkingDays: totalDays
+      });
     } catch (error) {
       console.error('Error fetching summary:', error);
       const message = error.response?.data?.message || 'Failed to fetch attendance summary';
@@ -58,9 +304,97 @@ const AttendanceSummary = () => {
 
   const fetchMonthlyRecords = async () => {
     try {
-      const response = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
-      const records = response.data?.response || [];
-      setMonthlyRecords(records);
+      let rawRecords = [];
+      try {
+        const response = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
+        rawRecords = parseAttendanceRecords(response.data);
+      } catch (err) {}
+
+      if (rawRecords.length === 0) {
+        try {
+          const dashRes = await axios.get(API_ENDPOINTS.GET_DASHBOARD, {
+            params: { month, year },
+            ...getAuthConfig()
+          });
+          rawRecords = parseAttendanceRecords(dashRes.data);
+        } catch (e) {}
+      }
+
+      // Merge approved client site records
+      const approvedOnSite = getClientSiteApprovedRecords();
+      approvedOnSite.forEach(onSiteRec => {
+        const existingIdx = rawRecords.findIndex(r => normalizeDate(r.date || r.attendanceDate || r.punchDate) === onSiteRec.date);
+        if (existingIdx >= 0) {
+          rawRecords[existingIdx] = {
+            ...rawRecords[existingIdx],
+            status: 'PRESENT',
+            checkIn: rawRecords[existingIdx].checkIn || onSiteRec.checkIn,
+            checkOut: rawRecords[existingIdx].checkOut || onSiteRec.checkOut,
+            workingHours: rawRecords[existingIdx].workingHours || onSiteRec.workingHours,
+            onSite: true,
+            isApproved: true,
+            clientName: onSiteRec.clientName,
+            remarks: onSiteRec.remarks
+          };
+        } else {
+          rawRecords.push(onSiteRec);
+        }
+      });
+
+      // Merge today's unified punch and local logs
+      const todayRec = getUnifiedTodayAttendance();
+      if (todayRec && todayRec.date && (todayRec.checkIn || todayRec.checkOut)) {
+        const normD = normalizeDate(todayRec.date);
+        const exIdx = rawRecords.findIndex(r => normalizeDate(r.date || r.attendanceDate || r.punchDate) === normD);
+        const todayObj = {
+          id: `today-${normD}`,
+          date: normD,
+          checkIn: todayRec.checkIn,
+          checkOut: todayRec.checkOut,
+          workingHours: todayRec.workingHours || 0,
+          status: todayRec.status || 'PRESENT',
+          shiftCode: todayRec.shiftCode || 'GS'
+        };
+        if (exIdx >= 0) {
+          rawRecords[exIdx] = { ...rawRecords[exIdx], ...todayObj };
+        } else {
+          rawRecords.push(todayObj);
+        }
+      }
+
+      const logs = JSON.parse(localStorage.getItem('hrms_attendance_logs') || '[]');
+      logs.forEach(logRec => {
+        if (logRec && logRec.date && (logRec.checkIn || logRec.checkOut)) {
+          const normD = normalizeDate(logRec.date);
+          const exIdx = rawRecords.findIndex(r => normalizeDate(r.date || r.attendanceDate || r.punchDate) === normD);
+          if (exIdx === -1) {
+            rawRecords.push({
+              id: `log-${normD}`,
+              date: normD,
+              checkIn: logRec.checkIn,
+              checkOut: logRec.checkOut,
+              workingHours: logRec.workingHours || 0,
+              status: logRec.status || 'PRESENT',
+              shiftCode: logRec.shiftCode || 'GS'
+            });
+          }
+        }
+      });
+
+      const transformed = rawRecords.map(r => {
+        const checkIn = r.checkIn || r.inTime || r.punchIn;
+        const isApproved = r.isApproved || r.approved || r.onSite || r.approvalStatus === 'APPROVED';
+        return {
+          ...r,
+          date: normalizeDate(r.date || r.attendanceDate || r.punchDate || r.checkInDate),
+          checkIn,
+          checkOut: r.checkOut || r.outTime || r.punchOut,
+          status: normalizeStatus(r.status || r.attendanceStatus, checkIn, isApproved),
+          workingHours: r.workingHours !== undefined ? r.workingHours : (r.hours || 0)
+        };
+      });
+
+      setMonthlyRecords(transformed);
     } catch (error) {
       console.error('Error fetching monthly records:', error);
     }
@@ -69,6 +403,23 @@ const AttendanceSummary = () => {
   useEffect(() => {
     fetchSummary();
     fetchMonthlyRecords();
+
+    const handleSync = () => {
+      fetchSummary();
+      fetchMonthlyRecords();
+    };
+
+    window.addEventListener('hrms_client_verification_updated', handleSync);
+    window.addEventListener('hrms_attendance_updated', handleSync);
+    window.addEventListener('hrms_today_punches_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener('hrms_client_verification_updated', handleSync);
+      window.removeEventListener('hrms_attendance_updated', handleSync);
+      window.removeEventListener('hrms_today_punches_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
   }, [month, year]);
 
   // Sync current month with selected month/year
@@ -107,7 +458,8 @@ const AttendanceSummary = () => {
   };
 
   const getAttendanceForDate = (dateStr) => {
-    return monthlyRecords.find(record => record.date === dateStr);
+    const target = normalizeDate(dateStr);
+    return monthlyRecords.find(record => normalizeDate(record.date) === target);
   };
 
   const isFutureDate = (dateStr) => {
@@ -123,7 +475,8 @@ const AttendanceSummary = () => {
     
     const record = getAttendanceForDate(dateStr);
     if (!record) return '';
-    switch(record.status) {
+    const status = normalizeStatus(record.status, record.checkIn, record.isApproved || record.onSite);
+    switch(status) {
       case 'PRESENT': return 'calendar-day-present';
       case 'ABSENT': return 'calendar-day-absent';
       case 'LEAVE': return 'calendar-day-leave';
@@ -138,6 +491,9 @@ const AttendanceSummary = () => {
     if (isFutureDate(dateStr)) return 'Future date - No data yet';
     const record = getAttendanceForDate(dateStr);
     if (!record) return 'No record';
+    if (record.onSite) {
+      return `PRESENT (Client Site Approved: ${record.clientName || 'On-Site'}) - ${(record.workingHours || 9).toFixed(1)} hrs`;
+    }
     if (record.status === 'LEAVE' && record.leaveType) {
       return `${record.status} (${record.leaveType})`;
     }
@@ -152,7 +508,7 @@ const AttendanceSummary = () => {
     const month = currentMonth.getMonth();
     const daysInMonth = getDaysInMonth(year, month);
     const firstDay = getFirstDayOfMonth(year, month);
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayStr();
     
     const days = [];
     // Add empty cells for days before month starts

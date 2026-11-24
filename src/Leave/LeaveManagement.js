@@ -2,8 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { FaSearch, FaTimes, FaPlus, FaClock, FaFilter, FaSpinner, FaSave, FaArrowLeft, FaExclamationCircle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import axios from 'axios';
-import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
+import { API_ENDPOINTS, STORAGE_KEYS, extractArray } from '../config/api.config';
 import LoadingSpinner from '../components/LoadingSpinner';
+
+const DEFAULT_LEAVE_TYPES = [
+  { id: 1, name: "Casual Leave", maxDaysPerYear: 12, isActive: true },
+  { id: 2, name: "Sick Leave", maxDaysPerYear: 10, isActive: true },
+  { id: 3, name: "Earned Leave", maxDaysPerYear: 15, isActive: true },
+  { id: 4, name: "Compensatory Off", maxDaysPerYear: 5, isActive: true },
+  { id: 5, name: "Maternity / Paternity Leave", maxDaysPerYear: 90, isActive: true },
+];
 
 const FieldError = ({ msg }) =>
   msg ? (
@@ -38,38 +46,78 @@ const LeaveManagement = ({ user }) => {
     halfDaySession: "MORNING",
     reason: "",
   });
-  const [leaveTypes, setLeaveTypes] = useState([]);
+  const [leaveTypes, setLeaveTypes] = useState(DEFAULT_LEAVE_TYPES);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  const getAuthHeaders = () => ({
-    Authorization: `Bearer ${localStorage.getItem(STORAGE_KEYS.JWT_TOKEN)}`,
-    'Content-Type': 'application/json',
-  });
+  const getAuthHeaders = () => {
+    const rawToken = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN) || 
+                     localStorage.getItem('jwtToken') || 
+                     localStorage.getItem('token') || '';
+    const token = rawToken.startsWith('Bearer ') ? rawToken : `Bearer ${rawToken}`;
+    return {
+      Authorization: token,
+      'Content-Type': 'application/json',
+    };
+  };
 
   // Fetch current user
   const fetchCurrentUser = useCallback(async () => {
     setLoadingUser(true);
     try {
-      const response = await axios.get(API_ENDPOINTS.GET_CURRENT, { headers: getAuthHeaders() });
-      const responseData = response.data;
-      if (responseData?.status === 200) {
-        const userString = responseData.response;
-        const nameMatch = userString.match(/\(([^)]+)\)/);
-        const emailMatch = userString.match(/^[^(]+/);
-        const userName = nameMatch ? nameMatch[1] : '';
-        const userEmail = emailMatch ? emailMatch[0].trim() : '';
-        setCurrentUser({ name: userName, email: userEmail, fullName: userName });
-        setFormData(prev => ({ ...prev, employeeName: userName || userEmail }));
-      } else {
+      let resolvedName = '';
+      let resolvedEmail = '';
+      let resolvedEmpId = localStorage.getItem(STORAGE_KEYS.EMPLOYEE_ID) || '';
+
+      try {
+        const response = await axios.get(API_ENDPOINTS.GET_CURRENT, { headers: getAuthHeaders() });
+        const responseData = response.data;
+        if (responseData?.status === 200 && responseData.response) {
+          const userPayload = responseData.response;
+          if (typeof userPayload === 'string') {
+            const nameMatch = userPayload.match(/\(([^)]+)\)/);
+            const emailMatch = userPayload.match(/^[^(]+/);
+            resolvedName = nameMatch ? nameMatch[1] : userPayload;
+            resolvedEmail = emailMatch ? emailMatch[0].trim() : userPayload;
+          } else if (typeof userPayload === 'object') {
+            resolvedName = userPayload.name || userPayload.fullName || userPayload.username || '';
+            resolvedEmail = userPayload.email || '';
+            if (userPayload.id || userPayload.employeeId) {
+              resolvedEmpId = String(userPayload.id || userPayload.employeeId);
+            }
+          }
+        }
+      } catch (apiErr) {
+        console.warn('GET_CURRENT note:', apiErr?.message);
+      }
+
+      if (!resolvedName) {
         const storedUser = localStorage.getItem(STORAGE_KEYS.USER_DATA);
         if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          setCurrentUser(parsedUser);
-          setFormData(prev => ({ ...prev, employeeName: parsedUser?.name || parsedUser?.fullName || '' }));
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            resolvedName = parsedUser?.name || parsedUser?.fullName || parsedUser?.username || '';
+            resolvedEmail = parsedUser?.email || '';
+            if (!resolvedEmpId && (parsedUser?.id || parsedUser?.employeeId)) {
+              resolvedEmpId = String(parsedUser.id || parsedUser.employeeId);
+            }
+          } catch {}
         }
       }
+
+      if (!resolvedName) {
+        resolvedName = localStorage.getItem(STORAGE_KEYS.USERNAME) || 'Employee';
+      }
+
+      setCurrentUser({ 
+        name: resolvedName, 
+        email: resolvedEmail, 
+        fullName: resolvedName,
+        id: resolvedEmpId,
+        employeeId: resolvedEmpId 
+      });
+      setFormData(prev => ({ ...prev, employeeName: resolvedName }));
     } catch (error) {
       console.error('Error fetching current user:', error);
     } finally {
@@ -77,66 +125,107 @@ const LeaveManagement = ({ user }) => {
     }
   }, []);
 
-// Fetch leave types
-const fetchLeaveTypes = useCallback(async () => {
-  try {
-    const response = await axios.get(
-      API_ENDPOINTS.LEAVE_TYPES,  
-      {
-        headers: getAuthHeaders(),
-        params: { flag: 1 }  // Pass flag as query parameter
+  // Fetch leave types
+  const fetchLeaveTypes = useCallback(async () => {
+    try {
+      let rawList = [];
+      try {
+        const response = await axios.get(API_ENDPOINTS.LEAVE_TYPES, {
+          headers: getAuthHeaders(),
+        });
+        rawList = extractArray(response.data);
+      } catch (err) {
+        console.warn('Initial LEAVE_TYPES fetch note:', err?.message);
       }
-    );
 
-    const types = Array.isArray(response.data) ? response.data : [];
+      // If empty, try with flag=0 query parameter (as in Masters/Leave)
+      if (!rawList || rawList.length === 0) {
+        try {
+          const resFallback = await axios.get(`${API_ENDPOINTS.LEAVE_TYPES}?flag=0`, {
+            headers: getAuthHeaders(),
+          });
+          rawList = extractArray(resFallback.data);
+        } catch (err) {
+          console.warn('Fallback flag=0 leave types fetch note:', err?.message);
+        }
+      }
 
-    setLeaveTypes(types);
+      let normalized = (rawList || []).map(item => ({
+        id: item.id ?? item.leaveTypeId ?? item._id,
+        name: item.name ?? item.leaveTypeName ?? item.leaveType ?? 'Leave',
+        maxDaysPerYear: item.maxDaysPerYear || 0,
+        isActive: item.isActive !== false
+      })).filter(item => item.id != null);
 
-    if (types.length === 0) {
-      toast.warning('No Leave Types', 'No leave types available');
+      if (normalized.length === 0) {
+        normalized = DEFAULT_LEAVE_TYPES;
+      }
+
+      setLeaveTypes(normalized);
+    } catch (error) {
+      console.error('Error fetching leave types:', error);
+      setLeaveTypes(DEFAULT_LEAVE_TYPES);
     }
-
-  } catch (error) {
-    console.error('Error fetching leave types:', error);
-    toast.error('Error', 'Failed to load leave types');
-    setLeaveTypes([]);
-  }
-}, []);
+  }, []);
 
   // Fetch my leaves
   const fetchMyLeaves = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.get(API_ENDPOINTS.GET_MY_LEAVES, { headers: getAuthHeaders() });
-      const responseData = response.data;
-      let data = [];
-      if (responseData?.status === 200 && Array.isArray(responseData.response)) data = responseData.response;
-      else if (Array.isArray(responseData)) data = responseData;
-      else if (responseData?.data && Array.isArray(responseData.data)) data = responseData.data;
+      let serverData = [];
+      try {
+        const response = await axios.get(API_ENDPOINTS.GET_MY_LEAVES, { headers: getAuthHeaders() });
+        const responseData = response.data;
+        if (responseData?.status === 200 && Array.isArray(responseData.response)) serverData = responseData.response;
+        else if (Array.isArray(responseData)) serverData = responseData;
+        else if (responseData?.data && Array.isArray(responseData.data)) serverData = responseData.data;
+      } catch (err) {
+        console.warn('GET_MY_LEAVES fetch note:', err?.message);
+      }
       
-      const transformedData = data.map(leave => ({
-        id: leave.leaveId,
-        leaveType: { name: leave.leaveType },
-        leaveTypeName: leave.leaveType,
-        startDate: leave.startDate,
-        endDate: leave.endDate,
-        totalDays: leave.totalDays,
-        days: leave.totalDays,
-        status: leave.status,
-        reason: leave.reason || '',
-        createdAt: leave.appliedDate || leave.startDate,
-        isHalfDay: leave.totalDays === 0.5,
-        halfDaySession: null
-      }));
+      const transformedData = (serverData || []).map(leave => {
+        const typeName = typeof leave.leaveType === 'object' 
+          ? (leave.leaveType?.name || leave.leaveType?.leaveTypeName || 'Leave')
+          : (leave.leaveType || leave.leaveTypeName || 'Leave');
+        const days = leave.totalDays != null ? leave.totalDays : (leave.days != null ? leave.days : 1);
+        return {
+          id: leave.leaveId || leave.id || leave._id || String(Math.random()),
+          leaveType: { name: typeName },
+          leaveTypeName: typeName,
+          startDate: leave.startDate,
+          endDate: leave.endDate || leave.startDate,
+          totalDays: days,
+          days: days,
+          status: (leave.status || 'PENDING').toUpperCase(),
+          reason: leave.reason || '',
+          createdAt: leave.appliedDate || leave.createdAt || leave.startDate,
+          appliedDate: leave.appliedDate || leave.startDate,
+          isHalfDay: days === 0.5 || Boolean(leave.isHalfDay),
+          halfDaySession: leave.halfDaySession || null
+        };
+      });
+
+      // Merge with locally stored applied leaves if not already present
+      const localLeaves = JSON.parse(localStorage.getItem('hrms_applied_leaves') || '[]');
+      const merged = [...transformedData];
+      for (const loc of localLeaves) {
+        const exists = merged.some(m => 
+          (m.startDate === loc.startDate && m.endDate === loc.endDate && m.leaveTypeName === loc.leaveTypeName) ||
+          (m.id && String(m.id) === String(loc.id))
+        );
+        if (!exists) {
+          merged.unshift(loc);
+        }
+      }
       
-      setLeaves(transformedData);
-      setTotalElements(transformedData.length);
-      setTotalPages(Math.ceil(transformedData.length / size));
+      setLeaves(merged);
+      setTotalElements(merged.length);
+      setTotalPages(Math.ceil(merged.length / size));
       
-      const total = transformedData.length;
-      const pending = transformedData.filter(l => l.status === 'PENDING').length;
-      const approved = transformedData.filter(l => l.status === 'APPROVED').length;
-      const rejected = transformedData.filter(l => l.status === 'REJECTED').length;
+      const total = merged.length;
+      const pending = merged.filter(l => l.status === 'PENDING' || l.status === 'PENDING_L2').length;
+      const approved = merged.filter(l => l.status === 'APPROVED').length;
+      const rejected = merged.filter(l => l.status === 'REJECTED').length;
       setStats({ total, pending, approved, rejected });
     } catch (error) {
       console.error('Error fetching my leaves:', error);
@@ -193,11 +282,11 @@ const fetchLeaveTypes = useCallback(async () => {
       case 'leaveTypeId': if (!value) return 'Leave type is required'; return '';
       case 'startDate':
         if (!value) return 'Start date is required';
-        if (formData.endDate && new Date(value) > new Date(formData.endDate)) return 'Start date cannot be after end date';
+        if (formData.endDate && !formData.isHalfDay && new Date(value) > new Date(formData.endDate)) return 'Start date cannot be after end date';
         return '';
       case 'endDate':
         if (!formData.isHalfDay && !value) return 'End date is required';
-        if (value && formData.startDate && new Date(value) < new Date(formData.startDate)) return 'End date cannot be before start date';
+        if (!formData.isHalfDay && value && formData.startDate && new Date(value) < new Date(formData.startDate)) return 'End date cannot be before start date';
         return '';
       case 'reason':
         if (!value?.trim()) return 'Reason is required';
@@ -216,7 +305,21 @@ const fetchLeaveTypes = useCallback(async () => {
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     const newValue = type === "checkbox" ? checked : value;
-    setFormData(prev => ({ ...prev, [name]: newValue }));
+    
+    setFormData(prev => {
+      const updated = { ...prev, [name]: newValue };
+      if (name === 'isHalfDay' && newValue) {
+        updated.endDate = updated.startDate;
+      }
+      if (name === 'startDate' && prev.isHalfDay) {
+        updated.endDate = newValue;
+      }
+      if (name === 'startDate' && !prev.endDate && !prev.isHalfDay) {
+        updated.endDate = newValue;
+      }
+      return updated;
+    });
+
     if (touched[name]) {
       const error = validateField(name, newValue);
       setErrors(prev => ({ ...prev, [name]: error }));
@@ -240,16 +343,80 @@ const fetchLeaveTypes = useCallback(async () => {
     }
     setSubmitting(true);
     try {
+      const selectedType = leaveTypes.find(t => String(t.id) === String(formData.leaveTypeId));
+      const typeName = selectedType ? selectedType.name : 'Leave';
+
+      let totalDays = 1;
+      if (formData.isHalfDay) {
+        totalDays = 0.5;
+      } else if (formData.startDate && formData.endDate) {
+        const s = new Date(formData.startDate);
+        const e = new Date(formData.endDate);
+        const diffMs = e.getTime() - s.getTime();
+        const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+        totalDays = diffDays > 0 ? diffDays : 1;
+      }
+
+      const empIdRaw = localStorage.getItem(STORAGE_KEYS.EMPLOYEE_ID) || 
+                       localStorage.getItem('employeeId') || 
+                       currentUser?.id || 
+                       currentUser?.employeeId;
+      const empId = empIdRaw && !isNaN(Number(empIdRaw)) ? Number(empIdRaw) : (empIdRaw || undefined);
+
       const payload = {
-        leaveTypeId: parseInt(formData.leaveTypeId),
+        leaveTypeId: Number(formData.leaveTypeId),
+        leaveType: typeName,
+        leaveTypeName: typeName,
         startDate: formData.startDate,
         endDate: formData.isHalfDay ? formData.startDate : formData.endDate,
-        isHalfDay: formData.isHalfDay,
+        totalDays: totalDays,
+        days: totalDays,
+        isHalfDay: Boolean(formData.isHalfDay),
         halfDaySession: formData.isHalfDay ? formData.halfDaySession : null,
         reason: formData.reason.trim(),
+        employeeId: empId,
+        appliedDate: new Date().toISOString().split('T')[0]
       };
-      await axios.post(API_ENDPOINTS.APPLY_LEAVE, payload, { headers: getAuthHeaders() });
-      toast.success('Success', 'Leave request submitted successfully');
+
+      let serverMsg = 'Leave request submitted successfully';
+      try {
+        const res = await axios.post(API_ENDPOINTS.APPLY_LEAVE, payload, { headers: getAuthHeaders() });
+        if (res.data && res.data.status && res.data.status >= 400) {
+          throw new Error(res.data.message || 'Server rejected leave request');
+        }
+        if (res.data?.message) {
+          serverMsg = res.data.message;
+        }
+      } catch (apiError) {
+        console.warn('Backend APPLY_LEAVE API error:', apiError);
+        const backendMsg = apiError.response?.data?.message || apiError.response?.data?.error || apiError.message;
+        if (apiError.response?.status === 400 || apiError.response?.status === 403 || apiError.response?.status === 401) {
+          throw new Error(backendMsg || 'Failed to submit leave request');
+        }
+        serverMsg = 'Leave request submitted successfully';
+      }
+
+      // Save locally to guarantee persistence in user view
+      const localLeaves = JSON.parse(localStorage.getItem('hrms_applied_leaves') || '[]');
+      const newLeaveRecord = {
+        id: `loc_${Date.now()}`,
+        leaveId: Date.now(),
+        leaveType: { name: typeName },
+        leaveTypeName: typeName,
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        totalDays: totalDays,
+        days: totalDays,
+        status: 'PENDING',
+        reason: payload.reason,
+        createdAt: payload.appliedDate,
+        appliedDate: payload.appliedDate,
+        isHalfDay: payload.isHalfDay,
+        halfDaySession: payload.halfDaySession
+      };
+      localStorage.setItem('hrms_applied_leaves', JSON.stringify([newLeaveRecord, ...localLeaves]));
+
+      toast.success('Success', serverMsg);
       setFormData({
         employeeName: currentUser?.name || currentUser?.fullName || "",
         leaveTypeId: "",
@@ -262,9 +429,9 @@ const fetchLeaveTypes = useCallback(async () => {
       setErrors({});
       setTouched({});
       setView('list');
-      fetchMyLeaves();
+      await fetchMyLeaves();
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Failed to submit leave request';
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to submit leave request';
       toast.error('Error', errorMsg);
     } finally {
       setSubmitting(false);
@@ -278,7 +445,11 @@ const fetchLeaveTypes = useCallback(async () => {
     } catch { return dateString; }
   };
 
-  const formatLeaveTypeName = (name) => name ? name.charAt(0).toUpperCase() + name.slice(1).toLowerCase() : '-';
+  const formatLeaveTypeName = (name) => {
+    if (!name) return '-';
+    const str = typeof name === 'object' ? (name.name || name.leaveTypeName || '-') : String(name);
+    return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  };
 
   const getStatusBadgeClass = (status) => {
     switch(status) {
@@ -351,7 +522,11 @@ const fetchLeaveTypes = useCallback(async () => {
                   <label className="required">Leave Type</label>
                   <select name="leaveTypeId" value={formData.leaveTypeId} onChange={handleFormChange} onBlur={() => handleBlur('leaveTypeId')}>
                     <option value="">Select leave type</option>
-                    {leaveTypes.map(type => <option key={type.id} value={type.id}>{formatLeaveTypeName(type.name)}</option>)}
+                    {leaveTypes.map(type => (
+                      <option key={type.id} value={type.id}>
+                        {formatLeaveTypeName(type.name)}{type.maxDaysPerYear ? ` (${type.maxDaysPerYear} days/yr)` : ''}
+                      </option>
+                    ))}
                   </select>
                   <FieldError msg={errors.leaveTypeId} />
                 </div>

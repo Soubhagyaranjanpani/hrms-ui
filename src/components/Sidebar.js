@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  FaTachometerAlt, FaUsers, FaCalendarCheck, FaMoneyBillWave,
+  FaTachometerAlt, FaUsers, FaCalendarCheck, FaCalendarAlt, FaMoneyBillWave,
   FaPlane, FaUserPlus, FaChartLine, FaChalkboardTeacher,
   FaFileAlt, FaChartBar, FaCog,
   FaBuilding, FaSitemap,FaPlus,FaBriefcase ,
@@ -18,8 +18,10 @@ import {
 import { BsChevronDown, BsChevronRight } from 'react-icons/bs';
 import ariHrmsLogo from '../assets/ARI-HRMS-logo.png';
 import { FaAudible, FaHeartCircleCheck, FaTimeline } from 'react-icons/fa6';
+import axios from 'axios';
+import { API_ENDPOINTS } from '../config/api.config';
 
-const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogout }) => {
+const Sidebar = ({ user, sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogout }) => {
   const [masterOpen, setMasterOpen] = useState(true);
   const [employeeOpen, setEmployeeOpen] = useState(true);
   const [serviceBookOpen, setServiceBookOpen] = useState(true);
@@ -32,15 +34,105 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
  const [loanOpen, setLoanOpen] = useState(true);
  const toggleLoan = () => setLoanOpen(!loanOpen);
 
-  const [userRole, setUserRole] = useState(null);
+  const normalizeRole = (r) => {
+    if (!r) return 'Employee';
+    if (typeof r === 'object') {
+      r = r.name || r.roleName || r.role || '';
+    }
+    let s = String(r || '').trim();
+    if (s.toUpperCase().startsWith('ROLE_')) {
+      s = s.substring(5);
+    }
+    const up = s.toUpperCase().replace(/[\s_-]+/g, '');
+    if (up === 'ADMIN' || up === 'ADMINISTRATOR' || up === 'SUPERADMIN') return 'Admin';
+    if (up === 'HR' || up === 'HUMANRESOURCE' || up === 'HUMANRESOURCES' || up === 'HROFFICER' || up === 'HRMANAGER') return 'Hr';
+    if (up === 'MANAGER') return 'Manager';
+    return 'Employee';
+  };
+
+  const getRole = () => {
+    try {
+      const uData = JSON.parse(localStorage.getItem('userData') || '{}');
+      const raw = localStorage.getItem('roleName') || 
+                  localStorage.getItem('role') || 
+                  localStorage.getItem('userRole') || 
+                  user?.role || 
+                  user?.roleName || 
+                  user?.role?.name ||
+                  uData?.role || 
+                  uData?.roleName || 
+                  uData?.role?.name;
+      if (raw) return normalizeRole(raw);
+
+      const token = localStorage.getItem('jwtToken');
+      if (token && token.includes('.')) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const tokenRole = payload.role || payload.roles || payload.roleName || payload.authorities || payload.auth;
+          if (Array.isArray(tokenRole)) {
+            const found = tokenRole.find(Boolean);
+            if (found) return normalizeRole(typeof found === 'string' ? found : found.authority || found.role);
+          } else if (tokenRole) {
+            return normalizeRole(tokenRole);
+          }
+        } catch {}
+      }
+    } catch {}
+    return 'Employee';
+  };
+
+  const [userRole, setUserRole] = useState(getRole);
+
   useEffect(() => {
-    // Get user role from localStorage or your auth context
-    // Convert to proper case for comparison
-    const role = localStorage.getItem('roleName') || 'Employee';
-    // Normalize role: capitalize first letter, rest lowercase
-    const normalizedRole = role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
-    console.log('User Role:', role, 'Normalized:', normalizedRole); // For debugging
-    setUserRole(normalizedRole);
+    const role = getRole();
+    console.log('User Role Normalized:', role);
+    setUserRole(role);
+  }, [user]);
+
+  const [verificationPendingCount, setVerificationPendingCount] = useState(0);
+
+  useEffect(() => {
+    const fetchPendingVerificationCount = async () => {
+      try {
+        const token = localStorage.getItem('jwtToken');
+        if (!token) return;
+        const res = await axios.get(API_ENDPOINTS.CLIENT_VERIFICATION_PENDING_COUNT, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data && res.data.pendingCount !== undefined) {
+          setVerificationPendingCount(Number(res.data.pendingCount));
+          return;
+        }
+      } catch (err) {
+        // Fallback
+      }
+      try {
+        const stored = JSON.parse(localStorage.getItem('hrms_client_verifications') || '[]');
+        const count = stored.filter(r => r.status === 'PENDING_VERIFICATION' || r.status === 'PENDING').length;
+        setVerificationPendingCount(count);
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchPendingVerificationCount();
+
+    // Real-time synchronization across HR users and open tabs
+    const handleSync = () => fetchPendingVerificationCount();
+    window.addEventListener('hrms_client_verification_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('focus', handleSync);
+
+    // Poll every 10 seconds so when another HR approves on their computer,
+    // this HR's counter automatically decreases/increases accordingly
+    const syncInterval = setInterval(fetchPendingVerificationCount, 10000);
+
+    return () => {
+      window.removeEventListener('hrms_client_verification_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('focus', handleSync);
+      clearInterval(syncInterval);
+    };
   }, []);
 
   // Menu items accessible to all roles
@@ -83,6 +175,7 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
   const loanApplicationForm = [
     { path: '/LoanApplicationForm', icon: <FaMoneyBillWave />, label: 'Apply for Loan', roles: ['Admin', 'Hr', 'Employee'] },
     { path: '/MyLoan', icon: <FaMoneyBillWave />, label: 'My Loans', roles: ['Admin', 'Hr', 'Employee'] },
+    {path: '/LoanApproval', icon: <FaMoneyBillWave />, label: 'Loan Approval', roles: ['Admin', 'Hr']},
     // { path: '/loan-status', icon: <FaSearch />, label: 'Check Loan Status', roles: ['Admin', 'Hr', 'Employee'] },
   ];
 
@@ -91,7 +184,10 @@ const Sidebar = ({ sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogou
     { path: '/attendance-dashboard', icon: <FaChartLine />, label: 'Attendance Dashboard', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/attendance-summary', icon: <FaChartPie />, label: 'Attendance Summary', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/attendance', icon: <FaCalendarCheck />, label: 'Mark Attendance', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
-    { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy', roles: ['Admin', 'Hr'] },
+    { path: '/my-shift', icon: <FaClock />, label: 'My Shift', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/client-site-work', icon: <FaMapMarker />, label: 'Client Site Work', roles: ['Admin', 'Hr', 'Manager', 'Employee'], showBadge: true },
+    { path: '/roster-management', icon: <FaCalendarAlt />, label: 'Roster Management', roles: ['Hr'] },
+    { path: '/attendance-policy', icon: <FaCog />, label: 'Attendance Policy', roles: ['Hr'] },
     
 {
   icon: <FaCog />,
@@ -184,8 +280,12 @@ const masterItems = [
 
   // Helper function to check if user has access to an item
   const hasAccess = (itemRoles) => {
-    if (!userRole) return false;
-    return itemRoles.includes(userRole);
+    if (!itemRoles || itemRoles.length === 0) return true;
+    const current = normalizeRole(userRole || getRole()).toLowerCase();
+    return itemRoles.some(r => {
+      const norm = normalizeRole(r).toLowerCase();
+      return norm === current;
+    });
   };
 
   // Helper function to check if a section has any visible items
@@ -359,7 +459,26 @@ const masterItems = [
                     })}
                   >
                     <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
-                    {!sidebarCollapsed && <span>{item.label}</span>}
+                    {!sidebarCollapsed && (
+                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                        <span>{item.label}</span>
+                        {item.showBadge && verificationPendingCount > 0 && (userRole === 'Hr' || userRole === 'Admin') && (
+                          <span
+                            style={{
+                              background: 'var(--accent-indigo)',
+                              color: '#fff',
+                              borderRadius: '10px',
+                              padding: '1px 6px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              marginLeft: '8px',
+                            }}
+                          >
+                            {verificationPendingCount}
+                          </span>
+                        )}
+                      </span>
+                    )}
                   </NavLink>
                 </li>
               )
@@ -663,7 +782,26 @@ const masterItems = [
             })}
           >
             <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
-            {!sidebarCollapsed && <span>{item.label}</span>}
+            {!sidebarCollapsed && (
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span>{item.label}</span>
+                {item.showBadge && verificationPendingCount > 0 && (userRole === 'Hr' || userRole === 'Admin') && (
+                  <span
+                    style={{
+                      background: 'var(--accent-indigo, #4338ca)',
+                      color: '#fff',
+                      borderRadius: '10px',
+                      padding: '1px 6px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      marginLeft: '8px',
+                    }}
+                  >
+                    {verificationPendingCount}
+                  </span>
+                )}
+              </span>
+            )}
           </NavLink>
         </li>
       );
@@ -781,86 +919,86 @@ const masterItems = [
           </li>
         )}
 
-        {/* ==================== LOAN & ADVANCE SECTION ==================== */}
-{hasAnyVisibleItems(loanApplicationForm) && !sidebarCollapsed && (
-  <li style={{ margin: '16px 10px 8px 10px' }}>
-    <div
-      onClick={toggleLoan}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '8px 10px',
-        color: 'var(--sidebar-heading)',
-        fontSize: '11px',
-        fontWeight: 600,
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-        cursor: 'pointer',
-        borderRadius: '8px',
-        transition: 'all 0.2s ease',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.color = 'var(--sidebar-text-active)';
-        e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.color = 'var(--sidebar-heading)';
-        e.currentTarget.style.background = 'transparent';
-      }}
-    >
-      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <FaMoneyBillWave size={12} />
-        <span>LOANS & ADVANCES</span>
-      </span>
-      {loanOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
-    </div>
-  </li>
-)}
-
-{/* Loan Items */}
-{(loanOpen || sidebarCollapsed) && (
-  <>
-    {loanApplicationForm.map((item, index) => (
-      hasAccess(item.roles) && (
-        <li key={`loan-${index}`} style={{ margin: '3px 10px' }}>
-          <NavLink
-            to={item.path}
-            title={sidebarCollapsed ? item.label : ''}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: sidebarCollapsed ? '0' : '12px',
-              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-              padding: sidebarCollapsed ? '11px' : '11px 14px',
-              paddingLeft: sidebarCollapsed ? '11px' : '38px',
-              color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
-              textDecoration: 'none',
-              borderRadius: '10px',
-              transition: 'all 0.2s ease',
-              background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
-              borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
-              fontSize: '14px',
-              fontWeight: isActive ? 600 : 400,
-              whiteSpace: 'nowrap',
-              cursor: 'pointer',
-            })}
-          >
-            <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
-            {!sidebarCollapsed && <span>{item.label}</span>}
-          </NavLink>
-        </li>
-      )
-    ))}
-  </>
-)}
-
         {/* Leave Items */}
         {(leaveOpen || sidebarCollapsed) && (
           <>
             {leaveItems.map((item, index) => (
               hasAccess(item.roles) && (
                 <li key={`leave-${index}`} style={{ margin: '3px 10px' }}>
+                  <NavLink
+                    to={item.path}
+                    title={sidebarCollapsed ? item.label : ''}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: sidebarCollapsed ? '0' : '12px',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      padding: sidebarCollapsed ? '11px' : '11px 14px',
+                      paddingLeft: sidebarCollapsed ? '11px' : '38px',
+                      color: isActive ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)',
+                      textDecoration: 'none',
+                      borderRadius: '10px',
+                      transition: 'all 0.2s ease',
+                      background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+                      borderLeft: isActive ? '3px solid var(--sidebar-border-active)' : '3px solid transparent',
+                      fontSize: '14px',
+                      fontWeight: isActive ? 600 : 400,
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                    })}
+                  >
+                    <span style={{ fontSize: '1.05rem', flexShrink: 0 }}>{item.icon}</span>
+                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  </NavLink>
+                </li>
+              )
+            ))}
+          </>
+        )}
+
+        {/* ==================== LOAN & ADVANCE SECTION ==================== */}
+        {hasAnyVisibleItems(loanApplicationForm) && !sidebarCollapsed && (
+          <li style={{ margin: '16px 10px 8px 10px' }}>
+            <div
+              onClick={toggleLoan}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 10px',
+                color: 'var(--sidebar-heading)',
+                fontSize: '11px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                cursor: 'pointer',
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = 'var(--sidebar-text-active)';
+                e.currentTarget.style.background = 'var(--sidebar-hover-bg)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = 'var(--sidebar-heading)';
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FaMoneyBillWave size={12} />
+                <span>LOANS & ADVANCES</span>
+              </span>
+              {loanOpen ? <BsChevronDown size={10} /> : <BsChevronRight size={10} />}
+            </div>
+          </li>
+        )}
+
+        {/* Loan Items */}
+        {(loanOpen || sidebarCollapsed) && (
+          <>
+            {loanApplicationForm.map((item, index) => (
+              hasAccess(item.roles) && (
+                <li key={`loan-${index}`} style={{ margin: '3px 10px' }}>
                   <NavLink
                     to={item.path}
                     title={sidebarCollapsed ? item.label : ''}

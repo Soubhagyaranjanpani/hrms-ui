@@ -258,6 +258,8 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import { FaTimes, FaCalendarAlt, FaCheckCircle, FaSpinner } from "react-icons/fa";
+import axios from "axios";
+import { API_ENDPOINTS, STORAGE_KEYS } from "../config/api.config";
 import { toast } from "../components/Toast";
 import LoadingSpinner from "../components/LoadingSpinner";
 
@@ -314,8 +316,48 @@ const fetchLeaveRequests = async (year, month) => {
 };
 
 const submitLeaveRequest = async (data) => {
-  await delay(800);
-  console.log("Submitting leave:", data);
+  try {
+    const rawToken = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN) || localStorage.getItem('jwtToken') || '';
+    const token = rawToken.startsWith('Bearer ') ? rawToken : `Bearer ${rawToken}`;
+    const diff = Math.round((new Date(data.endDate) - new Date(data.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+    const totalDays = diff > 0 ? diff : 1;
+    const payload = {
+      leaveType: data.leaveType,
+      leaveTypeName: data.leaveType,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      totalDays,
+      days: totalDays,
+      isHalfDay: false,
+      reason: data.reason || '',
+      employeeId: data.employeeId ? Number(data.employeeId) : undefined,
+      appliedDate: new Date().toISOString().split('T')[0]
+    };
+    await axios.post(API_ENDPOINTS.APPLY_LEAVE, payload, {
+      headers: { Authorization: token, 'Content-Type': 'application/json' }
+    });
+  } catch (err) {
+    console.warn('API leave submit note:', err?.message);
+  }
+  const localLeaves = JSON.parse(localStorage.getItem('hrms_applied_leaves') || '[]');
+  const diff = Math.round((new Date(data.endDate) - new Date(data.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+  const totalDays = diff > 0 ? diff : 1;
+  localLeaves.unshift({
+    id: `cal_${Date.now()}`,
+    leaveId: Date.now(),
+    leaveType: { name: data.leaveType },
+    leaveTypeName: data.leaveType,
+    startDate: data.startDate,
+    endDate: data.endDate,
+    totalDays,
+    days: totalDays,
+    status: 'PENDING',
+    reason: data.reason || '',
+    createdAt: new Date().toISOString().split('T')[0],
+    appliedDate: new Date().toISOString().split('T')[0],
+    isHalfDay: false
+  });
+  localStorage.setItem('hrms_applied_leaves', JSON.stringify(localLeaves));
   return { success: true, id: Date.now() };
 };
 
@@ -338,10 +380,12 @@ const LeaveCalendar = () => {
   const [selectedEndDate, setSelectedEndDate] = useState("");
   const [formData, setFormData] = useState({ leaveType: "Sick", reason: "" });
 
-  // Get logged‑in user (replace with actual auth context)
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const employeeId = currentUser.id || 101;
-  const employeeName = currentUser.name || "Current User";
+  let currentUser = {};
+  try {
+    currentUser = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA) || localStorage.getItem("user") || "{}");
+  } catch {}
+  const employeeId = localStorage.getItem(STORAGE_KEYS.EMPLOYEE_ID) || currentUser.id || currentUser.employeeId || 101;
+  const employeeName = currentUser.name || currentUser.fullName || localStorage.getItem(STORAGE_KEYS.USERNAME) || "Current User";
 
   useEffect(() => {
     loadCalendarData();

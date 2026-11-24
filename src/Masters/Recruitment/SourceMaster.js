@@ -147,15 +147,23 @@ const SourceManagement = () => {
   const [touched, setTouched] = useState({});
 
   // Category options
-  const categories = [
-    { value: 'Online', label: 'Online' },
-    { value: 'Referral', label: 'Referral' },
-    { value: 'Campus', label: 'Campus' },
-    { value: 'Agency', label: 'Agency' },
-    { value: 'Direct', label: 'Direct' },
-    { value: 'Social Media', label: 'Social Media' },
-    { value: 'Other', label: 'Other' }
-  ];
+  // const categories = [
+  //   { value: 'Online', label: 'Online' },
+  //   { value: 'Referral', label: 'Referral' },
+  //   { value: 'Campus', label: 'Campus' },
+  //   { value: 'Agency', label: 'Agency' },
+  //   { value: 'Direct', label: 'Direct' },
+  //   { value: 'Social Media', label: 'Social Media' },
+  //   { value: 'Other', label: 'Other' }
+  // ];
+
+
+
+  
+
+
+
+
 
   // Filtered sources
   const filteredSources = sources.filter(src => {
@@ -499,9 +507,9 @@ const SourceManagement = () => {
                     style={{ fontSize: '14px', padding: '6px 12px' }}
                   >
                     <option value="">Select Category</option>
-                    {categories.map(cat => (
+                    {/* {categories.map(cat => (
                       <option key={cat.value} value={cat.value}>{cat.label}</option>
-                    ))}
+                    ))} */}
                   </select>
                   <FieldError msg={errors.category} />
                 </div>
