@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   FaPlus, FaSearch, FaTimes, FaEye, FaBan, FaPaperclip, FaArrowLeft,
-  FaMoneyBillWave, FaCalendarAlt, FaWallet, FaCheckCircle
+  FaMoneyBillWave, FaCalendarAlt, FaWallet, FaCheckCircle,
+  FaSave, FaExclamationCircle, FaPercent
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -71,6 +72,8 @@ const STATIC_MY_LOANS = [
 ];
 
 const STATUS_TABS = ['All', 'Active', 'Pending Approval', 'Draft', 'Closed', 'Rejected'];
+const LOAN_TYPES = ['Salary Advance', 'Personal Loan', 'Emergency Loan'];
+const RECOVERY_MODES = ['Payroll Deduction', 'Bank Transfer'];
 
 // ============================================
 // HELPERS
@@ -114,10 +117,43 @@ const buildSchedule = (loan) => {
   });
 };
 
+const calculateEmi = (amount, tenure) => {
+  const a = Number(amount) || 0;
+  const t = Number(tenure) || 0;
+  if (t <= 0) return 0;
+  return Math.round(a / t);
+};
+
+const emptyForm = (loanRef) => ({
+  loanRef,
+  empId: CURRENT_EMP.empId,
+  empName: CURRENT_EMP.empName,
+  department: CURRENT_EMP.department,
+  grade: CURRENT_EMP.grade,
+  netSalary: CURRENT_EMP.netSalary,
+  loanType: '',
+  amount: '',
+  tenure: '',
+  purpose: '',
+  requestedDisburse: '',
+  preferredRecovery: 'Payroll Deduction',
+  attachment: ''
+});
+
+// ============================================
+// FIELD ERROR COMPONENT
+// ============================================
+const FieldError = ({ msg }) =>
+  msg ? (
+    <span className="field-err">
+      <FaExclamationCircle size={10} /> {msg}
+    </span>
+  ) : null;
+
 // ============================================
 // COMPONENT
 // ============================================
-const MyLoansScreen = ({ onNewApplication }) => {
+const MyLoansScreen = () => {
   const [loans, setLoans] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -129,6 +165,13 @@ const MyLoansScreen = ({ onNewApplication }) => {
 
   const [viewLoan, setViewLoan] = useState(null);
   const [cancelLoan, setCancelLoan] = useState(null);
+
+  // ---------- apply form state ----------
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState(emptyForm(''));
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
 
   // ---------- simulate fetch ----------
   const fetchLoans = useCallback(() => {
@@ -199,30 +242,171 @@ const MyLoansScreen = ({ onNewApplication }) => {
 
   const canCancel = (l) => l.status === 'Pending Approval' || l.status === 'Draft';
 
+  // ============================================
+  // APPLY FORM HANDLERS
+  // ============================================
+  // next ref = highest existing number + 1 (avoids clashes)
+  const generateLoanRef = () => {
+    const max = loans.reduce((m, l) => {
+      const n = parseInt(String(l.loanRef).replace(/\D/g, ''), 10);
+      return Number.isNaN(n) ? m : Math.max(m, n);
+    }, 0);
+    return `LN-${String(max + 1).padStart(4, '0')}`;
+  };
+
+  const handleOpenForm = () => {
+    setFormData(emptyForm(generateLoanRef()));
+    setErrors({});
+    setTouched({});
+    setViewLoan(null);
+    setShowForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setFormData(emptyForm(''));
+    setErrors({});
+    setTouched({});
+  };
+
+  const validateField = (field, value, data = formData) => {
+    let error = '';
+
+    if (field === 'loanType' && !value) {
+      error = 'Loan Type is required';
+    } else if (field === 'amount') {
+      if (!value) error = 'Loan Amount is required';
+      else if (Number(value) <= 0) error = 'Amount must be greater than zero';
+      else if (Number(value) > data.netSalary * 0.5)
+        error = 'Amount exceeds 50% of net salary limit';
+    } else if (field === 'tenure') {
+      if (!value) error = 'Tenure is required';
+      else if (Number(value) < 1 || Number(value) > 12)
+        error = 'Tenure must be between 1 and 12 months';
+    } else if (field === 'purpose' && !String(value).trim()) {
+      error = 'Purpose is required';
+    } else if (field === 'requestedDisburse' && !value) {
+      error = 'Requested disbursement date is required';
+    }
+
+    setErrors((prev) => ({ ...prev, [field]: error }));
+  };
+
+  const handleChange = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (touched[field]) validateField(field, value);
+  };
+
+  const handleBlur = (field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    validateField(field, formData[field]);
+  };
+
+  const validateForm = () => {
+    const fieldsToValidate = ['loanType', 'amount', 'tenure', 'purpose', 'requestedDisburse'];
+    const newErrors = {};
+
+    for (const field of fieldsToValidate) {
+      if (!String(formData[field]).trim()) newErrors[field] = 'This field is required';
+    }
+
+    if (formData.amount && Number(formData.amount) <= 0) {
+      newErrors.amount = 'Amount must be greater than zero';
+    } else if (formData.amount && Number(formData.amount) > formData.netSalary * 0.5) {
+      newErrors.amount = 'Amount exceeds 50% of net salary limit';
+    }
+
+    if (formData.tenure && (Number(formData.tenure) < 1 || Number(formData.tenure) > 12)) {
+      newErrors.tenure = 'Tenure must be between 1 and 12 months';
+    }
+
+    setErrors(newErrors);
+    setTouched({
+      loanType: true, amount: true, tenure: true, purpose: true, requestedDisburse: true
+    });
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!validateForm()) {
+      toast.warning('Validation Error', 'Please fix the highlighted fields');
+      return;
+    }
+
+    setSubmitting(true);
+    setTimeout(() => {
+      const newLoan = {
+        id: Date.now(),
+        loanRef: formData.loanRef,
+        loanType: formData.loanType,
+        amount: Number(formData.amount),
+        tenure: Number(formData.tenure),
+        emi: calculateEmi(formData.amount, formData.tenure),
+        purpose: formData.purpose.trim(),
+        appliedOn: new Date().toISOString().slice(0, 10),
+        requestedDisburse: formData.requestedDisburse,
+        disbursedOn: null,
+        preferredRecovery: formData.preferredRecovery,
+        attachment: formData.attachment,
+        paidEmis: 0,
+        balance: 0,
+        status: 'Pending Approval',
+        nextEmiDate: null,
+        chain: [
+          { role: 'Reporting Manager', status: 'Pending', date: null },
+          { role: 'HR Head', status: 'Waiting', date: null },
+          { role: 'Finance', status: 'Waiting', date: null }
+        ]
+      };
+
+      setLoans((prev) => [newLoan, ...prev]);
+      toast.success('Success', 'Loan application submitted successfully');
+      setSubmitting(false);
+      handleCloseForm();
+      setStatusTab('All');
+      setSearchTerm('');
+      setPage(0);
+    }, 500);
+  };
+
   if (loading && loans.length === 0) return <LoadingSpinner message="Loading your loans..." />;
+
+  const emiPreview = calculateEmi(formData.amount, formData.tenure);
 
   return (
     <div className="cert-root">
       {/* HEADER */}
       <div className="cert-header">
         <div>
-          <h1 className="cert-title">{viewLoan ? `Loan ${viewLoan.loanRef}` : 'My Loans'}</h1>
+          <h1 className="cert-title">
+            {showForm ? 'New Loan Application' : viewLoan ? `Loan ${viewLoan.loanRef}` : 'My Loans'}
+          </h1>
           <p className="cert-subtitle">
-            {viewLoan
-              ? 'Loan details, approval status and repayment schedule'
-              : `${CURRENT_EMP.empName} (${CURRENT_EMP.empId}) · Track your applications, balances and repayments`}
+            {showForm
+              ? 'Fill in the details below to apply for a loan or salary advance'
+              : viewLoan
+                ? 'Loan details, approval status and repayment schedule'
+                : `${CURRENT_EMP.empName} (${CURRENT_EMP.empId}) · Track your applications, balances and repayments`}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!viewLoan && (
-            <button
-              className="cert-add-btn"
-              onClick={() => (onNewApplication ? onNewApplication() : toast.success('Info', 'Opens New Loan Application'))}
-            >
+          {!viewLoan && !showForm && (
+            <button className="cert-add-btn" onClick={handleOpenForm}>
               <FaPlus size={13} /> New Loan Application
             </button>
           )}
-          {viewLoan && (
+          {showForm && (
+            <button
+              type="button"
+              className="cert-back-btn"
+              onClick={handleCloseForm}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
+            >
+              <FaArrowLeft size={12} /> Back
+            </button>
+          )}
+          {viewLoan && !showForm && (
             <button
               type="button"
               className="cert-back-btn"
@@ -235,7 +419,214 @@ const MyLoansScreen = ({ onNewApplication }) => {
         </div>
       </div>
 
-      {viewLoan ? (
+      {showForm ? (
+        /* ================= NEW LOAN APPLICATION FORM ================= */
+        <div className="cert-form-wrap">
+          <form onSubmit={handleSubmit} className="cert-form-compact">
+            {/* EMPLOYEE DETAILS (READ-ONLY) */}
+            <div className="cert-form-section-compact" style={{ marginBottom: '16px' }}>
+              <div className="cert-section-label">Employee Details</div>
+              <div className="cert-form-grid-3col">
+                {[
+                  ['Employee ID', formData.empId],
+                  ['Name', formData.empName],
+                  ['Department', formData.department],
+                  ['Grade', formData.grade],
+                  ['Net Salary (Monthly)', `₹ ${formData.netSalary.toLocaleString()}`],
+                  ['Loan Ref No.', formData.loanRef]
+                ].map(([label, value]) => (
+                  <div className="cert-field-compact" key={label}>
+                    <label>{label}</label>
+                    <input
+                      type="text"
+                      className="form-control bg-light"
+                      value={value}
+                      readOnly
+                      style={{
+                        fontSize: '14px', padding: '6px 12px', background: '#f3f4f6',
+                        fontFamily: label === 'Loan Ref No.' ? 'monospace' : undefined
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* LOAN REQUEST */}
+            <div className="cert-form-section-compact">
+              <div className="cert-section-label">Loan Request</div>
+              <div className="cert-form-grid-3col">
+
+                {/* Loan Type */}
+                <div className={`cert-field-compact ${touched.loanType && errors.loanType ? 'has-error' : ''}`}>
+                  <label className="required">Loan Type</label>
+                  <select
+                    value={formData.loanType}
+                    onChange={(e) => handleChange('loanType', e.target.value)}
+                    onBlur={() => handleBlur('loanType')}
+                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                  >
+                    <option value="">Select Loan Type</option>
+                    {LOAN_TYPES.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                  <FieldError msg={touched.loanType && errors.loanType} />
+                </div>
+
+                {/* Loan Amount */}
+                <div className={`cert-field-compact ${touched.amount && errors.amount ? 'has-error' : ''}`}>
+                  <label className="required">Loan Amount (₹)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 50000"
+                    value={formData.amount}
+                    onChange={(e) => handleChange('amount', e.target.value)}
+                    onBlur={() => handleBlur('amount')}
+                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                  />
+                  <FieldError msg={touched.amount && errors.amount} />
+                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
+                    Max Eligible: ₹ {(formData.netSalary * 0.5).toLocaleString()} (50% of net salary)
+                  </small>
+                </div>
+
+                {/* Tenure */}
+                <div className={`cert-field-compact ${touched.tenure && errors.tenure ? 'has-error' : ''}`}>
+                  <label className="required">Tenure (months)</label>
+                  <input
+                    type="number"
+                    placeholder="1 - 12 months"
+                    value={formData.tenure}
+                    onChange={(e) => handleChange('tenure', e.target.value)}
+                    onBlur={() => handleBlur('tenure')}
+                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                    min="1"
+                    max="12"
+                  />
+                  <FieldError msg={touched.tenure && errors.tenure} />
+                </div>
+
+                {/* Requested Disburse */}
+                <div className={`cert-field-compact ${touched.requestedDisburse && errors.requestedDisburse ? 'has-error' : ''}`}>
+                  <label className="required">Requested Disburse Date</label>
+                  <input
+                    type="date"
+                    value={formData.requestedDisburse}
+                    onChange={(e) => handleChange('requestedDisburse', e.target.value)}
+                    onBlur={() => handleBlur('requestedDisburse')}
+                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                  />
+                  <FieldError msg={touched.requestedDisburse && errors.requestedDisburse} />
+                </div>
+
+                {/* Preferred Recovery */}
+                <div className="cert-field-compact">
+                  <label>Preferred Recovery</label>
+                  <select
+                    value={formData.preferredRecovery}
+                    onChange={(e) => handleChange('preferredRecovery', e.target.value)}
+                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                  >
+                    {RECOVERY_MODES.map((mode) => (
+                      <option key={mode} value={mode}>{mode}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Attachment */}
+                <div className="cert-field-compact">
+                  <label>Attach Document</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., medical_bill.pdf"
+                    value={formData.attachment}
+                    onChange={(e) => handleChange('attachment', e.target.value)}
+                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                  />
+                  <small style={{ fontSize: '12px', color: '#6b7280' }}>
+                    Medical bill / quotation / receipt (static demo)
+                  </small>
+                </div>
+
+                {/* Purpose - full width */}
+                <div
+                  className={`cert-field-compact ${touched.purpose && errors.purpose ? 'has-error' : ''}`}
+                  style={{ gridColumn: 'span 3' }}
+                >
+                  <label className="required">Purpose / Reason</label>
+                  <textarea
+                    rows="2"
+                    placeholder="Describe the reason for this loan..."
+                    value={formData.purpose}
+                    onChange={(e) => handleChange('purpose', e.target.value)}
+                    onBlur={() => handleBlur('purpose')}
+                    style={{
+                      fontSize: '14px',
+                      padding: '6px 12px',
+                      resize: 'vertical',
+                      minHeight: '70px',
+                      width: '100%'
+                    }}
+                  />
+                  <FieldError msg={touched.purpose && errors.purpose} />
+                </div>
+
+              </div>
+            </div>
+
+            {/* LIVE EMI PREVIEW */}
+            <div
+              className="cert-form-section-compact"
+              style={{ marginTop: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}
+            >
+              <div className="cert-section-label" style={{ color: '#065f46' }}>
+                Live EMI Preview
+              </div>
+              <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', fontSize: '13px', marginTop: '4px' }}>
+                <div>
+                  <FaMoneyBillWave size={12} style={{ color: '#059669', marginRight: '6px' }} />
+                  <strong>EMI per month:</strong>{' '}
+                  <span style={{ color: '#065f46', fontWeight: 600 }}>
+                    ₹ {emiPreview.toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <FaPercent size={12} style={{ color: '#059669', marginRight: '6px' }} />
+                  <strong>Interest:</strong>{' '}
+                  <span style={{ color: '#065f46', fontWeight: 600 }}>0% (advance)</span>
+                </div>
+                <div>
+                  <FaCalendarAlt size={12} style={{ color: '#059669', marginRight: '6px' }} />
+                  <strong>Tenure:</strong>{' '}
+                  <span style={{ color: '#065f46', fontWeight: 600 }}>
+                    {formData.tenure || 0} months
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="cert-form-actions" style={{ marginTop: '16px' }}>
+              <button type="button" className="cert-cancel-btn" onClick={handleCloseForm}>
+                <FaTimes size={12} /> Cancel
+              </button>
+              <button
+                type="submit"
+                className="cert-add-btn"
+                disabled={submitting}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                {submitting ? (
+                  <><span className="emp-spinner" /> Saving…</>
+                ) : (
+                  <><FaSave size={12} /> Submit Application</>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : viewLoan ? (
         /* ================= DETAIL (full page) ================= */
         <div className="cert-form-wrap">
           <div className="cert-form-compact">
