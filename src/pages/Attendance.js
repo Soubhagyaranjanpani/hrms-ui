@@ -7,6 +7,9 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ShiftPunchWidget from '../components/ShiftPunchWidget';
 import {
   getUnifiedTodayAttendance,
+  getCurrentUserAttendanceLogs,
+  filterBackendRecordsForCurrentEmployee,
+  recordMatchesCurrentEmployee,
   calculateShiftAttendance,
   getShiftByCode,
   format12Hour
@@ -162,7 +165,7 @@ const MyAttendance = ({ user }) => {
         const id = String(empId || '').trim();
         const n = String(name || '').trim().toLowerCase();
 
-        if (!e && !id && !n) return true;
+        if (!e && !id && !n) return false;
         if (currentEmp) {
           if (e === currentEmp) return true;
           if (e && (e.startsWith(currentEmp) || currentEmp.startsWith(e))) return true;
@@ -244,8 +247,8 @@ const MyAttendance = ({ user }) => {
   const mergeLocalAndShiftAttendance = (baseRecords) => {
     let list = [...(baseRecords || [])];
     try {
-      // 1. Merge today's unified punch
-      const todayRecord = getUnifiedTodayAttendance();
+      // 1. Merge today's unified punch (scoped to current employee)
+      const todayRecord = getUnifiedTodayAttendance(user);
       if (todayRecord && todayRecord.date && (todayRecord.checkIn || todayRecord.checkOut)) {
         const normToday = normalizeDate(todayRecord.date);
         const existingIdx = list.findIndex(r => normalizeDate(r.date || r.attendanceDate || r.punchDate || r.checkInDate) === normToday);
@@ -282,8 +285,8 @@ const MyAttendance = ({ user }) => {
         }
       }
 
-      // 2. Merge local attendance logs
-      const logs = JSON.parse(localStorage.getItem('hrms_attendance_logs') || '[]');
+      // 2. Merge local attendance logs (strictly scoped to current employee)
+      const logs = getCurrentUserAttendanceLogs(user);
       logs.forEach(logRec => {
         if (logRec && logRec.date && (logRec.checkIn || logRec.checkOut)) {
           const normD = normalizeDate(logRec.date);
@@ -331,7 +334,7 @@ const MyAttendance = ({ user }) => {
       let rawRecords = [];
       try {
         const response = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
-        rawRecords = parseAttendanceRecords(response.data);
+        rawRecords = filterBackendRecordsForCurrentEmployee(parseAttendanceRecords(response.data), user);
       } catch (err) {
         console.warn('GET_MY_ATTENDANCE failed, attempting dashboard fallback:', err);
       }
@@ -343,7 +346,7 @@ const MyAttendance = ({ user }) => {
             params: { month: selectedMonth + 1, year: selectedYear },
             ...getAuthConfig()
           });
-          rawRecords = parseAttendanceRecords(dashRes.data);
+          rawRecords = filterBackendRecordsForCurrentEmployee(parseAttendanceRecords(dashRes.data), user);
         } catch (e) {
           // ignore
         }
@@ -396,7 +399,8 @@ const MyAttendance = ({ user }) => {
   useEffect(() => {
     fetchAttendance();
 
-    const handleSync = () => {
+    const handleSync = (e) => {
+      if (e?.detail && !recordMatchesCurrentEmployee(e.detail, user)) return;
       fetchAttendance();
     };
 
@@ -411,7 +415,7 @@ const MyAttendance = ({ user }) => {
       window.removeEventListener('hrms_today_punches_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
-  }, []);
+  }, [user]);
 
   // Sync current month with selected month/year
   useEffect(() => {

@@ -20,7 +20,8 @@ import {
   parseDateYMD,
   getDaysInMonth,
   evaluateShiftTimingRules,
-  getEmployeeShiftForDate
+  getEmployeeShiftForDate,
+  filterBackendRecordsForCurrentEmployee
 } from '../utils/rosterUtils';
 
 const monthNames = [
@@ -162,16 +163,15 @@ export default function MyRoster({ user }) {
       const res = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, {
         headers: { Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}` }
       });
-      const list = res.data?.response || res.data?.data || res.data || [];
+      const rawList = res.data?.response || res.data?.data || res.data || [];
+      const list = filterBackendRecordsForCurrentEmployee(rawList, user);
       if (Array.isArray(list)) {
         const todayStr = getTodayDateYMD();
-        const found = list.find(r => r.date === todayStr);
-        if (found) {
-          setTodayPunchRecord(found);
-        }
+        const found = list.find(r => String(r.date || r.attendanceDate || '').split('T')[0] === todayStr);
+        setTodayPunchRecord(found || null);
       }
     } catch {}
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchBackendData();

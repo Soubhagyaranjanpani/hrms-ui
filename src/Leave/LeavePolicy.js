@@ -1,3 +1,11 @@
+
+
+
+
+
+
+
+
 import React, { useState, useEffect } from "react";
 import { FaEdit, FaArrowLeft, FaCheckCircle, FaExclamationCircle, FaPlus } from "react-icons/fa";
 import axios from "axios";
@@ -155,10 +163,12 @@ const LeavePolicy = () => {
         leaveTypeId: parseInt(formData.leaveTypeId),
       };
       if (editingPolicy) {
-        await axios.put(API_ENDPOINTS.UPDATE_LEAVE_POLICY(editingPolicy.id), payload, getAuthHeaders());
+        const { data } = await axios.put(API_ENDPOINTS.UPDATE_LEAVE_POLICY(editingPolicy.id), payload, getAuthHeaders());
+        if (Number(data?.status) >= 400) throw new Error(data.message || "Update failed");
         toast.success("Success", "Leave policy updated successfully");
       } else {
-        await axios.post(API_ENDPOINTS.CREATE_LEAVE_POLICY, payload, getAuthHeaders());
+        const { data } = await axios.post(API_ENDPOINTS.CREATE_LEAVE_POLICY, payload, getAuthHeaders());
+        if (Number(data?.status) >= 400) throw new Error(data.message || "Creation failed");
         toast.success("Success", "Leave policy created successfully");
       }
       await fetchPolicies();
@@ -195,18 +205,9 @@ const LeavePolicy = () => {
     });
   };
 
-  const handleActivate = async (policy) => {
-    if (!window.confirm(`Activate this policy for ${getLeaveTypeName(policy.leaveType?.id || policy.leaveType)}? This will deactivate other policies for this leave type.`)) return;
-    setLoading(true);
-    try {
-      await axios.put(API_ENDPOINTS.ACTIVATE_LEAVE_POLICY(policy.id), {}, getAuthHeaders());
-      await fetchPolicies();
-      toast.success("Success", "Policy activated successfully");
-    } catch (error) {
-      toast.error("Error", error.response?.data?.message || "Error activating policy");
-    } finally {
-      setLoading(false);
-    }
+  const handleActivate = (policy) => {
+    handleEdit(policy);
+    setFormData(prev => ({ ...prev, isActive: true }));
   };
 
   const handleEdit = (policy) => {

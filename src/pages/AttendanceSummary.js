@@ -6,12 +6,15 @@ import { toast, ToastContainer } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import {
   getUnifiedTodayAttendance,
+  getCurrentUserAttendanceLogs,
+  filterBackendRecordsForCurrentEmployee,
+  recordMatchesCurrentEmployee,
   calculateShiftAttendance,
   getShiftByCode,
   format12Hour
 } from '../utils/rosterUtils';
 
-const AttendanceSummary = () => {
+const AttendanceSummary = ({ user }) => {
   const [summary, setSummary] = useState(null);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
@@ -117,7 +120,7 @@ const AttendanceSummary = () => {
         const id = String(empId || '').trim();
         const n = String(name || '').trim().toLowerCase();
 
-        if (!e && !id && !n) return true;
+        if (!e && !id && !n) return false;
         if (currentEmp) {
           if (e === currentEmp) return true;
           if (e && (e.startsWith(currentEmp) || currentEmp.startsWith(e))) return true;
@@ -220,7 +223,7 @@ const AttendanceSummary = () => {
       // Fetch raw records to check which dates are already marked present
       try {
         const myRes = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
-        rawRecords = parseAttendanceRecords(myRes.data);
+        rawRecords = filterBackendRecordsForCurrentEmployee(parseAttendanceRecords(myRes.data), user);
       } catch (e) {}
 
       if (rawRecords.length === 0) {
@@ -229,7 +232,7 @@ const AttendanceSummary = () => {
             params: { month, year },
             ...getAuthConfig()
           });
-          rawRecords = parseAttendanceRecords(dashRes.data);
+          rawRecords = filterBackendRecordsForCurrentEmployee(parseAttendanceRecords(dashRes.data), user);
         } catch (e) {}
       }
 
@@ -258,8 +261,8 @@ const AttendanceSummary = () => {
         }
       });
 
-      // Merge today's unified punch if within selected month/year
-      const todayRec = getUnifiedTodayAttendance();
+      // Merge today's unified punch if within selected month/year (strictly scoped to current employee)
+      const todayRec = getUnifiedTodayAttendance(user);
       if (todayRec && todayRec.date && todayRec.checkIn) {
         const [ty, tm] = todayRec.date.split('-');
         if (ty === yearStr && tm === monthStr) {
@@ -307,7 +310,7 @@ const AttendanceSummary = () => {
       let rawRecords = [];
       try {
         const response = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
-        rawRecords = parseAttendanceRecords(response.data);
+        rawRecords = filterBackendRecordsForCurrentEmployee(parseAttendanceRecords(response.data), user);
       } catch (err) {}
 
       if (rawRecords.length === 0) {
@@ -316,7 +319,7 @@ const AttendanceSummary = () => {
             params: { month, year },
             ...getAuthConfig()
           });
-          rawRecords = parseAttendanceRecords(dashRes.data);
+          rawRecords = filterBackendRecordsForCurrentEmployee(parseAttendanceRecords(dashRes.data), user);
         } catch (e) {}
       }
 
@@ -341,8 +344,8 @@ const AttendanceSummary = () => {
         }
       });
 
-      // Merge today's unified punch and local logs
-      const todayRec = getUnifiedTodayAttendance();
+      // Merge today's unified punch and local logs (strictly scoped to current employee)
+      const todayRec = getUnifiedTodayAttendance(user);
       if (todayRec && todayRec.date && (todayRec.checkIn || todayRec.checkOut)) {
         const normD = normalizeDate(todayRec.date);
         const exIdx = rawRecords.findIndex(r => normalizeDate(r.date || r.attendanceDate || r.punchDate) === normD);
@@ -362,7 +365,7 @@ const AttendanceSummary = () => {
         }
       }
 
-      const logs = JSON.parse(localStorage.getItem('hrms_attendance_logs') || '[]');
+      const logs = getCurrentUserAttendanceLogs(user);
       logs.forEach(logRec => {
         if (logRec && logRec.date && (logRec.checkIn || logRec.checkOut)) {
           const normD = normalizeDate(logRec.date);
@@ -404,7 +407,8 @@ const AttendanceSummary = () => {
     fetchSummary();
     fetchMonthlyRecords();
 
-    const handleSync = () => {
+    const handleSync = (e) => {
+      if (e?.detail && !recordMatchesCurrentEmployee(e.detail, user)) return;
       fetchSummary();
       fetchMonthlyRecords();
     };
@@ -420,7 +424,7 @@ const AttendanceSummary = () => {
       window.removeEventListener('hrms_today_punches_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
-  }, [month, year]);
+  }, [month, year, user]);
 
   // Sync current month with selected month/year
   useEffect(() => {

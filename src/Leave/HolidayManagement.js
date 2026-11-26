@@ -1,3 +1,12 @@
+
+
+
+
+
+
+
+
+
 // src/pages/holiday/HolidayManagement.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -188,49 +197,9 @@ const HolidayManagement = () => {
         }
     };
 
-    const handleEdit = (holiday) => {
-        setSelectedHoliday(holiday);
-        setFormData({
-            name: holiday.name || '',
-            date: holiday.date || '',
-            description: holiday.description || ''
-        });
-        setEditMode(true);
-        setView('form');
-    };
-
-    const handleUpdate = async (e) => {
-        e.preventDefault();
-        const allFields = ['name', 'date', 'description'];
-        setTouched(allFields.reduce((a, f) => ({ ...a, [f]: true }), {}));
-        const errs = validateAll();
-        setErrors(errs);
-        if (Object.keys(errs).length > 0) {
-            toast.warning('Validation Error', 'Please fix the highlighted fields');
-            return;
-        }
-        setSubmitting(true);
-        try {
-            const response = await fetch(`${API_ENDPOINTS.GET_ALL_HOLIDAYS}/${selectedHoliday.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAuthToken()}` },
-                body: JSON.stringify(formData)
-            });
-            const result = await response.json();
-            if (result.status === 200) {
-                toast.success('Success', 'Holiday updated successfully');
-                resetForm();
-                setView('list');
-                fetchHolidays();
-            } else {
-                toast.error('Error', result.message || 'Failed to update holiday');
-            }
-        } catch (error) {
-            toast.error('Error', 'Network error while updating holiday');
-        } finally {
-            setSubmitting(false);
-        }
-    };
+    // The supplied backend has no holiday update endpoint.
+    const handleEdit = () => toast.warning('Unavailable', 'Holiday editing is not supported by the existing API');
+    const handleUpdate = (e) => { e.preventDefault(); handleEdit(); };
 
     const confirmDelete = (holiday) => {
         setHolidayToDelete(holiday);

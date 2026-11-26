@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   FaSearch, FaEdit, FaTrash, FaUserPlus, FaTimes,
   FaArrowLeft, FaSave, FaExclamationCircle, FaUpload, FaDownload,
@@ -9,6 +9,8 @@ import {
 import { toast } from '../components/Toast'; 
 import LoadingSpinner from '../components/LoadingSpinner';
 import { BASE_URL, STORAGE_KEYS, API_ENDPOINTS } from '../config/api.config';
+import { getNormalizedRole as resolveNormalizedRole, normalizeRole } from '../Task/taskAccess';
+import { getMyOrgScope, getStoredUser } from '../Task/taskScope';
 import axios from 'axios';
 
 /* ─── Validation Rules ─── */
@@ -111,6 +113,10 @@ const EDUCATION_LEVELS = [
 ];
 
 const Employees = ({ user }) => {
+  const currentUser = user || getStoredUser();
+  const userRole = resolveNormalizedRole(currentUser);
+  const isAdmin = userRole === 'Admin';
+
   const [view, setView] = useState('list');
   const [editMode, setEditMode] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -120,9 +126,12 @@ const Employees = ({ user }) => {
   const [submitting, setSubmitting] = useState(false);
 
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(100);
+  const [rowsPerPage, setRowsPerPage] = useState(() => (isAdmin ? 100 : 10));
 
   const [searchName, setSearchName] = useState('');
+  const [filterBranch, setFilterBranch] = useState('ALL');
+  const [filterDepartment, setFilterDepartment] = useState('ALL');
+  const [filterRole, setFilterRole] = useState('ALL');
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
@@ -463,17 +472,297 @@ const resetExperienceForm = () => {
     }
   }, []);
 
-  const filteredEmployees = allEmployees.filter(emp => {
+  const resolveEmpBranchName = useCallback((emp) => {
+    if (!emp) return '';
+    if (emp.branchName) return String(emp.branchName).trim();
+    if (typeof emp.branch === 'object' && emp.branch?.name) return String(emp.branch.name).trim();
+    if (typeof emp.branch === 'string' && isNaN(Number(emp.branch))) return emp.branch.trim();
+    const bId = emp.branchId ?? (typeof emp.branch === 'number' || !isNaN(Number(emp.branch)) ? emp.branch : null);
+    if (bId != null) {
+      const foundB = branches.find(b => String(b.id) === String(bId));
+      if (foundB?.name) return foundB.name.trim();
+    }
+    const dId = emp.departmentId ?? emp.department?.id;
+    if (dId != null) {
+      const foundD = allDepartments.find(d => String(d.id) === String(dId));
+      if (foundD?.branchId != null) {
+        const foundB = branches.find(b => String(b.id) === String(foundD.branchId));
+        if (foundB?.name) return foundB.name.trim();
+      }
+    }
+    return '';
+  }, [branches, allDepartments]);
+
+  const resolveEmpDeptName = useCallback((emp) => {
+    if (!emp) return '';
+    if (emp.departmentName) return String(emp.departmentName).trim();
+    if (typeof emp.department === 'object' && emp.department?.name) return String(emp.department.name).trim();
+    if (typeof emp.department === 'string' && isNaN(Number(emp.department))) return emp.department.trim();
+    const dId = emp.departmentId ?? emp.department?.id;
+    if (dId != null) {
+      const foundD = allDepartments.find(d => String(d.id) === String(dId));
+      if (foundD?.name) return foundD.name.trim();
+    }
+    return '';
+  }, [allDepartments]);
+
+  // Role-based Employee Directory Scoping:
+  // - Admin: full list untouched
+  // - Manager: shows Employees (direct / dept / branch) and HR (same branch)
+  // - Hr: shows Employees and Managers (same branch / dept / reporting HR)
+  // - Employee: shows Employees in own department & branch
+  const roleScopedEmployees = useMemo(() => {
+    if (isAdmin) return allEmployees;
+
+    const {
+      myRecord,
+      myIds,
+      myName,
+      myBranchId,
+      myBranchName,
+      myDeptId,
+      myDeptName,
+    } = getMyOrgScope(allEmployees, currentUser, allEmployees);
+
+    const normStr = (v) => String(v || '').trim().toLowerCase();
+    const resolvedMyBranch = normStr(
+      myBranchName ||
+      (myBranchId != null ? branches.find(b => String(b.id) === String(myBranchId))?.name : '')
+    );
+    const resolvedMyDept = normStr(
+      myDeptName ||
+      (myDeptId != null ? allDepartments.find(d => String(d.id) === String(myDeptId))?.name : '')
+    );
+
+    const getEmpBranchId = (emp) => {
+      if (emp?.branchId != null) return emp.branchId;
+      if (emp?.branch?.id != null) return emp.branch.id;
+      const dId = emp?.departmentId ?? emp?.department?.id;
+      if (dId != null) {
+        const dObj = allDepartments.find(d => String(d.id) === String(dId));
+        if (dObj?.branchId != null) return dObj.branchId;
+      }
+      return null;
+    };
+
+    const matchesDept = (emp) => {
+      const eDeptId = emp?.departmentId ?? emp?.department?.id ?? null;
+      if (myDeptId != null && eDeptId != null) {
+        return String(eDeptId) === String(myDeptId);
+      }
+      const eDeptName = normStr(resolveEmpDeptName(emp));
+      if (resolvedMyDept && eDeptName) {
+        return eDeptName === resolvedMyDept;
+      }
+      return false;
+    };
+
+    const getMgrId = (emp) =>
+      emp?.managerId ?? emp?.reportingManagerId ?? emp?.reportingToId ?? emp?.supervisorId ?? null;
+    const getMgrName = (emp) =>
+      normStr(emp?.reportingManagerName || emp?.managerName || emp?.reportingToName);
+    const getHrIdVal = (emp) =>
+      emp?.hrId ?? emp?.reportingHrId ?? emp?.assignedHrId ?? (typeof emp?.hr === 'object' ? emp?.hr?.id : null) ?? null;
+    const getHrName = (emp) =>
+      normStr(
+        emp?.hrName ||
+        emp?.reportingHrName ||
+        emp?.assignedHrName ||
+        (typeof emp?.hr === 'object' ? emp?.hr?.name : typeof emp?.hr === 'string' ? emp.hr : '')
+      );
+
+    let effectiveMyBranchId = myBranchId;
+    if (effectiveMyBranchId == null && myDeptId != null) {
+      const deptObj = allDepartments.find(d => String(d.id) === String(myDeptId));
+      if (deptObj?.branchId != null) effectiveMyBranchId = deptObj.branchId;
+    }
+
+    const resolvedMyBranchWithDept = normStr(
+      resolvedMyBranch ||
+      (effectiveMyBranchId != null ? branches.find(b => String(b.id) === String(effectiveMyBranchId))?.name : '')
+    );
+
+    const matchesBranchScope = (emp) => {
+      const eBranchId = getEmpBranchId(emp);
+      if (effectiveMyBranchId != null && eBranchId != null) {
+        return String(eBranchId) === String(effectiveMyBranchId);
+      }
+      const eBranchName = normStr(resolveEmpBranchName(emp));
+      if (resolvedMyBranchWithDept && eBranchName) {
+        return eBranchName === resolvedMyBranchWithDept;
+      }
+      return false;
+    };
+
+  const hasBranchScope = effectiveMyBranchId != null || Boolean(resolvedMyBranchWithDept);
+  const hasDeptScope = myDeptId != null || Boolean(resolvedMyDept);
+
+  if (userRole === 'Manager') {
+    return allEmployees.filter(emp => {
+      const eRole = normalizeRole(emp.roleName || emp.role);
+      if (eRole !== 'Employee' && eRole !== 'Hr') return false;
+
+      if (eRole === 'Hr') {
+        if (hasBranchScope) return matchesBranchScope(emp);
+        if (hasDeptScope) return matchesDept(emp);
+        return false;
+      }
+
+      // eRole === 'Employee': direct reports or same-department employees without another explicit manager
+      const mId = getMgrId(emp);
+      const mName = getMgrName(emp);
+      if (mId != null && myIds.size > 0 && myIds.has(String(mId))) return true;
+      if (mName && myName && mName === myName) return true;
+
+      const hasOtherMgr =
+        (mId != null && myIds.size > 0 && !myIds.has(String(mId))) ||
+        (mName && myName && mName !== myName);
+      if (hasOtherMgr) return false;
+
+      if (hasDeptScope) {
+        return matchesDept(emp) && (!hasBranchScope || !resolveEmpBranchName(emp) || matchesBranchScope(emp));
+      }
+      if (hasBranchScope) return matchesBranchScope(emp);
+      return false;
+    });
+  }
+
+  if (userRole === 'Hr') {
+    return allEmployees.filter(emp => {
+      const eRole = normalizeRole(emp.roleName || emp.role);
+      if (eRole !== 'Employee' && eRole !== 'Manager') return false;
+
+      const hId = getHrIdVal(emp);
+      if (hId != null && myIds.size > 0) {
+        return myIds.has(String(hId));
+      }
+      if (hasBranchScope) return matchesBranchScope(emp);
+      if (hasDeptScope) return matchesDept(emp);
+      return false;
+    });
+  }
+
+  // Employee role: shows only her own Manager and HR (not all employees)
+  const myMgrId = getMgrId(myRecord) ?? getMgrId(currentUser);
+  const myMgrName = getMgrName(myRecord) || getMgrName(currentUser);
+  const myHrId = getHrIdVal(myRecord) ?? getHrIdVal(currentUser);
+  const myHrName = getHrName(myRecord) || getHrName(currentUser);
+
+  const matchesEmpIdOrName = (emp, targetId, targetName) => {
+    if (targetId != null && [emp.id, emp.employeeId, emp.userId].some(v => v != null && String(v) === String(targetId))) {
+      return true;
+    }
+    if (targetName && normStr(emp.name) === targetName) {
+      return true;
+    }
+    return false;
+  };
+
+  const hasMatchedDirectMgr =
+    (myMgrId != null || Boolean(myMgrName)) &&
+    allEmployees.some(emp => normalizeRole(emp.roleName || emp.role) === 'Manager' && matchesEmpIdOrName(emp, myMgrId, myMgrName));
+
+  const hasMatchedDirectHr =
+    (myHrId != null || Boolean(myHrName)) &&
+    allEmployees.some(emp => normalizeRole(emp.roleName || emp.role) === 'Hr' && matchesEmpIdOrName(emp, myHrId, myHrName));
+
+  return allEmployees.filter(emp => {
+    const eRole = normalizeRole(emp.roleName || emp.role);
+    if (eRole !== 'Manager' && eRole !== 'Hr') return false;
+
+    if (eRole === 'Hr') {
+      if (hasMatchedDirectHr) {
+        return matchesEmpIdOrName(emp, myHrId, myHrName);
+      }
+      if (hasBranchScope) return matchesBranchScope(emp);
+      if (hasDeptScope) return matchesDept(emp);
+      return false;
+    }
+
+    // eRole === 'Manager'
+    if (hasMatchedDirectMgr) {
+      return matchesEmpIdOrName(emp, myMgrId, myMgrName);
+    }
+    if (hasDeptScope) {
+      return matchesDept(emp) && (!hasBranchScope || !resolveEmpBranchName(emp) || matchesBranchScope(emp));
+    }
+    if (hasBranchScope) return matchesBranchScope(emp);
+    return false;
+  });
+  }, [
+    isAdmin,
+    userRole,
+    allEmployees,
+    currentUser,
+    branches,
+    allDepartments,
+    resolveEmpBranchName,
+    resolveEmpDeptName,
+  ]);
+
+  // Dynamic Branch -> Department -> Role filter options from visible scope
+  const branchFilterOptions = useMemo(() => {
+    const set = new Set();
+    roleScopedEmployees.forEach(emp => {
+      const bName = resolveEmpBranchName(emp);
+      if (bName) set.add(bName);
+    });
+    if (isAdmin) {
+      branches.forEach(b => {
+        if (b?.name) set.add(b.name.trim());
+      });
+    }
+    return [...set].sort();
+  }, [roleScopedEmployees, resolveEmpBranchName, isAdmin, branches]);
+
+  const departmentFilterOptions = useMemo(() => {
+    const set = new Set();
+    roleScopedEmployees.forEach(emp => {
+      const bName = resolveEmpBranchName(emp);
+      if (filterBranch !== 'ALL' && bName !== filterBranch) return;
+      const dName = resolveEmpDeptName(emp);
+      if (dName) set.add(dName);
+    });
+    if (isAdmin) {
+      const branchObj = branches.find(b => b.name?.trim() === filterBranch);
+      allDepartments.forEach(d => {
+        if (!d?.name) return;
+        if (filterBranch !== 'ALL' && branchObj && String(d.branchId) !== String(branchObj.id)) return;
+        set.add(d.name.trim());
+      });
+    }
+    return [...set].sort();
+  }, [roleScopedEmployees, filterBranch, resolveEmpBranchName, resolveEmpDeptName, isAdmin, branches, allDepartments]);
+
+  const roleFilterOptions = useMemo(() => {
+    const set = new Set();
+    roleScopedEmployees.forEach(emp => {
+      const rName = emp?.roleName || (typeof emp?.role === 'string' ? emp.role : emp?.role?.name) || '';
+      if (rName) set.add(String(rName).trim());
+    });
+    return [...set].sort();
+  }, [roleScopedEmployees]);
+
+  const filteredEmployees = roleScopedEmployees.filter(emp => {
+    const bName = resolveEmpBranchName(emp);
+    const dName = resolveEmpDeptName(emp);
+    const rawRole = emp.roleName || (typeof emp.role === 'string' ? emp.role : emp.role?.name) || '';
+    const rName = rawRole ? String(rawRole).trim() : '';
+
+    if (filterBranch !== 'ALL' && bName !== filterBranch) return false;
+    if (filterDepartment !== 'ALL' && dName !== filterDepartment) return false;
+    if (filterRole !== 'ALL' && rName !== filterRole) return false;
+
     const query = searchName.toLowerCase().trim();
     if (!query) return true;
     return (
       (emp.name && emp.name.toLowerCase().includes(query)) ||
       (emp.email && emp.email.toLowerCase().includes(query)) ||
       (emp.employeeCode && emp.employeeCode.toLowerCase().includes(query)) ||
-      (emp.departmentName && emp.departmentName.toLowerCase().includes(query)) ||
+      (dName && dName.toLowerCase().includes(query)) ||
       (emp.designation && emp.designation.toLowerCase().includes(query)) ||
-      (emp.roleName && emp.roleName.toLowerCase().includes(query)) ||
-      (emp.branchName && emp.branchName.toLowerCase().includes(query))
+      (rName && rName.toLowerCase().includes(query)) ||
+      (bName && bName.toLowerCase().includes(query))
     );
   });
 
@@ -484,7 +773,13 @@ const resetExperienceForm = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [searchName]);
+  }, [searchName, filterBranch, filterDepartment, filterRole]);
+
+  useEffect(() => {
+    if (totalPages > 0 && page >= totalPages) {
+      setPage(totalPages - 1);
+    }
+  }, [totalPages, page]);
 
   useEffect(() => {
     fetchEmployees();
@@ -1056,80 +1351,7 @@ const resetExperienceForm = () => {
   };
 
   const isEmployee = getNormalizedRole() === 'Employee';
-
-  if (isEmployee) {
-    return (
-      <div style={{
-        minHeight: '80vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-        background: '#f8fafc',
-        fontFamily: "'DM Sans', sans-serif"
-      }}>
-        <div style={{
-          maxWidth: '500px',
-          width: '100%',
-          background: '#ffffff',
-          borderRadius: '16px',
-          border: '1px solid #fee2e2',
-          padding: '40px 30px',
-          textAlign: 'center',
-          boxShadow: '0 10px 25px -5px rgba(220, 38, 38, 0.08)'
-        }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            background: '#fee2e2',
-            color: '#dc2626',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '28px',
-            marginBottom: '20px'
-          }}>
-            <FaExclamationCircle />
-          </div>
-          <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', marginBottom: '8px', fontFamily: "'Sora', sans-serif" }}>
-            Access Restricted
-          </h2>
-          <div style={{
-            display: 'inline-block',
-            background: '#fef2f2',
-            color: '#991b1b',
-            border: '1px solid #fecaca',
-            borderRadius: '20px',
-            padding: '4px 14px',
-            fontSize: '12px',
-            fontWeight: '700',
-            marginBottom: '16px'
-          }}>
-            Restricted Directory
-          </div>
-          <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.6, marginBottom: '24px' }}>
-            Employees do not have access to view or manage the company-wide employee directory.
-          </p>
-          <button
-            onClick={() => window.location.href = '/dashboard'}
-            style={{
-              background: '#6B1E2E',
-              color: '#ffffff',
-              border: 'none',
-              padding: '10px 24px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            Go to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const canManageEmployees = !isEmployee;
 
   const getPaginationRange = () => {
     const delta = 2;
@@ -1155,7 +1377,7 @@ const resetExperienceForm = () => {
   return (
     <div className="emp-root">
       <div className="emp-header" style={{ justifyContent: view !== 'list' ? 'space-between' : 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        {view !== 'list' ? (
+        {canManageEmployees && view !== 'list' ? (
           <>
             <div>
               <h1 className="emp-title">{editMode ? 'Edit Employee' : 'Add Employee'}</h1>
@@ -1168,25 +1390,27 @@ const resetExperienceForm = () => {
         ) : (
           <>
             <div>
-              <h1 className="emp-title">Employee Directory</h1>
-              <p className="emp-subtitle">{totalItems} total employees</p>
+              <h1 className="emp-title">{isEmployee ? 'Manager & HR Directory' : 'Employee Directory'}</h1>
+              <p className="emp-subtitle">{totalItems} total {isEmployee ? 'contacts' : 'employees'}</p>
             </div>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button className="emp-bulk-btn" onClick={() => setShowBulkUploadModal(true)}>
-                <FaUpload size={13} /> Bulk Upload
-              </button>
-              <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
-                <FaUserPlus size={13} /> Add Employee
-              </button>
-            </div>
+            {canManageEmployees && (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button className="emp-bulk-btn" onClick={() => setShowBulkUploadModal(true)}>
+                  <FaUpload size={13} /> Bulk Upload
+                </button>
+                <button className="emp-add-btn" onClick={() => { resetForm(); setView('form'); }}>
+                  <FaUserPlus size={13} /> Add Employee
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {view === 'list' ? (
+      {view === 'list' || !canManageEmployees ? (
         <>
-          <div className="emp-search-bar">
-            <div className="emp-search-wrap">
+          <div className="emp-search-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+            <div className="emp-search-wrap" style={{ flex: '1 1 260px', minWidth: '220px' }}>
               <FaSearch className="emp-search-icon" size={12} />
               <input
                 className="emp-search-input"
@@ -1201,6 +1425,103 @@ const resetExperienceForm = () => {
                 </button>
               )}
             </div>
+
+            {branchFilterOptions.length > 0 && (
+              <select
+                value={filterBranch}
+                onChange={(e) => {
+                  setFilterBranch(e.target.value);
+                  setFilterDepartment('ALL');
+                }}
+                style={{
+                  height: '38px',
+                  padding: '0 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  background: '#fff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="ALL">All Branches ({branchFilterOptions.length})</option>
+                {branchFilterOptions.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            )}
+
+            {departmentFilterOptions.length > 0 && (
+              <select
+                value={filterDepartment}
+                onChange={(e) => setFilterDepartment(e.target.value)}
+                style={{
+                  height: '38px',
+                  padding: '0 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  background: '#fff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="ALL">All Departments ({departmentFilterOptions.length})</option>
+                {departmentFilterOptions.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            )}
+
+            {roleFilterOptions.length > 0 && (
+              <select
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value)}
+                style={{
+                  height: '38px',
+                  padding: '0 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  background: '#fff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="ALL">All Roles ({roleFilterOptions.length})</option>
+                {roleFilterOptions.map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            )}
+
+            {(filterBranch !== 'ALL' || filterDepartment !== 'ALL' || filterRole !== 'ALL' || searchName) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterBranch('ALL');
+                  setFilterDepartment('ALL');
+                  setFilterRole('ALL');
+                  setSearchName('');
+                }}
+                style={{
+                  height: '38px',
+                  padding: '0 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #fca5a5',
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <FaTimes size={10} /> Reset
+              </button>
+            )}
           </div>
 
           <div className="emp-table-card">
@@ -1215,7 +1536,7 @@ const resetExperienceForm = () => {
                     <th>Role</th>
                     <th>Branch</th>
                     <th>Joined</th>
-                    <th style={{ width: 80, textAlign: 'center' }}>Actions</th>
+                    {canManageEmployees && <th style={{ width: 80, textAlign: 'center' }}>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1254,19 +1575,20 @@ const resetExperienceForm = () => {
                         </td>
                         <td className="emp-branch">{emp.branchName || <span className="emp-dash">—</span>}</td>
                         <td className="emp-date">{formatDate(emp.joiningDate)}</td>
-                        <td>
-                          <div className="emp-actions">
-                            <button className="emp-act emp-act--edit" onClick={() => handleEdit(emp)} title="Edit">
-                              <FaEdit size={12} />
-                            </button>
-                           
-                          </div>
-                        </td>
+                        {canManageEmployees && (
+                          <td>
+                            <div className="emp-actions">
+                              <button className="emp-act emp-act--edit" onClick={() => handleEdit(emp)} title="Edit">
+                                <FaEdit size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   }) : (
                     <tr>
-                      <td colSpan="8" className="emp-empty">
+                      <td colSpan={canManageEmployees ? 8 : 7} className="emp-empty">
                         <div className="emp-empty-inner">
                           <span className="emp-empty-icon">👤</span>
                           <p>No employees found</p>

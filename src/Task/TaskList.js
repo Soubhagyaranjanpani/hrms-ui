@@ -1,138 +1,133 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  FaTasks, FaSearch, FaEye, FaEdit,
-  FaThList, FaColumns, FaTimes,
+  FaTasks, FaSearch, FaEye, FaEdit, FaPlus,
+  FaThList, FaColumns, FaTimes, FaSort, FaSortUp, FaSortDown,
+  FaChevronLeft, FaChevronRight, FaCalendarAlt, FaStar,
+  FaClock, FaCheckCircle, FaClipboardCheck
 } from 'react-icons/fa';
-import { API_ENDPOINTS, STORAGE_KEYS, getAuthHeaders } from '../config/api.config';
+import {
+  API_ENDPOINTS,
+  getAuthHeaders,
+  extractArray
+} from '../config/api.config';
+import {
+  getNormalizedRole,
+  cleanPersonName
+} from './taskAccess';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
+import './TaskModule.css';
 
-const getUser = () => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA)) || {}; } catch { return {}; }
+const PRIORITY_COLORS = { Critical: '#991b1b', High: '#dc2626', Medium: '#d97706', Low: '#16a34a' };
+const PRIORITY_BG     = { Critical: '#fee2e2', High: '#fef2f2', Medium: '#fef3c7', Low: '#dcfce7' };
+const PRIORITY_RANK   = { Critical: 4, High: 3, Medium: 2, Low: 1 };
+
+const STATUS_LABELS = {
+  PENDING_APPROVAL: 'Pending Approval',
+  IN_PROGRESS:      'In Progress',
+  COMPLETED:        'Completed',
+  IN_REVIEW:        'In Review',
+  REJECTED:         'Rejected',
+  CHANGE_REQUESTED: 'Change Requested',
 };
 
-const PRIORITY_COLORS = { Critical: '#9d174d', HIGH: '#ef4444', MEDIUM: '#d97706', LOW: '#059669' };
-const PRIORITY_BG     = { Critical: '#fdf2f8', HIGH: '#fee2e2', MEDIUM: '#fef3c7', LOW: '#d1fae5' };
-const PRIORITY_BAR_COLOR = PRIORITY_COLORS;
-
-// normalise backend SNAKE_CASE status to display label
-const STATUS_LABELS = {
-  PENDING_APPROVAL:  'Pending Approval',
-  IN_PROGRESS:       'In Progress',
-  COMPLETED:         'Completed',
-  IN_REVIEW:         'In Review',
-  REJECTED:          'Rejected',
-  CHANGE_REQUESTED:  'Change Requested',
+const normalizePriority = (p) => {
+  if (!p) return 'Medium';
+  const u = String(p).toUpperCase();
+  if (u === 'CRITICAL') return 'Critical';
+  if (u === 'HIGH')     return 'High';
+  if (u === 'MEDIUM')   return 'Medium';
+  if (u === 'LOW')      return 'Low';
+  return u.charAt(0) + u.slice(1).toLowerCase();
 };
 
 const StatusBadge = ({ status }) => {
   const map = {
-    PENDING_APPROVAL:  { bg: '#fef3c7', color: '#92400e' },
-    IN_PROGRESS:       { bg: '#dbeafe', color: '#1e40af' },
-    COMPLETED:         { bg: '#dcfce7', color: '#166534' },
-    IN_REVIEW:         { bg: '#f3e8ff', color: '#5b21b6' },
-    REJECTED:          { bg: '#fee2e2', color: '#991b1b' },
-    CHANGE_REQUESTED:  { bg: '#fff7ed', color: '#c2410c' },
+    PENDING_APPROVAL: { bg: '#fef3c7', color: '#92400e' },
+    IN_PROGRESS:      { bg: '#dbeafe', color: '#1e40af' },
+    COMPLETED:        { bg: '#dcfce7', color: '#166534' },
+    IN_REVIEW:        { bg: '#fef3c7', color: '#92400e' },
+    REJECTED:         { bg: '#fee2e2', color: '#991b1b' },
+    CHANGE_REQUESTED: { bg: '#fff7ed', color: '#c2410c' },
   };
   const s = map[status] || { bg: '#f1f5f9', color: '#475569' };
   return (
-    <span style={{ background: s.bg, color: s.color, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+    <span className="tm-status-badge" style={{ background: s.bg, color: s.color }}>
+      <span className="tm-status-dot" />
       {STATUS_LABELS[status] || status}
     </span>
   );
 };
 
 const PriorityBadge = ({ priority }) => {
-  // Handle both uppercase (from API) and title case
-  const p = (priority || '').toUpperCase() === 'HIGH' ? 'High' : 
-            (priority || '').toUpperCase() === 'MEDIUM' ? 'Medium' :
-            (priority || '').toUpperCase() === 'LOW' ? 'Low' :
-            (priority || '').charAt(0).toUpperCase() + (priority || '').slice(1).toLowerCase();
+  const p = normalizePriority(priority);
   return (
-    <span style={{ background: PRIORITY_BG[p] || '#f1f5f9', color: PRIORITY_COLORS[p] || '#475569', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
+    <span className="tm-status-badge" style={{ background: PRIORITY_BG[p] || '#f1f5f9', color: PRIORITY_COLORS[p] || '#475569' }}>
       {p}
     </span>
   );
 };
 
 const KANBAN_COLS = [
-  { key: 'pending',    title: 'Pending Approval',          statuses: ['PENDING_APPROVAL'],              borderColor: '#fbbf24' },
-  { key: 'inprogress', title: 'In Progress',               statuses: ['IN_PROGRESS'],                   borderColor: 'var(--accent-indigo)' },
-  { key: 'review',     title: 'In Review / Change Req.',   statuses: ['IN_REVIEW', 'CHANGE_REQUESTED'], borderColor: '#8b5cf6' },
-  { key: 'done',       title: 'Completed',                 statuses: ['COMPLETED'],                     borderColor: 'var(--success)' },
+  { key: 'pending',    title: 'Pending Approval',        statuses: ['PENDING_APPROVAL'],              borderColor: '#f59e0b' },
+  { key: 'inprogress', title: 'In Progress',             statuses: ['IN_PROGRESS'],                   borderColor: '#2563eb' },
+  { key: 'review',     title: 'In Review / Change Req.', statuses: ['IN_REVIEW', 'CHANGE_REQUESTED'], borderColor: '#d97706' },
+  { key: 'done',       title: 'Completed',               statuses: ['COMPLETED'],                     borderColor: '#16a34a' },
 ];
 
-const STATUSES_FILTER = ['All', 'Pending Approval', 'In Progress', 'In Review', 'Completed', 'Change Requested', 'Rejected'];
-const PRIORITIES_LIST = ['All', 'Critical', 'High', 'Medium', 'Low'];
+const formatShortDate = (val) => {
+  if (!val) return '—';
+  const d = new Date(val);
+  if (isNaN(d)) return '—';
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 export default function TaskList({ user }) {
-  const navigate    = useNavigate();
-  const currentUser = user || getUser();
-
-  const getNormalizedRole = () => {
-    try {
-      const uData = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA) || '{}');
-      const raw = localStorage.getItem(STORAGE_KEYS.ROLE) ||
-                  localStorage.getItem('roleName') ||
-                  localStorage.getItem('role') ||
-                  localStorage.getItem('userRole') ||
-                  currentUser?.role ||
-                  currentUser?.roleName ||
-                  currentUser?.role?.name ||
-                  uData?.role ||
-                  uData?.roleName ||
-                  uData?.role?.name;
-      if (raw) {
-        let s = typeof raw === 'object' ? (raw.name || raw.roleName || raw.role || '') : String(raw);
-        if (s.toUpperCase().startsWith('ROLE_')) s = s.substring(5);
-        const up = s.toUpperCase().replace(/[\s_-]+/g, '');
-        if (up === 'ADMIN' || up === 'ADMINISTRATOR' || up === 'SUPERADMIN') return 'Admin';
-        if (up === 'HR' || up === 'HUMANRESOURCE' || up === 'HUMANRESOURCES' || up === 'HROFFICER' || up === 'HRMANAGER') return 'Hr';
-        if (up === 'MANAGER') return 'Manager';
-        return 'Employee';
-      }
-    } catch {}
-    return 'Employee';
-  };
-
-  const userRole = getNormalizedRole();
+  const navigate   = useNavigate();
+  const location   = useLocation();
+  const navState   = location.state || {};
+  const userRole   = getNormalizedRole(user);
   const isEmployee = userRole === 'Employee';
+  const canCreate  = ['Admin', 'Hr', 'Manager'].includes(userRole);
 
   const [tasks,        setTasks]        = useState([]);
+  const [branches,     setBranches]     = useState([]);
+  const [departments,  setDepartments]  = useState([]);
   const [loading,      setLoading]      = useState(true);
-  const [filterSource, setFilterSource] = useState(isEmployee ? 'mine' : 'all'); // 'all' | 'mine'
+  const [filterSource, setFilterSource] = useState(isEmployee ? 'mine' : 'all');
 
-  const [view,           setView]           = useState('table');
-  const [filterStatus,   setFilterStatus]   = useState('All');
-  const [filterPriority, setFilterPriority] = useState('All');
-  const [search,         setSearch]         = useState('');
+  const [view,             setView]             = useState(navState.view || 'table');
+  const [filterBranch,     setFilterBranch]     = useState(navState.branch || 'ALL');
+  const [filterDepartment, setFilterDepartment] = useState(navState.department || 'ALL');
+  const [filterStatus,     setFilterStatus]     = useState(navState.status || 'ALL');
+  const [filterPriority,   setFilterPriority]   = useState(navState.priority || 'ALL');
+  const [filterAssignee,   setFilterAssignee]   = useState(navState.assignee || 'ALL');
+  const [filterDueDate,    setFilterDueDate]    = useState('');
+  const [search,           setSearch]           = useState('');
 
-  // Helper function to extract tasks array from API response
-  const extractTasksArray = (data) => {
-    if (data.response && Array.isArray(data.response)) {
-      return data.response;
-    } else if (Array.isArray(data)) {
-      return data;
-    } else if (data.data && Array.isArray(data.data)) {
-      return data.data;
-    } else if (data.tasks && Array.isArray(data.tasks)) {
-      return data.tasks;
-    } else {
-      console.warn('Unexpected API response structure:', data);
-      return [];
-    }
-  };
+  const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // Helper function to format assignee name
-  const formatAssignee = (assignedTo) => {
-    if (!assignedTo) return 'Unassigned';
-    // Remove "null" text if present (e.g., "ANIRUDH null" -> "ANIRUDH")
-    return assignedTo.replace(/\s+null\s*/g, '').trim();
-  };
-
-  // ── fetch tasks when filter source changes ──
+  // Load branches & departments for filter dropdowns (non-employee)
   useEffect(() => {
+    if (isEmployee) return;
+    let active = true;
+    Promise.all([
+      fetch(API_ENDPOINTS.GET_ACTIVE_BRANCHES, { headers: getAuthHeaders() }).then(r => r.json()).catch(() => []),
+      fetch(API_ENDPOINTS.GET_ACTIVE_DEPARTMENTS, { headers: getAuthHeaders() }).then(r => r.json()).catch(() => []),
+    ]).then(([bData, dData]) => {
+      if (!active) return;
+      setBranches(extractArray(bData));
+      setDepartments(extractArray(dData));
+    });
+    return () => { active = false; };
+  }, [isEmployee]);
+
+  // Fetch tasks when filter source changes
+  useEffect(() => {
+    let active = true;
     const fetchTasks = async () => {
       setLoading(true);
       try {
@@ -143,130 +138,416 @@ export default function TaskList({ user }) {
         const res  = await fetch(url, { headers: getAuthHeaders() });
         const data = await res.json();
 
+        if (!active) return;
         if (!res.ok) throw new Error(data.message || 'Failed to load tasks');
-        
-        const tasksArray = extractTasksArray(data);
-        setTasks(tasksArray);
+
+        setTasks(extractArray(data));
       } catch (err) {
+        if (!active) return;
         toast.error('Load Error', err.message || 'Could not load tasks');
         setTasks([]);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     fetchTasks();
-  }, [filterSource]);
+    return () => { active = false; };
+  }, [filterSource, isEmployee]);
 
-  // Safety check before filtering
-  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const safeTasks = useMemo(() => (Array.isArray(tasks) ? tasks : []), [tasks]);
 
-  // ── filter on frontend ──
-  const filtered = safeTasks.filter(t => {
-    const displayStatus   = STATUS_LABELS[t.status] || t.status;
-    const displayPriority = (t.priority || '').toUpperCase() === 'HIGH' ? 'High' : 
-                           (t.priority || '').toUpperCase() === 'MEDIUM' ? 'Medium' :
-                           (t.priority || '').toUpperCase() === 'LOW' ? 'Low' :
-                           (t.priority || '').charAt(0).toUpperCase() + (t.priority || '').slice(1).toLowerCase();
+  // Resolve branch/department display names safely
+  const getTaskBranchName = (t) => {
+    if (t.branchName) return t.branchName;
+    if (typeof t.branch === 'object' && t.branch?.name) return t.branch.name;
+    if (typeof t.branch === 'string' && isNaN(Number(t.branch))) return t.branch;
+    const found = branches.find(b => String(b.id) === String(t.branchId ?? t.branch));
+    return found?.name || '—';
+  };
 
-    const byStatus   = filterStatus   === 'All' || displayStatus   === filterStatus;
-    const byPriority = filterPriority === 'All' || displayPriority === filterPriority;
-    const bySearch   = !search || t.title.toLowerCase().includes(search.toLowerCase());
+  const getTaskDeptName = (t) => {
+    if (t.departmentName) return t.departmentName;
+    if (typeof t.department === 'object' && t.department?.name) return t.department.name;
+    if (typeof t.department === 'string' && isNaN(Number(t.department))) return t.department;
+    const found = departments.find(d => String(d.id) === String(t.departmentId ?? t.department));
+    return found?.name || '—';
+  };
 
-    return byStatus && byPriority && bySearch;
-  });
+  // Dynamic filter options
+  const branchOptions = useMemo(() => {
+    const names = new Set(branches.map(b => b.name).filter(Boolean));
+    safeTasks.forEach(t => {
+      const n = getTaskBranchName(t);
+      if (n && n !== '—') names.add(n);
+    });
+    return [...names].sort();
+  }, [branches, safeTasks, departments]);
 
-  const openDetail  = id => navigate('/TaskDetail', { state: { taskId: id } });
-  
-  // Navigate to edit task page
+  const deptOptions = useMemo(() => {
+    const selectedBranchObj = branches.find(b => b.name === filterBranch);
+    const names = new Set();
+
+    departments.forEach(d => {
+      if (filterBranch === 'ALL' || !selectedBranchObj || String(d.branchId) === String(selectedBranchObj.id)) {
+        if (d.name) names.add(d.name);
+      }
+    });
+
+    safeTasks.forEach(t => {
+      if (filterBranch !== 'ALL' && getTaskBranchName(t) !== filterBranch) return;
+      const n = getTaskDeptName(t);
+      if (n && n !== '—') names.add(n);
+    });
+    return [...names].sort();
+  }, [departments, branches, safeTasks, filterBranch]);
+
+  const assigneeOptions = useMemo(() => {
+    const set = new Set();
+    safeTasks.forEach(t => {
+      const name = cleanPersonName(t.assignedTo);
+      if (name) set.add(name);
+    });
+    return [...set].sort();
+  }, [safeTasks]);
+
+  const summaryStats = useMemo(() => ({
+    total: safeTasks.length,
+    inProgress: safeTasks.filter(t => t.status === 'IN_PROGRESS').length,
+    inReview: safeTasks.filter(t => t.status === 'IN_REVIEW').length,
+    completed: safeTasks.filter(t => t.status === 'COMPLETED').length,
+  }), [safeTasks]);
+
+  // Filter + Sort
+  const filteredAndSorted = useMemo(() => {
+    const list = safeTasks.filter(t => {
+      const bName = getTaskBranchName(t);
+      const dName = getTaskDeptName(t);
+      const aName = cleanPersonName(t.assignedTo) || 'Unassigned';
+      const byName = cleanPersonName(t.assignedBy);
+      const pri = normalizePriority(t.priority);
+
+      if (filterBranch !== 'ALL' && bName !== filterBranch) return false;
+      if (filterDepartment !== 'ALL' && dName !== filterDepartment) return false;
+      if (filterStatus !== 'ALL' && t.status !== filterStatus) return false;
+      if (filterPriority !== 'ALL' && pri !== filterPriority) return false;
+      if (filterAssignee !== 'ALL' && aName !== filterAssignee) return false;
+
+      if (filterDueDate && t.dueDate) {
+        const dueStr = new Date(t.dueDate).toISOString().split('T')[0];
+        if (dueStr > filterDueDate) return false;
+      } else if (filterDueDate && !t.dueDate) {
+        return false;
+      }
+
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const idStr = `t-${String(t.id).padStart(3, '0')}`;
+        const matches =
+          t.title?.toLowerCase().includes(q) ||
+          idStr.includes(q) ||
+          String(t.id).includes(q) ||
+          aName.toLowerCase().includes(q) ||
+          byName.toLowerCase().includes(q) ||
+          dName.toLowerCase().includes(q) ||
+          bName.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+
+      return true;
+    });
+
+    const { key, direction } = sortConfig;
+    const mult = direction === 'asc' ? 1 : -1;
+
+    return [...list].sort((a, b) => {
+      if (key === 'id') return (Number(a.id) - Number(b.id)) * mult;
+      if (key === 'title') return (a.title || '').localeCompare(b.title || '') * mult;
+      if (key === 'priority') {
+        const ra = PRIORITY_RANK[normalizePriority(a.priority)] || 0;
+        const rb = PRIORITY_RANK[normalizePriority(b.priority)] || 0;
+        return (ra - rb) * mult;
+      }
+      if (key === 'status') return (a.status || '').localeCompare(b.status || '') * mult;
+      if (key === 'dueDate') {
+        const da = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+        const db = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+        return (da - db) * mult;
+      }
+      if (key === 'progress') return ((Number(a.progress) || 0) - (Number(b.progress) || 0)) * mult;
+      return 0;
+    });
+  }, [
+    safeTasks, filterBranch, filterDepartment, filterStatus,
+    filterPriority, filterAssignee, filterDueDate, search,
+    sortConfig, branches, departments
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / pageSize));
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
+
+  const paginatedTasks = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAndSorted.slice(start, start + pageSize);
+  }, [filteredAndSorted, currentPage, pageSize]);
+
+  const toggleSort = (key) => {
+    setSortConfig(prev =>
+      prev.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' }
+    );
+  };
+
+  const renderSortIcon = (key) => {
+    if (sortConfig.key !== key) return <FaSort size={10} style={{ opacity: 0.35, marginLeft: 4 }} />;
+    return sortConfig.direction === 'asc'
+      ? <FaSortUp size={10} style={{ marginLeft: 4 }} />
+      : <FaSortDown size={10} style={{ marginLeft: 4 }} />;
+  };
+
+  const getPageNumbers = () => {
+    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (currentPage <= 3) return [1, 2, 3, 4, '...', totalPages];
+    if (currentPage >= totalPages - 2) return [1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+  };
+
+  const openDetail = (id) => navigate('/TaskDetail', { state: { taskId: id } });
   const editTask = (task, e) => {
     e.stopPropagation();
     navigate('/CreateTask', { state: { taskToEdit: task, isEditing: true } });
   };
-  
-  const hasFilters  = filterStatus !== 'All' || filterPriority !== 'All' || search;
 
-  const BtnStyle = (active) => ({
-    padding: '7px 16px', borderRadius: 9, border: 'none', cursor: 'pointer',
-    fontSize: 13, fontWeight: active ? 700 : 500, transition: 'all .2s',
-    background: active ? 'var(--bg-white)' : 'transparent',
-    color: active ? 'var(--accent-indigo)' : 'var(--text-muted)',
-    boxShadow: active ? '0 1px 6px rgba(99,102,241,.12)' : 'none',
-  });
+  const hasFilters =
+    filterBranch !== 'ALL' ||
+    filterDepartment !== 'ALL' ||
+    filterStatus !== 'ALL' ||
+    filterPriority !== 'ALL' ||
+    filterAssignee !== 'ALL' ||
+    Boolean(filterDueDate) ||
+    Boolean(search.trim());
+
+  const clearFilters = () => {
+    setFilterBranch('ALL');
+    setFilterDepartment('ALL');
+    setFilterStatus('ALL');
+    setFilterPriority('ALL');
+    setFilterAssignee('ALL');
+    setFilterDueDate('');
+    setSearch('');
+    setCurrentPage(1);
+  };
+
+  const startItem = filteredAndSorted.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endItem   = Math.min(currentPage * pageSize, filteredAndSorted.length);
 
   return (
-    <div style={{ padding: '22px 24px', background: 'var(--bg-page)', minHeight: '100vh', animation: 'taskFadeUp .35s ease' }}>
-      <style>{`
-        @keyframes taskFadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
-        .tl-tr:hover td { background:#fafbff !important; cursor:pointer }
-        select.tl-sel { padding:8px 12px; border:1.5px solid var(--border-medium); border-radius:10px; font-size:13px; font-family:'DM Sans',sans-serif; color:var(--text-primary); background:var(--bg-white); cursor:pointer; transition:all .2s; }
-        select.tl-sel:focus { outline:none; border-color:var(--accent-indigo); box-shadow:0 0 0 3px rgba(99,102,241,.10); }
-      `}</style>
-
+    <div className="tm-page">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22, flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 46, height: 46, background: 'linear-gradient(135deg,var(--accent-indigo),var(--accent-indigo-light))', borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 21, boxShadow: '0 4px 12px rgba(99,102,241,.25)' }}>
+      <div className="tm-header">
+        <div className="tm-header-left">
+          <div className="tm-header-icon">
             <FaTasks />
           </div>
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, fontFamily: "'Sora',sans-serif", letterSpacing: '-0.02em' }}>
-              {isEmployee ? 'My Tasks' : 'Task List'}
+            <h1 className="tm-title">
+              {isEmployee ? 'My Assigned Tasks' : 'Task Directory'}
             </h1>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
-              {loading ? 'Loading…' : `${filtered.length} task${filtered.length !== 1 ? 's' : ''} found`}
+            <p className="tm-subtitle">
+              {loading ? 'Loading…' : `${filteredAndSorted.length} task${filteredAndSorted.length !== 1 ? 's' : ''} matching current filters`}
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', background: 'var(--bg-surface)', padding: 4, borderRadius: 12, border: '1px solid var(--border-light)', gap: 3 }}>
-          <button style={BtnStyle(view === 'table')}  onClick={() => setView('table')}>  <FaThList  size={12} style={{ marginRight: 5 }} />Table</button>
-          <button style={BtnStyle(view === 'kanban')} onClick={() => setView('kanban')}> <FaColumns size={12} style={{ marginRight: 5 }} />Kanban</button>
+
+        <div className="tm-header-actions">
+          <button
+            type="button"
+            className="tm-btn tm-btn-secondary"
+            onClick={() => navigate('/performance')}
+          >
+            <FaStar size={11} /> Performance
+          </button>
+          {canCreate && (
+            <button
+              type="button"
+              className="tm-btn tm-btn-primary"
+              onClick={() => navigate('/CreateTask')}
+            >
+              <FaPlus size={11} /> Create Task
+            </button>
+          )}
+          <div className="tm-segmented">
+            <button type="button" className={`tm-segmented-btn ${view === 'table' ? 'active' : ''}`} onClick={() => setView('table')}>
+              <FaThList size={12} /> Table
+            </button>
+            <button type="button" className={`tm-segmented-btn ${view === 'kanban' ? 'active' : ''}`} onClick={() => setView('kanban')}>
+              <FaColumns size={12} /> Kanban
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 18 }}>
-        {/* Assign filter — triggers new API fetch (Admin/HR/Manager only) */}
+      {/* Compact Clickable KPI Summary Strip */}
+      {!loading && (
+        <div className="tm-kpi-grid tm-kpi-grid--compact">
+          {[
+            {
+              key: 'ALL',
+              label: 'Total Tasks',
+              val: summaryStats.total,
+              color: '#2563eb',
+              bg: '#eff6ff',
+              sub: 'Show all',
+              icon: <FaTasks size={13} />,
+            },
+            {
+              key: 'IN_PROGRESS',
+              label: 'In Progress',
+              val: summaryStats.inProgress,
+              color: '#0891b2',
+              bg: '#ecfeff',
+              sub: 'Active work',
+              icon: <FaClock size={13} />,
+            },
+            {
+              key: 'IN_REVIEW',
+              label: 'In Review',
+              val: summaryStats.inReview,
+              color: '#d97706',
+              bg: '#fffbeb',
+              sub: 'Awaiting approval',
+              icon: <FaClipboardCheck size={13} />,
+            },
+            {
+              key: 'COMPLETED',
+              label: 'Completed',
+              val: summaryStats.completed,
+              color: '#16a34a',
+              bg: '#f0fdf4',
+              sub: `${summaryStats.total > 0 ? Math.round((summaryStats.completed / summaryStats.total) * 100) : 0}% done`,
+              icon: <FaCheckCircle size={13} />,
+            },
+          ].map(card => {
+            const isSelected = filterStatus === card.key && card.key !== 'ALL';
+            return (
+              <div
+                key={card.key}
+                className="tm-kpi-card tm-kpi-card--compact"
+                style={{
+                  borderLeftColor: card.color,
+                  cursor: 'pointer',
+                  outline: isSelected ? `2px solid ${card.color}` : 'none',
+                }}
+                onClick={() => {
+                  setFilterStatus(prev => (prev === card.key || card.key === 'ALL' ? 'ALL' : card.key));
+                  setCurrentPage(1);
+                }}
+              >
+                <div className="tm-kpi-top">
+                  <span className="tm-kpi-label">{card.label}</span>
+                  <span className="tm-kpi-icon" style={{ background: card.bg, color: card.color }}>
+                    {card.icon}
+                  </span>
+                </div>
+                <div className="tm-kpi-bottom">
+                  <div className="tm-kpi-value" style={{ color: card.color }}>{card.val}</div>
+                  <span className="tm-kpi-sub">{card.sub}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Multi-Facet Filter Bar */}
+      <div className="tm-filter-bar">
         {!isEmployee ? (
           <select
-            className="tl-sel"
+            className="tm-select"
             value={filterSource}
-            onChange={e => {
-              setFilterSource(e.target.value);
-              setFilterStatus('All');
-            }}
+            onChange={e => { setFilterSource(e.target.value); setCurrentPage(1); }}
           >
-            <option value="all">All Tasks</option>
-            <option value="mine">Assigned to Me</option>
+            <option value="all">Scope: All Accessible</option>
+            <option value="mine">Scope: Assigned to Me</option>
           </select>
         ) : (
-          <div style={{ background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 9, border: '1.5px solid var(--border-medium)', fontSize: 12, fontWeight: 600, color: 'var(--accent-indigo)' }}>
+          <span className="tm-role-pill">
             Assigned to Me
-          </div>
+          </span>
         )}
 
-        <select className="tl-sel" value={filterStatus}   onChange={e => setFilterStatus(e.target.value)}>
-          {STATUSES_FILTER.map(s => <option key={s}>{s}</option>)}
-        </select>
-        <select className="tl-sel" value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
-          {PRIORITIES_LIST.map(p => <option key={p}>{p}</option>)}
+        {!isEmployee && branchOptions.length > 0 && (
+          <select
+            className="tm-select"
+            value={filterBranch}
+            onChange={e => { setFilterBranch(e.target.value); setFilterDepartment('ALL'); setCurrentPage(1); }}
+          >
+            <option value="ALL">All Branches</option>
+            {branchOptions.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+        )}
+
+        {!isEmployee && deptOptions.length > 0 && (
+          <select
+            className="tm-select"
+            value={filterDepartment}
+            onChange={e => { setFilterDepartment(e.target.value); setCurrentPage(1); }}
+          >
+            <option value="ALL">All Departments</option>
+            {deptOptions.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        )}
+
+        <select className="tm-select" value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}>
+          <option value="ALL">All Statuses</option>
+          {Object.entries(STATUS_LABELS).map(([k, label]) => (
+            <option key={k} value={k}>{label}</option>
+          ))}
         </select>
 
-        <div style={{ position: 'relative' }}>
-          <FaSearch style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 13 }} />
+        <select className="tm-select" value={filterPriority} onChange={e => { setFilterPriority(e.target.value); setCurrentPage(1); }}>
+          <option value="ALL">All Priorities</option>
+          {['Critical', 'High', 'Medium', 'Low'].map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+
+        {!isEmployee && assigneeOptions.length > 1 && (
+          <select className="tm-select" value={filterAssignee} onChange={e => { setFilterAssignee(e.target.value); setCurrentPage(1); }}>
+            <option value="ALL">All Assignees</option>
+            {assigneeOptions.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        )}
+
+        <div className="tm-date-inline">
+          <span className="tm-date-inline-label">Due ≤</span>
           <input
+            type="date"
+            className="tm-input"
+            value={filterDueDate}
+            onChange={e => { setFilterDueDate(e.target.value); setCurrentPage(1); }}
+            title="Filter tasks due on or before date"
+          />
+        </div>
+
+        <div className="tm-search-wrap tm-search-wrap--grow">
+          <FaSearch className="tm-search-icon" />
+          <input
+            className="tm-input"
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search tasks…"
-            style={{ padding: '8px 12px 8px 34px', border: '1.5px solid var(--border-medium)', borderRadius: 10, fontSize: 13, fontFamily: "'DM Sans',sans-serif", color: 'var(--text-primary)', background: 'var(--bg-white)', width: 220, outline: 'none' }}
+            onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+            placeholder="Search ID, title, assignee, dept…"
           />
         </div>
 
         {hasFilters && (
           <button
-            onClick={() => { setFilterStatus('All'); setFilterPriority('All'); setSearch(''); }}
-            style={{ background: 'var(--bg-surface)', border: '1.5px solid var(--border-medium)', color: 'var(--text-secondary)', padding: '7px 13px', borderRadius: 9, fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
+            type="button"
+            className="tm-btn tm-btn-danger-outline tm-btn-sm"
+            onClick={clearFilters}
           >
-            <FaTimes size={10} /> Clear
+            <FaTimes size={10} /> Reset
           </button>
         )}
       </div>
@@ -275,120 +556,256 @@ export default function TaskList({ user }) {
 
       {/* TABLE VIEW */}
       {!loading && view === 'table' && (
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 18, overflow: 'hidden' }}>
-          {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-muted)' }}>
-              <FaSearch style={{ fontSize: 36, opacity: .3, marginBottom: 14 }} />
-              <h4 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>No tasks found</h4>
-              <p style={{ fontSize: 13 }}>Try adjusting your filters or create a new task.</p>
+        <div className="tm-card">
+          {paginatedTasks.length === 0 ? (
+            <div className="tm-table-empty">
+              <FaSearch style={{ fontSize: 32, opacity: 0.3, marginBottom: 10 }} />
+              <h4 style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--tm-text-secondary)', margin: '0 0 6px' }}>No tasks found</h4>
+              <p style={{ fontSize: 13, margin: 0 }}>Try adjusting your filters or creating a new task.</p>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
-                <thead>
-                  <tr style={{ background: 'var(--bg-surface)', borderBottom: '1.5px solid var(--accent-indigo-pale)' }}>
-                    {['ID','Title','Assignee','Priority','Status','Deadline','Progress','Actions'].map(h => (
-                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--accent-indigo)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(t => (
-                    <tr key={t.id} className="tl-tr" onClick={() => openDetail(t.id)}>
-                      <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}>
-                        <span style={{ fontFamily: 'monospace', fontSize: 12, background: '#ede9fe', padding: '2px 8px', borderRadius: 6, fontWeight: 600, color: 'var(--accent-indigo)' }}>
-                          T-{String(t.id).padStart(3, '0')}
-                        </span>
-                      </td>
-                      <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 13.5 }}>{t.title}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t.department} · {t.effort}</div>
-                      </td>
-                      <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9', fontSize: 13, color: 'var(--text-secondary)' }}>
-                        {formatAssignee(t.assignedTo)}
-                      </td>
-                      <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}><PriorityBadge priority={t.priority} /></td>
-                      <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}><StatusBadge status={t.status} /></td>
-                      <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9', fontFamily: 'monospace', fontSize: 12, color: 'var(--text-secondary)' }}>
-                        {t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN') : '—'}
-                      </td>
-                      <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9', minWidth: 120 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ flex: 1, background: '#e8eaf6', borderRadius: 8, height: 7, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${t.progress || 0}%`, background: (t.progress || 0) >= 100 ? 'var(--success)' : 'linear-gradient(90deg,var(--accent-indigo),var(--accent-indigo-light))', borderRadius: 8 }} />
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', width: 28 }}>{t.progress || 0}%</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '13px 16px', borderBottom: '1px solid #f0f2f9' }}>
-                        <div style={{ display: 'flex', gap: 5 }}>
-                          <button onClick={e => { e.stopPropagation(); openDetail(t.id); }} style={{ width: 32, height: 32, background: '#ede9fe', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-indigo)' }}>
-                            <FaEye size={13} />
-                          </button>
-                          <button 
-                            onClick={e => editTask(t, e)} 
-                            style={{ width: 32, height: 32, background: '#fef3c7', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b45309' }}
-                          >
-                            <FaEdit size={12} />
-                          </button>
-                        </div>
-                      </td>
+            <>
+              <div className="tm-table-scroll">
+                <table className="tm-table tm-table--wide">
+                  <thead>
+                    <tr>
+                      <th className="tm-th-sort" onClick={() => toggleSort('id')}>
+                        ID {renderSortIcon('id')}
+                      </th>
+                      <th className="tm-th-sort" onClick={() => toggleSort('title')}>
+                        Task Title {renderSortIcon('title')}
+                      </th>
+                      <th>Assigned By</th>
+                      <th>Assigned To</th>
+                      <th>Branch / Dept</th>
+                      <th className="tm-th-sort" onClick={() => toggleSort('priority')}>
+                        Priority {renderSortIcon('priority')}
+                      </th>
+                      <th className="tm-th-sort" onClick={() => toggleSort('status')}>
+                        Status {renderSortIcon('status')}
+                      </th>
+                      <th className="tm-th-sort" onClick={() => toggleSort('progress')}>
+                        Progress {renderSortIcon('progress')}
+                      </th>
+                      <th>Start Date</th>
+                      <th className="tm-th-sort" onClick={() => toggleSort('dueDate')}>
+                        Due Date {renderSortIcon('dueDate')}
+                      </th>
+                      <th className="tm-th-center">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {paginatedTasks.map(t => {
+                      const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED';
+                      const bName = getTaskBranchName(t);
+                      const dName = getTaskDeptName(t);
+                      const pct = t.progress || 0;
+                      return (
+                        <tr key={t.id} className="tm-tr-clickable" onClick={() => openDetail(t.id)}>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <span className="tm-id-badge">
+                              T-{String(t.id).padStart(3, '0')}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="tm-cell-title" title={t.title}>
+                              {t.title}
+                            </div>
+                            {t.effort && (
+                              <div className="tm-cell-sub">
+                                Est: {t.effort}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ color: 'var(--tm-text-secondary)', whiteSpace: 'nowrap' }}>
+                            {cleanPersonName(t.assignedBy) || '—'}
+                          </td>
+                          <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {cleanPersonName(t.assignedTo) || 'Unassigned'}
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600 }}>{bName}</div>
+                            <div className="tm-cell-sub">{dName}</div>
+                          </td>
+                          <td>
+                            <PriorityBadge priority={t.priority} />
+                          </td>
+                          <td>
+                            <StatusBadge status={t.status} />
+                          </td>
+                          <td style={{ minWidth: 120 }}>
+                            <div className="tm-progress-row">
+                              <div className="tm-progress-track">
+                                <div className={`tm-progress-fill ${pct >= 100 ? 'tm-progress-fill--done' : ''}`} style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="tm-progress-pct">{pct}%</span>
+                            </div>
+                          </td>
+                          <td style={{ color: 'var(--tm-text-secondary)', whiteSpace: 'nowrap' }}>
+                            {formatShortDate(t.startDate || t.createdAt)}
+                          </td>
+                          <td>
+                            <span className={`tm-cell-date ${isOverdue ? 'tm-cell-date--overdue' : ''}`}>
+                              <FaCalendarAlt size={10} /> {formatShortDate(t.dueDate)}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'inline-flex', gap: 6 }}>
+                              <button
+                                type="button"
+                                className="tm-icon-action tm-icon-action--primary"
+                                onClick={e => { e.stopPropagation(); openDetail(t.id); }}
+                                title="Open Task Workspace"
+                              >
+                                <FaEye size={12} />
+                              </button>
+                              {canCreate && (
+                                <button
+                                  type="button"
+                                  className="tm-icon-action tm-icon-action--amber"
+                                  onClick={e => editTask(t, e)}
+                                  title="Edit Task"
+                                >
+                                  <FaEdit size={11} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Footer */}
+              <div className="tm-pagination-bar">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="tm-pagination-info">
+                    Showing <strong>{startItem}</strong>–<strong>{endItem}</strong> of <strong>{filteredAndSorted.length}</strong> tasks
+                  </span>
+                  <select
+                    className="tm-select tm-select--compact"
+                    value={pageSize}
+                    onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                  >
+                    <option value={10}>10 / page</option>
+                    <option value={20}>20 / page</option>
+                    <option value={50}>50 / page</option>
+                  </select>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="tm-pagination-controls">
+                    <button
+                      type="button"
+                      className="tm-pg-btn"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <FaChevronLeft size={10} />
+                    </button>
+                    {getPageNumbers().map((pg, idx) =>
+                      pg === '...' ? (
+                        <span key={`el-${idx}`} style={{ padding: '0 6px', fontSize: 12, color: 'var(--tm-text-muted)' }}>…</span>
+                      ) : (
+                        <button
+                          key={pg}
+                          type="button"
+                          className={`tm-pg-btn ${pg === currentPage ? 'active' : ''}`}
+                          onClick={() => setCurrentPage(pg)}
+                        >
+                          {pg}
+                        </button>
+                      )
+                    )}
+                    <button
+                      type="button"
+                      className="tm-pg-btn"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <FaChevronRight size={10} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       )}
 
       {/* KANBAN VIEW */}
       {!loading && view === 'kanban' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, alignItems: 'start' }}>
+        <div className="tm-kanban-grid">
           {KANBAN_COLS.map(col => {
-            const colTasks = safeTasks.filter(t => col.statuses.includes(t.status));
-            const getPriorityColor = (t) => {
-              const priority = (t.priority || '').toUpperCase();
-              if (priority === 'HIGH') return PRIORITY_BAR_COLOR.HIGH || '#ef4444';
-              if (priority === 'MEDIUM') return PRIORITY_BAR_COLOR.MEDIUM || '#d97706';
-              if (priority === 'LOW') return PRIORITY_BAR_COLOR.LOW || '#059669';
-              return '#ccc';
-            };
+            const colTasks = filteredAndSorted.filter(t => col.statuses.includes(t.status));
             return (
-              <div key={col.key} style={{ background: 'var(--bg-surface)', borderRadius: 16, padding: 14, border: '1px solid var(--border-light)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${col.borderColor}` }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{col.title}</span>
-                  <span style={{ background: 'var(--bg-white)', border: '1px solid var(--border-medium)', width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>{colTasks.length}</span>
+              <div key={col.key} className="tm-kanban-col">
+                <div className="tm-kanban-col-head" style={{ borderBottomColor: col.borderColor }}>
+                  <span className="tm-kanban-col-title">{col.title}</span>
+                  <span className="tm-kanban-count">
+                    {colTasks.length}
+                  </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {colTasks.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, padding: '18px 0' }}>No tasks</div>}
-                  {colTasks.map(t => (
-                    <div
-                      key={t.id}
-                      onClick={() => openDetail(t.id)}
-                      style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 14, padding: '14px 14px 14px 18px', cursor: 'pointer', transition: 'all .25s', position: 'relative', borderLeft: `4px solid ${getPriorityColor(t)}` }}
-                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 22px rgba(99,102,241,.10)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                        <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--accent-indigo)', fontWeight: 600 }}>T-{String(t.id).padStart(3,'0')}</span>
-                        <PriorityBadge priority={t.priority} />
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-primary)', marginBottom: 6, lineHeight: 1.4 }}>{t.title}</div>
-                      {(t.progress || 0) > 0 && (
-                        <div style={{ marginBottom: 10 }}>
-                          <div style={{ background: '#e8eaf6', borderRadius: 6, height: 6, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${t.progress}%`, background: 'linear-gradient(90deg,var(--accent-indigo),var(--accent-indigo-light))', borderRadius: 6 }} />
-                          </div>
-                          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{t.progress}% complete</span>
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>👤 {formatAssignee(t.assignedTo)}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>📅 {t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN') : '—'}</span>
-                      </div>
+                <div className="tm-kanban-list">
+                  {colTasks.length === 0 && (
+                    <div className="tm-table-empty" style={{ padding: '20px 8px' }}>
+                      No tasks
                     </div>
-                  ))}
+                  )}
+                  {colTasks.map(t => {
+                    const pri = normalizePriority(t.priority);
+                    const pct = t.progress || 0;
+                    return (
+                      <div
+                        key={t.id}
+                        className="tm-kanban-card"
+                        onClick={() => openDetail(t.id)}
+                        style={{ borderLeftColor: PRIORITY_COLORS[pri] || '#94a3b8' }}
+                      >
+                        <div className="tm-kanban-card-top">
+                          <span className="tm-id-badge">
+                            T-{String(t.id).padStart(3, '0')}
+                          </span>
+                          <PriorityBadge priority={t.priority} />
+                        </div>
+                        <div className="tm-kanban-card-title">
+                          {t.title}
+                        </div>
+                        <div className="tm-kanban-card-org">
+                          {getTaskBranchName(t)} · {getTaskDeptName(t)}
+                        </div>
+                        {pct > 0 && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div className="tm-progress-row">
+                              <div className="tm-progress-track">
+                                <div className={`tm-progress-fill ${pct >= 100 ? 'tm-progress-fill--done' : ''}`} style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="tm-progress-pct">{pct}%</span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="tm-kanban-card-foot">
+                          <span>{cleanPersonName(t.assignedTo) || 'Unassigned'}</span>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                            <span>{formatShortDate(t.dueDate)}</span>
+                            {canCreate && (
+                              <button
+                                type="button"
+                                className="tm-icon-action tm-icon-action--amber"
+                                onClick={e => editTask(t, e)}
+                                title="Edit Task"
+                                style={{ width: 22, height: 22 }}
+                              >
+                                <FaEdit size={10} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

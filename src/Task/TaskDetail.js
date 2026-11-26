@@ -1,3 +1,6 @@
+import SubmissionsPanel, { SubmitWorkModal } from './TaskSubmissions';
+import DailyWorkReport from './DailyWorkReport';
+import { formatDate as formatIsoDate } from './DailyWorkCalendar';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -5,37 +8,36 @@ import {
   FaArrowLeft, FaCheck, FaTimes, FaComment, FaExchangeAlt,
   FaCheckCircle, FaUndo, FaTasks, FaPlus, FaSave, FaExclamationCircle,
   FaEdit, FaChevronDown, FaClock, FaBan, FaSearch, FaCalendarAlt,
-  FaChevronLeft, FaChevronRight
+  FaChevronLeft, FaChevronRight, FaPaperPlane, FaEye, FaUserTie,
+  FaBuilding, FaSitemap, FaStar
 } from 'react-icons/fa';
-import { API_ENDPOINTS, STORAGE_KEYS, getAuthHeaders } from '../config/api.config';
+import {
+  API_ENDPOINTS,
+  getAuthHeaders,
+  extractArray
+} from '../config/api.config';
+import {
+  getNormalizedRole,
+  getMyId,
+  cleanPersonName,
+  unwrapResponse,
+  calculateEffortFromDates
+} from './taskAccess';
+import { getStoredUser, scopeEmployeesForRole } from './taskScope';
+import { parseReview } from './taskRating';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
+import './TaskModule.css';
 
-// Helper to extract array from API response
-const extractArray = (data) => {
-  if (data?.response && Array.isArray(data.response)) return data.response;
-  if (data?.response?.content && Array.isArray(data.response.content)) return data.response.content;
-  if (Array.isArray(data)) return data;
-  if (data?.data && Array.isArray(data.data)) return data.data;
-  if (data?.data?.content && Array.isArray(data.data.content)) return data.data.content;
-  if (data?.content && Array.isArray(data.content)) return data.content;
-  console.warn('Unexpected data format:', data);
-  return [];
-};
-
-const getUser = () => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA)) || {}; } catch { return {}; }
-};
-
-const PRIORITY_COLORS = { Critical: '#9d174d', HIGH: '#ef4444', MEDIUM: '#d97706', LOW: '#059669' };
-const PRIORITY_BG     = { Critical: '#fdf2f8', HIGH: '#fee2e2', MEDIUM: '#fef3c7', LOW: '#d1fae5' };
+const PRIORITY_COLORS = { Critical: '#991b1b', High: '#dc2626', Medium: '#d97706', Low: '#16a34a' };
+const PRIORITY_BG     = { Critical: '#fee2e2', High: '#fef2f2', Medium: '#fef3c7', Low: '#dcfce7' };
 
 const STATUS_LABELS = {
   PENDING_APPROVAL: 'Pending Approval',
-  IN_PROGRESS: 'In Progress',
-  IN_REVIEW: 'In Review',
-  COMPLETED: 'Completed',
-  REJECTED: 'Rejected',
+  IN_PROGRESS:      'In Progress',
+  IN_REVIEW:        'In Review',
+  COMPLETED:        'Completed',
+  REJECTED:         'Rejected',
   CHANGE_REQUESTED: 'Change Requested',
 };
 
@@ -55,23 +57,34 @@ const daysUntil = (dateStr) => {
 
 const normaliseEffort = (effort) => {
   if (!effort) return '—';
-  return effort.trim().replace(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)$/, '$1 $2');
+  return String(effort).trim().replace(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)$/, '$1 $2');
+};
+
+const priKey = (p) => {
+  if (!p) return 'Medium';
+  const u = String(p).toUpperCase();
+  if (u === 'HIGH') return 'High';
+  if (u === 'MEDIUM') return 'Medium';
+  if (u === 'LOW') return 'Low';
+  if (u === 'CRITICAL') return 'Critical';
+  return u.charAt(0) + u.slice(1).toLowerCase();
 };
 
 const StatusBadge = ({ status, onClick, showDropdown = false, disabled = false }) => {
   const map = {
-    PENDING_APPROVAL:  ['#fef3c7', '#92400e'],
-    IN_PROGRESS:       ['#dbeafe', '#1e40af'],
-    COMPLETED:         ['#dcfce7', '#166534'],
-    IN_REVIEW:         ['#f3e8ff', '#5b21b6'],
-    REJECTED:          ['#fee2e2', '#991b1b'],
-    CHANGE_REQUESTED:  ['#fff7ed', '#c2410c'],
+    PENDING_APPROVAL: ['#fef3c7', '#92400e'],
+    IN_PROGRESS:      ['#dbeafe', '#1e40af'],
+    COMPLETED:        ['#dcfce7', '#166534'],
+    IN_REVIEW:        ['#fef3c7', '#92400e'],
+    REJECTED:         ['#fee2e2', '#991b1b'],
+    CHANGE_REQUESTED: ['#fff7ed', '#c2410c'],
   };
   const [bg, color] = map[status] || ['#f1f5f9', '#475569'];
 
   if (!showDropdown) {
     return (
-      <span style={{ background: bg, color, padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+      <span className="tm-status-badge" style={{ background: bg, color }}>
+        <span className="tm-status-dot" />
         {STATUS_LABELS[status] || status}
       </span>
     );
@@ -79,50 +92,33 @@ const StatusBadge = ({ status, onClick, showDropdown = false, disabled = false }
 
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
+      className="tm-status-badge"
       style={{
-        background: bg, color, padding: '4px 8px 4px 10px', borderRadius: 20,
-        fontSize: 11, fontWeight: 600, border: 'none',
+        background: bg, color,
+        border: '1px solid rgba(15,23,42,0.1)',
         cursor: disabled ? 'not-allowed' : 'pointer',
-        display: 'flex', alignItems: 'center', gap: 4,
-        opacity: disabled ? 0.6 : 1, transition: 'all 0.2s', whiteSpace: 'nowrap'
+        opacity: disabled ? 0.6 : 1,
       }}
     >
+      <span className="tm-status-dot" />
       {STATUS_LABELS[status] || status}
       <FaChevronDown size={8} />
     </button>
   );
 };
 
-const priKey = (p) => {
-  if (!p) return 'Medium';
-  const u = p.toUpperCase();
-  if (u === 'HIGH') return 'High';
-  if (u === 'MEDIUM') return 'Medium';
-  if (u === 'LOW') return 'Low';
-  if (u === 'CRITICAL') return 'Critical';
-  return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
-};
-
-const formatAssignee = (assignedTo) => {
-  if (!assignedTo) return 'Unassigned';
-  return assignedTo.replace(/\s+null\s*/g, '').trim();
-};
-
-const cleanEmployeeName = (name) => {
-  if (!name) return '';
-  return name.replace(/\s+null\s*/gi, '').trim();
-};
-
 const MiniAvatar = ({ name, size = 24 }) => {
-  const initial = (formatAssignee(name) || '?').charAt(0).toUpperCase();
-  const colors  = ['#6366f1', '#0891b2', '#059669', '#d97706', '#9333ea', '#e11d48'];
+  const clean   = cleanPersonName(name) || 'U';
+  const initial = clean.charAt(0).toUpperCase();
+  const colors  = ['#2563eb', '#0891b2', '#16a34a', '#d97706', '#4f46e5', '#dc2626'];
   const idx     = initial.charCodeAt(0) % colors.length;
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: colors[idx], color: '#fff', fontSize: size * 0.45,
+      background: colors[idx], color: '#fff', fontSize: size * 0.44,
       fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontFamily: "'Sora', sans-serif",
     }}>{initial}</div>
@@ -130,29 +126,32 @@ const MiniAvatar = ({ name, size = 24 }) => {
 };
 
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
+const SUBTASKS_PER_PAGE = 5;
 
 const FieldError = ({ msg }) =>
-  msg ? <span className="field-err"><FaExclamationCircle size={10} /> {msg}</span> : null;
+  msg ? <span className="tm-field-err"><FaExclamationCircle size={10} /> {msg}</span> : null;
 
 const CharCount = ({ value, max }) => {
   const len = (value || '').length;
   return (
-    <span className="char-count" style={{ color: len > max * 0.85 ? '#f97316' : '#8b92b8' }}>
+    <span className="tm-char-count" style={{ color: len > max * 0.85 ? '#d97706' : '#64748b' }}>
       {len}/{max}
     </span>
   );
 };
 
-const SUBTASKS_PER_PAGE = 5;
-
 export default function TaskDetail({ user }) {
-  const navigate    = useNavigate();
-  const location    = useLocation();
-  const currentUser = user || getUser();
+  const navigate        = useNavigate();
+  const location        = useLocation();
   const taskIdFromState = location.state?.taskId;
+  const userRole        = getNormalizedRole(user);
+  const myId            = getMyId(user);
+  const canManageSubtasks = ['Admin', 'Hr', 'Manager'].includes(userRole);
 
-  const [task,      setTask]      = useState(null);
-  const [loading,   setLoading]   = useState(true);
+  const [showSubmitWork, setShowSubmitWork] = useState(false);
+  const [task,           setTask]           = useState(null);
+  const [submissions,    setSubmissions]    = useState([]);
+  const [loading,        setLoading]        = useState(true);
 
   const [branches,          setBranches]          = useState([]);
   const [departments,       setDepartments]       = useState([]);
@@ -172,8 +171,10 @@ export default function TaskDetail({ user }) {
   const [crReason,    setCrReason]    = useState('');
   const [crDeadline,  setCrDeadline]  = useState('');
 
+  // Subtask Form State
   const [showSubtaskForm, setShowSubtaskForm] = useState(false);
   const [editingSubtask,  setEditingSubtask]  = useState(null);
+  const [subEffortEdited, setSubEffortEdited] = useState(false);
   const [subtaskForm,     setSubtaskForm]     = useState({
     title: '', description: '', assignee: '', branch: '', dept: '',
     priority: 'Medium', deadline: '', effort: '', tags: '',
@@ -181,56 +182,71 @@ export default function TaskDetail({ user }) {
   const [subtaskErrors,  setSubtaskErrors]  = useState({});
   const [subtaskTouched, setSubtaskTouched] = useState({});
 
-  // Dropdown state
+  // Portal Status Dropdown State
   const [dropdownState, setDropdownState] = useState({
     open: false,
     subtaskId: null,
     position: { top: 0, left: 0 }
   });
-  
-  const [subtaskCurrentPage, setSubtaskCurrentPage] = useState(1);
-  const [subtaskSearchTerm, setSubtaskSearchTerm] = useState('');
-  const dropdownRef = useRef(null);
-  const tableContainerRef = useRef(null);
 
-  // Close dropdown on outside click
+  // Subtask Filter & Pagination State
+  const [subtaskCurrentPage,  setSubtaskCurrentPage]  = useState(1);
+  const [subtaskSearchTerm,   setSubtaskSearchTerm]   = useState('');
+  const [subtaskStatusFilter, setSubtaskStatusFilter] = useState('ALL');
+  const dropdownRef = useRef(null);
+
   useEffect(() => {
-    const handler = (e) => {
+    const handleMouseDown = (e) => {
+      if (e.target.closest('[data-status-portal="true"]') || e.target.closest('[data-status-trigger="true"]')) {
+        return;
+      }
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownState({ open: false, subtaskId: null, position: { top: 0, left: 0 } });
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setDropdownState({ open: false, subtaskId: null, position: { top: 0, left: 0 } });
+        setShowCRModal(false);
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
-  // Add scroll listener to close dropdown when scrolling
   useEffect(() => {
     if (!dropdownState.open) return;
-    
     const handleScroll = () => {
       setDropdownState({ open: false, subtaskId: null, position: { top: 0, left: 0 } });
     };
-    
     window.addEventListener('scroll', handleScroll, true);
     return () => window.removeEventListener('scroll', handleScroll, true);
   }, [dropdownState.open]);
 
-  const extractTaskFromResponse = (data) => {
-    if (data.response && typeof data.response === 'object') return data.response;
-    if (data.data    && typeof data.data    === 'object') return data.data;
-    if (typeof data  === 'object' && data.id)             return data;
-    console.warn('Unexpected API response structure:', data);
-    return null;
-  };
-
-  const fetchTask = useCallback(async () => {
-    if (!taskIdFromState) { setLoading(false); return; }
+  const fetchTaskAndSubmissions = useCallback(async () => {
+    if (!taskIdFromState) {
+      setLoading(false);
+      return;
+    }
     try {
-      const res  = await fetch(API_ENDPOINTS.GET_TASK_BY_ID(taskIdFromState), { headers: getAuthHeaders() });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Task not found');
-      setTask(extractTaskFromResponse(data));
+      const [taskRes, subRes] = await Promise.all([
+        fetch(API_ENDPOINTS.GET_TASK_BY_ID(taskIdFromState), { headers: getAuthHeaders() }),
+        fetch(API_ENDPOINTS.GET_TASK_SUBMISSIONS(taskIdFromState), { headers: getAuthHeaders() }),
+      ]);
+
+      const taskData = await taskRes.json();
+      if (!taskRes.ok) throw new Error(taskData.message || 'Task not found');
+      const unwrappedTask = unwrapResponse(taskData);
+      setTask(unwrappedTask && typeof unwrappedTask === 'object' ? unwrappedTask : null);
+
+      if (subRes.ok) {
+        const subData = await subRes.json();
+        setSubmissions(extractArray(subData));
+      }
     } catch (err) {
       toast.error('Error', err.message);
     } finally {
@@ -239,25 +255,67 @@ export default function TaskDetail({ user }) {
   }, [taskIdFromState]);
 
   useEffect(() => {
+    setActiveTab('overview');
+    setShowSubtaskForm(false);
+    setEditingSubtask(null);
+    setLoading(true);
+    fetchTaskAndSubmissions();
+  }, [fetchTaskAndSubmissions]);
+
+  useEffect(() => {
+    if (!canManageSubtasks) return;
+    let active = true;
     const fetchDropdowns = async () => {
       try {
-        const [branchRes, empRes, deptRes] = await Promise.all([
+        const currentRole = getNormalizedRole();
+        const needsRefEmployees = currentRole === 'Manager' || currentRole === 'Hr';
+        const [branchRes, empRes, deptRes, refEmpRes] = await Promise.all([
           fetch(API_ENDPOINTS.GET_ACTIVE_BRANCHES, { headers: getAuthHeaders() }),
-          fetch(`${API_ENDPOINTS.GET_EMPLOYEES}?page=0&size=100`, { headers: getAuthHeaders() }),
+          fetch(API_ENDPOINTS.GET_TASK_ASSIGNEES, { headers: getAuthHeaders() }),
           fetch(API_ENDPOINTS.GET_ACTIVE_DEPARTMENTS, { headers: getAuthHeaders() }),
+          needsRefEmployees
+            ? fetch(`${API_ENDPOINTS.GET_EMPLOYEES}?page=0&size=200`, { headers: getAuthHeaders() }).catch(() => null)
+            : Promise.resolve(null),
         ]);
-        setBranches(extractArray(await branchRes.json()));
-        setEmployees(extractArray(await empRes.json()));
-        setDepartments(extractArray(await deptRes.json()));
+
+        const [bJson, eJson, dJson, refJson] = await Promise.all([
+          branchRes.json(),
+          empRes.json(),
+          deptRes.json(),
+          refEmpRes ? refEmpRes.json().catch(() => null) : Promise.resolve(null),
+        ]);
+
+        if (!active) return;
+        const deptList = extractArray(dJson);
+        setBranches(extractArray(bJson));
+        setDepartments(deptList);
+        if (empRes.ok) {
+          const flatEmployees = extractArray(eJson).flatMap(group =>
+            Array.isArray(group.employees)
+              ? group.employees.map(employee => ({
+                  ...employee,
+                  roleName: employee.roleName || employee.role,
+                  departmentId: employee.departmentId ?? group.departmentId,
+                  departmentName: employee.departmentName ?? group.departmentName,
+                }))
+              : [{ ...group, roleName: group.roleName || group.role }]
+          );
+          const referenceEmployees = refJson ? extractArray(refJson) : [];
+          setEmployees(
+            scopeEmployeesForRole(flatEmployees, getStoredUser(), deptList, {
+              referenceEmployees,
+              failClosed: false,
+            })
+          );
+        }
         setDropdownsLoaded(true);
       } catch (err) {
         console.error('Dropdown fetch error:', err);
-        toast.error('Load Error', 'Could not load form data');
       }
     };
-    fetchTask();
     fetchDropdowns();
-  }, [fetchTask]);
+    return () => { active = false; };
+  }, [canManageSubtasks]);
 
   const areAllSubtasksCompleted = () => {
     if (!task?.subtasks?.length) return true;
@@ -266,30 +324,29 @@ export default function TaskDetail({ user }) {
 
   useEffect(() => {
     if (subtaskForm.branch && departments.length > 0) {
-      setFilteredDepts(departments.filter(d => d.branchId === parseInt(subtaskForm.branch)));
+      setFilteredDepts(departments.filter(d => String(d.branchId) === String(subtaskForm.branch)));
     } else {
       setFilteredDepts([]);
     }
   }, [subtaskForm.branch, departments]);
 
   useEffect(() => {
-    if (!employees.length) { setFilteredEmployees([]); return; }
     let filtered = [...employees];
-    if (subtaskForm.branch) {
-      const sel = branches.find(b => b.id === parseInt(subtaskForm.branch));
-      if (sel) filtered = filtered.filter(e => e.branchName === sel.name);
-    }
     if (subtaskForm.dept) {
-      const sel = departments.find(d => d.id === parseInt(subtaskForm.dept));
-      if (sel) filtered = filtered.filter(e => e.departmentName === sel.name);
+      filtered = filtered.filter(emp => String(emp.departmentId) === String(subtaskForm.dept));
+    } else if (subtaskForm.branch) {
+      const deptIds = departments
+        .filter(d => String(d.branchId) === String(subtaskForm.branch))
+        .map(d => String(d.id));
+      filtered = filtered.filter(emp => deptIds.includes(String(emp.departmentId)));
     }
     setFilteredEmployees(filtered);
-  }, [employees, subtaskForm.branch, subtaskForm.dept, branches, departments]);
+  }, [employees, departments, subtaskForm.branch, subtaskForm.dept]);
 
   const updateTaskStatus = async (taskId, newStatus, extraProgress = null) => {
     const payload = { taskId, status: newStatus };
     if (extraProgress !== null) payload.progress = extraProgress;
-    const res  = await fetch(API_ENDPOINTS.UPDATE_TASK_STATUS, {
+    const res = await fetch(API_ENDPOINTS.UPDATE_TASK_STATUS, {
       method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload),
     });
     const data = await res.json();
@@ -312,7 +369,7 @@ export default function TaskDetail({ user }) {
       await updateTaskStatus(taskId, newStatus);
       toast.success('Updated', `${isSubtask ? 'Subtask' : 'Task'} moved to ${STATUS_LABELS[newStatus]}`);
       setDropdownState({ open: false, subtaskId: null, position: { top: 0, left: 0 } });
-      await fetchTask();
+      await fetchTaskAndSubmissions();
     } catch (err) {
       toast.error('Error', err.message);
     } finally {
@@ -320,16 +377,11 @@ export default function TaskDetail({ user }) {
     }
   };
 
-  const updateSubtaskStatus = async (subtaskId, newStatus) => {
-    await handleStatusChange(subtaskId, newStatus, true);
-  };
-
   const updateStatus = async (newStatus, extraProgress = null) => {
     if (newStatus === 'COMPLETED' && !areAllSubtasksCompleted()) {
       toast.warning('Cannot Complete', 'All subtasks must be completed before marking the main task as complete.');
       return;
     }
-    
     if (newStatus === 'CHANGE_REQUESTED') {
       setCrTaskId(task.id);
       setCrReason('');
@@ -342,7 +394,7 @@ export default function TaskDetail({ user }) {
     try {
       await updateTaskStatus(task.id, newStatus, extraProgress);
       toast.success('Updated', `Task moved to ${STATUS_LABELS[newStatus] || newStatus}`);
-      await fetchTask();
+      await fetchTaskAndSubmissions();
     } catch (err) {
       toast.error('Error', err.message);
     } finally {
@@ -350,22 +402,15 @@ export default function TaskDetail({ user }) {
     }
   };
 
-  const handleApprove      = () => updateStatus('IN_PROGRESS');
-  const handleReject       = () => updateStatus('REJECTED');
-  const handleSubmitReview = () => updateStatus('IN_REVIEW', Math.max((task?.progress || 0), 80));
-  const handleComplete     = () => updateStatus('COMPLETED', 100);
-  const handleSendBack     = () => updateStatus('IN_PROGRESS');
-  const handleRequestChange = () => updateStatus('CHANGE_REQUESTED');
-
   const handleApproveChange = async () => {
     setActionBusy(true);
     try {
       const res  = await fetch(API_ENDPOINTS.APPROVE_CHANGE(crTaskId || task.id), { method: 'POST', headers: getAuthHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed');
-      toast.success('Approved', 'Change request approved, deadline updated');
+      toast.success('Approved', 'Change request approved');
       setShowCRModal(false); setCrTaskId(null); setCrReason(''); setCrDeadline('');
-      await fetchTask();
+      await fetchTaskAndSubmissions();
     } catch (err) { toast.error('Error', err.message); }
     finally { setActionBusy(false); }
   };
@@ -378,7 +423,7 @@ export default function TaskDetail({ user }) {
       if (!res.ok) throw new Error(data.message || 'Failed');
       toast.success('Rejected', 'Change request rejected');
       setShowCRModal(false); setCrTaskId(null); setCrReason(''); setCrDeadline('');
-      await fetchTask();
+      await fetchTaskAndSubmissions();
     } catch (err) { toast.error('Error', err.message); }
     finally { setActionBusy(false); }
   };
@@ -388,31 +433,31 @@ export default function TaskDetail({ user }) {
     setActionBusy(true);
     try {
       const targetId = crTaskId || task.id;
-      const payload = { reason: crReason, requestedDeadline: crDeadline ? `${crDeadline}T00:00:00` : null };
+      const payload = { reason: crReason.trim(), requestedDeadline: crDeadline ? `${crDeadline}T00:00:00` : null };
       const res  = await fetch(API_ENDPOINTS.SEND_CHANGE_REQ(targetId), {
         method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed');
-      toast.warning('Sent', 'Change request submitted to manager');
+      toast.warning('Sent', 'Change request submitted');
       setShowCRModal(false); setCrTaskId(null); setCrReason(''); setCrDeadline('');
-      await fetchTask();
+      await fetchTaskAndSubmissions();
     } catch (err) { toast.error('Error', err.message); }
     finally { setActionBusy(false); }
   };
 
   const handleComment = async () => {
-    if (!commentText.trim()) return;
+    if (!commentText.trim() || submitting) return;
     setSubmitting(true);
     try {
       const res  = await fetch(API_ENDPOINTS.ADD_COMMENT(task.id), {
-        method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ comment: commentText }),
+        method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ comment: commentText.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed');
       toast.success('Added', 'Comment posted');
       setCommentText('');
-      await fetchTask();
+      await fetchTaskAndSubmissions();
     } catch (err) { toast.error('Error', err.message); }
     finally { setSubmitting(false); }
   };
@@ -426,10 +471,16 @@ export default function TaskDetail({ user }) {
   };
 
   const handleSubtaskChange = (field, value) => {
+    if (field === 'effort') {
+      setSubEffortEdited(value.trim() !== '');
+    }
     setSubtaskForm(prev => {
       const nf = { ...prev, [field]: value };
       if (field === 'branch') { nf.dept = ''; nf.assignee = ''; }
       if (field === 'dept')   { nf.assignee = ''; }
+      if (field === 'deadline' && !subEffortEdited) {
+        nf.effort = calculateEffortFromDates(value) || '';
+      }
       return nf;
     });
     if (subtaskTouched[field])
@@ -441,54 +492,72 @@ export default function TaskDetail({ user }) {
     setSubtaskErrors(prev => ({ ...prev, [field]: validateSubtaskField(field, subtaskForm[field]) }));
   };
 
+  const openCreateSubtaskForm = () => {
+    let defaultBranch = task?.branchId != null ? String(task.branchId) : '';
+    if (!defaultBranch && task?.branch && branches.length > 0) {
+      const bName = typeof task.branch === 'object' ? task.branch.name : task.branch;
+      const found = branches.find(b => b.name === bName || String(b.id) === String(task.branch));
+      if (found) defaultBranch = String(found.id);
+    }
+
+    let defaultDept = task?.departmentId != null ? String(task.departmentId) : '';
+    if (!defaultDept && task?.department && departments.length > 0) {
+      const dName = typeof task.department === 'object' ? task.department.name : task.department;
+      const found = departments.find(d => d.name === dName || String(d.id) === String(task.department));
+      if (found) defaultDept = String(found.id);
+    }
+
+    setEditingSubtask(null);
+    setSubEffortEdited(false);
+    setSubtaskForm({
+      title: '', description: '', assignee: '',
+      branch: defaultBranch, dept: defaultDept,
+      priority: 'Medium', deadline: '', effort: '', tags: '',
+    });
+    setSubtaskErrors({});
+    setSubtaskTouched({});
+    setShowSubtaskForm(true);
+  };
+
   const handleEditSubtask = (subtask) => {
     if (!dropdownsLoaded) { toast.warning('Please wait', 'Loading form data...'); return; }
     let formattedDeadline = '';
     if (subtask.dueDate) {
       formattedDeadline = new Date(subtask.dueDate).toISOString().split('T')[0];
     }
-    let branchId = '';
-    if (subtask.branchId) {
-      branchId = String(subtask.branchId);
-    } else if (subtask.branch && branches.length > 0) {
+    let branchId = subtask.branchId != null ? String(subtask.branchId) : '';
+    if (!branchId && subtask.branch && branches.length > 0) {
       const name = typeof subtask.branch === 'object' ? subtask.branch.name : subtask.branch;
-      const found = branches.find(b => b.name === name || b.id === subtask.branch);
+      const found = branches.find(b => b.name === name || String(b.id) === String(subtask.branch));
       if (found) branchId = String(found.id);
     }
-    let deptId = '';
-    if (subtask.departmentId) {
-      deptId = String(subtask.departmentId);
-    } else if (subtask.department && departments.length > 0) {
+    let deptId = subtask.departmentId != null ? String(subtask.departmentId) : '';
+    if (!deptId && subtask.department && departments.length > 0) {
       const name = typeof subtask.department === 'object' ? subtask.department.name : subtask.department;
-      const found = departments.find(d => d.name === name || d.id === subtask.department);
+      const found = departments.find(d => d.name === name || String(d.id) === String(subtask.department));
       if (found) deptId = String(found.id);
     }
-    let assigneeId = '';
-    if (subtask.assignedToId) {
-      assigneeId = String(subtask.assignedToId);
-    } else if (subtask.assignedTo && employees.length > 0) {
-      const aName = typeof subtask.assignedTo === 'object'
-        ? (subtask.assignedTo.name || `${subtask.assignedTo.firstName} ${subtask.assignedTo.lastName}`)
-        : subtask.assignedTo;
-      const found = employees.find(e =>
-        cleanEmployeeName(e.name) === cleanEmployeeName(aName) || e.id === subtask.assignedTo
+    let assigneeId = subtask.assignedToId != null ? String(subtask.assignedToId) : '';
+    if (!assigneeId && subtask.assignedTo && employees.length > 0) {
+      const aName = cleanPersonName(subtask.assignedTo);
+      const found = employees.find(
+        e => cleanPersonName(e.name) === aName || String(e.id) === String(subtask.assignedTo)
       );
       if (found) assigneeId = String(found.id);
     }
-    let priority = 'Medium';
-    if (subtask.priority) {
-      const u = subtask.priority.toUpperCase();
-      if (u === 'HIGH') priority = 'High';
-      else if (u === 'MEDIUM') priority = 'Medium';
-      else if (u === 'LOW') priority = 'Low';
-      else if (u === 'CRITICAL') priority = 'Critical';
-    }
+
+    const existingEffort = subtask.effort || subtask.effortEstimate || '';
+    setSubEffortEdited(Boolean(existingEffort));
     setEditingSubtask(subtask);
     setSubtaskForm({
-      title: subtask.title || '', description: subtask.description || '',
-      assignee: assigneeId, branch: branchId, dept: deptId,
-      priority, deadline: formattedDeadline,
-      effort: subtask.effort || subtask.effortEstimate || '',
+      title: subtask.title || '',
+      description: subtask.description || '',
+      assignee: assigneeId,
+      branch: branchId,
+      dept: deptId,
+      priority: priKey(subtask.priority),
+      deadline: formattedDeadline,
+      effort: existingEffort,
       tags: subtask.tags || '',
     });
     setShowSubtaskForm(true);
@@ -498,6 +567,7 @@ export default function TaskDetail({ user }) {
 
   const handleCreateOrUpdateSubtask = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     const allFields = ['title', 'assignee', 'branch', 'dept', 'deadline'];
     setSubtaskTouched(allFields.reduce((a, f) => ({ ...a, [f]: true }), {}));
     const errs = {};
@@ -507,19 +577,19 @@ export default function TaskDetail({ user }) {
 
     const payload = {
       title:        subtaskForm.title.trim(),
-      description:  subtaskForm.description || null,
+      description:  subtaskForm.description.trim() || null,
       priority:     subtaskForm.priority.toUpperCase(),
       assignedToId: Number(subtaskForm.assignee),
       departmentId: Number(subtaskForm.dept),
       branchId:     Number(subtaskForm.branch),
       dueDate:      subtaskForm.deadline ? `${subtaskForm.deadline}T00:00:00` : null,
-      effort:       subtaskForm.effort || null,
-      tags:         subtaskForm.tags   || null,
+      effort:       subtaskForm.effort.trim() || null,
+      tags:         subtaskForm.tags.trim() || null,
     };
 
     setSubmitting(true);
     try {
-      const url    = editingSubtask
+      const url = editingSubtask
         ? API_ENDPOINTS.UPDATE_SUBTASK(task.id, editingSubtask.id)
         : API_ENDPOINTS.CREATE_SUBTASK(task.id);
       const method = editingSubtask ? 'PUT' : 'POST';
@@ -531,7 +601,7 @@ export default function TaskDetail({ user }) {
       setSubtaskForm({ title: '', description: '', assignee: '', branch: '', dept: '', priority: 'Medium', deadline: '', effort: '', tags: '' });
       setSubtaskErrors({}); setSubtaskTouched({});
       setSubtaskCurrentPage(1);
-      await fetchTask();
+      await fetchTaskAndSubmissions();
     } catch (err) {
       toast.error('Error', err.message);
     } finally {
@@ -558,285 +628,481 @@ export default function TaskDetail({ user }) {
   };
 
   const handleStatusClick = (subtaskId, event) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    
-    // Get viewport dimensions
-    const viewportHeight = window.innerHeight;
-    const dropdownHeight = 200; // Approximate height of dropdown
-    
-    let top = rect.bottom + 4;
-    
-    // If dropdown would go off screen, position it above the button
-    if (top + dropdownHeight > viewportHeight) {
-      top = rect.top - dropdownHeight - 4;
+    event.stopPropagation();
+    if (dropdownState.open && dropdownState.subtaskId === subtaskId) {
+      setDropdownState({ open: false, subtaskId: null, position: { top: 0, left: 0 } });
+      return;
     }
-    
+    const rect = event.currentTarget.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const dropdownHeight = 160;
+    let top = rect.bottom + 6;
+    if (top + dropdownHeight > viewportHeight) {
+      top = rect.top - dropdownHeight - 6;
+    }
     setDropdownState({
       open: true,
-      subtaskId: subtaskId,
-      position: {
-        top: top,
-        left: rect.left
-      }
+      subtaskId,
+      position: { top, left: Math.min(rect.left, window.innerWidth - 190) }
     });
   };
 
   const isSubtaskFieldErr = (f) => subtaskTouched[f] && !!subtaskErrors[f];
-  const isSubtaskFieldOk  = (f) => subtaskTouched[f] && !subtaskErrors[f] && subtaskForm[f];
+  const isSubtaskFieldOk  = (f) => subtaskTouched[f] && !subtaskErrors[f] && Boolean(subtaskForm[f]);
 
   const STATUS_FLOW = ['PENDING_APPROVAL', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED'];
   const statusIdx   = task ? STATUS_FLOW.indexOf(task.status) : -1;
 
+  // Subtask filter & pagination
   const filteredSubtasks = useMemo(() => {
     if (!task?.subtasks) return [];
-    if (!subtaskSearchTerm) return task.subtasks;
-    return task.subtasks.filter(s => 
-      s.title.toLowerCase().includes(subtaskSearchTerm.toLowerCase()) ||
-      String(s.id).includes(subtaskSearchTerm) ||
-      formatAssignee(s.assignedTo).toLowerCase().includes(subtaskSearchTerm.toLowerCase())
-    );
-  }, [task?.subtasks, subtaskSearchTerm]);
+    return task.subtasks.filter(s => {
+      const matchesStatus =
+        subtaskStatusFilter === 'ALL' ||
+        (subtaskStatusFilter === 'COMPLETED' && s.status === 'COMPLETED') ||
+        (subtaskStatusFilter === 'PENDING' && s.status !== 'COMPLETED');
 
-  const totalSubtaskPages = Math.ceil(filteredSubtasks.length / SUBTASKS_PER_PAGE);
-  const paginatedSubtasks = filteredSubtasks.slice(
-    (subtaskCurrentPage - 1) * SUBTASKS_PER_PAGE,
-    subtaskCurrentPage * SUBTASKS_PER_PAGE
-  );
+      if (!matchesStatus) return false;
+      if (!subtaskSearchTerm.trim()) return true;
+
+      const term = subtaskSearchTerm.toLowerCase();
+      return (
+        s.title?.toLowerCase().includes(term) ||
+        String(s.id).includes(term) ||
+        `t-${String(s.id).padStart(3, '0')}`.includes(term) ||
+        cleanPersonName(s.assignedTo).toLowerCase().includes(term)
+      );
+    });
+  }, [task?.subtasks, subtaskSearchTerm, subtaskStatusFilter]);
+
+  const totalSubtaskPages = Math.max(1, Math.ceil(filteredSubtasks.length / SUBTASKS_PER_PAGE));
+  const paginatedSubtasks = useMemo(() => {
+    const start = (subtaskCurrentPage - 1) * SUBTASKS_PER_PAGE;
+    return filteredSubtasks.slice(start, start + SUBTASKS_PER_PAGE);
+  }, [filteredSubtasks, subtaskCurrentPage]);
 
   useEffect(() => {
-    if (subtaskCurrentPage > totalSubtaskPages && totalSubtaskPages > 0) {
+    if (subtaskCurrentPage > totalSubtaskPages) {
       setSubtaskCurrentPage(totalSubtaskPages);
     }
   }, [totalSubtaskPages, subtaskCurrentPage]);
 
-  if (loading) return <LoadingSpinner message="Loading task…" />;
+  const getPageNumbers = () => {
+    if (totalSubtaskPages <= 5) return Array.from({ length: totalSubtaskPages }, (_, i) => i + 1);
+    if (subtaskCurrentPage <= 3) return [1, 2, 3, 4, '...', totalSubtaskPages];
+    if (subtaskCurrentPage >= totalSubtaskPages - 2) {
+      return [1, '...', totalSubtaskPages - 3, totalSubtaskPages - 2, totalSubtaskPages - 1, totalSubtaskPages];
+    }
+    return [1, '...', subtaskCurrentPage - 1, subtaskCurrentPage, subtaskCurrentPage + 1, '...', totalSubtaskPages];
+  };
+
+  // Real actual hours logged across submissions
+  const actualHoursLogged = useMemo(() => {
+    return submissions.reduce((sum, s) => {
+      const h = Number(s.hoursSpent);
+      return Number.isFinite(h) ? sum + h : sum;
+    }, 0);
+  }, [submissions]);
+
+  // Reviewed feedback records
+  const reviewedFeedbacks = useMemo(() => {
+    return submissions.filter(s => s.status !== 'SUBMITTED' || s.reviewComment);
+  }, [submissions]);
+
+  // Real chronological activity timeline (no fabricated entries)
+  const activityEvents = useMemo(() => {
+    if (!task) return [];
+    const items = [];
+    if (task.createdAt) {
+      items.push({
+        id: 'created',
+        icon: '🆕',
+        color: '#6366f1',
+        title: 'Task Created',
+        desc: `Assigned to ${cleanPersonName(task.assignedTo) || 'Unassigned'}${task.assignedBy ? ` by ${cleanPersonName(task.assignedBy)}` : ''}`,
+        time: task.createdAt,
+      });
+    }
+    (task.subtasks || []).forEach(sub => {
+      if (sub.createdAt) {
+        items.push({
+          id: `sub-${sub.id}`,
+          icon: sub.status === 'COMPLETED' ? '✅' : '📌',
+          color: sub.status === 'COMPLETED' ? '#059669' : '#0891b2',
+          title: `Subtask T-${String(sub.id).padStart(3, '0')}: ${sub.title}`,
+          desc: `Status: ${STATUS_LABELS[sub.status] || sub.status} · Assigned to ${cleanPersonName(sub.assignedTo) || 'Unassigned'}`,
+          time: sub.updatedAt || sub.createdAt,
+        });
+      }
+    });
+    submissions.forEach(sub => {
+      if (sub.submittedAt) {
+        items.push({
+          id: `work-${sub.id}`,
+          icon: '📤',
+          color: '#2563eb',
+          title: `${sub.finalSubmission ? 'Final Submission' : 'Daily Work Report'} by ${cleanPersonName(sub.employeeName) || 'Employee'}`,
+          desc: `Progress: ${sub.progressPercent ?? 0}%${sub.hoursSpent != null ? ` · Hours: ${sub.hoursSpent}h` : ''} · Status: ${sub.status}`,
+          time: sub.submittedAt,
+        });
+      }
+    });
+    if (task.changeRequest) {
+      items.push({
+        id: 'cr',
+        icon: '↩',
+        color: '#d97706',
+        title: 'Change Request Submitted',
+        desc: task.changeRequest.reason,
+        time: task.changeRequest.createdAt || task.updatedAt || task.createdAt,
+      });
+    }
+    (task.comments || []).forEach((c, idx) => {
+      items.push({
+        id: `comment-${c.id || idx}`,
+        icon: '💬',
+        color: '#7c3aed',
+        title: `Comment by ${cleanPersonName(c.author) || 'User'}`,
+        desc: c.comment,
+        time: c.createdAt,
+      });
+    });
+    return items.sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
+  }, [task, submissions]);
+
+  if (loading) return <LoadingSpinner message="Loading task workspace…" />;
   if (!task)   return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Task not found.</div>;
 
-  const tags = task.tags ? task.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
-  const allSubtasksCompleted     = areAllSubtasksCompleted();
-  const incompleteSubtasksCount  = task.subtasks ? task.subtasks.filter(s => s.status !== 'COMPLETED').length : 0;
+  const isAssignedUser = !!myId && String(task.assignedToId) === String(myId);
+  const canReviewSubmission =
+    !!myId &&
+    !isAssignedUser &&
+    (String(task.assignedById) === String(myId) || ['Admin', 'Hr'].includes(userRole));
 
-  // Find the currently open subtask for dropdown
-  const openSubtask = dropdownState.open && dropdownState.subtaskId 
-    ? paginatedSubtasks.find(s => s.id === dropdownState.subtaskId) 
+  const tags = task.tags ? task.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const allSubtasksCompleted    = areAllSubtasksCompleted();
+  const totalSubtasksCount      = task.subtasks?.length || 0;
+  const completedSubtasksCount  = task.subtasks ? task.subtasks.filter(s => s.status === 'COMPLETED').length : 0;
+  const incompleteSubtasksCount = totalSubtasksCount - completedSubtasksCount;
+  const subtaskCompletionPct    = totalSubtasksCount > 0 ? Math.round((completedSubtasksCount / totalSubtasksCount) * 100) : 0;
+
+  const openSubtask = dropdownState.open && dropdownState.subtaskId
+    ? paginatedSubtasks.find(s => s.id === dropdownState.subtaskId)
     : null;
   const availableStatuses = openSubtask ? getAvailableStatuses(openSubtask.status) : [];
 
+  const startItemIndex = filteredSubtasks.length === 0 ? 0 : (subtaskCurrentPage - 1) * SUBTASKS_PER_PAGE + 1;
+  const endItemIndex   = Math.min(subtaskCurrentPage * SUBTASKS_PER_PAGE, filteredSubtasks.length);
+
   return (
-    <div style={{ padding: '22px 24px', background: 'var(--bg-page)', minHeight: '100vh', animation: 'tdFadeUp .35s ease' }}>
-      <style>{`
-        @keyframes tdFadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
-        textarea.td-ta:focus { border-color:var(--accent-indigo)!important; box-shadow:0 0 0 3px rgba(99,102,241,.10); background:var(--bg-white)!important; outline:none; }
-        .subtask-field { display:flex; flex-direction:column; gap:4px; }
-        .subtask-field label { font-size:13px; font-weight:600; color:var(--text-secondary); }
-        .subtask-label-row { display:flex; justify-content:space-between; align-items:center; }
-        .subtask-field input,.subtask-field select,.subtask-field textarea { padding:10px 12px; border:1.5px solid var(--border-medium); border-radius:10px; font-size:14px; font-family:'DM Sans',sans-serif; color:var(--text-primary); background:var(--bg-surface); transition:all 0.2s; width:100%; }
-        .subtask-field input:focus,.subtask-field select:focus,.subtask-field textarea:focus { outline:none; border-color:var(--accent-indigo); background:var(--bg-white); box-shadow:0 0 0 3px rgba(99,102,241,0.1); }
-        .subtask-field.has-error input,.subtask-field.has-error select { border-color:var(--danger); }
-        .subtask-field.has-ok input,.subtask-field.has-ok select { border-color:var(--success); }
-        .field-err { font-size:11px; color:var(--danger); font-weight:500; display:flex; align-items:center; gap:4px; }
-        .char-count { font-size:11px; }
-        .req { color:var(--accent-coral); }
-        .subtask-spinner { width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .6s linear infinite; }
-        @keyframes spin { to { transform:rotate(360deg); } }
-        
-        .status-dropdown { 
-          position: fixed; 
-          background: var(--bg-white); 
-          border: 1px solid var(--border-light); 
-          border-radius: 10px; 
-          box-shadow: 0 4px 20px rgba(0,0,0,0.15); 
-          z-index: 99999; 
-          min-width: 170px; 
-          overflow: hidden;
-          animation: fadeIn 0.15s ease-out;
-        }
-        
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .status-dropdown-item { padding:10px 14px; font-size:12px; cursor:pointer; transition:background 0.2s; border:none; background:none; width:100%; text-align:left; display:flex; align-items:center; gap:8px; color:var(--text-primary); }
-        .status-dropdown-item:hover { background:var(--bg-surface); }
-        .status-dropdown-item:not(:last-child) { border-bottom:1px solid var(--border-light); }
+    <div className="tm-page">
+      {/* Top Header Card */}
+      <div className="tm-detail-hero">
+        <div className="tm-detail-hero-top">
+          <div className="tm-detail-badges">
+            <button type="button" className="tm-btn tm-btn-ghost tm-btn-sm" onClick={() => navigate('/TaskList')}>
+              <FaArrowLeft size={11} /> Back
+            </button>
+            {(task.parentTaskId || task.parentId) && (
+              <button
+                type="button"
+                className="tm-link-chip"
+                onClick={() => navigate('/TaskDetail', { state: { taskId: task.parentTaskId || task.parentId } })}
+                title="Open parent task"
+              >
+                Parent #T-{String(task.parentTaskId || task.parentId).padStart(3, '0')}
+              </button>
+            )}
+            <span className="tm-id-badge">
+              T-{String(task.id).padStart(3, '0')}
+            </span>
+            <StatusBadge status={task.status} />
+            <span className="tm-status-badge" style={{ background: PRIORITY_BG[priKey(task.priority)] || '#f1f5f9', color: PRIORITY_COLORS[priKey(task.priority)] || '#475569' }}>
+              {priKey(task.priority)} Priority
+            </span>
+          </div>
 
-        .subtask-table { width:100%; border-collapse:collapse; }
-        .subtask-table th { text-align:left; padding:12px 16px; font-size:11px; font-weight:700; color:var(--accent-indigo); text-transform:uppercase; letter-spacing:0.05em; background:var(--bg-surface); border-bottom:1.5px solid var(--accent-indigo-pale); }
-        .subtask-table td { padding:14px 16px; border-bottom:1px solid #f0f2f9; vertical-align:middle; }
-        .subtask-table tbody tr:hover td { background:#fafbff; }
-        
-        .pagination-btn { width:32px; height:32px; display:flex; align-items:center; justify-content:center; border:1px solid var(--border-medium); border-radius:8px; background:var(--bg-white); color:var(--text-secondary); cursor:pointer; transition:all 0.2s; }
-        .pagination-btn:hover:not(:disabled) { border-color:var(--accent-indigo); color:var(--accent-indigo); background:var(--bg-surface); }
-        .pagination-btn:disabled { opacity:0.5; cursor:not-allowed; }
-        .pagination-btn.active { background:var(--accent-indigo); border-color:var(--accent-indigo); color:#fff; }
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {task.status === 'COMPLETED' && (
+              <button
+                type="button"
+                className="tm-btn tm-btn-secondary tm-btn-sm"
+                onClick={() => navigate('/performance')}
+              >
+                <FaStar size={11} /> Performance
+              </button>
+            )}
+            {canManageSubtasks && (
+              <>
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-secondary tm-btn-sm"
+                  disabled={actionBusy}
+                  onClick={() => navigate('/CreateTask', { state: { taskToEdit: task, isEditing: true } })}
+                >
+                  <FaEdit size={11} /> Edit Task
+                </button>
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-primary tm-btn-sm"
+                  disabled={actionBusy}
+                  onClick={() => {
+                    setActiveTab('subtasks');
+                    openCreateSubtaskForm();
+                  }}
+                >
+                  <FaPlus size={11} /> Add Subtask
+                </button>
+              </>
+            )}
 
-        .tab-btn { flex: 1; padding: 10px 14px; border: none; border-radius: 9px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
-        .tab-btn.active { background: var(--accent-indigo) !important; color: #fff !important; font-weight: 700; box-shadow: 0 2px 8px rgba(99,102,241,.25); }
-        .tab-btn:not(.active) { background: transparent; color: var(--text-muted); }
-        .tab-btn:not(.active):hover { background: var(--bg-white); color: var(--text-primary); }
-
-        .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 10000; }
-        .modal-content { background: var(--bg-white); border-radius: 22px; width: 90%; max-width: 500px; box-shadow: 0 25px 70px rgba(15,23,42,.25); }
-      `}</style>
-
-      {/* Header */}
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-          <button onClick={() => navigate('/TaskList')} style={{ background: 'var(--bg-surface)', border: '1.5px solid var(--border-medium)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <FaArrowLeft size={11} /> Back to Tasks
-          </button>
-          <span style={{ fontFamily: 'monospace', fontSize: 13, background: '#ede9fe', padding: '4px 11px', borderRadius: 7, fontWeight: 700, color: 'var(--accent-indigo)' }}>T-{String(task.id).padStart(3, '0')}</span>
-          <StatusBadge status={task.status} />
-          <span style={{ background: PRIORITY_BG[priKey(task.priority)] || '#f1f5f9', color: PRIORITY_COLORS[priKey(task.priority)] || '#475569', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{priKey(task.priority)}</span>
+            {isAssignedUser && task.status === 'IN_PROGRESS' && (
+              <button
+                type="button"
+                className="tm-btn tm-btn-primary tm-btn-sm"
+                disabled={actionBusy}
+                onClick={() => setShowSubmitWork(true)}
+              >
+                <FaPaperPlane size={11} /> Submit Work
+              </button>
+            )}
+          </div>
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, fontFamily: "'Sora',sans-serif", letterSpacing: '-0.02em' }}>{task.title}</h1>
+        <h1 className="tm-detail-title">
+          {task.title}
+        </h1>
       </div>
 
-      {/* Action banners */}
-      {task.status === 'PENDING_APPROVAL' && (
-        <div style={{ background: 'linear-gradient(135deg,#fffbeb,#fef3c7)', border: '1.5px solid #fcd34d', borderRadius: 16, padding: 18, marginBottom: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#92400e', marginBottom: 12 }}>🔔 Action Required — Manager Review</div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button disabled={actionBusy} onClick={handleApprove} style={{ background: 'linear-gradient(135deg,#059669,#10b981)', border: 'none', color: '#fff', padding: '9px 20px', borderRadius: 11, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}><FaCheck size={11} /> Approve Task</button>
-            <button disabled={actionBusy} onClick={handleReject}  style={{ background: 'linear-gradient(135deg,#ef4444,#f87171)', border: 'none', color: '#fff', padding: '9px 20px', borderRadius: 11, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}><FaTimes size={11} /> Reject Task</button>
+      {/* Action Banners */}
+      {isAssignedUser && task.status === 'PENDING_APPROVAL' && (
+        <div className="tm-alert tm-alert--amber">
+          <div className="tm-alert-text">Action Required — Accept or Reject Assigned Task</div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button type="button" className="tm-btn tm-btn-success" disabled={actionBusy} onClick={() => updateStatus('IN_PROGRESS')}><FaCheck size={11} /> Accept Task</button>
+            <button type="button" className="tm-btn tm-btn-danger" disabled={actionBusy} onClick={() => updateStatus('REJECTED')}><FaTimes size={11} /> Reject Task</button>
           </div>
         </div>
       )}
 
-      {task.status === 'IN_PROGRESS' && (
-        <div style={{ background: 'linear-gradient(135deg,#f0fdf4,#ecfdf5)', border: '1.5px solid #6ee7b7', borderRadius: 16, padding: 18, marginBottom: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#065f46', marginBottom: 12 }}>🚀 Task In Progress</div>
-          {!allSubtasksCompleted && task.subtasks?.length > 0 && (
-            <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: '#92400e' }}>
-              ⚠️ {incompleteSubtasksCount} subtask{incompleteSubtasksCount !== 1 ? 's' : ''} still pending. All subtasks must be completed before marking this task as complete.
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button disabled={actionBusy} onClick={handleSubmitReview} style={{ background: 'linear-gradient(135deg,var(--accent-indigo),var(--accent-indigo-light))', border: 'none', color: '#fff', padding: '9px 18px', borderRadius: 11, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>🔍 Submit for Review</button>
-            <button disabled={actionBusy} onClick={handleRequestChange} style={{ background: 'transparent', border: '1.5px solid var(--warning)', color: 'var(--warning)', padding: '8px 16px', borderRadius: 10, fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}><FaExchangeAlt size={11} /> Request Change</button>
-            <button disabled={actionBusy || !allSubtasksCompleted} onClick={handleComplete} style={{ background: !allSubtasksCompleted ? 'var(--bg-surface)' : 'linear-gradient(135deg,#059669,#10b981)', border: !allSubtasksCompleted ? '1.5px solid var(--border-medium)' : 'none', color: !allSubtasksCompleted ? 'var(--text-muted)' : '#fff', padding: '9px 18px', borderRadius: 11, fontWeight: 600, fontSize: 13, cursor: !allSubtasksCompleted ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 7, opacity: !allSubtasksCompleted ? 0.6 : 1 }}>
+      {isAssignedUser && task.status === 'IN_PROGRESS' && (
+        <div className="tm-alert tm-alert--green">
+          <div>
+            <div className="tm-alert-text">Task In Progress</div>
+            {!allSubtasksCompleted && totalSubtasksCount > 0 && (
+              <div className="tm-alert-sub">
+                {incompleteSubtasksCount} of {totalSubtasksCount} subtask{incompleteSubtasksCount !== 1 ? 's' : ''} still pending completion.
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="tm-btn tm-btn-primary" disabled={actionBusy} onClick={() => setShowSubmitWork(true)}>Submit for Review</button>
+            <button type="button" className="tm-btn tm-btn-amber-outline" disabled={actionBusy} onClick={() => updateStatus('CHANGE_REQUESTED')}><FaExchangeAlt size={11} /> Request Change</button>
+            <button type="button" className="tm-btn tm-btn-success" disabled={actionBusy || !allSubtasksCompleted} onClick={() => updateStatus('COMPLETED', 100)}>
               <FaCheckCircle size={11} /> Mark Complete
             </button>
           </div>
         </div>
       )}
 
-      {task.status === 'IN_REVIEW' && (
-        <div style={{ background: 'linear-gradient(135deg,#faf5ff,#f3e8ff)', border: '1.5px solid #a78bfa', borderRadius: 16, padding: 18, marginBottom: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#5b21b6', marginBottom: 12 }}>🔍 Under Review — Manager Action</div>
-          {!allSubtasksCompleted && task.subtasks?.length > 0 && (
-            <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: '#92400e' }}>
-              ⚠️ {incompleteSubtasksCount} subtask{incompleteSubtasksCount !== 1 ? 's' : ''} still pending. All subtasks must be completed before approving.
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button disabled={actionBusy || !allSubtasksCompleted} onClick={handleComplete} style={{ background: !allSubtasksCompleted ? 'var(--bg-surface)' : 'linear-gradient(135deg,#059669,#10b981)', border: !allSubtasksCompleted ? '1.5px solid var(--border-medium)' : 'none', color: !allSubtasksCompleted ? 'var(--text-muted)' : '#fff', padding: '9px 18px', borderRadius: 11, fontWeight: 600, fontSize: 13, cursor: !allSubtasksCompleted ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 7, opacity: !allSubtasksCompleted ? 0.6 : 1 }}>
-              <FaCheck size={11} /> Approve & Complete
+      {canReviewSubmission && task.status === 'IN_REVIEW' && (
+        <div className="tm-alert tm-alert--purple">
+          <div>
+            <div className="tm-alert-text">Under Review — Manager Action</div>
+            {!allSubtasksCompleted && totalSubtasksCount > 0 && (
+              <div className="tm-alert-sub">
+                {incompleteSubtasksCount} subtask{incompleteSubtasksCount !== 1 ? 's' : ''} still pending before approving.
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="tm-btn tm-btn-success" disabled={actionBusy || !allSubtasksCompleted} onClick={() => updateStatus('COMPLETED', 100)}>
+              <FaCheck size={11} /> Approve &amp; Complete
             </button>
-            <button disabled={actionBusy} onClick={handleSendBack} style={{ background: 'var(--bg-surface)', border: '1.5px solid var(--border-medium)', color: 'var(--text-secondary)', padding: '9px 18px', borderRadius: 11, fontWeight: 500, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}><FaUndo size={11} /> Send Back</button>
+            <button type="button" className="tm-btn tm-btn-secondary" disabled={actionBusy} onClick={() => updateStatus('IN_PROGRESS')}><FaUndo size={11} /> Send Back</button>
           </div>
         </div>
       )}
 
       {task.status === 'CHANGE_REQUESTED' && (
-        <div style={{ background: 'linear-gradient(135deg,#fffbeb,#fef3c7)', border: '1.5px solid #fcd34d', borderRadius: 16, padding: 18, marginBottom: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#92400e', marginBottom: 10 }}>↩ Change Request Pending</div>
+        <div className="tm-alert tm-alert--amber" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+          <div className="tm-alert-text">Change Request Pending</div>
           {task.changeRequest && (
-            <div style={{ background: 'var(--bg-white)', borderRadius: 10, padding: '11px 14px', marginBottom: 12, border: '1px solid var(--border-light)' }}>
-              <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}><strong>Reason:</strong> {task.changeRequest.reason}</div>
+            <div className="tm-card tm-card--padded" style={{ padding: '10px 14px' }}>
+              <div style={{ fontSize: 13, color: 'var(--tm-text-primary)', marginBottom: 4 }}><strong>Reason:</strong> {task.changeRequest.reason}</div>
               {task.changeRequest.requestedDeadline && (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>📅 Requested: <strong>{formatDate(task.changeRequest.requestedDeadline)}</strong></div>
+                <div style={{ fontSize: 12, color: 'var(--tm-text-muted)' }}>Requested Deadline: <strong>{formatDate(task.changeRequest.requestedDeadline)}</strong></div>
               )}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button disabled={actionBusy} onClick={handleApproveChange} style={{ background: 'linear-gradient(135deg,#059669,#10b981)', border: 'none', color: '#fff', padding: '9px 18px', borderRadius: 11, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}><FaCheck size={11} /> Approve Change</button>
-            <button disabled={actionBusy} onClick={handleRejectChange}  style={{ background: 'linear-gradient(135deg,#ef4444,#f87171)', border: 'none', color: '#fff', padding: '9px 18px', borderRadius: 11, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}><FaTimes size={11} /> Reject Change</button>
-          </div>
+          {canReviewSubmission && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="tm-btn tm-btn-success" disabled={actionBusy} onClick={handleApproveChange}><FaCheck size={11} /> Approve Change</button>
+              <button type="button" className="tm-btn tm-btn-danger" disabled={actionBusy} onClick={handleRejectChange}><FaTimes size={11} /> Reject Change</button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 6, background: 'var(--bg-surface)', padding: 5, borderRadius: 12, border: '1px solid var(--border-light)', marginBottom: 20 }}>
-        <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
-          📋 Overview
+      {/* 6-Tab Workspace Navigation */}
+      <div className="tm-tab-bar">
+        <button type="button" className={`tm-tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
+          Overview
         </button>
-        <button className={`tab-btn ${activeTab === 'activity' ? 'active' : ''}`} onClick={() => setActiveTab('activity')}>
-          📜 Activity
+        <button type="button" className={`tm-tab-btn ${activeTab === 'subtasks' ? 'active' : ''}`} onClick={() => setActiveTab('subtasks')}>
+          Subtasks ({totalSubtasksCount})
         </button>
-        <button className={`tab-btn ${activeTab === 'comments' ? 'active' : ''}`} onClick={() => setActiveTab('comments')}>
-          💬 Comments ({(task.comments || []).length})
+        <button type="button" className={`tm-tab-btn ${activeTab === 'dailywork' ? 'active' : ''}`} onClick={() => setActiveTab('dailywork')}>
+          Daily Work
+        </button>
+        <button type="button" className={`tm-tab-btn ${activeTab === 'submissions' ? 'active' : ''}`} onClick={() => setActiveTab('submissions')}>
+          Submissions ({submissions.length})
+        </button>
+        <button type="button" className={`tm-tab-btn ${activeTab === 'feedback' ? 'active' : ''}`} onClick={() => setActiveTab('feedback')}>
+          Feedback &amp; Comments ({reviewedFeedbacks.length + (task.comments || []).length})
+        </button>
+        <button type="button" className={`tm-tab-btn ${activeTab === 'activity' ? 'active' : ''}`} onClick={() => setActiveTab('activity')}>
+          Activity History ({activityEvents.length})
         </button>
       </div>
 
-      {/* OVERVIEW TAB */}
+      {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Description */}
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 18, overflow: 'hidden' }}>
-            <div style={{ padding: '15px 20px', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-surface)' }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>📄 Description</h3>
+        <div className="tm-overview-grid">
+          <div className="tm-col-stack">
+            <div className="tm-card">
+              <div className="tm-card-header">
+                <h3 className="tm-card-title">Description &amp; Scope</h3>
+              </div>
+              <div className="tm-card-body">
+                <p className="tm-description-text">
+                  {task.description || 'No description provided.'}
+                </p>
+                {tags.length > 0 && (
+                  <div className="tm-tag-list">
+                    {tags.map(tag => (
+                      <span key={tag} className="tm-tag">
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <div style={{ padding: 20 }}>
-              <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>{task.description || 'No description provided.'}</p>
-              {tags.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14 }}>
-                  {tags.map(tag => (
-                    <span key={tag} style={{ background: '#ede9fe', color: 'var(--accent-indigo)', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{tag}</span>
-                  ))}
+
+            {/* Progress + Hours Summary */}
+            <div className="tm-card">
+              <div className="tm-card-header">
+                <h3 className="tm-card-title">Completion &amp; Hours Summary</h3>
+                <span style={{ fontSize: 19, fontWeight: 800, fontFamily: "'Sora',sans-serif", color: 'var(--tm-primary)' }}>
+                  {task.progress || 0}%
+                </span>
+              </div>
+              <div className="tm-card-body">
+                <div className="tm-progress-track tm-progress-track--lg" style={{ marginBottom: 16 }}>
+                  <div className={`tm-progress-fill ${(task.progress || 0) >= 100 ? 'tm-progress-fill--done' : ''}`} style={{ width: `${task.progress || 0}%` }} />
                 </div>
-              )}
+
+                <div className="tm-mini-stats-grid">
+                  <div className="tm-mini-stat">
+                    <div className="tm-mini-stat-label">Estimated Effort</div>
+                    <div className="tm-mini-stat-val">{normaliseEffort(task.effort || task.effortEstimate)}</div>
+                  </div>
+                  <div className="tm-mini-stat">
+                    <div className="tm-mini-stat-label">Actual Submitted Hours</div>
+                    <div className="tm-mini-stat-val">
+                      {actualHoursLogged > 0 ? `${actualHoursLogged} hrs` : '—'}
+                    </div>
+                  </div>
+                  <div className="tm-mini-stat">
+                    <div className="tm-mini-stat-label">Subtask Completion</div>
+                    <div className="tm-mini-stat-val">
+                      {completedSubtasksCount} / {totalSubtasksCount} ({subtaskCompletionPct}%)
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Progress + Status Flow Side by Side */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16 }}>
-            <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 18, overflow: 'hidden' }}>
-              <div style={{ padding: '15px 20px', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>📊 Progress</h3>
-                <span style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Sora',sans-serif", color: 'var(--accent-indigo)' }}>{task.progress || 0}%</span>
+          {/* RIGHT SIDEBAR */}
+          <div className="tm-col-stack">
+            <div className="tm-card">
+              <div className="tm-card-header">
+                <h3 className="tm-card-title">Task Metadata</h3>
               </div>
-              <div style={{ padding: 20 }}>
-                <div style={{ background: '#e8eaf6', borderRadius: 10, height: 12, overflow: 'hidden', marginBottom: 15 }}>
-                  <div style={{ height: '100%', width: `${task.progress || 0}%`, background: (task.progress || 0) >= 100 ? 'var(--success)' : 'linear-gradient(90deg,var(--accent-indigo),var(--accent-indigo-light))', borderRadius: 10, transition: 'width .6s ease' }} />
+              <div className="tm-card-body" style={{ paddingTop: 10, paddingBottom: 14 }}>
+                <div className="tm-meta-row">
+                  <span className="tm-meta-key">Assignee</span>
+                  <div className="tm-meta-val">
+                    <MiniAvatar name={task.assignedTo} size={22} />
+                    <span>{cleanPersonName(task.assignedTo) || 'Unassigned'}</span>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  {STATUS_FLOW.map(s => (
-                    <span key={s} style={{ fontSize: 11, color: task.status === s ? 'var(--accent-indigo)' : 'var(--text-muted)', fontWeight: task.status === s ? 700 : 400 }}>{STATUS_LABELS[s]}</span>
-                  ))}
+                {task.assignedBy && (
+                  <div className="tm-meta-row">
+                    <span className="tm-meta-key">Assigned By</span>
+                    <span className="tm-meta-val">
+                      <FaUserTie size={11} color="var(--tm-primary)" /> {cleanPersonName(task.assignedBy)}
+                    </span>
+                  </div>
+                )}
+                {task.department && (
+                  <div className="tm-meta-row">
+                    <span className="tm-meta-key">Department</span>
+                    <span className="tm-meta-val">
+                      <FaSitemap size={11} color="var(--tm-primary)" /> {typeof task.department === 'object' ? task.department.name : task.department}
+                    </span>
+                  </div>
+                )}
+                {task.branch && (
+                  <div className="tm-meta-row">
+                    <span className="tm-meta-key">Branch</span>
+                    <span className="tm-meta-val">
+                      <FaBuilding size={11} color="var(--tm-primary)" /> {typeof task.branch === 'object' ? task.branch.name : task.branch}
+                    </span>
+                  </div>
+                )}
+                <div className="tm-meta-row">
+                  <span className="tm-meta-key">Deadline</span>
+                  <span className="tm-meta-val" style={{ color: daysUntil(task.dueDate) < 0 && task.status !== 'COMPLETED' ? '#dc2626' : undefined }}>
+                    {formatDate(task.dueDate)}
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 18, overflow: 'hidden' }}>
-              <div style={{ padding: '15px 20px', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-surface)' }}>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>🗺 Status Tracker</h3>
+            <div className="tm-card">
+              <div className="tm-card-header">
+                <h3 className="tm-card-title">Workflow Stage</h3>
               </div>
-              <div style={{ padding: 16 }}>
+              <div className="tm-card-body">
                 {[
-                  { status: 'PENDING_APPROVAL', icon: '⏳', color: '#fbbf24' },
-                  { status: 'IN_PROGRESS',      icon: '🚀', color: 'var(--accent-indigo)' },
-                  { status: 'IN_REVIEW',         icon: '🔍', color: '#8b5cf6' },
-                  { status: 'COMPLETED',         icon: '✅', color: 'var(--success)' },
+                  { status: 'PENDING_APPROVAL', label: 'Pending Approval', color: '#d97706' },
+                  { status: 'IN_PROGRESS',      label: 'In Progress',      color: '#2563eb' },
+                  { status: 'IN_REVIEW',        label: 'In Review',        color: '#d97706' },
+                  { status: 'COMPLETED',        label: 'Completed',        color: '#16a34a' },
                 ].map((s, i) => {
                   const isDone   = statusIdx > i;
                   const isActive = task.status === s.status;
                   return (
-                    <div key={s.status} style={{ display: 'flex', gap: 10, paddingBottom: 12, position: 'relative' }}>
-                      {i < 3 && <div style={{ position: 'absolute', left: 14, top: 28, bottom: 0, width: 2, background: 'var(--border-light)' }} />}
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, zIndex: 1, background: isDone ? 'var(--success)' : isActive ? s.color : 'var(--bg-surface)', border: `2px solid ${isDone ? 'var(--success)' : isActive ? s.color : 'var(--border-medium)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, boxShadow: isActive ? `0 0 0 3px ${s.color}33` : undefined, color: isDone || isActive ? '#fff' : 'var(--text-muted)' }}>
-                        {isDone ? '✓' : s.icon}
+                    <div key={s.status} className={`tm-workflow-step ${i < 3 ? 'tm-workflow-step--spaced' : ''}`}>
+                      {i < 3 && (
+                        <div className={`tm-workflow-line ${isDone ? 'tm-workflow-line--done' : ''}`} />
+                      )}
+                      <div
+                        className="tm-workflow-node"
+                        style={{
+                          background: isDone ? '#16a34a' : isActive ? s.color : undefined,
+                          borderColor: isDone ? '#16a34a' : isActive ? s.color : undefined,
+                          color: isDone || isActive ? '#fff' : undefined,
+                        }}
+                      >
+                        {isDone ? '✓' : i + 1}
                       </div>
-                      <div style={{ paddingTop: 3 }}>
-                        <div style={{ fontSize: 12, fontWeight: isActive ? 700 : 500, color: isDone ? 'var(--success)' : isActive ? s.color : 'var(--text-muted)' }}>{STATUS_LABELS[s.status]}</div>
-                        {isActive && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Current status</div>}
+                      <div style={{ paddingTop: 2 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: isActive ? 700 : 500, color: isDone ? '#16a34a' : isActive ? s.color : 'var(--tm-text-muted)' }}>
+                          {s.label}
+                        </div>
                       </div>
                     </div>
                   );
@@ -844,261 +1110,485 @@ export default function TaskDetail({ user }) {
               </div>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Sub-tasks Table */}
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 18, overflow: 'hidden' }}>
-            <div style={{ padding: '15px 20px', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-surface)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <FaTasks size={13} color="var(--accent-indigo)" />
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Sub-tasks</h3>
-                <span style={{ background: '#ede9fe', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, color: 'var(--accent-indigo)' }}>{(task.subtasks || []).length}</span>
-                {incompleteSubtasksCount > 0 && (
-                  <span style={{ background: '#fee2e2', color: '#991b1b', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600 }}>
-                    {incompleteSubtasksCount} pending
-                  </span>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ position: 'relative' }}>
-                  <FaSearch style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 11 }} />
-                  <input
-                    type="text"
-                    placeholder="Search subtasks..."
-                    value={subtaskSearchTerm}
-                    onChange={(e) => { setSubtaskSearchTerm(e.target.value); setSubtaskCurrentPage(1); }}
-                    style={{ padding: '6px 10px 6px 30px', border: '1.5px solid var(--border-medium)', borderRadius: 8, fontSize: 12, fontFamily: "'DM Sans',sans-serif", color: 'var(--text-primary)', background: 'var(--bg-white)', width: 180, outline: 'none' }}
-                  />
-                </div>
-                {!showSubtaskForm && (
-                  <button onClick={() => setShowSubtaskForm(true)} style={{ background: 'transparent', border: '1px solid var(--accent-indigo)', color: 'var(--accent-indigo)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <FaPlus size={10} /> Add Subtask
-                  </button>
-                )}
-              </div>
+      {/* TAB 2: SUBTASKS */}
+      {activeTab === 'subtasks' && (
+        <div className="tm-card">
+          <div className="tm-card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <FaTasks size={14} color="var(--tm-primary)" />
+              <h3 className="tm-card-title">Subtasks</h3>
+              <span className="tm-count-badge">
+                {completedSubtasksCount}/{totalSubtasksCount} Done
+              </span>
             </div>
 
-            <div style={{ padding: '16px 20px' }}>
-              {/* Subtask form */}
-              {showSubtaskForm && (
-                <div style={{ marginBottom: 20, padding: 16, background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border-light)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--accent-indigo)' }}>
-                      {editingSubtask ? 'Edit Subtask' : 'Create New Subtask'}
+            {canManageSubtasks && !showSubtaskForm && (
+              <button
+                type="button"
+                className="tm-btn tm-btn-primary tm-btn-sm"
+                onClick={openCreateSubtaskForm}
+              >
+                <FaPlus size={10} /> Add Subtask
+              </button>
+            )}
+          </div>
+
+          {totalSubtasksCount > 0 && !showSubtaskForm && (
+            <div className="tm-subtask-toolbar">
+              <div className="tm-pill-group">
+                {[
+                  { id: 'ALL', label: `All (${totalSubtasksCount})` },
+                  { id: 'PENDING', label: `Pending (${incompleteSubtasksCount})` },
+                  { id: 'COMPLETED', label: `Completed (${completedSubtasksCount})` },
+                ].map(pill => (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    className={`tm-filter-pill ${subtaskStatusFilter === pill.id ? 'active' : ''}`}
+                    onClick={() => { setSubtaskStatusFilter(pill.id); setSubtaskCurrentPage(1); }}
+                  >
+                    {pill.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="tm-search-wrap">
+                <FaSearch className="tm-search-icon" />
+                <input
+                  type="text"
+                  className="tm-input"
+                  placeholder="Search title, ID, assignee..."
+                  value={subtaskSearchTerm}
+                  onChange={(e) => { setSubtaskSearchTerm(e.target.value); setSubtaskCurrentPage(1); }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="tm-card-body">
+            {showSubtaskForm && canManageSubtasks && (
+              <div className="tm-subtask-form-box">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <h4 style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: 'var(--tm-primary)' }}>
+                      {editingSubtask ? `Edit Subtask #T-${String(editingSubtask.id).padStart(3, '0')}` : 'Create New Subtask'}
                     </h4>
-                    <button onClick={handleCancelSubtaskForm} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
+                    <span className="tm-count-badge">Subtask</span>
                   </div>
-                  <form onSubmit={handleCreateOrUpdateSubtask}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                      <div className={`subtask-field ${isSubtaskFieldErr('title') ? 'has-error' : ''} ${isSubtaskFieldOk('title') ? 'has-ok' : ''}`}>
-                        <div className="subtask-label-row">
-                          <label>Title <span className="req">*</span></label>
-                          <CharCount value={subtaskForm.title} max={100} />
-                        </div>
-                        <input type="text" placeholder="Subtask title" value={subtaskForm.title} onChange={e => handleSubtaskChange('title', e.target.value)} onBlur={() => handleSubtaskBlur('title')} />
-                        <FieldError msg={subtaskErrors.title} />
-                      </div>
-                      <div className={`subtask-field ${isSubtaskFieldErr('branch') ? 'has-error' : ''}`}>
-                        <label>Branch <span className="req">*</span></label>
-                        <select value={subtaskForm.branch} onChange={e => handleSubtaskChange('branch', e.target.value)} onBlur={() => handleSubtaskBlur('branch')}>
-                          <option value="">Select branch</option>
-                          {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                        </select>
-                        <FieldError msg={subtaskErrors.branch} />
-                      </div>
-                      <div className={`subtask-field ${isSubtaskFieldErr('dept') ? 'has-error' : ''}`}>
-                        <label>Department <span className="req">*</span></label>
-                        <select value={subtaskForm.dept} onChange={e => handleSubtaskChange('dept', e.target.value)} onBlur={() => handleSubtaskBlur('dept')} disabled={!subtaskForm.branch}>
-                          <option value="">{!subtaskForm.branch ? 'Select branch first' : filteredDepts.length === 0 ? 'No departments' : 'Select department'}</option>
-                          {filteredDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                        </select>
-                        <FieldError msg={subtaskErrors.dept} />
-                      </div>
-                      <div className={`subtask-field ${isSubtaskFieldErr('assignee') ? 'has-error' : ''}`}>
-                        <label>Assign To <span className="req">*</span></label>
-                        <select value={subtaskForm.assignee} onChange={e => handleSubtaskChange('assignee', e.target.value)} onBlur={() => handleSubtaskBlur('assignee')} disabled={!subtaskForm.branch || !subtaskForm.dept}>
-                          <option value="">{!subtaskForm.branch || !subtaskForm.dept ? 'Select branch & dept first' : filteredEmployees.length === 0 ? 'No employees' : 'Select assignee'}</option>
-                          {filteredEmployees.map(m => <option key={m.id} value={m.id}>{cleanEmployeeName(m.name)}{m.roleName ? ` · ${m.roleName}` : ''}</option>)}
-                        </select>
-                        <FieldError msg={subtaskErrors.assignee} />
-                      </div>
-                      <div className="subtask-field">
-                        <label>Priority</label>
-                        <select value={subtaskForm.priority} onChange={e => handleSubtaskChange('priority', e.target.value)}>
-                          {PRIORITIES.map(p => <option key={p}>{p}</option>)}
-                        </select>
-                      </div>
-                      <div className={`subtask-field ${isSubtaskFieldErr('deadline') ? 'has-error' : ''}`}>
-                        <label>Deadline <span className="req">*</span></label>
-                        <input type="date" value={subtaskForm.deadline} onChange={e => handleSubtaskChange('deadline', e.target.value)} onBlur={() => handleSubtaskBlur('deadline')} min={new Date().toISOString().split('T')[0]} />
-                        <FieldError msg={subtaskErrors.deadline} />
-                      </div>
-                      <div className="subtask-field">
-                        <label>Estimated Effort</label>
-                        <input type="text" placeholder="e.g., 2 days" value={subtaskForm.effort} onChange={e => handleSubtaskChange('effort', e.target.value)} />
-                      </div>
-                      <div className="subtask-field" style={{ gridColumn: 'span 3' }}>
-                        <label>Description</label>
-                        <textarea rows={2} placeholder="Subtask description (optional)" value={subtaskForm.description} onChange={e => handleSubtaskChange('description', e.target.value)} />
-                      </div>
-                      <div className="subtask-field" style={{ gridColumn: 'span 3' }}>
-                        <label>Tags (comma-separated)</label>
-                        <input type="text" placeholder="e.g., Frontend, API, Testing" value={subtaskForm.tags} onChange={e => handleSubtaskChange('tags', e.target.value)} />
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-                      <button type="button" onClick={handleCancelSubtaskForm} style={{ padding: '8px 16px', border: '1px solid var(--border-medium)', borderRadius: 8, background: 'var(--bg-white)', cursor: 'pointer' }}>Cancel</button>
-                      <button type="submit" disabled={submitting} style={{ padding: '8px 20px', background: 'linear-gradient(135deg,var(--accent-indigo),var(--accent-indigo-light))', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {submitting
-                          ? <><span className="subtask-spinner" /> {editingSubtask ? 'Updating...' : 'Creating...'}</>
-                          : <><FaSave size={10} /> {editingSubtask ? 'Update Subtask' : 'Create Subtask'}</>}
-                      </button>
-                    </div>
-                  </form>
+                  <button type="button" className="tm-modal-close" onClick={handleCancelSubtaskForm}><FaTimes size={11} /></button>
                 </div>
-              )}
+                <form onSubmit={handleCreateOrUpdateSubtask}>
+                  <div className="tm-form-grid-3">
+                    <div className={`tm-field ${isSubtaskFieldErr('title') ? 'has-error' : ''} ${isSubtaskFieldOk('title') ? 'has-ok' : ''}`}>
+                      <div className="tm-field-label-row">
+                        <label>Title <span className="tm-req">*</span></label>
+                        <CharCount value={subtaskForm.title} max={100} />
+                      </div>
+                      <input type="text" maxLength={100} placeholder="Subtask title" value={subtaskForm.title} onChange={e => handleSubtaskChange('title', e.target.value)} onBlur={() => handleSubtaskBlur('title')} />
+                      <FieldError msg={subtaskErrors.title} />
+                    </div>
 
-              {/* Subtask Table */}
-              {filteredSubtasks.length > 0 ? (
-                <>
-                  <div ref={tableContainerRef} style={{ overflowX: 'auto', overflowY: 'visible' }}>
-                    <table className="subtask-table">
-                      <thead>
-                        <tr>
-                          <th>ID</th>
-                          <th>Title</th>
-                          <th>Assignee</th>
-                          <th>Priority</th>
-                          <th>Status</th>
-                          <th>Deadline</th>
-                          <th>Effort</th>
-                          <th style={{ textAlign: 'center' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedSubtasks.map(sub => {
-                          const availableStatuses = getAvailableStatuses(sub.status);
-                          const dueFmt = formatDate(sub.dueDate);
-                          const daysLeft = daysUntil(sub.dueDate);
-                          const isCompleted = sub.status === 'COMPLETED';
-                          
-                          let deadlineColor = 'var(--text-secondary)';
-                          if (!isCompleted && daysLeft !== null) {
-                            if (daysLeft < 0) deadlineColor = '#ef4444';
-                            else if (daysLeft <= 3) deadlineColor = '#f59e0b';
-                          }
+                    <div className={`tm-field ${isSubtaskFieldErr('branch') ? 'has-error' : ''}`}>
+                      <label>Branch <span className="tm-req">*</span></label>
+                      <select value={subtaskForm.branch} onChange={e => handleSubtaskChange('branch', e.target.value)} onBlur={() => handleSubtaskBlur('branch')}>
+                        <option value="">Select branch</option>
+                        {branches.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+                      </select>
+                      <FieldError msg={subtaskErrors.branch} />
+                    </div>
 
-                          return (
-                            <tr key={sub.id} style={{ opacity: isCompleted ? 0.7 : 1 }}>
-                              <td>
-                                <span style={{ fontFamily: 'monospace', fontSize: 11, background: isCompleted ? '#dcfce7' : '#ede9fe', color: isCompleted ? '#166534' : 'var(--accent-indigo)', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
-                                  T-{String(sub.id).padStart(3, '0')}
-                                </span>
-                              </td>
-                              <td>
-                                <div style={{ fontWeight: 500, color: isCompleted ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: isCompleted ? 'line-through' : 'none' }}>
-                                  {sub.title}
-                                </div>
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <MiniAvatar name={sub.assignedTo} size={22} />
-                                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{formatAssignee(sub.assignedTo)}</span>
-                                </div>
-                              </td>
-                              <td>
-                                <span style={{ background: PRIORITY_BG[priKey(sub.priority)] || '#f1f5f9', color: PRIORITY_COLORS[priKey(sub.priority)] || '#475569', padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600 }}>
-                                  {priKey(sub.priority)}
-                                </span>
-                              </td>
-                              <td>
-                                <StatusBadge
-                                  status={sub.status}
-                                  showDropdown={availableStatuses.length > 0}
-                                  onClick={(e) => handleStatusClick(sub.id, e)}
-                                  disabled={actionBusy}
-                                />
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <FaCalendarAlt size={10} color={deadlineColor} />
-                                  <span style={{ fontSize: 12, color: deadlineColor, fontWeight: 500 }}>{dueFmt}</span>
-                                  {!isCompleted && daysLeft !== null && daysLeft <= 7 && daysLeft >= 0 && (
-                                    <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 2 }}>({daysLeft}d)</span>
-                                  )}
-                                </div>
-                              </td>
-                              <td>
-                                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{normaliseEffort(sub.effort || sub.effortEstimate)}</span>
-                              </td>
-                              <td style={{ textAlign: 'center' }}>
-                                <button
-                                  onClick={() => handleEditSubtask(sub)}
-                                  style={{ width: 28, height: 28, background: '#fef3c7', border: 'none', borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#b45309' }}
-                                  title="Edit subtask"
-                                >
-                                  <FaEdit size={11} />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                    <div className={`tm-field ${isSubtaskFieldErr('dept') ? 'has-error' : ''}`}>
+                      <label>Department <span className="tm-req">*</span></label>
+                      <select value={subtaskForm.dept} onChange={e => handleSubtaskChange('dept', e.target.value)} onBlur={() => handleSubtaskBlur('dept')} disabled={!subtaskForm.branch}>
+                        <option value="">{!subtaskForm.branch ? 'Select branch first' : filteredDepts.length === 0 ? 'No departments' : 'Select department'}</option>
+                        {filteredDepts.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
+                      </select>
+                      <FieldError msg={subtaskErrors.dept} />
+                    </div>
+
+                    <div className={`tm-field ${isSubtaskFieldErr('assignee') ? 'has-error' : ''}`}>
+                      <label>Assign To <span className="tm-req">*</span></label>
+                      <select value={subtaskForm.assignee} onChange={e => handleSubtaskChange('assignee', e.target.value)} onBlur={() => handleSubtaskBlur('assignee')} disabled={!subtaskForm.branch || !subtaskForm.dept}>
+                        <option value="">{!subtaskForm.branch || !subtaskForm.dept ? 'Select branch & dept first' : filteredEmployees.length === 0 ? 'No employees' : 'Select assignee'}</option>
+                        {filteredEmployees.map(m => <option key={m.id} value={String(m.id)}>{cleanPersonName(m.name)}{m.roleName ? ` · ${m.roleName}` : ''}</option>)}
+                      </select>
+                      <FieldError msg={subtaskErrors.assignee} />
+                    </div>
+
+                    <div className="tm-field">
+                      <label>Priority</label>
+                      <select value={subtaskForm.priority} onChange={e => handleSubtaskChange('priority', e.target.value)}>
+                        {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+                      </select>
+                    </div>
+
+                    <div className={`tm-field ${isSubtaskFieldErr('deadline') ? 'has-error' : ''}`}>
+                      <label>Deadline <span className="tm-req">*</span></label>
+                      <input
+                        type="date"
+                        value={subtaskForm.deadline}
+                        onChange={e => handleSubtaskChange('deadline', e.target.value)}
+                        onBlur={() => handleSubtaskBlur('deadline')}
+                        min={!editingSubtask ? new Date().toISOString().split('T')[0] : undefined}
+                      />
+                      <FieldError msg={subtaskErrors.deadline} />
+                    </div>
+
+                    <div className="tm-field">
+                      <label>Estimated Effort</label>
+                      <input type="text" placeholder="Auto-fills on date selection" value={subtaskForm.effort} onChange={e => handleSubtaskChange('effort', e.target.value)} />
+                    </div>
+
+                    <div className="tm-field">
+                      <label>Tags</label>
+                      <input type="text" placeholder="e.g., Frontend, API" value={subtaskForm.tags} onChange={e => handleSubtaskChange('tags', e.target.value)} />
+                    </div>
+
+                    <div className="tm-field tm-col-span-full">
+                      <label>Description</label>
+                      <textarea rows={2} placeholder="Subtask description (optional)" value={subtaskForm.description} onChange={e => handleSubtaskChange('description', e.target.value)} />
+                    </div>
                   </div>
 
-                  {/* Pagination */}
-                  {totalSubtaskPages > 1 && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginTop: 20, paddingTop: 12, borderTop: '1px solid var(--border-light)' }}>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 8 }}>
-                        Page {subtaskCurrentPage} of {totalSubtaskPages}
-                      </span>
-                      <button className="pagination-btn" onClick={() => setSubtaskCurrentPage(1)} disabled={subtaskCurrentPage === 1}>
-                        <FaChevronLeft size={10} /><FaChevronLeft size={10} style={{ marginLeft: -4 }} />
-                      </button>
-                      <button className="pagination-btn" onClick={() => setSubtaskCurrentPage(p => Math.max(1, p - 1))} disabled={subtaskCurrentPage === 1}>
-                        <FaChevronLeft size={12} />
-                      </button>
-                      {[...Array(Math.min(5, totalSubtaskPages))].map((_, i) => {
-                        let pageNum;
-                        if (totalSubtaskPages <= 5) pageNum = i + 1;
-                        else if (subtaskCurrentPage <= 3) pageNum = i + 1;
-                        else if (subtaskCurrentPage >= totalSubtaskPages - 2) pageNum = totalSubtaskPages - 4 + i;
-                        else pageNum = subtaskCurrentPage - 2 + i;
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+                    <button type="button" className="tm-btn tm-btn-secondary" onClick={handleCancelSubtaskForm}>Cancel</button>
+                    <button type="submit" className="tm-btn tm-btn-primary" disabled={submitting}>
+                      {submitting
+                        ? <><span className="tm-spinner" /> {editingSubtask ? 'Updating...' : 'Creating...'}</>
+                        : <><FaSave size={11} /> {editingSubtask ? 'Update Subtask' : 'Create Subtask'}</>}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {filteredSubtasks.length > 0 ? (
+              <>
+                <div className="tm-table-scroll">
+                  <table className="tm-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Assignee</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Deadline</th>
+                        <th>Effort</th>
+                        <th className="tm-th-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedSubtasks.map(sub => {
+                        const subAvailableStatuses = getAvailableStatuses(sub.status);
+                        const dueFmt = formatDate(sub.dueDate);
+                        const daysLeft = daysUntil(sub.dueDate);
+                        const isCompleted = sub.status === 'COMPLETED';
+                        const isSubAssignee = !!myId && String(sub.assignedToId) === String(myId);
+                        const canChangeSubStatus = subAvailableStatuses.length > 0 && (isSubAssignee || canManageSubtasks);
+
+                        let dateClass = '';
+                        if (!isCompleted && daysLeft !== null) {
+                          if (daysLeft < 0) dateClass = 'tm-cell-date--overdue';
+                          else if (daysLeft <= 3) dateClass = 'tm-cell-date--soon';
+                        }
+
                         return (
-                          <button key={pageNum} className={`pagination-btn ${pageNum === subtaskCurrentPage ? 'active' : ''}`} onClick={() => setSubtaskCurrentPage(pageNum)} style={{ fontSize: 12 }}>
-                            {pageNum}
-                          </button>
+                          <tr key={sub.id} style={{ opacity: isCompleted ? 0.78 : 1 }}>
+                            <td>
+                              <button
+                                type="button"
+                                className={`tm-id-badge ${isCompleted ? 'tm-id-badge--done' : ''}`}
+                                style={{ border: 'none', cursor: 'pointer' }}
+                                onClick={() => navigate('/TaskDetail', { state: { taskId: sub.id } })}
+                                title="Open subtask workspace"
+                              >
+                                T-{String(sub.id).padStart(3, '0')}
+                              </button>
+                            </td>
+                            <td>
+                              <div
+                                className="tm-cell-title"
+                                style={{
+                                  color: isCompleted ? 'var(--tm-text-muted)' : undefined,
+                                  textDecoration: isCompleted ? 'line-through' : 'none',
+                                  cursor: 'pointer',
+                                }}
+                                title={sub.title}
+                                onClick={() => navigate('/TaskDetail', { state: { taskId: sub.id } })}
+                              >
+                                {sub.title}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
+                                <MiniAvatar name={sub.assignedTo} size={22} />
+                                <span style={{ color: 'var(--tm-text-secondary)' }}>{cleanPersonName(sub.assignedTo) || 'Unassigned'}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <span className="tm-status-badge" style={{ background: PRIORITY_BG[priKey(sub.priority)] || '#f1f5f9', color: PRIORITY_COLORS[priKey(sub.priority)] || '#475569' }}>
+                                {priKey(sub.priority)}
+                              </span>
+                            </td>
+                            <td data-status-trigger="true">
+                              <StatusBadge
+                                status={sub.status}
+                                showDropdown={canChangeSubStatus}
+                                onClick={(e) => handleStatusClick(sub.id, e)}
+                                disabled={actionBusy}
+                              />
+                            </td>
+                            <td>
+                              <span className={`tm-cell-date ${dateClass}`}>
+                                <FaCalendarAlt size={10} />
+                                {dueFmt}
+                              </span>
+                            </td>
+                            <td style={{ whiteSpace: 'nowrap', color: 'var(--tm-text-secondary)' }}>
+                              {normaliseEffort(sub.effort || sub.effortEstimate)}
+                            </td>
+                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'inline-flex', gap: 6 }}>
+                                <button
+                                  type="button"
+                                  className="tm-icon-action tm-icon-action--primary"
+                                  onClick={() => navigate('/TaskDetail', { state: { taskId: sub.id } })}
+                                  title="Open subtask workspace"
+                                >
+                                  <FaEye size={11} />
+                                </button>
+                                {canManageSubtasks && (
+                                  <button
+                                    type="button"
+                                    className="tm-icon-action tm-icon-action--amber"
+                                    onClick={() => handleEditSubtask(sub)}
+                                    title="Edit subtask"
+                                  >
+                                    <FaEdit size={11} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
                         );
                       })}
-                      <button className="pagination-btn" onClick={() => setSubtaskCurrentPage(p => Math.min(totalSubtaskPages, p + 1))} disabled={subtaskCurrentPage === totalSubtaskPages}>
-                        <FaChevronRight size={12} />
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="tm-pagination-bar" style={{ margin: '14px -20px -18px' }}>
+                  <span className="tm-pagination-info">
+                    Showing <strong>{startItemIndex}</strong>–<strong>{endItemIndex}</strong> of <strong>{filteredSubtasks.length}</strong> subtasks
+                  </span>
+
+                  {totalSubtaskPages > 1 && (
+                    <div className="tm-pagination-controls">
+                      <button
+                        type="button"
+                        className="tm-pg-btn"
+                        onClick={() => setSubtaskCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={subtaskCurrentPage === 1}
+                      >
+                        <FaChevronLeft size={10} />
                       </button>
-                      <button className="pagination-btn" onClick={() => setSubtaskCurrentPage(totalSubtaskPages)} disabled={subtaskCurrentPage === totalSubtaskPages}>
-                        <FaChevronRight size={10} /><FaChevronRight size={10} style={{ marginLeft: -4 }} />
+
+                      {getPageNumbers().map((pageItem, idx) =>
+                        pageItem === '...' ? (
+                          <span key={`ellipsis-${idx}`} style={{ padding: '0 6px', fontSize: 12, color: 'var(--tm-text-muted)' }}>…</span>
+                        ) : (
+                          <button
+                            key={pageItem}
+                            type="button"
+                            className={`tm-pg-btn ${pageItem === subtaskCurrentPage ? 'active' : ''}`}
+                            onClick={() => setSubtaskCurrentPage(pageItem)}
+                          >
+                            {pageItem}
+                          </button>
+                        )
+                      )}
+
+                      <button
+                        type="button"
+                        className="tm-pg-btn"
+                        onClick={() => setSubtaskCurrentPage(p => Math.min(totalSubtaskPages, p + 1))}
+                        disabled={subtaskCurrentPage === totalSubtaskPages}
+                      >
+                        <FaChevronRight size={10} />
                       </button>
                     </div>
                   )}
-                </>
+                </div>
+              </>
+            ) : (
+              !showSubtaskForm && (
+                <div className="tm-table-empty">
+                  <FaTasks style={{ fontSize: 30, opacity: 0.3, marginBottom: 10 }} />
+                  <p style={{ fontSize: 13, margin: 0 }}>
+                    {subtaskSearchTerm || subtaskStatusFilter !== 'ALL'
+                      ? 'No subtasks match the current filter.'
+                      : 'No subtasks created under this task yet.'}
+                  </p>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: DAILY WORK */}
+      {activeTab === 'dailywork' && (
+        <div className="tm-col-stack">
+          {isAssignedUser ? (
+            <DailyWorkReport
+              tasks={[task, ...(task.subtasks || [])]}
+              selectedDate={formatIsoDate(new Date())}
+              onSubmitted={fetchTaskAndSubmissions}
+            />
+          ) : (
+            <div className="tm-card tm-card--padded">
+              <h3 className="tm-card-title" style={{ marginBottom: 8 }}>Daily Work Logs</h3>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--tm-text-muted)' }}>
+                Daily work reports submitted by {cleanPersonName(task.assignedTo) || 'the assignee'} appear in the Submissions and Feedback tabs.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: SUBMISSIONS */}
+      {activeTab === 'submissions' && (
+        <SubmissionsPanel taskId={task.id} canReview={canReviewSubmission} onChanged={fetchTaskAndSubmissions} />
+      )}
+
+      {/* TAB 5: FEEDBACK & COMMENTS */}
+      {activeTab === 'feedback' && (
+        <div className="tm-col-stack">
+          {/* Manager Review Feedback from Submissions */}
+          <div className="tm-card">
+            <div className="tm-card-header">
+              <h3 className="tm-card-title">Manager Review Feedback ({reviewedFeedbacks.length})</h3>
+            </div>
+            <div className="tm-card-body">
+              {reviewedFeedbacks.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--tm-text-muted)' }}>No review feedback recorded yet.</p>
               ) : (
-                !showSubtaskForm && (
-                  <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-                    <FaTasks style={{ fontSize: 36, opacity: 0.3, marginBottom: 12 }} />
-                    <p style={{ fontSize: 13, margin: 0 }}>
-                      {subtaskSearchTerm ? 'No subtasks match your search.' : 'No sub-tasks yet. Click "Add Subtask" to create one.'}
-                    </p>
-                  </div>
-                )
+                reviewedFeedbacks.map(sub => {
+                  const parsed = parseReview(sub.reviewComment);
+                  return (
+                    <div key={sub.id} className="tm-feedback-item">
+                      <div className="tm-submission-head">
+                        <span className="tm-submission-author">
+                          {sub.reviewedBy ? `Reviewed by ${cleanPersonName(sub.reviewedBy)}` : 'Submission Review'}
+                        </span>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          {parsed.rating && (
+                            <span className="tm-count-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <FaStar size={9} /> {parsed.rating}
+                            </span>
+                          )}
+                          <span className="tm-mini-tag" style={{ background: sub.status === 'APPROVED' ? '#dcfce7' : '#fee2e2', color: sub.status === 'APPROVED' ? '#166534' : '#991b1b' }}>
+                            {sub.status}
+                          </span>
+                        </div>
+                      </div>
+                      <p style={{ margin: 0, fontSize: 13.5, color: 'var(--tm-text-secondary)' }}>
+                        {parsed.feedback || 'No written comment.'}
+                      </p>
+                    </div>
+                  );
+                })
               )}
+            </div>
+          </div>
+
+          {/* Task Discussion Comments */}
+          <div className="tm-card">
+            <div className="tm-card-header">
+              <h3 className="tm-card-title">Task Comments ({(task.comments || []).length})</h3>
+            </div>
+            <div className="tm-card-body">
+              {(task.comments || []).map((c, i) => (
+                <div key={c.id || i} className="tm-comment-row">
+                  <MiniAvatar name={c.author} size={32} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--tm-text-primary)' }}>{cleanPersonName(c.author) || 'User'}</span>
+                      <span style={{ fontSize: 11, color: 'var(--tm-text-muted)' }}>
+                        {c.createdAt ? new Date(c.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : ''}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 13.5, color: 'var(--tm-text-secondary)', lineHeight: 1.5, margin: 0 }}>{c.comment}</p>
+                  </div>
+                </div>
+              ))}
+              {!(task.comments || []).length && (
+                <div className="tm-table-empty" style={{ padding: 20 }}>
+                  No comments yet.
+                </div>
+              )}
+              <div className="tm-comment-composer">
+                <div style={{ flex: 1 }}>
+                  <textarea className="tm-textarea" value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Write a comment…" style={{ minHeight: 74 }} />
+                </div>
+                <button type="button" className="tm-btn tm-btn-primary" onClick={handleComment} disabled={!commentText.trim() || submitting}>
+                  <FaComment size={11} /> {submitting ? 'Sending…' : 'Send'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Fixed Position Status Dropdown - Rendered at root level using Portal */}
+      {/* TAB 6: ACTIVITY HISTORY */}
+      {activeTab === 'activity' && (
+        <div className="tm-card">
+          <div className="tm-card-header">
+            <h3 className="tm-card-title">Activity History</h3>
+          </div>
+          <div className="tm-card-body">
+            {activityEvents.length > 0 ? (
+              <div className="tm-timeline">
+                {activityEvents.map((ev, idx) => (
+                  <div key={ev.id} className="tm-timeline-item">
+                    {idx < activityEvents.length - 1 && (
+                      <div className="tm-timeline-line" />
+                    )}
+                    <div className="tm-timeline-icon" style={{ background: `${ev.color}18`, border: `1.5px solid ${ev.color}44` }}>
+                      {ev.icon}
+                    </div>
+                    <div className="tm-timeline-box">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 3 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--tm-text-primary)' }}>{ev.title}</span>
+                        {ev.time && (
+                          <span style={{ fontSize: 11, color: 'var(--tm-text-muted)' }}>
+                            {new Date(ev.time).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: 'var(--tm-text-secondary)' }}>{ev.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="tm-table-empty">
+                No activity recorded yet.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Portal Status Dropdown */}
       {dropdownState.open && openSubtask && availableStatuses.length > 0 && ReactDOM.createPortal(
         <div
           ref={dropdownRef}
-          className="status-dropdown"
+          data-status-portal="true"
+          className="tm-status-dropdown"
           style={{
             position: 'fixed',
             top: `${dropdownState.position.top}px`,
@@ -1108,19 +1598,20 @@ export default function TaskDetail({ user }) {
         >
           {availableStatuses.map(status => {
             const icons = {
-              IN_PROGRESS:      <FaCheckCircle size={11} color="#1e40af" />,
-              IN_REVIEW:        <FaSearch size={11} color="#5b21b6" />,
-              COMPLETED:        <FaCheck size={11} color="#166534" />,
-              CHANGE_REQUESTED: <FaExchangeAlt size={11} color="#c2410c" />,
-              REJECTED:         <FaBan size={11} color="#991b1b" />,
+              IN_PROGRESS:      <FaCheckCircle size={12} color="#1e40af" />,
+              IN_REVIEW:        <FaSearch size={12} color="#92400e" />,
+              COMPLETED:        <FaCheck size={12} color="#166534" />,
+              CHANGE_REQUESTED: <FaExchangeAlt size={12} color="#c2410c" />,
+              REJECTED:         <FaBan size={12} color="#991b1b" />,
             };
             return (
               <button
                 key={status}
-                className="status-dropdown-item"
-                onClick={() => updateSubtaskStatus(openSubtask.id, status)}
+                type="button"
+                className="tm-status-dropdown-item"
+                onClick={() => handleStatusChange(openSubtask.id, status, true)}
               >
-                {icons[status] || <FaClock size={11} color="#92400e" />}
+                {icons[status] || <FaClock size={12} color="#92400e" />}
                 {STATUS_LABELS[status]}
               </button>
             );
@@ -1129,92 +1620,35 @@ export default function TaskDetail({ user }) {
         document.body
       )}
 
-      {/* ACTIVITY TAB */}
-      {activeTab === 'activity' && (
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 18, overflow: 'hidden' }}>
-          <div style={{ padding: '15px 20px', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-surface)' }}>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>📜 Activity Log</h3>
-          </div>
-          <div style={{ padding: 20 }}>
-            <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: 36, opacity: .3, marginBottom: 14 }}>📜</div>
-              <p style={{ fontSize: 13 }}>Activity log coming soon...</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* COMMENTS TAB */}
-      {activeTab === 'comments' && (
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 18, overflow: 'hidden' }}>
-          <div style={{ padding: '15px 20px', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-surface)' }}>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>💬 Comments</h3>
-          </div>
-          <div style={{ padding: 20 }}>
-            {(task.comments || []).map((c, i) => (
-              <div key={c.id || i} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
-                <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg,var(--accent-teal),var(--accent-teal-light))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-                  {(c.author || '?').charAt(0)}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{formatAssignee(c.author)}</span>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      {c.createdAt ? new Date(c.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : ''}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>{c.comment}</p>
-                </div>
-              </div>
-            ))}
-            {!(task.comments || []).length && (
-              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', marginBottom: 16 }}>
-                <div style={{ fontSize: 28, opacity: .3 }}>💬</div>
-                <p style={{ fontSize: 13 }}>No comments yet. Be first!</p>
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', paddingTop: 14, borderTop: '1px solid var(--border-light)' }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg,var(--accent-indigo),var(--accent-teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-                {(currentUser?.name || currentUser?.firstName || 'Y').charAt(0)}
-              </div>
-              <div style={{ flex: 1 }}>
-                <textarea className="td-ta" value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Add a comment…" style={{ width: '100%', padding: '10px 13px', border: '1.5px solid var(--border-medium)', borderRadius: 11, fontFamily: "'DM Sans',sans-serif", fontSize: 13.5, color: 'var(--text-primary)', background: 'var(--bg-surface)', resize: 'vertical', minHeight: 76 }} />
-              </div>
-              <button onClick={handleComment} disabled={!commentText.trim() || submitting} style={{ background: 'linear-gradient(135deg,var(--accent-indigo),var(--accent-indigo-light))', border: 'none', color: '#fff', padding: '9px 16px', borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: commentText.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 6, opacity: commentText.trim() ? 1 : .6 }}>
-                <FaComment size={11} /> {submitting ? 'Sending…' : 'Send'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Change Request Modal */}
       {showCRModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>↩ Request Change</h3>
-              <button onClick={() => { setShowCRModal(false); setCrTaskId(null); }} style={{ background: 'var(--bg-surface)', border: 'none', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 15, color: 'var(--text-muted)' }}>✕</button>
+        <div className="tm-modal-overlay">
+          <div className="tm-modal-card">
+            <div className="tm-modal-head">
+              <h3 className="tm-modal-title"><FaExchangeAlt size={13} color="#d97706" /> Request Change</h3>
+              <button type="button" className="tm-modal-close" onClick={() => { setShowCRModal(false); setCrTaskId(null); }}><FaTimes size={12} /></button>
             </div>
-            <div style={{ padding: '20px 24px' }}>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 5 }}>Reason for Change <span style={{ color: 'var(--danger)' }}>*</span></label>
-                <textarea className="td-ta" value={crReason} onChange={e => setCrReason(e.target.value)} placeholder="Describe why you need a change…" style={{ width: '100%', padding: '10px 13px', border: '1.5px solid var(--border-medium)', borderRadius: 10, fontFamily: "'DM Sans',sans-serif", fontSize: 13.5, background: 'var(--bg-surface)', resize: 'vertical', minHeight: 80, color: 'var(--text-primary)' }} />
+            <div className="tm-modal-body">
+              <div className="tm-field" style={{ marginBottom: 14 }}>
+                <label>Reason for Change <span className="tm-req">*</span></label>
+                <textarea rows={3} value={crReason} onChange={e => setCrReason(e.target.value)} placeholder="Describe why you need a change…" />
               </div>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 5 }}>Requested New Deadline (optional)</label>
-                <input type="date" value={crDeadline} onChange={e => setCrDeadline(e.target.value)} style={{ padding: '10px 13px', border: '1.5px solid var(--border-medium)', borderRadius: 10, fontSize: 14, fontFamily: "'DM Sans',sans-serif", color: 'var(--text-primary)', background: 'var(--bg-surface)', width: '100%', outline: 'none' }} />
+              <div className="tm-field">
+                <label>Requested New Deadline (optional)</label>
+                <input type="date" value={crDeadline} onChange={e => setCrDeadline(e.target.value)} />
               </div>
             </div>
-            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--border-light)', background: 'var(--bg-surface)', display: 'flex', justifyContent: 'flex-end', gap: 10, borderRadius: '0 0 22px 22px' }}>
-              <button onClick={() => { setShowCRModal(false); setCrTaskId(null); }} style={{ background: 'var(--bg-white)', border: '1.5px solid var(--border-medium)', color: 'var(--text-secondary)', padding: '9px 18px', borderRadius: 10, fontWeight: 500, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleSendChange} disabled={!crReason.trim() || actionBusy} style={{ background: 'transparent', border: '1.5px solid var(--warning)', color: 'var(--warning)', padding: '9px 18px', borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: crReason.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 6, opacity: crReason.trim() ? 1 : .6 }}>
+            <div className="tm-modal-foot">
+              <button type="button" className="tm-btn tm-btn-secondary" onClick={() => { setShowCRModal(false); setCrTaskId(null); }}>Cancel</button>
+              <button type="button" className="tm-btn tm-btn-primary" style={{ background: '#d97706', borderColor: '#d97706' }} onClick={handleSendChange} disabled={!crReason.trim() || actionBusy}>
                 <FaExchangeAlt size={11} /> Send Request
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {showSubmitWork && <SubmitWorkModal task={task} onClose={() => setShowSubmitWork(false)} onDone={fetchTaskAndSubmissions} />}
     </div>
   );
 }

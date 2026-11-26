@@ -1,25 +1,30 @@
+
+
+
+
+
+
+
+
 import { useState, useEffect, useCallback } from 'react';
 import { FaSearch, FaTimes, FaPlus, FaClock, FaFilter, FaSpinner, FaSave, FaArrowLeft, FaExclamationCircle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import axios from 'axios';
-import { API_ENDPOINTS, STORAGE_KEYS, extractArray } from '../config/api.config';
+import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
 import LoadingSpinner from '../components/LoadingSpinner';
-
-const DEFAULT_LEAVE_TYPES = [
-  { id: 1, name: "Casual Leave", maxDaysPerYear: 12, isActive: true },
-  { id: 2, name: "Sick Leave", maxDaysPerYear: 10, isActive: true },
-  { id: 3, name: "Earned Leave", maxDaysPerYear: 15, isActive: true },
-  { id: 4, name: "Compensatory Off", maxDaysPerYear: 5, isActive: true },
-  { id: 5, name: "Maternity / Paternity Leave", maxDaysPerYear: 90, isActive: true },
-];
-
+const records = (body) => {
+  if (Number(body?.status) >= 400) throw new Error(body.message || 'Request failed');
+  const data = body?.response ?? body?.data ?? body;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.content)) return data.content;
+  throw new Error('Unexpected API response');
+};
 const FieldError = ({ msg }) =>
   msg ? (
     <span className="field-err">
       <FaExclamationCircle size={10} /> {msg}
     </span>
   ) : null;
-
 const LeaveManagement = ({ user }) => {
   // ---------- State ----------
   const [leaves, setLeaves] = useState([]);
@@ -32,10 +37,8 @@ const LeaveManagement = ({ user }) => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
-  
   const [currentUser, setCurrentUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
-
   // Form state
   const [formData, setFormData] = useState({
     employeeName: "",
@@ -46,11 +49,10 @@ const LeaveManagement = ({ user }) => {
     halfDaySession: "MORNING",
     reason: "",
   });
-  const [leaveTypes, setLeaveTypes] = useState(DEFAULT_LEAVE_TYPES);
+  const [leaveTypes, setLeaveTypes] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-
   const getAuthHeaders = () => {
     const rawToken = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN) || 
                      localStorage.getItem('jwtToken') || 
@@ -61,7 +63,6 @@ const LeaveManagement = ({ user }) => {
       'Content-Type': 'application/json',
     };
   };
-
   // Fetch current user
   const fetchCurrentUser = useCallback(async () => {
     setLoadingUser(true);
@@ -69,7 +70,6 @@ const LeaveManagement = ({ user }) => {
       let resolvedName = '';
       let resolvedEmail = '';
       let resolvedEmpId = localStorage.getItem(STORAGE_KEYS.EMPLOYEE_ID) || '';
-
       try {
         const response = await axios.get(API_ENDPOINTS.GET_CURRENT, { headers: getAuthHeaders() });
         const responseData = response.data;
@@ -91,7 +91,6 @@ const LeaveManagement = ({ user }) => {
       } catch (apiErr) {
         console.warn('GET_CURRENT note:', apiErr?.message);
       }
-
       if (!resolvedName) {
         const storedUser = localStorage.getItem(STORAGE_KEYS.USER_DATA);
         if (storedUser) {
@@ -105,11 +104,9 @@ const LeaveManagement = ({ user }) => {
           } catch {}
         }
       }
-
       if (!resolvedName) {
         resolvedName = localStorage.getItem(STORAGE_KEYS.USERNAME) || 'Employee';
       }
-
       setCurrentUser({ 
         name: resolvedName, 
         email: resolvedEmail, 
@@ -124,79 +121,33 @@ const LeaveManagement = ({ user }) => {
       setLoadingUser(false);
     }
   }, []);
-
   // Fetch leave types
   const fetchLeaveTypes = useCallback(async () => {
     try {
-      let rawList = [];
-      try {
-        const response = await axios.get(API_ENDPOINTS.LEAVE_TYPES, {
-          headers: getAuthHeaders(),
-        });
-        rawList = extractArray(response.data);
-      } catch (err) {
-        console.warn('Initial LEAVE_TYPES fetch note:', err?.message);
-      }
-
-      // If empty, try with flag=0 query parameter (as in Masters/Leave)
-      if (!rawList || rawList.length === 0) {
-        try {
-          const resFallback = await axios.get(`${API_ENDPOINTS.LEAVE_TYPES}?flag=0`, {
-            headers: getAuthHeaders(),
-          });
-          rawList = extractArray(resFallback.data);
-        } catch (err) {
-          console.warn('Fallback flag=0 leave types fetch note:', err?.message);
-        }
-      }
-
-      let normalized = (rawList || []).map(item => ({
-        id: item.id ?? item.leaveTypeId ?? item._id,
-        name: item.name ?? item.leaveTypeName ?? item.leaveType ?? 'Leave',
-        maxDaysPerYear: item.maxDaysPerYear || 0,
-        isActive: item.isActive !== false
-      })).filter(item => item.id != null);
-
-      if (normalized.length === 0) {
-        normalized = DEFAULT_LEAVE_TYPES;
-      }
-
-      setLeaveTypes(normalized);
-    } catch (error) {
-      console.error('Error fetching leave types:', error);
-      setLeaveTypes(DEFAULT_LEAVE_TYPES);
-    }
+      const { data } = await axios.get(API_ENDPOINTS.LEAVE_TYPES, { headers: getAuthHeaders(), params: { flag: 0 } });
+      setLeaveTypes(records(data).filter(t => t.isActive === true && t.id != null));
+    } catch (error) { setLeaveTypes([]); toast.error('Error', error.message || 'Failed to load leave types'); }
   }, []);
-
   // Fetch my leaves
   const fetchMyLeaves = useCallback(async () => {
     setLoading(true);
     try {
-      let serverData = [];
-      try {
-        const response = await axios.get(API_ENDPOINTS.GET_MY_LEAVES, { headers: getAuthHeaders() });
-        const responseData = response.data;
-        if (responseData?.status === 200 && Array.isArray(responseData.response)) serverData = responseData.response;
-        else if (Array.isArray(responseData)) serverData = responseData;
-        else if (responseData?.data && Array.isArray(responseData.data)) serverData = responseData.data;
-      } catch (err) {
-        console.warn('GET_MY_LEAVES fetch note:', err?.message);
-      }
-      
+      const { data } = await axios.get(API_ENDPOINTS.GET_MY_LEAVES, { headers: getAuthHeaders() });
+      const serverData = records(data);
       const transformedData = (serverData || []).map(leave => {
         const typeName = typeof leave.leaveType === 'object' 
           ? (leave.leaveType?.name || leave.leaveType?.leaveTypeName || 'Leave')
           : (leave.leaveType || leave.leaveTypeName || 'Leave');
-        const days = leave.totalDays != null ? leave.totalDays : (leave.days != null ? leave.days : 1);
+        const days = leave.totalDays != null ? leave.totalDays : (leave.days ?? null);
         return {
-          id: leave.leaveId || leave.id || leave._id || String(Math.random()),
+          id: leave.leaveId || leave.id || leave._id,
           leaveType: { name: typeName },
           leaveTypeName: typeName,
           startDate: leave.startDate,
           endDate: leave.endDate || leave.startDate,
           totalDays: days,
           days: days,
-          status: (leave.status || 'PENDING').toUpperCase(),
+          status: String(leave.status || 'UNKNOWN').toUpperCase(),
           reason: leave.reason || '',
           createdAt: leave.appliedDate || leave.createdAt || leave.startDate,
           appliedDate: leave.appliedDate || leave.startDate,
@@ -204,24 +155,10 @@ const LeaveManagement = ({ user }) => {
           halfDaySession: leave.halfDaySession || null
         };
       });
-
-      // Merge with locally stored applied leaves if not already present
-      const localLeaves = JSON.parse(localStorage.getItem('hrms_applied_leaves') || '[]');
-      const merged = [...transformedData];
-      for (const loc of localLeaves) {
-        const exists = merged.some(m => 
-          (m.startDate === loc.startDate && m.endDate === loc.endDate && m.leaveTypeName === loc.leaveTypeName) ||
-          (m.id && String(m.id) === String(loc.id))
-        );
-        if (!exists) {
-          merged.unshift(loc);
-        }
-      }
-      
+      const merged = transformedData;
       setLeaves(merged);
       setTotalElements(merged.length);
       setTotalPages(Math.ceil(merged.length / size));
-      
       const total = merged.length;
       const pending = merged.filter(l => l.status === 'PENDING' || l.status === 'PENDING_L2').length;
       const approved = merged.filter(l => l.status === 'APPROVED').length;
@@ -231,11 +168,11 @@ const LeaveManagement = ({ user }) => {
       console.error('Error fetching my leaves:', error);
       toast.error('Error', 'Failed to load your leave requests');
       setLeaves([]);
+      setStats({ total: 0, pending: 0, approved: 0, rejected: 0 });
     } finally {
       setLoading(false);
     }
   }, [size]);
-
   useEffect(() => {
     const init = async () => {
       await fetchCurrentUser();
@@ -244,7 +181,6 @@ const LeaveManagement = ({ user }) => {
     };
     init();
   }, [fetchCurrentUser, fetchLeaveTypes, fetchMyLeaves]);
-
   const getFilteredLeaves = useCallback(() => {
     const leavesArray = Array.isArray(leaves) ? leaves : [];
     if (!debouncedSearch.trim()) return leavesArray;
@@ -255,7 +191,6 @@ const LeaveManagement = ({ user }) => {
       (leave.status?.toLowerCase() || '').includes(term)
     );
   }, [leaves, debouncedSearch]);
-
   const filteredLeaves = getFilteredLeaves();
   const getPaginatedLeaves = () => {
     if (!Array.isArray(filteredLeaves)) return [];
@@ -263,7 +198,6 @@ const LeaveManagement = ({ user }) => {
     return filteredLeaves.slice(start, start + size);
   };
   const paginatedLeaves = getPaginatedLeaves();
-
   useEffect(() => {
     const filtered = getFilteredLeaves();
     const total = filtered.length;
@@ -271,12 +205,10 @@ const LeaveManagement = ({ user }) => {
     setTotalElements(total);
     if (page !== 0 && total > 0) setPage(0);
   }, [debouncedSearch, leaves]);
-
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
     return () => clearTimeout(timer);
   }, [searchTerm]);
-
   const validateField = (field, value) => {
     switch(field) {
       case 'leaveTypeId': if (!value) return 'Leave type is required'; return '';
@@ -295,17 +227,14 @@ const LeaveManagement = ({ user }) => {
       default: return '';
     }
   };
-
   const handleBlur = (field) => {
     setTouched(prev => ({ ...prev, [field]: true }));
     const error = validateField(field, formData[field]);
     setErrors(prev => ({ ...prev, [field]: error }));
   };
-
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     const newValue = type === "checkbox" ? checked : value;
-    
     setFormData(prev => {
       const updated = { ...prev, [name]: newValue };
       if (name === 'isHalfDay' && newValue) {
@@ -319,15 +248,14 @@ const LeaveManagement = ({ user }) => {
       }
       return updated;
     });
-
     if (touched[name]) {
       const error = validateField(name, newValue);
       setErrors(prev => ({ ...prev, [name]: error }));
     }
   };
-
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     const fieldsToValidate = ['leaveTypeId', 'startDate', 'reason'];
     if (!formData.isHalfDay) fieldsToValidate.push('endDate');
     const newErrors = {};
@@ -343,80 +271,16 @@ const LeaveManagement = ({ user }) => {
     }
     setSubmitting(true);
     try {
-      const selectedType = leaveTypes.find(t => String(t.id) === String(formData.leaveTypeId));
-      const typeName = selectedType ? selectedType.name : 'Leave';
-
-      let totalDays = 1;
-      if (formData.isHalfDay) {
-        totalDays = 0.5;
-      } else if (formData.startDate && formData.endDate) {
-        const s = new Date(formData.startDate);
-        const e = new Date(formData.endDate);
-        const diffMs = e.getTime() - s.getTime();
-        const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
-        totalDays = diffDays > 0 ? diffDays : 1;
-      }
-
-      const empIdRaw = localStorage.getItem(STORAGE_KEYS.EMPLOYEE_ID) || 
-                       localStorage.getItem('employeeId') || 
-                       currentUser?.id || 
-                       currentUser?.employeeId;
-      const empId = empIdRaw && !isNaN(Number(empIdRaw)) ? Number(empIdRaw) : (empIdRaw || undefined);
-
+      if (!leaveTypes.some(t => String(t.id) === String(formData.leaveTypeId))) throw new Error('Select a valid leave type');
       const payload = {
-        leaveTypeId: Number(formData.leaveTypeId),
-        leaveType: typeName,
-        leaveTypeName: typeName,
-        startDate: formData.startDate,
+        leaveTypeId: Number(formData.leaveTypeId), startDate: formData.startDate,
         endDate: formData.isHalfDay ? formData.startDate : formData.endDate,
-        totalDays: totalDays,
-        days: totalDays,
-        isHalfDay: Boolean(formData.isHalfDay),
-        halfDaySession: formData.isHalfDay ? formData.halfDaySession : null,
-        reason: formData.reason.trim(),
-        employeeId: empId,
-        appliedDate: new Date().toISOString().split('T')[0]
+        isHalfDay: Boolean(formData.isHalfDay), halfDaySession: formData.isHalfDay ? formData.halfDaySession : null,
+        reason: formData.reason.trim()
       };
-
-      let serverMsg = 'Leave request submitted successfully';
-      try {
-        const res = await axios.post(API_ENDPOINTS.APPLY_LEAVE, payload, { headers: getAuthHeaders() });
-        if (res.data && res.data.status && res.data.status >= 400) {
-          throw new Error(res.data.message || 'Server rejected leave request');
-        }
-        if (res.data?.message) {
-          serverMsg = res.data.message;
-        }
-      } catch (apiError) {
-        console.warn('Backend APPLY_LEAVE API error:', apiError);
-        const backendMsg = apiError.response?.data?.message || apiError.response?.data?.error || apiError.message;
-        if (apiError.response?.status === 400 || apiError.response?.status === 403 || apiError.response?.status === 401) {
-          throw new Error(backendMsg || 'Failed to submit leave request');
-        }
-        serverMsg = 'Leave request submitted successfully';
-      }
-
-      // Save locally to guarantee persistence in user view
-      const localLeaves = JSON.parse(localStorage.getItem('hrms_applied_leaves') || '[]');
-      const newLeaveRecord = {
-        id: `loc_${Date.now()}`,
-        leaveId: Date.now(),
-        leaveType: { name: typeName },
-        leaveTypeName: typeName,
-        startDate: payload.startDate,
-        endDate: payload.endDate,
-        totalDays: totalDays,
-        days: totalDays,
-        status: 'PENDING',
-        reason: payload.reason,
-        createdAt: payload.appliedDate,
-        appliedDate: payload.appliedDate,
-        isHalfDay: payload.isHalfDay,
-        halfDaySession: payload.halfDaySession
-      };
-      localStorage.setItem('hrms_applied_leaves', JSON.stringify([newLeaveRecord, ...localLeaves]));
-
-      toast.success('Success', serverMsg);
+      const { data } = await axios.post(API_ENDPOINTS.APPLY_LEAVE, payload, { headers: getAuthHeaders() });
+      if (Number(data?.status) >= 400) throw new Error(data.message || 'Leave application failed');
+      toast.success('Success', data?.message || 'Leave applied successfully');
       setFormData({
         employeeName: currentUser?.name || currentUser?.fullName || "",
         leaveTypeId: "",
@@ -428,6 +292,7 @@ const LeaveManagement = ({ user }) => {
       });
       setErrors({});
       setTouched({});
+      setPage(0);
       setView('list');
       await fetchMyLeaves();
     } catch (error) {
@@ -437,23 +302,21 @@ const LeaveManagement = ({ user }) => {
       setSubmitting(false);
     }
   };
-
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     try {
       return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     } catch { return dateString; }
   };
-
   const formatLeaveTypeName = (name) => {
     if (!name) return '-';
     const str = typeof name === 'object' ? (name.name || name.leaveTypeName || '-') : String(name);
     return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
   };
-
   const getStatusBadgeClass = (status) => {
     switch(status) {
       case 'APPROVED': return 'badge-success';
+      case 'PENDING_L2':
       case 'PENDING':  return 'badge-warning';
       case 'REJECTED': return 'badge-danger';
       default:         return 'badge-info';
@@ -462,12 +325,12 @@ const LeaveManagement = ({ user }) => {
   const getStatusText = (status) => {
     switch(status) {
       case 'APPROVED': return 'Approved';
+      case 'PENDING_L2':
       case 'PENDING':  return 'Pending';
       case 'REJECTED': return 'Rejected';
       default: return status || 'Unknown';
     }
   };
-
   const getPaginationRange = () => {
     if (totalPages <= 1) return [];
     const delta = 2;
@@ -485,9 +348,7 @@ const LeaveManagement = ({ user }) => {
     }
     return range;
   };
-
   if (loading && view === 'list' && leaves.length === 0) return <LoadingSpinner message="Loading your leave requests..." />;
-
   // ──────────────────────────────────────────────────────────────
   // FORM VIEW (matching Branch/CreateTask design)
   // ──────────────────────────────────────────────────────────────
@@ -495,7 +356,6 @@ const LeaveManagement = ({ user }) => {
     if (loadingUser) return <LoadingSpinner message="Loading user profile..." />;
     const fieldErrClass = (field) => (errors[field] && touched[field] ? 'has-error' : '');
     const fieldOkClass = (field) => (touched[field] && !errors[field] && formData[field] ? 'has-ok' : '');
-
     return (
       <div className="emp-root">
         <div className="emp-header" style={{ justifyContent: 'space-between' }}>
@@ -517,7 +377,6 @@ const LeaveManagement = ({ user }) => {
                   <input type="text" value={formData.employeeName || ''} style={{ background: '#f0f2ff', cursor: 'not-allowed', fontWeight: 500 }} readOnly />
                   <small className="task-hint-text">Auto-filled from your profile</small>
                 </div>
-
                 <div className={`emp-field-compact ${fieldErrClass('leaveTypeId')} ${fieldOkClass('leaveTypeId')}`}>
                   <label className="required">Leave Type</label>
                   <select name="leaveTypeId" value={formData.leaveTypeId} onChange={handleFormChange} onBlur={() => handleBlur('leaveTypeId')}>
@@ -530,27 +389,23 @@ const LeaveManagement = ({ user }) => {
                   </select>
                   <FieldError msg={errors.leaveTypeId} />
                 </div>
-
                 <div className={`emp-field-compact ${fieldErrClass('startDate')}`}>
                   <label className="required">Start Date</label>
                   <input type="date" name="startDate" value={formData.startDate} onChange={handleFormChange} onBlur={() => handleBlur('startDate')} />
                   <FieldError msg={errors.startDate} />
                 </div>
-
                 <div className={`emp-field-compact ${!formData.isHalfDay && fieldErrClass('endDate')}`}>
                   <label>{!formData.isHalfDay && <span className="required">End Date</span>}{formData.isHalfDay && 'End Date'}</label>
                   <input type="date" name="endDate" value={formData.endDate} onChange={handleFormChange} onBlur={() => handleBlur('endDate')} disabled={formData.isHalfDay} />
                   {formData.isHalfDay && <small className="task-hint-text">Disabled for half‑day requests</small>}
                   <FieldError msg={!formData.isHalfDay ? errors.endDate : ''} />
                 </div>
-
                 <div className="emp-field-compact">
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                     <input type="checkbox" name="isHalfDay" checked={formData.isHalfDay} onChange={handleFormChange} style={{ width: '16px', height: '16px', margin: 0 }} />
                     Half Day Leave
                   </label>
                 </div>
-
                 {formData.isHalfDay && (
                   <div className="emp-field-compact">
                     <label className="required">Session</label>
@@ -560,7 +415,6 @@ const LeaveManagement = ({ user }) => {
                     </select>
                   </div>
                 )}
-
                 <div className={`emp-field-compact ${fieldErrClass('reason')}`} style={{ gridColumn: 'span 3' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <label className="required">Reason</label>
@@ -585,7 +439,6 @@ const LeaveManagement = ({ user }) => {
       </div>
     );
   }
-
   // ──────────────────────────────────────────────────────────────
   // LIST VIEW
   // ──────────────────────────────────────────────────────────────
@@ -600,7 +453,6 @@ const LeaveManagement = ({ user }) => {
           <FaPlus size={13} /> Apply for Leave
         </button>
       </div>
-
       {/* Stats Cards - Centered (icon above label/value) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
         <div className="stat-card" style={{ padding: '20px 16px', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
@@ -609,21 +461,18 @@ const LeaveManagement = ({ user }) => {
           <div style={{ fontSize: 32, fontWeight: 700, fontFamily: "'Sora', sans-serif", lineHeight: 1.2, marginTop: 4 }}>{stats.total}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>All time</div>
         </div>
-
         <div className="stat-card" style={{ padding: '20px 16px', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: '#f59e0b', fontSize: 20 }}><FaClock /></div>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Sora', sans-serif" }}>Pending</div>
           <div style={{ fontSize: 32, fontWeight: 700, fontFamily: "'Sora', sans-serif", lineHeight: 1.2, marginTop: 4 }}>{stats.pending}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Awaiting approval</div>
         </div>
-
         <div className="stat-card" style={{ padding: '20px 16px', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: '#10b981', fontSize: 20 }}><FaCheckCircle /></div>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Sora', sans-serif" }}>Approved</div>
           <div style={{ fontSize: 32, fontWeight: 700, fontFamily: "'Sora', sans-serif", lineHeight: 1.2, marginTop: 4 }}>{stats.approved}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Approved leaves</div>
         </div>
-
         <div className="stat-card" style={{ padding: '20px 16px', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: '#ef4444', fontSize: 20 }}><FaTimesCircle /></div>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Sora', sans-serif" }}>Rejected</div>
@@ -631,7 +480,6 @@ const LeaveManagement = ({ user }) => {
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Rejected leaves</div>
         </div>
       </div>
-
       <div className="emp-search-bar">
         <div className="emp-search-wrap">
           <FaSearch className="emp-search-icon" size={12} />
@@ -639,7 +487,6 @@ const LeaveManagement = ({ user }) => {
           {searchTerm && <button className="emp-search-clear" onClick={() => setSearchTerm('')}><FaTimes size={11} /></button>}
         </div>
       </div>
-
       <div className="emp-table-card">
         <div className="emp-table-wrap">
           <table className="emp-table">
@@ -655,7 +502,7 @@ const LeaveManagement = ({ user }) => {
                     <td className="emp-sno">{page * size + idx + 1}</td>
                     <td><span className="emp-pill emp-pill--indigo">{formatLeaveTypeName(leave?.leaveType?.name || leave?.leaveTypeName)}</span></td>
                     <td className="emp-date">{formatDate(leave?.startDate)} → {formatDate(leave?.endDate)}</td>
-                    <td>{leave?.totalDays || leave?.days || 1}</td>
+                    <td>{leave?.totalDays ?? leave?.days ?? '-'}</td>
                     <td>{leave?.isHalfDay ? (leave?.halfDaySession === 'MORNING' ? 'Morning' : 'Afternoon') : 'Full Day'}</td>
                     <td style={{ maxWidth: '200px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{leave?.reason || '-'}</td>
                     <td className="emp-date">{formatDate(leave?.createdAt || leave?.appliedDate)}</td>
@@ -668,7 +515,6 @@ const LeaveManagement = ({ user }) => {
             </tbody>
            </table>
         </div>
-
         {totalPages > 1 && (
           <div className="emp-pagination">
             <span className="emp-page-info">Showing {page * size + 1}–{Math.min((page + 1) * size, totalElements)} of {totalElements} requests</span>
@@ -685,5 +531,4 @@ const LeaveManagement = ({ user }) => {
     </div>
   );
 };
-
 export default LeaveManagement;

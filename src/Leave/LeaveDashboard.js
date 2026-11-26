@@ -1,3 +1,11 @@
+
+
+
+
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
@@ -72,6 +80,7 @@ const LeaveDashboard = () => {
         ...getAuthConfig()
       });
       
+      if (Number(response.data?.status) >= 400) throw new Error(response.data.message || 'Dashboard failed');
       const data = response.data?.response || response.data;
       
       if (data) {
@@ -83,14 +92,8 @@ const LeaveDashboard = () => {
           stats: data.stats || null
         });
         
-        if (data.stats) {
-          setUserRole('HR');
-        } else if (data.teamLeaves?.length > 0 || data.pendingApprovals?.length > 0) {
-          setUserRole('MANAGER');
-        } else {
-          setUserRole('EMPLOYEE');
-        }
-        
+        setUserRole((localStorage.getItem(STORAGE_KEYS.ROLE) || '').trim().toUpperCase().replace(/^ROLE_/, ''));
+
         if (showRefreshMessage) {
           toast.success('Success', 'Dashboard refreshed successfully');
         }

@@ -1,3 +1,18 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -32,6 +47,8 @@ import TaskDashboard from './Task/TaskDashboard';
 import CreateTask from './Task/CreateTask';
 import TaskList from './Task/TaskList';
 import TaskDetail from './Task/TaskDetail';
+import DailyWorkDashboard from './Task/DailyWorkDashboard';
+import TaskProgressChart from './Task/TaskProgressChart';
 import ChatBot from './components/ChatBot';
 import SalaryConfig from './pages/SalaryConfigPage';
 import EmployeeGrade from './pages/EmployeeGradePage';
@@ -126,6 +143,15 @@ function App() {
   const clearSession = () => {
     // ✅ Remove every key we store — no key left behind
     Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
+    [
+      'roleName',
+      'role',
+      'userRole',
+      'employee_joining_date',
+      'hrms_today_punches',
+      'hrms_attendance_logs',
+      'hrms_current_user_shift_override'
+    ].forEach((key) => localStorage.removeItem(key));
     setIsAuthenticated(false);
     setCurrentUser(null);
   };
@@ -197,6 +223,8 @@ function App() {
           <Route path="CreateTask" element={<CreateTask user={currentUser} />} />
           <Route path="TaskList" element={<TaskList user={currentUser} />} />
           <Route path="TaskDetail" element={<TaskDetail user={currentUser} />} />
+          <Route path="DailyWork" element={<DailyWorkDashboard user={currentUser} />} />
+          <Route path="TaskProgress" element={<TaskProgressChart user={currentUser} />} />
           <Route path="PerformanceReview" element={<StartPerformanceReview user={currentUser} />} />
           <Route path="skills" element={<Skills user={currentUser} />} />
           <Route path="leave" element={<LeaveTypes user={currentUser} />} />
@@ -262,5 +290,9 @@ function App() {
 }
 
 export default App;
+
+
+
+
 
 

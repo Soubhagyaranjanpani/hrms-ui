@@ -1,3 +1,19 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
@@ -22,17 +38,17 @@ import axios from 'axios';
 import { API_ENDPOINTS } from '../config/api.config';
 
 const Sidebar = ({ user, sidebarCollapsed, sidebarOpen, isMobile, onItemClick, onLogout }) => {
-  const [masterOpen, setMasterOpen] = useState(true);
-  const [employeeOpen, setEmployeeOpen] = useState(true);
-  const [serviceBookOpen, setServiceBookOpen] = useState(true);
-  const [attendanceOpen, setAttendanceOpen] = useState(true);
-  const [leaveOpen, setLeaveOpen] = useState(true);
-  const [payrollOpen, setPayrollOpen] = useState(true);
-  const [documentsOpen, setDocumentsOpen] = useState(true);
-  const [tasksOpen, setTasksOpen] = useState(true);
- const [subMenuOpen, setSubMenuOpen] = useState({});
- const [loanOpen, setLoanOpen] = useState(true);
- const toggleLoan = () => setLoanOpen(!loanOpen);
+  const [masterOpen, setMasterOpen] = useState(false);
+  const [employeeOpen, setEmployeeOpen] = useState(false);
+  const [serviceBookOpen, setServiceBookOpen] = useState(false);
+  const [attendanceOpen, setAttendanceOpen] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [payrollOpen, setPayrollOpen] = useState(false);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const [subMenuOpen, setSubMenuOpen] = useState({});
+  const [loanOpen, setLoanOpen] = useState(false);
+  const toggleLoan = () => setLoanOpen(!loanOpen);
 
   const normalizeRole = (r) => {
     if (!r) return 'Employee';
@@ -53,15 +69,13 @@ const Sidebar = ({ user, sidebarCollapsed, sidebarOpen, isMobile, onItemClick, o
   const getRole = () => {
     try {
       const uData = JSON.parse(localStorage.getItem('userData') || '{}');
-      const raw = localStorage.getItem('roleName') || 
-                  localStorage.getItem('role') || 
-                  localStorage.getItem('userRole') || 
-                  user?.role || 
-                  user?.roleName || 
-                  user?.role?.name ||
-                  uData?.role || 
-                  uData?.roleName || 
-                  uData?.role?.name;
+      const raw = user?.roleName ||
+                  user?.role ||
+                  localStorage.getItem('roleName') ||
+                  localStorage.getItem('role') ||
+                  localStorage.getItem('userRole') ||
+                  uData?.roleName ||
+                  uData?.role;
       if (raw) return normalizeRole(raw);
 
       const token = localStorage.getItem('jwtToken');
@@ -83,11 +97,26 @@ const Sidebar = ({ user, sidebarCollapsed, sidebarOpen, isMobile, onItemClick, o
 
   const [userRole, setUserRole] = useState(getRole);
 
+  const userIdentity = user?.id ?? user?.userId ?? user?.email ?? '';
+
   useEffect(() => {
     const role = getRole();
     console.log('User Role Normalized:', role);
     setUserRole(role);
   }, [user]);
+
+  useEffect(() => {
+    setMasterOpen(false);
+    setEmployeeOpen(false);
+    setServiceBookOpen(false);
+    setAttendanceOpen(false);
+    setLeaveOpen(false);
+    setPayrollOpen(false);
+    setDocumentsOpen(false);
+    setTasksOpen(false);
+    setLoanOpen(false);
+    setSubMenuOpen({});
+  }, [userIdentity]);
 
   const [verificationPendingCount, setVerificationPendingCount] = useState(0);
 
@@ -144,7 +173,7 @@ const Sidebar = ({ user, sidebarCollapsed, sidebarOpen, isMobile, onItemClick, o
 
   // Employee section items - Employee Management
   const employeeItems = [
-    { path: '/employees', icon: <FaUsers />, label: 'Employee List', roles: ['Admin', 'Hr', 'Manager'] },
+    { path: '/employees', icon: <FaUsers />, label: 'Employee List', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/EmployeeGrade', icon: <FaUserTag />, label: 'Employee Grade', roles: ['Admin', 'Hr'] },
         {path: '/Certification', icon: <FaChalkboardTeacher />, label: 'Certification', roles: ['Admin', 'Hr']},
     {path: '/EmployeeDesignation', icon:<FaCheck />,label: 'Employee Designation',roles:['Admin','Hr']},
@@ -274,6 +303,8 @@ const masterItems = [
     { path: '/TaskDashboard', icon: <FaTachometerAlt />, label: 'Task Dashboard', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/CreateTask', icon: <FaTasks />, label: 'Create & Edit Task', roles: ['Admin', 'Hr', 'Manager'] },
     { path: '/TaskList', icon: <FaTasks />, label: 'My Tasks', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/DailyWork', icon: <FaCalendarCheck />, label: 'Work & Performance', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
+    { path: '/TaskProgress', icon: <FaChartLine />, label: 'Task Progress', roles: ['Admin', 'Hr', 'Manager', 'Employee'] },
     { path: '/performance', icon: <FaChartLine />, label: 'Performance', roles: ['Admin', 'Hr', 'Manager'] },
     { path: '/PerformanceReview', icon: <FaChartLine />, label: 'Performance Review', roles: ['Admin', 'Hr', 'Manager'] },
   ];
@@ -1313,3 +1344,7 @@ const masterItems = [
 };
 
 export default Sidebar;
+
+
+
+

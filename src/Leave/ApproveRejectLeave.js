@@ -1,9 +1,29 @@
+
+
+
+
+
+
+
+
+
+
+
+
 import { useState, useEffect, useCallback } from 'react';
 import { FaSearch, FaTimes, FaCheck, FaTimesCircle, FaSpinner } from 'react-icons/fa';
 import { toast } from '../components/Toast';
 import axios from 'axios';
 import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
 import LoadingSpinner from '../components/LoadingSpinner';
+
+const records = (body) => {
+  if (Number(body?.status) >= 400) throw new Error(body.message || 'Request failed');
+  const data = body?.response ?? body?.data ?? body;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.content)) return data.content;
+  throw new Error('Unexpected API response');
+};
 
 const LeaveApproval = ({ user }) => {
   // ---------- State ----------
@@ -33,7 +53,7 @@ const LeaveApproval = ({ user }) => {
 
   // Check user role on component mount
   useEffect(() => {
-    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    const role = (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "");
     setUserRole(role);
     
     if (role !== 'HR' && role !== 'ROLE_HR' && role !== 'MANAGER' && role !== 'ROLE_MANAGER') {
@@ -45,7 +65,7 @@ const LeaveApproval = ({ user }) => {
   const fetchLeaves = useCallback(async () => {
     setLoading(true);
     try {
-      const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+      const role = (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "");
       let response;
       let data = [];
       
@@ -55,7 +75,7 @@ const LeaveApproval = ({ user }) => {
         response = await axios.get(API_ENDPOINTS.GET_ALL_LEAVES, {
           headers: getAuthHeaders(),
           params: {
-            status: 'PENDING_L2'  // Filter for PENDING_L2 status
+            status: 'PENDING_L2', page: 1, size: 100
           }
         });
       } else if (role === 'MANAGER' || role === 'ROLE_MANAGER') {
@@ -74,22 +94,13 @@ const LeaveApproval = ({ user }) => {
       
       const responseData = response.data;
       
-      // Handle response structure
-      if (responseData?.status === 200 && Array.isArray(responseData.response)) {
-        data = responseData.response;
-      } else if (Array.isArray(responseData)) {
-        data = responseData;
-      } else if (responseData?.data && Array.isArray(responseData.data)) {
-        data = responseData.data;
-      } else {
-        data = [];
-      }
-      
+      data = records(responseData);
+
       // Transform data
       const transformedData = data.map(leave => ({
         id: leave.leaveId || leave.id,
         employeeName: leave.employeeName || leave.employee?.name || 'Unknown',
-        leaveType: leave.leaveType,
+        leaveType: leave.leaveType?.name ?? leave.leaveTypeName ?? leave.leaveType ?? "",
         startDate: leave.startDate,
         endDate: leave.endDate,
         totalDays: leave.totalDays,
@@ -117,7 +128,7 @@ const LeaveApproval = ({ user }) => {
       } else if (error.response?.status === 403) {
         toast.error('Access Denied', 'You don\'t have permission to view these requests');
       } else {
-        toast.error('Error', error.response?.data?.message || 'Failed to load leave requests');
+        toast.error('Error', error.response?.data?.message || error.message || 'Failed to load leave requests');
       }
       setLeaves([]);
     } finally {
@@ -127,7 +138,7 @@ const LeaveApproval = ({ user }) => {
 
   // Initialize data based on role
   useEffect(() => {
-    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    const role = (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "");
     if (role === 'HR' || role === 'ROLE_HR' || role === 'MANAGER' || role === 'ROLE_MANAGER') {
       fetchLeaves();
     }
@@ -170,7 +181,7 @@ const LeaveApproval = ({ user }) => {
     const total = Array.isArray(filtered) ? filtered.length : 0;
     setTotalPages(Math.ceil(total / size));
     setTotalElements(total);
-    if (page !== 0 && total > 0) {
+    if (page > 0 && page >= Math.ceil(total / size)) {
       setPage(0);
     }
   }, [debouncedSearch, leaves, getFilteredLeaves, size, page]);
@@ -214,6 +225,7 @@ const LeaveApproval = ({ user }) => {
         headers: getAuthHeaders(),
       });
       
+      if (Number(response.data?.status) >= 400) throw new Error(response.data.message || 'Request failed');
       if (response.data?.status === 200) {
         toast.success('Success', response.data?.message || 'Leave request approved successfully');
         closeModal();
@@ -225,7 +237,7 @@ const LeaveApproval = ({ user }) => {
       }
       
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Failed to approve leave request';
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to approve leave request';
       toast.error('Error', errorMsg);
     } finally {
       setSubmitting(false);
@@ -252,6 +264,7 @@ const LeaveApproval = ({ user }) => {
         headers: getAuthHeaders(),
       });
       
+      if (Number(response.data?.status) >= 400) throw new Error(response.data.message || 'Request failed');
       if (response.data?.status === 200) {
         toast.success('Success', response.data?.message || 'Leave request rejected successfully');
         closeModal();
@@ -263,7 +276,7 @@ const LeaveApproval = ({ user }) => {
       }
       
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Failed to reject leave request';
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to reject leave request';
       toast.error('Error', errorMsg);
     } finally {
       setSubmitting(false);
@@ -281,7 +294,7 @@ const LeaveApproval = ({ user }) => {
   };
 
   const getStatusText = (status) => {
-    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    const role = (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "");
     switch(status) {
       case 'APPROVED': return 'Approved';
       case 'PENDING': return role === 'HR' ? 'Pending (Level 1)' : 'Pending';
@@ -292,7 +305,7 @@ const LeaveApproval = ({ user }) => {
   };
 
   const isPending = (status) => {
-    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    const role = (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "");
     if (role === 'HR' || role === 'ROLE_HR') {
       return status === 'PENDING_L2';
     }
@@ -336,7 +349,7 @@ const LeaveApproval = ({ user }) => {
   };
 
   // Show access denied message if user is not HR or Manager
-  const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+  const role = (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "");
   if (role !== 'HR' && role !== 'ROLE_HR' && role !== 'MANAGER' && role !== 'ROLE_MANAGER' && role !== null) {
     return (
       <div className="emp-root" style={{ maxWidth: '100%', overflowX: 'auto', padding: '40px' }}>
@@ -351,14 +364,14 @@ const LeaveApproval = ({ user }) => {
 
   // Loading state
   if (loading && leaves.length === 0) {
-    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    const role = (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "");
     const message = role === 'HR' ? 'Loading Level 2 pending requests...' : 'Loading team leave requests...';
     return <LoadingSpinner message={message} />;
   }
 
   // Get title based on role
   const getPageTitle = () => {
-    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    const role = (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "");
     if (role === 'HR' || role === 'ROLE_HR') {
       return 'Leave Approval - HR Level 2';
     }
@@ -366,7 +379,7 @@ const LeaveApproval = ({ user }) => {
   };
 
   const getSubtitle = () => {
-    const role = localStorage.getItem(STORAGE_KEYS.ROLE);
+    const role = (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "");
     if (role === 'HR' || role === 'ROLE_HR') {
       return `${totalElements} pending Level 2 requests`;
     }
@@ -442,7 +455,7 @@ const LeaveApproval = ({ user }) => {
       </div>
 
       {/* Info Banner for HR */}
-      {/* {(localStorage.getItem(STORAGE_KEYS.ROLE) === 'HR' || localStorage.getItem(STORAGE_KEYS.ROLE) === 'ROLE_HR') && (
+      {/* {((localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "") === 'HR' || (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "") === 'ROLE_HR') && (
         <div style={{ 
           background: '#fef3c7', 
           borderLeft: '4px solid #f59e0b', 
@@ -457,7 +470,7 @@ const LeaveApproval = ({ user }) => {
       )} */}
 
       {/* Info Banner for Manager */}
-      {(localStorage.getItem(STORAGE_KEYS.ROLE) === 'MANAGER' || localStorage.getItem(STORAGE_KEYS.ROLE) === 'ROLE_MANAGER') && (
+      {((localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "") === 'MANAGER' || (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "") === 'ROLE_MANAGER') && (
         <div style={{ 
           background: '#dbeafe', 
           borderLeft: '4px solid #3b82f6', 
@@ -587,7 +600,7 @@ const LeaveApproval = ({ user }) => {
                       <span className="emp-empty-icon" style={{ fontSize: '32px', opacity: 0.4 }}>📋</span>
                       <p style={{ fontWeight: 600, color: '#4a5082', marginTop: '8px' }}>No leave requests found</p>
                       <small style={{ fontSize: '12px', color: '#8b92b8' }}>
-                        {(localStorage.getItem(STORAGE_KEYS.ROLE) === 'HR' || localStorage.getItem(STORAGE_KEYS.ROLE) === 'ROLE_HR') 
+                        {((localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "") === 'HR' || (localStorage.getItem(STORAGE_KEYS.ROLE) || "").trim().toUpperCase().replace(/^ROLE_/, "") === 'ROLE_HR') 
                           ? 'No Level 2 pending requests at this time'
                           : 'No pending requests from your team members'}
                       </small>
@@ -722,3 +735,7 @@ const LeaveApproval = ({ user }) => {
 };
 
 export default LeaveApproval;
+
+
+
+

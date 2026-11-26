@@ -727,12 +727,101 @@ export const getEmployeeShiftForDate = (employeeId, dateStr = getTodayDateYMD())
   return getShiftByCode('GS');
 };
 
-export const getCurrentUserTodayShift = () => {
+export const getCurrentEmployeeIdentity = (explicitUser = null) => {
+  let uData = {};
   try {
-    const empId = localStorage.getItem('employeeId') || localStorage.getItem('hrms_employee_id');
+    uData = JSON.parse(localStorage.getItem('userData') || '{}') || {};
+  } catch {}
+
+  const rawId =
+    explicitUser?.employeeId ??
+    explicitUser?.id ??
+    localStorage.getItem('employeeId') ??
+    localStorage.getItem('hrms_employee_id') ??
+    uData?.employeeId ??
+    uData?.id ??
+    localStorage.getItem('userId');
+
+  const cleanVal = (v) => {
+    if (v === undefined || v === null) return '';
+    const s = String(v).trim();
+    return s && s !== 'null' && s !== 'undefined' ? s : '';
+  };
+
+  const employeeId = cleanVal(rawId);
+  const rawUsername =
+    explicitUser?.email ??
+    explicitUser?.username ??
+    localStorage.getItem('username') ??
+    uData?.email ??
+    uData?.username ??
+    '';
+  const username = cleanVal(rawUsername).toLowerCase();
+
+  return {
+    employeeId,
+    username,
+    storageScope: employeeId || username || 'anonymous'
+  };
+};
+
+const extractRecordEmployeeIds = (record) => {
+  if (!record || typeof record !== 'object') return { id: '', username: '' };
+  const cleanVal = (v) => {
+    if (v === undefined || v === null) return '';
+    const s = String(v).trim();
+    return s && s !== 'null' && s !== 'undefined' ? s : '';
+  };
+  const id = cleanVal(
+    record.employeeId ??
+      record.empId ??
+      record.userId ??
+      record.employee?.employeeId ??
+      record.employee?.id
+  );
+  const username = cleanVal(
+    record.employeeUsername ??
+      record.username ??
+      record.employeeEmail ??
+      record.email ??
+      record.employee?.email ??
+      record.employee?.username
+  ).toLowerCase();
+  return { id, username };
+};
+
+export const recordMatchesCurrentEmployee = (record, explicitUser = null) => {
+  if (!record || typeof record !== 'object') return false;
+  const { employeeId, username } = getCurrentEmployeeIdentity(explicitUser);
+  const rec = extractRecordEmployeeIds(record);
+
+  if (rec.id) {
+    return Boolean(employeeId && rec.id === employeeId);
+  }
+  if (rec.username) {
+    return Boolean(username && rec.username === username);
+  }
+  return false;
+};
+
+export const filterBackendRecordsForCurrentEmployee = (records, explicitUser = null) => {
+  if (!Array.isArray(records)) return [];
+  const { employeeId, username } = getCurrentEmployeeIdentity(explicitUser);
+  return records.filter((record) => {
+    const rec = extractRecordEmployeeIds(record);
+    if (rec.id) return Boolean(employeeId && rec.id === employeeId);
+    if (rec.username) return Boolean(username && rec.username === username);
+    // Backend /my endpoints may omit employeeId on personal DTOs
+    return true;
+  });
+};
+
+export const getCurrentUserTodayShift = (explicitUser = null) => {
+  try {
+    const { employeeId } = getCurrentEmployeeIdentity(explicitUser);
     const today = getTodayDateYMD();
-    if (empId) {
-      return getEmployeeShiftForDate(empId, today);
+    if (employeeId) {
+      return getEmployeeShiftForDate(employeeId, today);
     }
   } catch {}
   return getShiftByCode('GS');
@@ -1017,32 +1106,44 @@ export const calculateShiftAttendance = ({
 };
 
 /**
- * Sync today's attendance record across all storage channels and dispatch broadcast events
+ * Sync today's attendance record across employee-scoped storage channels and dispatch broadcast events
  */
-export const syncAttendanceRecord = (record, notify = true) => {
+export const syncAttendanceRecord = (record, notify = true, explicitUser = null) => {
   if (!record || !record.date) return;
   try {
-    // 1. Primary today punch object
-    localStorage.setItem('hrms_today_punches', JSON.stringify(record));
+    const { employeeId, username, storageScope } = getCurrentEmployeeIdentity(explicitUser);
+    if (!employeeId && !username) return;
 
-    // 2. User-specific key for backwards compatibility
-    const empId = localStorage.getItem('employeeId') || localStorage.getItem('userId') || 'user';
-    localStorage.setItem(`hrms_today_punch_${record.date}_${empId}`, JSON.stringify(record));
+    const taggedRecord = {
+      ...record,
+      employeeId: record.employeeId || employeeId || undefined,
+      employeeUsername: record.employeeUsername || username || undefined
+    };
 
-    // 3. Global attendance logs history
-    const logs = JSON.parse(localStorage.getItem('hrms_attendance_logs') || '[]');
-    const existingIdx = logs.findIndex(r => (r.date || '').split('T')[0] === record.date);
+    // 1. Employee-scoped today punch object (replaces global hrms_today_punches)
+    localStorage.setItem(`hrms_user_today_punch_${storageScope}`, JSON.stringify(taggedRecord));
+
+    // 2. Date + employee-specific key (used by RosterManagement & AttendanceDashboard)
+    localStorage.setItem(`hrms_today_punch_${taggedRecord.date}_${storageScope}`, JSON.stringify(taggedRecord));
+
+    // 3. Employee-scoped attendance logs history
+    const logsKey = `hrms_attendance_logs_${storageScope}`;
+    const logs = JSON.parse(localStorage.getItem(logsKey) || '[]');
+    const existingIdx = logs.findIndex(r => (r.date || '').split('T')[0] === taggedRecord.date);
     if (existingIdx >= 0) {
-      logs[existingIdx] = { ...logs[existingIdx], ...record };
+      logs[existingIdx] = { ...logs[existingIdx], ...taggedRecord };
     } else {
-      logs.unshift(record);
+      logs.unshift(taggedRecord);
     }
-    localStorage.setItem('hrms_attendance_logs', JSON.stringify(logs));
+    localStorage.setItem(logsKey, JSON.stringify(logs));
+
+    // Clear legacy global keys so another user never inherits a shared punch
+    localStorage.removeItem('hrms_today_punches');
 
     // 4. Notify all components and windows
     if (notify && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('hrms_attendance_updated', { detail: record }));
-      window.dispatchEvent(new CustomEvent('hrms_today_punches_updated', { detail: record }));
+      window.dispatchEvent(new CustomEvent('hrms_attendance_updated', { detail: taggedRecord }));
+      window.dispatchEvent(new CustomEvent('hrms_today_punches_updated', { detail: taggedRecord }));
       window.dispatchEvent(new Event('storage'));
     }
   } catch (err) {
@@ -1051,38 +1152,66 @@ export const syncAttendanceRecord = (record, notify = true) => {
 };
 
 /**
- * Retrieve the current unified attendance record for today
+ * Retrieve the current employee's locally cached attendance logs
  */
-export const getUnifiedTodayAttendance = () => {
-  const today = getTodayDateYMD();
+export const getCurrentUserAttendanceLogs = (explicitUser = null) => {
   try {
-    const raw = localStorage.getItem('hrms_today_punches');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.date === today) {
-        return parsed;
-      }
+    const { employeeId, username, storageScope } = getCurrentEmployeeIdentity(explicitUser);
+    if (!employeeId && !username) return [];
+
+    const scopedRaw = localStorage.getItem(`hrms_attendance_logs_${storageScope}`);
+    if (scopedRaw) {
+      const parsed = JSON.parse(scopedRaw);
+      if (Array.isArray(parsed)) return parsed;
     }
 
-    const empId = localStorage.getItem('employeeId') || localStorage.getItem('userId') || 'user';
-    const userSpecific = localStorage.getItem(`hrms_today_punch_${today}_${empId}`);
-    if (userSpecific) {
-      const parsed = JSON.parse(userSpecific);
-      if (parsed.date === today) {
-        return parsed;
-      }
+    // Legacy fallback: only include records explicitly tagged for this employee
+    const legacyLogs = JSON.parse(localStorage.getItem('hrms_attendance_logs') || '[]');
+    if (Array.isArray(legacyLogs)) {
+      return legacyLogs.filter(r => recordMatchesCurrentEmployee(r, explicitUser));
     }
+  } catch {}
+  return [];
+};
 
-    const logs = JSON.parse(localStorage.getItem('hrms_attendance_logs') || '[]');
-    const found = logs.find(r => (r.date || '').split('T')[0] === today);
-    if (found) {
-      return found;
+/**
+ * Retrieve the current unified attendance record for today (strictly scoped to current employee)
+ */
+export const getUnifiedTodayAttendance = (explicitUser = null) => {
+  const today = getTodayDateYMD();
+  const { employeeId, username, storageScope } = getCurrentEmployeeIdentity(explicitUser);
+
+  try {
+    if (employeeId || username) {
+      const scopedCurrent = localStorage.getItem(`hrms_user_today_punch_${storageScope}`);
+      if (scopedCurrent) {
+        const parsed = JSON.parse(scopedCurrent);
+        if (parsed.date === today && recordMatchesCurrentEmployee(parsed, explicitUser)) {
+          return parsed;
+        }
+      }
+
+      const userSpecific = localStorage.getItem(`hrms_today_punch_${today}_${storageScope}`);
+      if (userSpecific) {
+        const parsed = JSON.parse(userSpecific);
+        if (parsed.date === today && recordMatchesCurrentEmployee(parsed, explicitUser)) {
+          return parsed;
+        }
+      }
+
+      const logs = getCurrentUserAttendanceLogs(explicitUser);
+      const found = logs.find(r => (r.date || '').split('T')[0] === today);
+      if (found) {
+        return found;
+      }
     }
   } catch {}
 
-  const activeShift = getCurrentUserTodayShift();
+  const activeShift = getCurrentUserTodayShift(explicitUser);
   return {
     date: today,
+    employeeId: employeeId || undefined,
+    employeeUsername: username || undefined,
     checkIn: null,
     checkOut: null,
     status: 'NOT_CHECKED_IN',

@@ -13,7 +13,8 @@ import {
   getCurrentUserTodayShift,
   calculateShiftAttendance,
   syncAttendanceRecord,
-  getUnifiedTodayAttendance
+  getUnifiedTodayAttendance,
+  getCurrentEmployeeIdentity
 } from '../utils/rosterUtils';
 import './MarkAttendance.css';
 
@@ -125,7 +126,7 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
   // 1. Initial Load of Today's Punch State from LocalStorage and Backend
   const loadTodayPunchState = useCallback(() => {
     const todayStr = getTodayKey();
-    const unified = getUnifiedTodayAttendance();
+    const unified = getUnifiedTodayAttendance(user);
     if (unified && unified.date === todayStr && (unified.checkIn || unified.checkOut)) {
       setTodayRecord(unified);
       setWorkMode(unified.workMode || 'OFFICE');
@@ -136,9 +137,12 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
     }
 
     // Default empty record for today
-    const activeShift = getCurrentUserTodayShift();
+    const activeShift = getCurrentUserTodayShift(user);
+    const { employeeId, username } = getCurrentEmployeeIdentity(user);
     setTodayRecord({
       date: todayStr,
+      employeeId: employeeId || undefined,
+      employeeUsername: username || undefined,
       status: 'IDLE',
       checkIn: null,
       checkOut: null,
@@ -150,17 +154,18 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
       punches: [],
       workingHours: 0
     });
-  }, []);
+  }, [user]);
 
-  // 2. Load Regularization requests
+  // 2. Load Regularization requests (scoped to current employee)
   const loadRegularizations = useCallback(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem('hrms_regularization_requests') || '[]');
-      setRegularizations(stored);
+      const { storageScope } = getCurrentEmployeeIdentity(user);
+      const stored = JSON.parse(localStorage.getItem(`hrms_regularization_requests_${storageScope}`) || '[]');
+      setRegularizations(Array.isArray(stored) ? stored : []);
     } catch {
       setRegularizations([]);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadTodayPunchState();
@@ -330,16 +335,19 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
       console.log('Backend check-in sync notice (proceeding with local verified record):', err.message);
     }
 
-    const activeShift = getCurrentUserTodayShift();
+    const activeShift = getCurrentUserTodayShift(user);
     const calc = calculateShiftAttendance({
       checkIn: timeStr,
       checkOut: null,
       shift: activeShift
     });
 
+    const { employeeId, username } = getCurrentEmployeeIdentity(user);
     // Construct local state
     const newRecord = {
       date: todayStr,
+      employeeId: employeeId || undefined,
+      employeeUsername: username || undefined,
       employee: currentUserName,
       status: calc.status,
       statusLabel: calc.statusLabel,
@@ -376,7 +384,7 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
     };
 
     setTodayRecord(newRecord);
-    syncAttendanceRecord(newRecord, true);
+    syncAttendanceRecord(newRecord, true, user);
 
     const lateNotice = calc.isLate ? ` (Late by ${calc.lateMinutes}m)` : '';
     toast.success('Punch In Recorded!', `Clocked in at ${formatTimeOnly(now)} (${workMode}, Shift: ${activeShift.name})${lateNotice}`);
@@ -414,11 +422,10 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
     };
 
     setTodayRecord(updatedRecord);
-    localStorage.setItem('hrms_today_punches', JSON.stringify(updatedRecord));
+    syncAttendanceRecord(updatedRecord, true, user);
     setShowBreakModal(false);
 
     toast.info('Break Started', `Enjoy your ${selectedBreakType.toLowerCase()} break. Work timer paused.`);
-    window.dispatchEvent(new Event('hrms_attendance_updated'));
   };
 
   // 9. Break End Handler
@@ -459,10 +466,9 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
     };
 
     setTodayRecord(updatedRecord);
-    localStorage.setItem('hrms_today_punches', JSON.stringify(updatedRecord));
+    syncAttendanceRecord(updatedRecord, true, user);
 
     toast.success('Break Ended', `Welcome back! Work timer resumed.`);
-    window.dispatchEvent(new Event('hrms_attendance_updated'));
   };
 
   // 10. Punch Out Handler
@@ -499,7 +505,7 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
       console.log('Backend check-out notice (saved to verified local audit):', err.message);
     }
 
-    const activeShift = getCurrentUserTodayShift();
+    const activeShift = getCurrentUserTodayShift(user);
     const calc = calculateShiftAttendance({
       checkIn: todayRecord.checkIn,
       checkOut: timeStr,
@@ -519,8 +525,11 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
       }
     ];
 
+    const { employeeId, username } = getCurrentEmployeeIdentity(user);
     const completedRecord = {
       ...todayRecord,
+      employeeId: employeeId || todayRecord.employeeId || undefined,
+      employeeUsername: username || todayRecord.employeeUsername || undefined,
       status: calc.status,
       statusLabel: calc.statusLabel,
       shiftCode: activeShift.code,
@@ -537,7 +546,7 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
     };
 
     setTodayRecord(completedRecord);
-    syncAttendanceRecord(completedRecord, true);
+    syncAttendanceRecord(completedRecord, true, user);
 
     setShowClockOutModal(false);
     setLoading(false);
@@ -548,20 +557,9 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
     if (onAttendanceChange) onAttendanceChange();
   };
 
-  // 11. Helper to sync punch to local historical logs
+  // 11. Helper to sync punch to employee-scoped local historical logs
   const syncToGlobalAttendance = (record) => {
-    try {
-      const logs = JSON.parse(localStorage.getItem('hrms_attendance_logs') || '[]');
-      const existingIdx = logs.findIndex(r => r.date === record.date);
-      if (existingIdx >= 0) {
-        logs[existingIdx] = record;
-      } else {
-        logs.unshift(record);
-      }
-      localStorage.setItem('hrms_attendance_logs', JSON.stringify(logs));
-    } catch (e) {
-      console.error('Error syncing logs', e);
-    }
+    syncAttendanceRecord(record, false, user);
   };
 
   // 12. Submit Regularization Request
@@ -572,8 +570,10 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
       return;
     }
 
+    const { employeeId, storageScope } = getCurrentEmployeeIdentity(user);
     const newReq = {
       id: `REG-${Date.now().toString().slice(-5)}`,
+      employeeId: employeeId || undefined,
       employee: currentUserName,
       date: regForm.date,
       type: regForm.type,
@@ -588,7 +588,7 @@ const MarkAttendancePunch = ({ user, onAttendanceChange }) => {
 
     const updated = [newReq, ...regularizations];
     setRegularizations(updated);
-    localStorage.setItem('hrms_regularization_requests', JSON.stringify(updated));
+    localStorage.setItem(`hrms_regularization_requests_${storageScope}`, JSON.stringify(updated));
 
     toast.success('Request Submitted', 'Attendance regularization request sent to HR for approval.');
     setRegForm({

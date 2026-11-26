@@ -5,13 +5,15 @@ import {
   FaUserPlus, FaLayerGroup, FaRobot, FaChevronRight, FaCircle,
   FaUser, FaCheckCircle, FaClock, FaTrophy, FaSync, FaCalendarAlt, FaFileAlt
 } from 'react-icons/fa';
-import { BASE_URL, STORAGE_KEYS } from '../config/api.config';
+import { BASE_URL, STORAGE_KEYS, API_ENDPOINTS, extractArray } from '../config/api.config';
 import axios from 'axios';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { collectMyIds, getTokenClaims } from '../Task/taskScope';
 import {
   getUnifiedTodayAttendance,
   getCurrentUserTodayShift,
   getStoredShifts,
+  recordMatchesCurrentEmployee,
   format12Hour
 } from '../utils/rosterUtils';
 
@@ -26,6 +28,89 @@ const fmtK     = (n) => { const v = (n || 0) / 1000; return v >= 1 ? `₹${v.toF
 const clean    = (n) => (n || '').replace(/\s*null\s*/gi, ' ').replace(/\s+/g, ' ').trim();
 const ini      = (n) => { const p = clean(n).split(' ').filter(Boolean); return (p.length > 1 ? p[0][0] + p[p.length - 1][0] : p[0]?.[0] || '?').toUpperCase(); };
 const cap      = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase().replace(/_/g, ' ') : '';
+
+const normalizeRoleValue = (raw) => {
+  if (!raw) return null;
+  let str = typeof raw === 'object' ? (raw.name || raw.roleName || raw.role || '') : String(raw);
+  if (!str) return null;
+  if (str.toUpperCase().startsWith('ROLE_')) str = str.substring(5);
+  const up = str.toUpperCase().replace(/[\s_-]+/g, '');
+  if (up === 'ADMIN' || up === 'ADMINISTRATOR' || up === 'SUPERADMIN') return 'Admin';
+  if (up === 'HR' || up === 'HUMANRESOURCE' || up === 'HUMANRESOURCES' || up === 'HROFFICER' || up === 'HRMANAGER') return 'Hr';
+  if (up === 'MANAGER') return 'Manager';
+  if (up === 'EMPLOYEE') return 'Employee';
+  return null;
+};
+
+const resolveDashboardRole = (cu, statsData) => {
+  try {
+    const uData = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_DATA) || '{}');
+    const candidates = [
+      statsData?.loggedInUserRole,
+      localStorage.getItem(STORAGE_KEYS.ROLE),
+      localStorage.getItem('roleName'),
+      localStorage.getItem('role'),
+      localStorage.getItem('userRole'),
+      cu?.role,
+      cu?.roleName,
+      cu?.role?.name,
+      uData?.role,
+      uData?.roleName,
+      uData?.role?.name,
+    ];
+    for (const raw of candidates) {
+      const role = normalizeRoleValue(raw);
+      if (role) return role;
+    }
+    const claims = getTokenClaims();
+    const tokenRole = claims?.role || claims?.roles || claims?.roleName || claims?.authorities || claims?.auth;
+    if (Array.isArray(tokenRole)) {
+      const first = tokenRole.find(Boolean);
+      const parsed = normalizeRoleValue(typeof first === 'string' ? first : first?.authority || first?.role);
+      if (parsed) return parsed;
+    } else if (tokenRole) {
+      const parsed = normalizeRoleValue(tokenRole);
+      if (parsed) return parsed;
+    }
+  } catch {}
+  return 'Employee';
+};
+
+const isTaskOverdueForDashboard = (t) => {
+  if (!t?.dueDate || t.status === 'COMPLETED' || t.status === 'REJECTED') return false;
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+  return new Date(t.dueDate) < todayMidnight;
+};
+
+const taskBelongsToEmployee = (t, myIds, myFullName) => {
+  const assigneeId = t?.assignedToId ?? t?.assigneeId ?? (typeof t?.assignedTo === 'object' ? t.assignedTo?.id : null);
+  const assigneeName = clean(
+    typeof t?.assignedTo === 'object'
+      ? (t.assignedTo?.name || `${t.assignedTo?.firstName || ''} ${t.assignedTo?.lastName || ''}`)
+      : t?.assignedTo
+  ).toLowerCase();
+
+  if (assigneeId != null && myIds.size > 0 && myIds.has(String(assigneeId))) return true;
+  if (assigneeName && myFullName && assigneeName === myFullName) return true;
+
+  if (Array.isArray(t?.subtasks) && t.subtasks.some(st => {
+    const stId = st?.assignedToId ?? st?.assigneeId ?? (typeof st?.assignedTo === 'object' ? st.assignedTo?.id : null);
+    const stName = clean(
+      typeof st?.assignedTo === 'object'
+        ? (st.assignedTo?.name || `${st.assignedTo?.firstName || ''} ${st.assignedTo?.lastName || ''}`)
+        : st?.assignedTo
+    ).toLowerCase();
+    if (stId != null && myIds.size > 0 && myIds.has(String(stId))) return true;
+    if (stName && myFullName && stName === myFullName) return true;
+    return false;
+  })) {
+    return true;
+  }
+
+  if ((assigneeId != null && myIds.size > 0) || (assigneeName && myFullName)) return false;
+  return true;
+};
 
 /* ─── Design tokens ───────────────────────────────────────────── */
 const BRAND   = '#6B1E2E';
@@ -195,7 +280,7 @@ export default function Dashboard({ user }) {
   const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
 
   // ── Unified Shift & Attendance Interconnection ──
-  const [todayAttendance, setTodayAttendance] = useState(() => getUnifiedTodayAttendance());
+  const [todayAttendance, setTodayAttendance] = useState(() => getUnifiedTodayAttendance(cu));
   const activeShift = useMemo(() => {
     const shifts = getStoredShifts();
     const code = todayAttendance?.shiftCode;
@@ -203,13 +288,19 @@ export default function Dashboard({ user }) {
       const found = shifts.find(sh => sh.code === code);
       if (found) return found;
     }
-    return getCurrentUserTodayShift();
-  }, [todayAttendance]);
+    return getCurrentUserTodayShift(cu);
+  }, [todayAttendance, cu]);
 
   useEffect(() => {
+    setTodayAttendance(getUnifiedTodayAttendance(cu));
     const handleSync = (e) => {
-      const rec = e?.detail || getUnifiedTodayAttendance();
-      setTodayAttendance(rec);
+      if (e?.detail) {
+        if (recordMatchesCurrentEmployee(e.detail, cu)) {
+          setTodayAttendance(e.detail);
+        }
+        return;
+      }
+      setTodayAttendance(getUnifiedTodayAttendance(cu));
     };
     window.addEventListener('hrms_attendance_updated', handleSync);
     window.addEventListener('hrms_today_punches_updated', handleSync);
@@ -219,7 +310,7 @@ export default function Dashboard({ user }) {
       window.removeEventListener('hrms_today_punches_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
-  }, []);
+  }, [cu]);
 
   const tasks = s.recentTasks        || [];
   const emps  = s.recentEmployees    || [];

@@ -11,13 +11,16 @@ import {
   calculateShiftAttendance,
   syncAttendanceRecord,
   getUnifiedTodayAttendance,
+  getCurrentEmployeeIdentity,
+  recordMatchesCurrentEmployee,
+  filterBackendRecordsForCurrentEmployee,
   getStoredShifts,
   saveStoredShifts,
   getTodayDateYMD,
   format12Hour
 } from '../utils/rosterUtils';
 
-const AttendanceDashboard = () => {
+const AttendanceDashboard = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [todayRecord, setTodayRecord] = useState(null);
   const [stats, setStats] = useState({
@@ -142,7 +145,7 @@ const AttendanceDashboard = () => {
         const id = String(empId || '').trim();
         const n = String(name || '').trim().toLowerCase();
 
-        if (!e && !id && !n) return true;
+        if (!e && !id && !n) return false;
         if (currentEmp) {
           if (e === currentEmp) return true;
           if (e && (e.startsWith(currentEmp) || currentEmp.startsWith(e))) return true;
@@ -234,14 +237,16 @@ const AttendanceDashboard = () => {
   };
 
   const getTodayPunchStorageKey = () => {
-    const currentEmpId = String(localStorage.getItem(STORAGE_KEYS.EMPLOYEE_ID) || localStorage.getItem(STORAGE_KEYS.USERNAME) || 'user');
-    return `hrms_today_punch_${getTodayStr()}_${currentEmpId}`;
+    const { storageScope } = getCurrentEmployeeIdentity(user);
+    return `hrms_today_punch_${getTodayStr()}_${storageScope}`;
   };
 
   const getSavedTodayPunch = () => {
     try {
       const raw = localStorage.getItem(getTodayPunchStorageKey());
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return recordMatchesCurrentEmployee(parsed, user) ? parsed : null;
     } catch {
       return null;
     }
@@ -249,7 +254,13 @@ const AttendanceDashboard = () => {
 
   const saveTodayPunch = (record) => {
     try {
-      localStorage.setItem(getTodayPunchStorageKey(), JSON.stringify(record));
+      const { employeeId, username } = getCurrentEmployeeIdentity(user);
+      const tagged = {
+        ...record,
+        employeeId: record.employeeId || employeeId || undefined,
+        employeeUsername: record.employeeUsername || username || undefined
+      };
+      localStorage.setItem(getTodayPunchStorageKey(), JSON.stringify(tagged));
     } catch {}
   };
 
@@ -258,7 +269,7 @@ const AttendanceDashboard = () => {
       let rawRecords = [];
       try {
         const response = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
-        rawRecords = parseAttendanceRecords(response.data);
+        rawRecords = filterBackendRecordsForCurrentEmployee(parseAttendanceRecords(response.data), user);
       } catch (err) {
         console.warn('GET_MY_ATTENDANCE error:', err);
       }
@@ -271,7 +282,7 @@ const AttendanceDashboard = () => {
             params: { month: now.getMonth() + 1, year: now.getFullYear() },
             ...getAuthConfig()
           });
-          rawRecords = parseAttendanceRecords(dashRes.data);
+          rawRecords = filterBackendRecordsForCurrentEmployee(parseAttendanceRecords(dashRes.data), user);
         } catch (e) {}
       }
 
@@ -279,7 +290,7 @@ const AttendanceDashboard = () => {
       rawRecords = mergeClientSiteApprovedAttendance(rawRecords);
 
       const todayStr = getTodayStr();
-      const unifiedPunch = getUnifiedTodayAttendance();
+      const unifiedPunch = getUnifiedTodayAttendance(user);
       const savedPunch = getSavedTodayPunch();
       const todayData = rawRecords.find(record => {
         const rDate = normalizeDate(record.date || record.attendanceDate || record.punchDate || record.checkInDate);
@@ -298,8 +309,11 @@ const AttendanceDashboard = () => {
       });
 
       if (checkIn || todayData || unifiedPunch?.checkIn || savedPunch) {
+        const { employeeId, username } = getCurrentEmployeeIdentity(user);
         const recordObj = {
           id: todayData?.id || unifiedPunch?.id || savedPunch?.id || `today-${todayStr}`,
+          employeeId: employeeId || undefined,
+          employeeUsername: username || undefined,
           checkIn,
           checkOut,
           hours: calc.workingHours || todayData?.workingHours || 0,
@@ -319,7 +333,7 @@ const AttendanceDashboard = () => {
         };
         setTodayRecord(recordObj);
         saveTodayPunch(recordObj);
-        syncAttendanceRecord(recordObj, false);
+        syncAttendanceRecord(recordObj, false, user);
       } else {
         setTodayRecord(null);
       }
@@ -401,7 +415,7 @@ const AttendanceDashboard = () => {
           params: { month: target.getMonth() + 1, year: target.getFullYear() },
           ...getAuthConfig()
         });
-        records = parseAttendanceRecords(response.data);
+        records = filterBackendRecordsForCurrentEmployee(parseAttendanceRecords(response.data), user);
       } catch (e) {
         console.warn('Dashboard stats fetch error:', e);
       }
@@ -471,10 +485,10 @@ const AttendanceDashboard = () => {
     try {
       localStorage.removeItem('hrms_current_user_shift_override');
     } catch {}
-    const todayAssigned = getCurrentUserTodayShift();
+    const todayAssigned = getCurrentUserTodayShift(user);
     if (todayAssigned) return todayAssigned;
     return shiftsList[0] || DEFAULT_SHIFTS[0];
-  }, [shiftsList, shiftVersion]);
+  }, [shiftsList, shiftVersion, user]);
 
   const effectiveTime = currentTime;
   const timingRules = evaluateShiftTimingRules(activeShift, effectiveTime);
@@ -500,8 +514,11 @@ const AttendanceDashboard = () => {
         shift: activeShift
       });
 
+      const { employeeId, username } = getCurrentEmployeeIdentity(user);
       const newRecord = {
         id: `today-${todayStr}`,
+        employeeId: employeeId || undefined,
+        employeeUsername: username || undefined,
         date: todayStr,
         checkIn: nowTime,
         checkOut: null,
@@ -518,7 +535,7 @@ const AttendanceDashboard = () => {
 
       setTodayRecord(newRecord);
       saveTodayPunch(newRecord);
-      syncAttendanceRecord(newRecord, true);
+      syncAttendanceRecord(newRecord, true, user);
 
       const lateNotice = calc.isLate ? ` (Late: ${calc.lateMinutes} mins)` : ' (On-Time)';
       toast.success('Database Synced', `Checked in successfully for ${activeShift.name}!${lateNotice}`);
@@ -554,9 +571,12 @@ const AttendanceDashboard = () => {
         breakMinutes: activeShift.breakMinutes || 0
       });
 
+      const { employeeId, username } = getCurrentEmployeeIdentity(user);
       const updatedRecord = {
         ...(todayRecord || {}),
         id: todayRecord?.id || `today-${todayStr}`,
+        employeeId: employeeId || todayRecord?.employeeId || undefined,
+        employeeUsername: username || todayRecord?.employeeUsername || undefined,
         date: todayStr,
         checkIn: inTime,
         checkOut: nowTime,
@@ -575,7 +595,7 @@ const AttendanceDashboard = () => {
 
       setTodayRecord(updatedRecord);
       saveTodayPunch(updatedRecord);
-      syncAttendanceRecord(updatedRecord, true);
+      syncAttendanceRecord(updatedRecord, true, user);
 
       const statusLabel = calc.status === 'HALF_DAY' ? 'Half Day' : 'Full Day';
       const otNotice = calc.overtimeHours > 0 ? ` (+${calc.overtimeHours}h OT)` : '';
@@ -601,7 +621,8 @@ const AttendanceDashboard = () => {
     fetchShiftAndPolicyData();
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
 
-    const handleVerificationSync = () => {
+    const handleVerificationSync = (e) => {
+      if (e?.detail && !recordMatchesCurrentEmployee(e.detail, user)) return;
       fetchTodayStatus();
       fetchMonthlyStats(currentMonth);
     };
@@ -626,7 +647,7 @@ const AttendanceDashboard = () => {
       window.removeEventListener('hrms_active_policy_updated', handleShiftUpdated);
       window.removeEventListener('storage', handleVerificationSync);
     };
-  }, [currentMonth, fetchShiftAndPolicyData]);
+  }, [currentMonth, fetchShiftAndPolicyData, user]);
 
   const isCheckedIn = todayRecord?.checkIn && !todayRecord?.checkOut;
   const isCheckedOut = todayRecord?.checkOut !== null && todayRecord?.checkOut !== undefined;

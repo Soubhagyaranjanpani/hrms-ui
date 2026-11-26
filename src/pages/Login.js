@@ -63,6 +63,14 @@ const Login = ({ onLogin }) => {
       }
       if (!resolvedRole) resolvedRole = 'EMPLOYEE';
 
+      // Clear stale session/shared attendance keys before saving new user
+      [
+        'employee_joining_date',
+        'hrms_today_punches',
+        'hrms_attendance_logs',
+        'hrms_current_user_shift_override'
+      ].forEach((k) => localStorage.removeItem(k));
+
       // Save to localStorage
       localStorage.setItem(STORAGE_KEYS.JWT_TOKEN, jwtToken);
       localStorage.setItem(STORAGE_KEYS.EMPLOYEE_ID, employeeId);

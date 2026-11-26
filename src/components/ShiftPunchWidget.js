@@ -16,6 +16,9 @@ import {
   calculateShiftAttendance,
   syncAttendanceRecord,
   getUnifiedTodayAttendance,
+  getCurrentEmployeeIdentity,
+  recordMatchesCurrentEmployee,
+  filterBackendRecordsForCurrentEmployee,
   format12Hour,
   getTodayDateYMD
 } from '../utils/rosterUtils';
@@ -24,9 +27,9 @@ const ShiftPunchWidget = ({ user, onAttendanceChange, embeddedMode = false }) =>
   // Current real-time clock
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Today's attendance state
+  // Today's attendance state (strictly scoped to current employee)
   const [todayRecord, setTodayRecord] = useState(() => {
-    return getUnifiedTodayAttendance();
+    return getUnifiedTodayAttendance(user);
   });
 
   const [loading, setLoading] = useState(false);
@@ -38,7 +41,7 @@ const ShiftPunchWidget = ({ user, onAttendanceChange, embeddedMode = false }) =>
   const shiftsList = getStoredShifts();
 
   // Active shift resolution (strictly from official roster or active policy)
-  const activeShift = getCurrentUserTodayShift() || shiftsList[0] || DEFAULT_SHIFTS[0];
+  const activeShift = getCurrentUserTodayShift(user) || shiftsList[0] || DEFAULT_SHIFTS[0];
 
   // Effective real-time for rule checks
   const effectiveTime = currentTime;
@@ -78,8 +81,10 @@ const ShiftPunchWidget = ({ user, onAttendanceChange, embeddedMode = false }) =>
   const fetchTodayStatus = useCallback(async () => {
     try {
       const today = getTodayDateYMD();
+      const { employeeId, username } = getCurrentEmployeeIdentity(user);
       const res = await axios.get(API_ENDPOINTS.GET_MY_ATTENDANCE, getAuthConfig());
-      const records = res.data?.response || res.data?.data || res.data?.content || res.data || [];
+      const rawRecords = res.data?.response || res.data?.data || res.data?.content || res.data || [];
+      const records = filterBackendRecordsForCurrentEmployee(rawRecords, user);
       if (Array.isArray(records)) {
         const todayMatch = records.find(r => {
           const d = String(r.date || r.attendanceDate || '').split('T')[0];
@@ -97,6 +102,8 @@ const ShiftPunchWidget = ({ user, onAttendanceChange, embeddedMode = false }) =>
 
           const updated = {
             date: today,
+            employeeId: employeeId || undefined,
+            employeeUsername: username || undefined,
             checkIn: cIn,
             checkOut: cOut,
             status: calc.status,
@@ -111,21 +118,31 @@ const ShiftPunchWidget = ({ user, onAttendanceChange, embeddedMode = false }) =>
             earlyExitMinutes: calc.earlyExitMinutes
           };
           setTodayRecord(updated);
-          syncAttendanceRecord(updated, false);
+          syncAttendanceRecord(updated, false, user);
           return;
         }
       }
-    } catch {}
-  }, [getAuthConfig, activeShift]);
+      setTodayRecord(getUnifiedTodayAttendance(user));
+    } catch {
+      setTodayRecord(getUnifiedTodayAttendance(user));
+    }
+  }, [getAuthConfig, activeShift, user]);
 
   useEffect(() => {
+    setTodayRecord(getUnifiedTodayAttendance(user));
     fetchTodayStatus();
-  }, [fetchTodayStatus]);
+  }, [fetchTodayStatus, user]);
 
-  // Synchronize across all components and windows
+  // Synchronize across all components and windows (only for matching employee)
   useEffect(() => {
     const handleSync = (e) => {
-      const rec = e?.detail || getUnifiedTodayAttendance();
+      if (e?.detail) {
+        if (e.detail.date === getTodayDateYMD() && recordMatchesCurrentEmployee(e.detail, user)) {
+          setTodayRecord(e.detail);
+        }
+        return;
+      }
+      const rec = getUnifiedTodayAttendance(user);
       if (rec && rec.date === getTodayDateYMD()) {
         setTodayRecord(rec);
       }
@@ -138,7 +155,7 @@ const ShiftPunchWidget = ({ user, onAttendanceChange, embeddedMode = false }) =>
       window.removeEventListener('hrms_today_punches_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
-  }, []);
+  }, [user]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CHECK IN HANDLER
@@ -179,8 +196,11 @@ const ShiftPunchWidget = ({ user, onAttendanceChange, embeddedMode = false }) =>
           shift: activeShift
         });
 
+        const { employeeId, username } = getCurrentEmployeeIdentity(user);
         const updated = {
           date: today,
+          employeeId: employeeId || undefined,
+          employeeUsername: username || undefined,
           checkIn: nowTimeStr,
           checkOut: null,
           status: calc.status,
@@ -195,7 +215,7 @@ const ShiftPunchWidget = ({ user, onAttendanceChange, embeddedMode = false }) =>
           punchedAt: new Date().toISOString()
         };
         setTodayRecord(updated);
-        syncAttendanceRecord(updated, true);
+        syncAttendanceRecord(updated, true, user);
 
         const lateNotice = calc.isLate ? ` (Late by ${calc.lateMinutes} mins)` : ' (On-Time)';
         toast.success(
@@ -267,9 +287,12 @@ const ShiftPunchWidget = ({ user, onAttendanceChange, embeddedMode = false }) =>
           breakMinutes: activeShift.breakMinutes || 0
         });
 
+        const { employeeId, username } = getCurrentEmployeeIdentity(user);
         const updated = {
           ...todayRecord,
           date: today,
+          employeeId: employeeId || todayRecord.employeeId || undefined,
+          employeeUsername: username || todayRecord.employeeUsername || undefined,
           checkIn: todayRecord.checkIn,
           checkOut: nowTimeStr,
           status: calc.status,
@@ -286,7 +309,7 @@ const ShiftPunchWidget = ({ user, onAttendanceChange, embeddedMode = false }) =>
         };
 
         setTodayRecord(updated);
-        syncAttendanceRecord(updated, true);
+        syncAttendanceRecord(updated, true, user);
 
         const statusText = calc.status === 'PRESENT' ? 'Full Day Present' : 'Half Day';
         const otText = calc.overtimeHours > 0 ? ` (OT: +${calc.overtimeHours} hrs)` : '';
