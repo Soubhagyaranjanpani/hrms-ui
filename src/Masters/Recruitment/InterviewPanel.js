@@ -95,7 +95,7 @@ const InterviewPanelMaster = () => {
     }
     return true;
   };
-
+  
   // ============================================
   // FETCH PANELS
   // ============================================
@@ -104,7 +104,7 @@ const InterviewPanelMaster = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `${BASE_URL}/api/recuirment/getAllInterviewPanel`,
+        `${BASE_URL}/api/recuirment/getAllInterviewPanel`, 
         axiosConfig
       );
       const list = Array.isArray(res.data) ? res.data : (res.data?.response || []);

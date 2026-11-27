@@ -1,137 +1,61 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  FaSave, FaTimes, FaPlus, FaSearch, FaEdit, FaTrash, 
-  FaArrowLeft, FaArrowRight, FaCheckCircle, FaCircle
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import {
+  FaSave, FaTimes, FaPlus, FaEdit,
+  FaArrowLeft
 } from 'react-icons/fa';
+import axios from 'axios';
+import { toast } from '../../components/Toast';
+import { BASE_URL, STORAGE_KEYS } from '../../config/api.config';
 
+// ============================================
+// TOAST NOTIFICATION (fallback helper, unused but kept)
+// ============================================
 const showToast = (type, title, message) => {
   const toastContainer = document.getElementById('toast-container') || createToastContainer();
-  const toast = document.createElement('div');
-  toast.className = `toast-notification toast-${type}`;
-  toast.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6'};color:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:300px;margin-bottom:8px;">
+  const el = document.createElement('div');
+  const colors = { success: '#10b981', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' };
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:${colors[type] || '#3b82f6'};color:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:300px;margin-bottom:8px;">
       <span style="font-weight:600;">${title}</span>
       <span style="flex:1;">${message}</span>
-      <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:white;cursor:pointer;font-size:18px;">×</button>
-    </div>
-  `;
-  toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
+      <button onclick="this.parentElement.remove()" style="background:none;border:none;color:white;cursor:pointer;font-size:18px;">×</button>
+    </div>`;
+  toastContainer.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
 };
 
 const createToastContainer = () => {
-  const container = document.createElement('div');
-  container.id = 'toast-container';
-  container.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-width: 500px;
-  `;
-  document.body.appendChild(container);
-  return container;
+  const c = document.createElement('div');
+  c.id = 'toast-container';
+  c.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:500px;';
+  document.body.appendChild(c);
+  return c;
 };
 
 const SourceManagement = () => {
-  // State for sources
-  const [sources, setSources] = useState([
-    { 
-      id: 1, 
-      sourceCode: 'SRC001', 
-      sourceName: 'LinkedIn', 
-      category: 'Online', 
-      description: 'Professional networking platform',
-      displayOrder: 1,
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-15T10:30:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    { 
-      id: 2, 
-      sourceCode: 'SRC002', 
-      sourceName: 'Naukri.com', 
-      category: 'Online', 
-      description: 'Leading job portal in India',
-      displayOrder: 2,
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-01-20T14:20:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    { 
-      id: 3, 
-      sourceCode: 'SRC003', 
-      sourceName: 'Employee Referral', 
-      category: 'Referral', 
-      description: 'Referrals from existing employees',
-      displayOrder: 3,
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-02-01T09:15:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    { 
-      id: 4, 
-      sourceCode: 'SRC004', 
-      sourceName: 'Campus Recruitment', 
-      category: 'Campus', 
-      description: 'College campus placements',
-      displayOrder: 4,
-      status: 'Inactive',
-      createdBy: 'Admin',
-      createdDate: '2026-02-10T11:45:00Z',
-      modifiedBy: 'Admin',
-      modifiedDate: '2026-07-20T16:30:00Z'
-    },
-    { 
-      id: 5, 
-      sourceCode: 'SRC005', 
-      sourceName: 'Consultancy', 
-      category: 'Agency', 
-      description: 'External recruitment agencies',
-      displayOrder: 5,
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-03-05T08:50:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    },
-    { 
-      id: 6, 
-      sourceCode: 'SRC006', 
-      sourceName: 'Walk-in', 
-      category: 'Direct', 
-      description: 'Walk-in candidates',
-      displayOrder: 6,
-      status: 'Active',
-      createdBy: 'Admin',
-      createdDate: '2026-04-12T13:10:00Z',
-      modifiedBy: null,
-      modifiedDate: null
-    }
-  ]);
+  // ============================================
+  // STATE
+  // ============================================
+  const [sources, setSources] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editingSource, setEditingSource] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
+
+  const [categories, setCategories] = useState([]);
+
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [statusAction, setStatusAction] = useState({
-    id: null,
-    name: '',
-    newStatus: ''
-  });
+  const [statusAction, setStatusAction] = useState({ id: null, name: '', newStatus: '' });
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // Dropdown refs
+  const categoryRef = useRef(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -146,53 +70,126 @@ const SourceManagement = () => {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  // Category options
-  // const categories = [
-  //   { value: 'Online', label: 'Online' },
-  //   { value: 'Referral', label: 'Referral' },
-  //   { value: 'Campus', label: 'Campus' },
-  //   { value: 'Agency', label: 'Agency' },
-  //   { value: 'Direct', label: 'Direct' },
-  //   { value: 'Social Media', label: 'Social Media' },
-  //   { value: 'Other', label: 'Other' }
-  // ];
+  // ============================================
+  // AUTH
+  // ============================================
+  const getAuthToken = () => localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
+  const axiosConfig = {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      'Content-Type': 'application/json'
+    }
+  };
 
+  const ensureToken = () => {
+    if (!getAuthToken()) {
+      toast.error('Authentication Required', 'Please login to continue');
+      return false;
+    }
+    return true;
+  };
 
+  // ============================================
+  // FETCH SOURCES
+  // ============================================
+  const fetchSources = useCallback(async () => {
+    if (!ensureToken()) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/api/recruitment-source`, axiosConfig);
+      const list = Array.isArray(res.data) ? res.data : (res.data?.response || []);
 
-  
+      const mapped = list.map((item) => {
+        const isActive =
+          String(item.status ?? '').toLowerCase() === 'y' ||
+          item.status === true ||
+          String(item.status ?? '').toLowerCase() === 'active';
 
+        // ✅ Normalize category — could be a string, an object, or null
+        // const category =
+        //   typeof item.category === 'object' && item.category !== null
+        //     ? (item.category.name || item.category.categoryName || '')
+        //     : (item.category || '');
+        const categoryId =
+          typeof item.category === 'object' && item.category !== null
+            ? item.category.id
+            : item.categoryId ?? item.category ?? '';
 
+        const categoryName =
+          typeof item.category === 'object' && item.category !== null
+            ? (item.category.name || item.category.categoryName || '')
+            : '';
 
+        return {
+          id: item.id,
+          sourceCode: item.sourceCode || '',
+          sourceName: item.sourceName || '',
+          categoryId: categoryId,
+          categoryName: categoryName,
+          description: item.description || '',
+          displayOrder: item.displayOrder ?? '',
+          status: isActive ? 'Active' : 'Inactive',
+          createdBy: item.createdBy || '—',
+          createdDate: item.createdDate || null,
+          modifiedBy: item.modifiedBy || null,
+          modifiedDate: item.modifiedDate || null
+        };
+      });
 
+      setSources(mapped);
+    } catch (err) {
+      console.error('🔴 [fetchSources] error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to fetch recruitment sources');
+      setSources([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  // Filtered sources
+  // ============================================
+  // FETCH CATEGORIES
+  // ============================================
+  const fetchCategories = useCallback(async () => {
+    if (!ensureToken()) return;
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/api/source_category/list?flag=1`,
+        axiosConfig
+      );
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error('[fetchCategories] error:', error);
+      toast.error('Error', error.response?.data?.message || 'Failed to fetch source categories');
+      setCategories([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSources();
+    fetchCategories();
+  }, [fetchSources, fetchCategories]);
+
+  // ============================================
+  // FILTER & PAGINATION
+  // ============================================
   const filteredSources = sources.filter(src => {
     const search = searchTerm.toLowerCase();
-    return src.sourceCode.toLowerCase().includes(search) ||
-           src.sourceName.toLowerCase().includes(search) ||
-           src.category.toLowerCase().includes(search) ||
-           (src.description && src.description.toLowerCase().includes(search));
+    return (
+      src.sourceCode.toLowerCase().includes(search) ||
+      src.sourceName.toLowerCase().includes(search) ||
+      src.category.toLowerCase().includes(search) ||
+      (src.description && src.description.toLowerCase().includes(search))
+    );
   });
 
-  // Pagination
   const totalItems = filteredSources.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = page * rowsPerPage;
   const currentSources = filteredSources.slice(startIndex, startIndex + rowsPerPage);
 
-  // Format date
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Get pagination range
+  // ============================================
+  // UTILITIES
+  // ============================================
   const getPaginationRange = () => {
     const delta = 2;
     const range = [];
@@ -204,7 +201,6 @@ const SourceManagement = () => {
     return range;
   };
 
-  // Generate source code
   const generateSourceCode = () => {
     const count = sources.length + 1;
     const prefix = 'SRC';
@@ -212,7 +208,18 @@ const SourceManagement = () => {
     return `${prefix}${padded}`;
   };
 
-  // Reset form
+  // Click outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (categoryRef.current && !categoryRef.current.contains(e.target)) { /* no-op */ }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // ============================================
+  // FORM FUNCTIONS
+  // ============================================
   const resetForm = () => {
     setFormData({
       sourceCode: generateSourceCode(),
@@ -227,213 +234,194 @@ const SourceManagement = () => {
     setEditingSource(null);
   };
 
-  // Handle form field change
   const handleChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
-    if (touched[field]) {
-      validateField(field, value);
-    }
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (touched[field]) validateField(field, value);
   };
 
-  // Validate field
   const validateField = (field, value) => {
     let error = '';
-
     if (field === 'sourceName') {
-      if (!value) {
-        error = 'Source Name is required';
-      } else if (value.length > 100) {
-        error = 'Source Name must be 100 characters or less';
-      } else if (/[^a-zA-Z0-9\s\-\.]/.test(value)) {
-        error = 'No special characters allowed';
-      } else {
-        // Check uniqueness (excluding current editing source)
-        const duplicate = sources.some(src => 
-          src.sourceName.toLowerCase() === value.toLowerCase() && 
+      if (!value) error = 'Source Name is required';
+      else if (value.length > 100) error = 'Source Name must be 100 characters or less';
+      else if (/[^a-zA-Z0-9\s\-\.]/.test(value)) error = 'No special characters allowed';
+      else {
+        const dup = sources.some(src =>
+          src.sourceName.toLowerCase() === value.toLowerCase() &&
           (!editingSource || src.id !== editingSource.id)
         );
-        if (duplicate) {
-          error = 'Source Name must be unique';
-        }
+        if (dup) error = 'Source Name must be unique';
       }
     } else if (field === 'category' && !value) {
       error = 'Category is required';
     }
-
     setErrors(prev => ({ ...prev, [field]: error }));
     return error === '';
   };
 
-  // Handle blur
   const handleBlur = (field) => {
     setTouched(prev => ({ ...prev, [field]: true }));
     validateField(field, formData[field]);
   };
 
-  // Validate form
   const validateForm = () => {
-    const fieldsToValidate = ['sourceName', 'category'];
     const newErrors = {};
-
-    for (const field of fieldsToValidate) {
-      if (!formData[field]) {
-        newErrors[field] = 'This field is required';
+    const fields = ['sourceName', 'category'];
+    for (const f of fields) {
+      if (!formData[f]) {
+        newErrors[f] = 'This field is required';
       }
     }
-
-    // Additional validation for sourceName
     if (formData.sourceName) {
-      if (formData.sourceName.length > 100) {
-        newErrors.sourceName = 'Source Name must be 100 characters or less';
-      } else if (/[^a-zA-Z0-9\s\-\.]/.test(formData.sourceName)) {
-        newErrors.sourceName = 'No special characters allowed';
-      } else {
-        const duplicate = sources.some(src => 
-          src.sourceName.toLowerCase() === formData.sourceName.toLowerCase() && 
+      if (formData.sourceName.length > 100) newErrors.sourceName = 'Source Name must be 100 characters or less';
+      else if (/[^a-zA-Z0-9\s\-\.]/.test(formData.sourceName)) newErrors.sourceName = 'No special characters allowed';
+      else {
+        const dup = sources.some(src =>
+          src.sourceName.toLowerCase() === formData.sourceName.toLowerCase() &&
           (!editingSource || src.id !== editingSource.id)
         );
-        if (duplicate) {
-          newErrors.sourceName = 'Source Name must be unique';
-        }
+        if (dup) newErrors.sourceName = 'Source Name must be unique';
       }
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle submit
-  const handleSubmit = (e) => {
+  // ============================================
+  // CRUD
+  // ============================================
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!ensureToken()) return;
     if (!validateForm()) {
       showToast('warning', 'Validation Error', 'Please fix the highlighted fields');
       return;
     }
-
-    const sourceData = {
-      sourceCode: formData.sourceCode,
-      sourceName: formData.sourceName,
-      category: formData.category,
-      description: formData.description || '',
-      displayOrder: formData.displayOrder ? parseInt(formData.displayOrder) : null,
-      status: formData.status
-    };
-
-    if (editingSource) {
-      // Update existing source
-      const updated = sources.map(src =>
-        src.id === editingSource.id
-          ? { 
-              ...src, 
-              ...sourceData,
-              modifiedBy: 'Admin',
-              modifiedDate: new Date().toISOString()
-            }
-          : src
-      );
-      setSources(updated);
-      showToast('success', 'Success', 'Recruitment source updated successfully');
-    } else {
-      // Add new source
-      const newSource = {
-        id: Date.now(),
-        ...sourceData,
-        createdBy: 'Admin',
-        createdDate: new Date().toISOString(),
-        modifiedBy: null,
-        modifiedDate: null
+    setSubmitting(true);
+    try {
+      const payload = {
+        id: editingSource ? editingSource.id : 0,
+        sourceCode: formData.sourceCode,
+        sourceName: formData.sourceName,
+        category: Number(formData.category),
+        description: formData.description || '',
+        displayOrder: formData.displayOrder ? parseInt(formData.displayOrder, 10) : null,
+        status: 'y'
       };
-      setSources([newSource, ...sources]);
-      showToast('success', 'Success', 'Recruitment source added successfully');
-    }
 
-    resetForm();
-    setShowForm(false);
-    setPage(0);
+      let res;
+      if (editingSource) {
+        res = await axios.put(
+          `${BASE_URL}/api/recruitment-source/${editingSource.id}`,
+          payload,
+          axiosConfig
+        );
+      } else {
+        res = await axios.post(
+          `${BASE_URL}/api/recruitment-source`,
+          payload,
+          axiosConfig
+        );
+      }
+
+      if (res.status === 200 || res.status === 201) {
+        toast.success('Success', editingSource ? 'Recruitment source updated successfully' : 'Recruitment source created successfully');
+        resetForm();
+        setShowForm(false);
+        setPage(0);
+        fetchSources();
+      } else {
+        throw new Error(res.data?.message || 'Operation failed');
+      }
+    } catch (err) {
+      console.error('🔴 [submit] error:', err);
+      toast.error('Error', err.response?.data?.message || err.message || 'Something went wrong');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // Handle edit
-  const handleEdit = (source) => {
-    if (source.status === 'Inactive') {
-      showToast('warning', 'Cannot Edit', 'Inactive sources cannot be edited');
-      return;
-    }
-    setEditingSource(source);
-    setFormData({
-      sourceCode: source.sourceCode,
-      sourceName: source.sourceName,
-      category: source.category,
-      description: source.description || '',
-      displayOrder: source.displayOrder ? String(source.displayOrder) : '',
-      status: source.status
-    });
-    setShowForm(true);
-  };
+ const handleEdit = (item) => {
+  if (item.status === 'Inactive') {
+    showToast('warning', 'Cannot Edit', 'Inactive sources cannot be edited');
+    return;
+  }
 
-  // Handle delete
-  const handleDelete = (source) => {
-    setDeleteTarget(source);
+  setEditingSource(item);
+
+  setFormData({
+    sourceCode: item.sourceCode,
+    sourceName: item.sourceName,
+    category: String(item.categoryId || ''),
+    description: item.description || '',
+    displayOrder: item.displayOrder ? String(item.displayOrder) : '',
+    status: item.status
+  });
+
+  setShowForm(true);
+};
+
+  const handleDelete = (item) => {
+    setDeleteTarget(item);
     setShowDeleteModal(true);
   };
 
   const confirmDelete = () => {
-    const isUsed = false; 
-    
-    if (isUsed) {
-      showToast('error', 'Cannot Delete', 'This source is already in use and cannot be deleted');
-      setShowDeleteModal(false);
-      setDeleteTarget(null);
-      return;
-    }
-
-    const updated = sources.filter(src => src.id !== deleteTarget.id);
+    if (!ensureToken()) return;
+    const updated = sources.filter(item => item.id !== deleteTarget.id);
     setSources(updated);
     showToast('success', 'Deleted', `${deleteTarget.sourceName} has been deleted`);
     setShowDeleteModal(false);
     setDeleteTarget(null);
   };
 
-  // Handle status toggle
   const handleStatusToggle = (id, name, currentStatus) => {
-    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
     setStatusAction({
       id,
       name,
-      newStatus
+      newStatus: currentStatus === 'Active' ? 'Inactive' : 'Active'
     });
     setShowStatusModal(true);
   };
 
-  const confirmStatusChange = () => {
-    const { id, newStatus } = statusAction;
-    const updated = sources.map(src =>
-      src.id === id
-        ? { 
-            ...src, 
-            status: newStatus,
-            modifiedBy: 'Admin',
-            modifiedDate: new Date().toISOString()
-          }
-        : src
-    );
-    setSources(updated);
-    setShowStatusModal(false);
-    showToast('success', 'Status Updated', `${statusAction.name} is now ${newStatus}`);
+  const confirmStatusChange = async () => {
+    if (!ensureToken()) return;
+    const { id, newStatus, name } = statusAction;
+    setLoading(true);
+    try {
+      const res = await axios.put(
+        `${BASE_URL}/api/recruitment-source/updateRecruitmentSourceStatus/${id}`,
+        { status: newStatus === 'Active' ? 'y' : 'n' },
+        axiosConfig
+      );
+
+      if (res.status === 200) {
+        toast.success('Status Updated', `${name} is now ${newStatus}`);
+        fetchSources();
+      } else {
+        throw new Error(res.data?.message || 'Failed to change status');
+      }
+    } catch (err) {
+      console.error('🔴 [statusToggle] error:', err);
+      toast.error('Error', err.response?.data?.message || 'Failed to change status');
+    } finally {
+      setLoading(false);
+      setShowStatusModal(false);
+      setStatusAction({ id: null, name: '', newStatus: '' });
+    }
   };
 
-  // Cancel form
-  const handleCancelForm = () => {
-    resetForm();
-    setShowForm(false);
-  };
+  const handleCancelForm = () => { resetForm(); setShowForm(false); };
 
-  // Add new source
   const handleAddNew = () => {
     resetForm();
     setFormData(prev => ({ ...prev, sourceCode: generateSourceCode() }));
     setShowForm(true);
   };
 
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <div className="cert-root">
       {/* Header */}
@@ -449,9 +437,9 @@ const SourceManagement = () => {
             </button>
           )}
           {showForm && (
-            <button 
-              type="button" 
-              className="cert-back-btn" 
+            <button
+              type="button"
+              className="cert-back-btn"
               onClick={handleCancelForm}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}
             >
@@ -462,32 +450,32 @@ const SourceManagement = () => {
       </div>
 
       {showForm ? (
-        /* Form Section */
+        /* ================= FORM ================= */
         <div className="cert-form-wrap">
           <form onSubmit={handleSubmit} className="cert-form-compact">
             <div className="cert-form-section-compact">
               <div className="cert-section-label">Recruitment Source Details</div>
               <div className="cert-form-grid-3col">
-                {/* Source Code - Auto */}
+
+                {/* Source Code */}
                 <div className="cert-field-compact">
-                  <label>Source Code</label>
-                  <input 
-                    type="text" 
-                    className="form-control bg-light" 
-                    value={formData.sourceCode} 
-                    readOnly 
+                  <label className="required">Source Code</label>
+                  <input
+                    type="text"
+                    value={formData.sourceCode}
+                    readOnly
                     placeholder="Auto-generated"
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                    style={{ fontSize: '14px', padding: '6px 12px', background: '#f3f4f6' }}
                   />
                   <small style={{ fontSize: '12px', color: '#6b7280' }}>Auto-generated</small>
                 </div>
 
-                {/* Source Name - Required */}
+                {/* Source Name */}
                 <div className={`cert-field-compact ${touched.sourceName && errors.sourceName ? 'has-error' : ''}`}>
                   <label className="required">Source Name</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g., LinkedIn, Naukri.com" 
+                  <input
+                    type="text"
+                    placeholder="e.g., LinkedIn, Naukri.com"
                     value={formData.sourceName}
                     onChange={(e) => handleChange('sourceName', e.target.value)}
                     onBlur={() => handleBlur('sourceName')}
@@ -497,27 +485,32 @@ const SourceManagement = () => {
                   <small style={{ fontSize: '12px', color: '#6b7280' }}>Max 100 characters, no special characters</small>
                 </div>
 
-                {/* Category - Required */}
+                {/* Category */}
                 <div className={`cert-field-compact ${touched.category && errors.category ? 'has-error' : ''}`}>
                   <label className="required">Source Category</label>
-                  <select 
-                    value={formData.category} 
+                  <select
+                    value={formData.category}
                     onChange={(e) => handleChange('category', e.target.value)}
                     onBlur={() => handleBlur('category')}
-                    style={{ fontSize: '14px', padding: '6px 12px' }}
+                    style={{ fontSize: '14px', padding: '6px 12px', width: '100%', borderRadius: '8px', border: '1px solid #d1d5db' }}
                   >
                     <option value="">Select Category</option>
-                    {/* {categories.map(cat => (
-                      <option key={cat.value} value={cat.value}>{cat.label}</option>
-                    ))} */}
+                    {categories.length === 0 && (
+                      <option value="" disabled>Loading categories…</option>
+                    )}
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
                   </select>
                   <FieldError msg={errors.category} />
                 </div>
 
-                {/* Description - Text Area */}
+                {/* Description */}
                 <div className="cert-field-compact" style={{ gridColumn: 'span 1' }}>
                   <label>Description</label>
-                  <textarea 
+                  <textarea
                     rows="2"
                     placeholder="Enter description (optional)"
                     value={formData.description}
@@ -529,9 +522,9 @@ const SourceManagement = () => {
                 {/* Display Order */}
                 <div className="cert-field-compact">
                   <label>Display Sequence</label>
-                  <input 
-                    type="number" 
-                    placeholder="e.g., 1, 2, 3" 
+                  <input
+                    type="number"
+                    placeholder="e.g., 1, 2, 3"
                     value={formData.displayOrder}
                     onChange={(e) => handleChange('displayOrder', e.target.value)}
                     style={{ fontSize: '14px', padding: '6px 12px' }}
@@ -539,7 +532,6 @@ const SourceManagement = () => {
                   <small style={{ fontSize: '12px', color: '#6b7280' }}>Optional - determines display order</small>
                 </div>
 
-            
               </div>
             </div>
 
@@ -548,20 +540,17 @@ const SourceManagement = () => {
               <button type="button" className="cert-cancel-btn" onClick={handleCancelForm}>
                 <FaTimes size={12} /> Cancel
               </button>
-             
-              <button type="submit" className="cert-add-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <FaSave size={12} /> {editingSource ? 'Update' : 'Save'}
+              <button type="submit" className="cert-add-btn" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FaSave size={12} /> {submitting ? 'Saving...' : (editingSource ? 'Update' : 'Save')}
               </button>
             </div>
           </form>
         </div>
       ) : (
-        /* Table Section */
+        /* ================= TABLE ================= */
         <>
-          {/* Search Bar */}
           <div className="emp-search-bar">
             <div className="emp-search-wrap">
-              {/* <FaSearch className="emp-search-icon" size={12} /> */}
               <input
                 className="emp-search-input"
                 type="text"
@@ -576,10 +565,8 @@ const SourceManagement = () => {
                 </button>
               )}
             </div>
-           
           </div>
 
-          {/* Table */}
           <div className="cert-table-card">
             <div className="cert-table-wrap">
               <table className="cert-table">
@@ -605,15 +592,11 @@ const SourceManagement = () => {
                             {src.sourceCode}
                           </span>
                         </td>
+                        <td><strong>{src.sourceName}</strong></td>
                         <td>
-                          <strong>{src.sourceName}</strong>
-                        </td>
-                        <td>
-                          <span className="cert-status-badge" style={{ 
-                            background: '#e0e7ff', 
-                            color: '#4f46e5',
-                            fontSize: '12px',
-                            padding: '2px 10px'
+                          <span style={{
+                            background: '#e0e7ff', color: '#4f46e5',
+                            fontSize: '12px', padding: '2px 10px', borderRadius: '10px'
                           }}>
                             {src.category}
                           </span>
@@ -621,76 +604,53 @@ const SourceManagement = () => {
                         <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {src.description || '—'}
                         </td>
-                        <td style={{ textAlign: 'center' }}>
-                          {src.displayOrder || '—'}
-                        </td>
+                        <td style={{ textAlign: 'center' }}>{src.displayOrder || '—'}</td>
                         <td style={{ textAlign: 'center' }}>
                           <div
-                            className="d-flex align-items-center justify-content-center gap-1"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => handleStatusToggle(
-                              src.id,
-                              src.sourceName,
-                              src.status || 'Active'
-                            )}
+                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                            onClick={() => handleStatusToggle(src.id, src.sourceName, src.status || 'Active')}
                           >
-                            <div
-                              style={{
-                                width: '28px',
-                                height: '16px',
-                                borderRadius: '50px',
-                                backgroundColor: (src.status || 'Active') === 'Active' ? '#9d174d' : '#d1d5db',
-                                position: 'relative',
+                            <div style={{
+                              width: '28px', height: '16px', borderRadius: '50px',
+                              backgroundColor: (src.status || 'Active') === 'Active' ? '#9d174d' : '#d1d5db',
+                              position: 'relative', transition: '.2s'
+                            }}>
+                              <div style={{
+                                width: '12px', height: '12px', borderRadius: '50%',
+                                background: '#fff', position: 'absolute', top: '2px',
+                                left: (src.status || 'Active') === 'Active' ? '14px' : '2px',
                                 transition: '.2s'
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  background: '#fff',
-                                  position: 'absolute',
-                                  top: '2px',
-                                  left: (src.status || 'Active') === 'Active' ? '14px' : '2px',
-                                  transition: '.2s'
-                                }}
-                              />
+                              }} />
                             </div>
-                            <span
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 500,
-                                color: (src.status || 'Active') === 'Active' ? '#9d174d' : '#94a3b8'
-                              }}
-                            >
+                            <span style={{
+                              fontSize: '11px', fontWeight: 500,
+                              color: (src.status || 'Active') === 'Active' ? '#9d174d' : '#94a3b8'
+                            }}>
                               {src.status || 'Active'}
                             </span>
                           </div>
                         </td>
-                      
                         <td>
                           <div className="cert-actions" style={{ justifyContent: 'center' }}>
-                            <button 
-                              className="cert-act cert-act--edit" 
-                              onClick={() => handleEdit(src)} 
+                            <button
+                              className="cert-act cert-act--edit"
+                              onClick={() => handleEdit(src)}
                               title={src.status === 'Inactive' ? 'Cannot edit inactive record' : 'Edit'}
                               disabled={src.status === 'Inactive'}
-                              style={{ 
+                              style={{
                                 opacity: src.status === 'Inactive' ? 0.5 : 1,
                                 cursor: src.status === 'Inactive' ? 'not-allowed' : 'pointer'
                               }}
                             >
                               <FaEdit size={12} />
                             </button>
-                            
                           </div>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="9" className="text-center py-5" style={{ color: '#6b7280' }}>
+                      <td colSpan="8" className="text-center py-5" style={{ color: '#6b7280' }}>
                         No recruitment sources found
                       </td>
                     </tr>
@@ -705,58 +665,36 @@ const SourceManagement = () => {
                 <div className="cert-table-info" style={{ fontSize: '13px', color: '#6b7280' }}>
                   Showing {startIndex + 1} to {Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems} sources
                 </div>
-                
                 <div className="cert-pagination" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <button 
-                    className="cert-page-btn" 
-                    disabled={page === 0} 
+                  <button
+                    disabled={page === 0}
                     onClick={() => setPage(page - 1)}
-                    style={{ 
-                      padding: '6px 12px', 
-                      border: '1px solid #e5e7eb', 
-                      background: 'white', 
-                      borderRadius: '6px', 
-                      cursor: 'pointer', 
-                      fontSize: '12px'
-                    }}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
                   >
                     ← Prev
                   </button>
                   {getPaginationRange().map((pg, i) =>
                     pg === '...' ? (
-                      <span key={i} className="cert-page-dots" style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
+                      <span key={i} style={{ padding: '6px 4px', color: '#6b7280' }}>…</span>
                     ) : (
-                      <button 
-                        key={pg} 
-                        className={`cert-page-num ${pg === page ? 'active' : ''}`} 
+                      <button
+                        key={pg}
                         onClick={() => setPage(pg)}
-                        style={{ 
-                          padding: '6px 10px', 
-                          border: '1px solid #e5e7eb', 
-                          background: pg === page ? '#9d174d' : 'white', 
+                        style={{
+                          padding: '6px 10px', border: '1px solid #e5e7eb',
+                          background: pg === page ? '#9d174d' : 'white',
                           color: pg === page ? 'white' : '#374151',
-                          borderRadius: '6px', 
-                          cursor: 'pointer', 
-                          fontSize: '12px',
-                          minWidth: '34px'
+                          borderRadius: '6px', cursor: 'pointer', fontSize: '12px', minWidth: '34px'
                         }}
                       >
                         {pg + 1}
                       </button>
                     )
                   )}
-                  <button 
-                    className="cert-page-btn" 
-                    disabled={page + 1 >= totalPages} 
+                  <button
+                    disabled={page + 1 >= totalPages}
                     onClick={() => setPage(page + 1)}
-                    style={{ 
-                      padding: '6px 12px', 
-                      border: '1px solid #e5e7eb', 
-                      background: 'white', 
-                      borderRadius: '6px', 
-                      cursor: 'pointer', 
-                      fontSize: '12px'
-                    }}
+                    style={{ padding: '6px 12px', border: '1px solid #e5e7eb', background: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
                   >
                     Next →
                   </button>
@@ -767,13 +705,11 @@ const SourceManagement = () => {
         </>
       )}
 
-      {/* Status Change Modal */}
+      {/* STATUS MODAL */}
       {showStatusModal && (
         <div className="emp-modal-overlay" onClick={() => setShowStatusModal(false)}>
           <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="emp-modal-icon">
-              {statusAction.newStatus === 'Active' ? '✅' : '⛔'}
-            </div>
+            <div className="emp-modal-icon">{statusAction.newStatus === 'Active' ? '✅' : '⛔'}</div>
             <h3 className="emp-modal-title">Confirm Status Change</h3>
             <p className="emp-modal-body">
               Are you sure you want to{' '}
@@ -793,7 +729,7 @@ const SourceManagement = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* DELETE MODAL */}
       {showDeleteModal && deleteTarget && (
         <div className="emp-modal-overlay" onClick={() => setShowDeleteModal(false)}>
           <div className="emp-modal" onClick={(e) => e.stopPropagation()}>
@@ -803,7 +739,7 @@ const SourceManagement = () => {
               Are you sure you want to delete <strong>{deleteTarget.sourceName}</strong>?
             </p>
             <p className="emp-modal-warn" style={{ color: '#dc2626' }}>
-              {deleteTarget.status === 'Active' 
+              {deleteTarget.status === 'Active'
                 ? 'This source is currently active. It cannot be deleted if already used in candidate registrations.'
                 : 'This action cannot be undone.'}
             </p>
@@ -820,7 +756,7 @@ const SourceManagement = () => {
   );
 };
 
-// Field Error Component
+// FIELD ERROR
 const FieldError = ({ msg }) => msg ? <span className="text-danger small">{msg}</span> : null;
 
 export default SourceManagement;
