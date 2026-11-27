@@ -38,9 +38,12 @@ import {
 import {
   getNormalizedRole,
   normalizeRole,
-  cleanPersonName
+  cleanPersonName,
+  safeReadJson,
+  parseApiError
 } from './taskAccess';
 import { getStoredUser, fetchScopedEmployeesPool } from './taskScope';
+import TaskModuleNav from './TaskModuleNav';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import './TaskModule.css';
@@ -105,9 +108,9 @@ export default function TaskProgressChart({ user, isEmployee: isEmployeeProp }) 
 
     Promise.all(requests)
       .then(async ([res, branchRes, empPool]) => {
-        const data = await res.json();
+        const data = await safeReadJson(res);
         if (!active) return;
-        if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+        if (!res.ok) throw new Error(parseApiError(res, data, 'Could not load progress'));
         const body = data.response ?? data.data ?? data;
         let list = Array.isArray(body) ? body : body ? [body] : extractArray(data);
 
@@ -662,6 +665,7 @@ export default function TaskProgressChart({ user, isEmployee: isEmployeeProp }) 
 
   return (
     <div className="tm-page tm-page--compact">
+      <TaskModuleNav user={currentUser} />
       <div className="tm-card">
         {/* Header & Filters */}
         <div className="tm-card-header">

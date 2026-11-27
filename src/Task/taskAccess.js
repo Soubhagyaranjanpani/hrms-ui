@@ -130,6 +130,83 @@ export const unwrapResponse = (data) => {
   return data.response ?? data.data ?? data;
 };
 
+export const TASK_UPDATED_EVENT = 'hrms_task_updated';
+
+export const notifyTaskDataChanged = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(TASK_UPDATED_EVENT));
+  }
+};
+
+export const safeReadJson = async (res) => {
+  if (!res) return {};
+  try {
+    const text = await res.text();
+    if (!text || !text.trim()) return {};
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+};
+
+export const parseApiError = (res, data, fallback = 'Request failed') => {
+  if (res?.status === 401) {
+    return 'Session expired or unauthorized (401). Please sign in again.';
+  }
+  if (res?.status === 403) {
+    return 'Access denied (403): You are not authorized to perform this action.';
+  }
+  return data?.message || data?.error || `${fallback}${res?.status ? ` (HTTP ${res.status})` : ''}`;
+};
+
+export const toLocalDateStr = (val) => {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    if (/^\d{4}-\d{2}-\d{2}T00:00:00/.test(trimmed)) return trimmed.slice(0, 10);
+  }
+  const d = val instanceof Date ? val : new Date(val);
+  if (isNaN(d)) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+export const getNextBusinessDateStr = (fromDate = new Date()) => {
+  const d = new Date(fromDate);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 1);
+  while (d.getDay() === 0 || d.getDay() === 6) {
+    d.setDate(d.getDate() + 1);
+  }
+  return toLocalDateStr(d);
+};
+
+export const formatBusinessDateLabel = (dateStr) => {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+export const isTaskOverdue = (task) => {
+  if (!task?.dueDate || task.status === 'COMPLETED' || task.status === 'REJECTED') return false;
+  const due = toLocalDateStr(task.dueDate);
+  const today = toLocalDateStr(new Date());
+  if (!due || !today) return false;
+  return due < today;
+};
+
+export const getSubmissionLocalDate = (sub) => {
+  if (!sub) return '';
+  if (sub.submissionDate) return toLocalDateStr(sub.submissionDate);
+  if (sub.submittedAt) return toLocalDateStr(sub.submittedAt);
+  if (sub.createdAt) return toLocalDateStr(sub.createdAt);
+  return '';
+};
+
 export const calculateEffortFromDates = (dueDateStr, startDateStr = '') => {
   if (!dueDateStr) return '';
 

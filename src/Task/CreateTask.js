@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FaSave, FaExclamationCircle, FaArrowLeft,
@@ -6,35 +6,64 @@ import {
   FaCheckCircle, FaTags, FaFlag
 } from 'react-icons/fa';
 import { toast } from '../components/Toast';
-import { API_ENDPOINTS, STORAGE_KEYS } from '../config/api.config';
+import { API_ENDPOINTS, getAuthHeaders, extractArray } from '../config/api.config';
 import {
   getNormalizedRole,
+  normalizeRole,
+  cleanPersonName,
+  unwrapResponse,
+  safeReadJson,
+  parseApiError,
+  toLocalDateStr,
+  notifyTaskDataChanged,
   calculateEffortFromDates
 } from './taskAccess';
-import { getStoredUser, scopeEmployeesForRole } from './taskScope';
+import { getStoredUser, scopeEmployeesForRole, fetchScopedEmployeesPool } from './taskScope';
 import LoadingSpinner from '../components/LoadingSpinner';
 import './TaskModule.css';
 
-// Helper to extract array from various API response formats
-const extractArray = (data) => {
-  if (data?.response && Array.isArray(data.response)) return data.response;
-  if (data?.response?.content && Array.isArray(data.response.content)) return data.response.content;
-  if (Array.isArray(data)) return data;
-  if (data?.data && Array.isArray(data.data)) return data.data;
-  if (data?.data?.content && Array.isArray(data.data.content)) return data.data.content;
-  if (data?.content && Array.isArray(data.content)) return data.content;
-  console.warn('Unexpected data format:', data);
-  return [];
-};
+const norm = (v) => (v == null ? '' : String(v).trim().toLowerCase());
 
-const cleanEmployeeName = (name) => {
-  if (!name) return '';
-  return name.replace(/\s+null\s*/gi, '').trim();
-};
+const normalizeAssigneeList = (raw, refById = new Map()) => {
+  const arr = extractArray(raw);
+  const flat = arr.flatMap(group => {
+    if (Array.isArray(group?.employees)) {
+      return group.employees.map(emp => ({
+        ...emp,
+        departmentId: emp.departmentId ?? emp.department?.id ?? group.departmentId,
+        departmentName: emp.departmentName ?? emp.department?.name ?? group.departmentName,
+        branchId: emp.branchId ?? emp.branch?.id ?? group.branchId,
+        branchName: emp.branchName ?? emp.branch?.name ?? group.branchName,
+      }));
+    }
+    return [group];
+  });
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const dedup = new Map();
+  flat.forEach(emp => {
+    const id = emp?.id ?? emp?.employeeId ?? emp?.userId;
+    if (!emp || id == null) return;
+    const key = String(id);
+    const ref = refById.get(key) || {};
+    dedup.set(key, {
+      ...ref,
+      ...emp,
+      id,
+      name: cleanPersonName(emp.name || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || ref.name),
+      roleName: emp.roleName || emp.role || ref.roleName || ref.role,
+      departmentId: emp.departmentId ?? emp.department?.id ?? ref.departmentId,
+      departmentName:
+        emp.departmentName ??
+        (typeof emp.department === 'object' ? emp.department?.name : emp.department) ??
+        ref.departmentName,
+      branchId: emp.branchId ?? emp.branch?.id ?? ref.branchId,
+      branchName:
+        emp.branchName ??
+        (typeof emp.branch === 'object' ? emp.branch?.name : emp.branch) ??
+        ref.branchName,
+    });
+  });
+  return [...dedup.values()];
 };
 
 const PRIORITIES = [
@@ -66,17 +95,23 @@ export default function CreateTask({ user }) {
   const location = useLocation();
   const currentUser = user || getStoredUser();
   const userRole = getNormalizedRole(currentUser);
+  const isAdmin = userRole === 'Admin';
   const isManagerOrHR = userRole === 'Manager' || userRole === 'Hr';
 
-  const taskToEdit = location.state?.taskToEdit;
+  const navTaskToEdit = location.state?.taskToEdit;
   const isEditing = location.state?.isEditing || false;
 
+  const [taskToEdit, setTaskToEdit] = useState(navTaskToEdit || null);
   const [branches, setBranches] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [filteredDepts, setFilteredDepts] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [referenceEmployees, setReferenceEmployees] = useState([]);
+  const [deptAssignees, setDeptAssignees] = useState(null);
+  const [loadingDeptAssignees, setLoadingDeptAssignees] = useState(false);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [loadingDrops, setLoadingDrops] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [dataLoaded, setDataLoaded] = useState(false);
 
   const [form, setForm] = useState({
@@ -95,56 +130,78 @@ export default function CreateTask({ user }) {
   const [touched, setTouched] = useState({});
   const [effortEdited, setEffortEdited] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
-  // Fetch dropdown data
+  // Fetch dropdown data (+ fresh task details when editing)
   useEffect(() => {
+    let active = true;
     const fetchDropdowns = async () => {
+      setLoadingDrops(true);
+      setLoadError('');
       try {
-        const requests = [
-          fetch(API_ENDPOINTS.GET_ACTIVE_BRANCHES, { headers: getAuthHeaders() }),
-          fetch(API_ENDPOINTS.GET_TASK_ASSIGNEES, { headers: getAuthHeaders() }),
-          fetch(API_ENDPOINTS.GET_ACTIVE_DEPARTMENTS, { headers: getAuthHeaders() }),
-        ];
-        if (isManagerOrHR) {
-          requests.push(
-            fetch(`${API_ENDPOINTS.GET_EMPLOYEES}?page=0&size=200`, { headers: getAuthHeaders() }).catch(() => null)
-          );
-        }
-
-        const [branchRes, empRes, deptRes, allEmpRes] = await Promise.all(requests);
-        const [branchData, empData, deptData, allEmpData] = await Promise.all([
-          branchRes.json(),
-          empRes.json(),
-          deptRes.json(),
-          allEmpRes && allEmpRes.ok ? allEmpRes.json().catch(() => null) : Promise.resolve(null),
+        const headers = getAuthHeaders();
+        const [branchRes, empRes, deptRes, empPool, freshTaskRes] = await Promise.all([
+          fetch(API_ENDPOINTS.GET_ACTIVE_BRANCHES, { headers }),
+          fetch(API_ENDPOINTS.GET_TASK_ASSIGNEES, { headers }),
+          fetch(API_ENDPOINTS.GET_ACTIVE_DEPARTMENTS, { headers }),
+          fetchScopedEmployeesPool(currentUser, { includeAssigneesMeta: false, failClosed: isManagerOrHR }).catch(() => null),
+          isEditing && navTaskToEdit?.id
+            ? fetch(API_ENDPOINTS.GET_TASK_BY_ID(navTaskToEdit.id), { headers }).catch(() => null)
+            : Promise.resolve(null),
         ]);
 
+        const [branchData, empData, deptData, freshTaskJson] = await Promise.all([
+          safeReadJson(branchRes),
+          safeReadJson(empRes),
+          safeReadJson(deptRes),
+          freshTaskRes ? safeReadJson(freshTaskRes) : Promise.resolve(null),
+        ]);
+
+        if (!active) return;
+
+        if (!branchRes.ok) throw new Error(parseApiError(branchRes, branchData, 'Could not load branches'));
+        if (!deptRes.ok) throw new Error(parseApiError(deptRes, deptData, 'Could not load departments'));
+        if (!empRes.ok) throw new Error(parseApiError(empRes, empData, 'Could not load eligible assignees'));
+
+        if (freshTaskRes?.ok && freshTaskJson) {
+          const fresh = unwrapResponse(freshTaskJson);
+          if (fresh && typeof fresh === 'object') {
+            setTaskToEdit(fresh);
+          }
+        }
+
         const rawBranches = extractArray(branchData);
-        const rawDepts = extractArray(deptData);
-        if (!empRes.ok) throw new Error('Could not load eligible assignees');
+        const rawDepts = extractArray(deptData).map(d => ({
+          ...d,
+          branchId: d.branchId ?? d.branch?.id ?? null,
+          branchName:
+            d.branchName ??
+            (typeof d.branch === 'object' ? d.branch?.name : typeof d.branch === 'string' && isNaN(Number(d.branch)) ? d.branch : ''),
+        }));
 
-        let loadedEmployees = extractArray(empData).flatMap(group =>
-          (group.employees || []).map(employee => ({
-            ...employee,
-            roleName: employee.roleName || employee.role,
-            departmentId: employee.departmentId ?? group.departmentId,
-            departmentName: employee.departmentName ?? group.departmentName,
-            branchId: employee.branchId ?? group.branchId,
-          }))
-        );
+        const refPool = empPool?.rawEmployees || [];
+        setReferenceEmployees(refPool);
+        const refById = new Map();
+        refPool.forEach(r => {
+          const id = r?.id ?? r?.employeeId ?? r?.userId;
+          if (id != null) refById.set(String(id), r);
+        });
 
-        const referenceEmployees = allEmpData ? extractArray(allEmpData) : [];
+        let loadedEmployees = normalizeAssigneeList(empData, refById);
+        // Merge reference employees if GET_TASK_ASSIGNEES returned a subset without branch/role info
+        if (loadedEmployees.length === 0 && refPool.length > 0) {
+          loadedEmployees = refPool;
+        }
+
         let scopedBranches = rawBranches;
         let scopedDepts = rawDepts;
 
-        // Restrict Manager & HR to only their own employees (never Admin/Manager/HR or other teams)
         if (isManagerOrHR) {
           loadedEmployees = scopeEmployeesForRole(loadedEmployees, currentUser, rawDepts, {
-            referenceEmployees,
-            failClosed: false,
+            referenceEmployees: refPool,
+            failClosed: true,
           });
 
-          // Limit Branch & Department dropdowns to those containing eligible employees (unless editing)
           if (!isEditing && loadedEmployees.length > 0) {
             const eligibleDeptIds = new Set(loadedEmployees.map(e => String(e.departmentId)).filter(Boolean));
             const filteredDeptList = rawDepts.filter(d => eligibleDeptIds.has(String(d.id)));
@@ -156,6 +213,11 @@ export default function CreateTask({ user }) {
               }
             }
           }
+        } else if (isAdmin) {
+          const managers = loadedEmployees.filter(e => normalizeRole(e.roleName || e.role) === 'Manager');
+          if (managers.length > 0) {
+            loadedEmployees = managers;
+          }
         }
 
         setBranches(scopedBranches);
@@ -163,7 +225,6 @@ export default function CreateTask({ user }) {
         setDepartments(scopedDepts);
         setDataLoaded(true);
 
-        // Auto-select branch/department when Manager or HR only has a single scope
         if (isManagerOrHR && !isEditing && scopedBranches.length === 1) {
           const singleBranchId = String(scopedBranches[0].id);
           const branchDepts = scopedDepts.filter(d => String(d.branchId) === singleBranchId);
@@ -174,28 +235,78 @@ export default function CreateTask({ user }) {
           }));
         }
       } catch (err) {
+        if (!active) return;
         console.error('Dropdown fetch error:', err);
+        setLoadError(err.message || 'Could not load form data');
         toast.error('Load Error', err.message || 'Could not load form data');
       } finally {
-        setLoadingDrops(false);
+        if (active) setLoadingDrops(false);
       }
     };
     fetchDropdowns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fetch department-specific assignees when department changes using GET /api/tasks/assignees?departmentId={id}
+  useEffect(() => {
+    if (!form.dept) {
+      setDeptAssignees(null);
+      return;
+    }
+    let active = true;
+    const loadDeptAssignees = async () => {
+      setLoadingDeptAssignees(true);
+      try {
+        const res = await fetch(API_ENDPOINTS.GET_DEPARTMENT_ASSIGNEES(form.dept), {
+          headers: getAuthHeaders(),
+        });
+        const data = await safeReadJson(res);
+        if (!active) return;
+        if (!res.ok) {
+          setDeptAssignees(null);
+          return;
+        }
+        const refById = new Map();
+        referenceEmployees.forEach(r => {
+          const id = r?.id ?? r?.employeeId ?? r?.userId;
+          if (id != null) refById.set(String(id), r);
+        });
+        let list = normalizeAssigneeList(data, refById).map(emp => ({
+          ...emp,
+          departmentId: emp.departmentId ?? form.dept,
+          branchId: emp.branchId ?? (form.branch || undefined),
+        }));
+
+        if (isManagerOrHR) {
+          list = scopeEmployeesForRole(list, currentUser, departments, {
+            referenceEmployees,
+            failClosed: true,
+          });
+        } else if (isAdmin) {
+          const managers = list.filter(e => normalizeRole(e.roleName || e.role) === 'Manager');
+          if (managers.length > 0 || list.some(e => Boolean(e.roleName || e.role))) {
+            list = managers;
+          }
+        }
+        setDeptAssignees(list);
+      } catch {
+        if (active) setDeptAssignees(null);
+      } finally {
+        if (active) setLoadingDeptAssignees(false);
+      }
+    };
+    loadDeptAssignees();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.dept, form.branch, dataLoaded]);
+
   // Pre-fill form when editing
   useEffect(() => {
     if (isEditing && taskToEdit && dataLoaded) {
-      let formattedDeadline = '';
-      if (taskToEdit.dueDate) {
-        const date = new Date(taskToEdit.dueDate);
-        formattedDeadline = date.toISOString().split('T')[0];
-      }
+      const formattedDeadline = toLocalDateStr(taskToEdit.dueDate);
 
       let priority = 'MEDIUM';
       if (taskToEdit.priority) {
-        const upper = taskToEdit.priority.toUpperCase();
+        const upper = String(taskToEdit.priority).toUpperCase();
         if (PRIORITIES.some(p => p.code === upper)) priority = upper;
       }
 
@@ -203,10 +314,10 @@ export default function CreateTask({ user }) {
       const taskBranchName =
         taskToEdit.branchName ||
         (typeof taskToEdit.branch === 'object' ? taskToEdit.branch?.name : taskToEdit.branch);
-      if (taskToEdit.branchId) branchId = String(taskToEdit.branchId);
-      else if (typeof taskToEdit.branch === 'object' && taskToEdit.branch?.id) branchId = String(taskToEdit.branch.id);
+      if (taskToEdit.branchId != null) branchId = String(taskToEdit.branchId);
+      else if (typeof taskToEdit.branch === 'object' && taskToEdit.branch?.id != null) branchId = String(taskToEdit.branch.id);
       else if (taskBranchName && branches.length) {
-        const found = branches.find(b => b.name === taskBranchName);
+        const found = branches.find(b => norm(b.name) === norm(taskBranchName));
         if (found) branchId = String(found.id);
       }
 
@@ -214,10 +325,15 @@ export default function CreateTask({ user }) {
       const taskDeptName =
         taskToEdit.departmentName ||
         (typeof taskToEdit.department === 'object' ? taskToEdit.department?.name : taskToEdit.department);
-      if (taskToEdit.departmentId) deptId = String(taskToEdit.departmentId);
-      else if (typeof taskToEdit.department === 'object' && taskToEdit.department?.id) deptId = String(taskToEdit.department.id);
+      if (taskToEdit.departmentId != null) deptId = String(taskToEdit.departmentId);
+      else if (typeof taskToEdit.department === 'object' && taskToEdit.department?.id != null) deptId = String(taskToEdit.department.id);
       else if (taskDeptName && departments.length) {
-        const found = departments.find(d => d.name === taskDeptName);
+        const found = departments.find(d => {
+          const sameName = norm(d.name) === norm(taskDeptName);
+          if (!sameName) return false;
+          if (!branchId) return true;
+          return String(d.branchId) === String(branchId);
+        }) || departments.find(d => norm(d.name) === norm(taskDeptName));
         if (found) deptId = String(found.id);
       }
 
@@ -227,10 +343,12 @@ export default function CreateTask({ user }) {
       }
 
       let assigneeId = '';
-      if (taskToEdit.assignedToId) assigneeId = String(taskToEdit.assignedToId);
-      else if (taskToEdit.assignedTo && employees.length) {
-        const found = employees.find(e =>
-          cleanEmployeeName(e.name) === cleanEmployeeName(taskToEdit.assignedTo)
+      const rawAssignedId = taskToEdit.assignedToId ?? taskToEdit.assigneeId ?? taskToEdit.assignedTo?.id;
+      if (rawAssignedId != null) assigneeId = String(rawAssignedId);
+      else if (taskToEdit.assignedTo) {
+        const pool = [...employees, ...referenceEmployees];
+        const found = pool.find(e =>
+          norm(cleanPersonName(e.name)) === norm(cleanPersonName(taskToEdit.assignedTo))
         );
         if (found) assigneeId = String(found.id);
       }
@@ -251,25 +369,62 @@ export default function CreateTask({ user }) {
         note: taskToEdit.note || '',
       });
     }
-  }, [isEditing, taskToEdit, dataLoaded, branches, departments, employees]);
+  }, [isEditing, taskToEdit, dataLoaded, branches, departments, employees, referenceEmployees]);
 
   // Filter departments based on branch
   useEffect(() => {
     if (form.branch && departments.length) {
-      setFilteredDepts(departments.filter(d => String(d.branchId) === String(form.branch)));
+      const selectedBranchObj = branches.find(b => String(b.id) === String(form.branch));
+      setFilteredDepts(
+        departments.filter(d => {
+          if (d.branchId != null) return String(d.branchId) === String(form.branch);
+          if (selectedBranchObj?.name && d.branchName) return norm(d.branchName) === norm(selectedBranchObj.name);
+          return false;
+        })
+      );
     } else setFilteredDepts([]);
-  }, [form.branch, departments]);
+  }, [form.branch, departments, branches]);
 
-  // Filter employees based on branch and department
+  // Filter assignees based on branch, department, and role
   useEffect(() => {
-    let filtered = [...employees];
-    if (form.branch) {
-      const ids = departments.filter(d => String(d.branchId) === String(form.branch)).map(d => String(d.id));
-      filtered = filtered.filter(e => ids.includes(String(e.departmentId)));
+    if (!form.branch || !form.dept) {
+      setFilteredEmployees([]);
+      return;
     }
-    if (form.dept) filtered = filtered.filter(e => String(e.departmentId) === String(form.dept));
-    setFilteredEmployees(filtered);
-  }, [employees, form.branch, form.dept, departments]);
+
+    const selectedDeptObj = departments.find(d => String(d.id) === String(form.dept));
+    const sourceList = Array.isArray(deptAssignees)
+      ? deptAssignees
+      : employees.filter(e => {
+          if (e.departmentId != null && String(e.departmentId) === String(form.dept)) return true;
+          if (selectedDeptObj?.name && e.departmentName && norm(e.departmentName) === norm(selectedDeptObj.name)) {
+            if (e.branchId != null) return String(e.branchId) === String(form.branch);
+            return true;
+          }
+          return false;
+        });
+
+    let finalPool = [...sourceList];
+
+    // While editing, preserve the currently assigned owner in the dropdown if backend returned them on the task
+    if (isEditing && taskToEdit?.assignedToId != null) {
+      const existingId = String(taskToEdit.assignedToId);
+      if (!finalPool.some(e => String(e.id) === existingId)) {
+        const refMatch = [...employees, ...referenceEmployees].find(e => String(e.id) === existingId);
+        if (refMatch) {
+          finalPool.push(refMatch);
+        } else if (taskToEdit.assignedTo) {
+          finalPool.push({
+            id: taskToEdit.assignedToId,
+            name: cleanPersonName(taskToEdit.assignedTo),
+            roleName: isAdmin ? 'Manager' : '',
+          });
+        }
+      }
+    }
+
+    setFilteredEmployees(finalPool);
+  }, [deptAssignees, employees, referenceEmployees, departments, form.branch, form.dept, isEditing, taskToEdit, isAdmin]);
 
   const validateField = (field, value) => {
     if (!value && ['title', 'assignee', 'branch', 'dept', 'deadline'].includes(field))
@@ -279,10 +434,8 @@ export default function CreateTask({ user }) {
     if (field === 'title' && value && value.trim().length > 100)
       return 'Maximum 100 characters allowed';
     if (field === 'deadline' && value && !isEditing) {
-      const selected = new Date(value);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (selected < today) return 'Deadline cannot be in the past';
+      const todayStr = toLocalDateStr(new Date());
+      if (value < todayStr) return 'Deadline cannot be in the past';
     }
     return '';
   };
@@ -321,6 +474,12 @@ export default function CreateTask({ user }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submittingRef.current || submitting) return;
+    if (userRole === 'Employee') {
+      toast.error('Access Denied', 'Employees cannot create or edit tasks');
+      return;
+    }
+
     const allFields = ['title', 'assignee', 'branch', 'dept', 'deadline'];
     setTouched(allFields.reduce((a, f) => ({ ...a, [f]: true }), {}));
     const errs = validateAll();
@@ -334,14 +493,15 @@ export default function CreateTask({ user }) {
       title: form.title.trim(),
       description: form.description.trim() || null,
       priority: form.priority,
-      assignedToId: parseInt(form.assignee),
-      departmentId: parseInt(form.dept),
-      branchId: parseInt(form.branch),
+      assignedToId: Number(form.assignee),
+      departmentId: Number(form.dept),
+      branchId: Number(form.branch),
       dueDate: form.deadline ? `${form.deadline}T00:00:00` : null,
-      effort: form.effort || null,
-      tags: form.tags || null,
+      effort: form.effort?.trim() || null,
+      tags: form.tags?.trim() || null,
     };
 
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       let url, method;
@@ -353,14 +513,16 @@ export default function CreateTask({ user }) {
         method = 'POST';
       }
       const res = await fetch(url, { method, headers: getAuthHeaders(), body: JSON.stringify(payload) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `Failed to ${isEditing ? 'update' : 'create'} task`);
-      toast.success(isEditing ? 'Task Updated' : 'Task Created', `"${form.title}" has been ${isEditing ? 'updated' : 'submitted'} successfully`);
+      const data = await safeReadJson(res);
+      if (!res.ok) throw new Error(parseApiError(res, data, `Failed to ${isEditing ? 'update' : 'create'} task`));
+      toast.success(isEditing ? 'Task Updated' : 'Task Created', `"${form.title.trim()}" has been ${isEditing ? 'updated' : 'created'} successfully`);
+      notifyTaskDataChanged();
       navigate('/TaskList');
     } catch (err) {
       console.error(err);
       toast.error('Error', err.message || 'Something went wrong');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -390,12 +552,12 @@ export default function CreateTask({ user }) {
   const readinessSteps = [
     { label: 'Scope', done: Boolean(form.branch && form.dept) },
     { label: 'Task Info', done: Boolean(form.title && form.title.trim().length >= 3) },
-    { label: 'Assignee', done: Boolean(form.assignee) },
+    { label: isAdmin ? 'Manager' : 'Assignee', done: Boolean(form.assignee) },
     { label: 'Deadline', done: Boolean(form.deadline) },
   ];
 
   const getInitials = (name) => {
-    const clean = cleanEmployeeName(name);
+    const clean = cleanPersonName(name);
     if (!clean) return '?';
     return clean
       .split(/\s+/)
@@ -405,6 +567,22 @@ export default function CreateTask({ user }) {
   };
 
   if (loadingDrops) return <LoadingSpinner message="Loading form data…" />;
+
+  if (userRole === 'Employee') {
+    return (
+      <div className="tm-page tm-page--narrow">
+        <div className="tm-card tm-card--padded" style={{ textAlign: 'center', padding: 36 }}>
+          <h2 className="tm-title" style={{ marginBottom: 8 }}>Access Restricted</h2>
+          <p className="tm-subtitle" style={{ justifyContent: 'center', marginBottom: 16 }}>
+            Employees cannot create or edit tasks. View your assigned tasks in the directory.
+          </p>
+          <button type="button" className="tm-btn tm-btn-primary" onClick={() => navigate('/TaskList')}>
+            <FaArrowLeft size={11} /> Back to My Tasks
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="tm-page">
@@ -440,6 +618,15 @@ export default function CreateTask({ user }) {
           </button>
         </div>
       </div>
+
+      {loadError && (
+        <div className="tm-alert tm-alert--danger" style={{ marginBottom: 14 }}>
+          <div className="tm-alert-text">
+            <FaExclamationCircle size={13} />
+            <span>{loadError}</span>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} noValidate>
         <div className="tm-create-layout">
@@ -536,7 +723,9 @@ export default function CreateTask({ user }) {
                 <h3 className="tm-form-section-title">
                   <FaBuilding size={13} color="var(--tm-primary)" /> Organization &amp; Assignment
                 </h3>
-                <span className="tm-form-section-sub">Branch → Department → Owner</span>
+                <span className="tm-form-section-sub">
+                  {isAdmin ? 'Branch → Department → Manager' : 'Branch → Department → Owner'}
+                </span>
               </div>
 
               <div className="tm-form-stack" style={{ gap: 12 }}>
@@ -588,11 +777,11 @@ export default function CreateTask({ user }) {
                   <div className="tm-field-label-row">
                     <label>
                       <span className="tm-step-badge">3</span>
-                      Assign To <span className="tm-req">*</span>
+                      {isAdmin ? 'Assign To Manager' : 'Assign To'} <span className="tm-req">*</span>
                     </label>
                     {form.branch && form.dept && (
                       <span className="tm-card-meta">
-                        {filteredEmployees.length} eligible
+                        {loadingDeptAssignees ? 'Loading…' : `${filteredEmployees.length} eligible`}
                       </span>
                     )}
                   </div>
@@ -600,18 +789,20 @@ export default function CreateTask({ user }) {
                     value={form.assignee}
                     onChange={(e) => handleChange('assignee', e.target.value)}
                     onBlur={() => handleBlur('assignee')}
-                    disabled={!form.branch || !form.dept || filteredEmployees.length === 0}
+                    disabled={!form.branch || !form.dept || loadingDeptAssignees || filteredEmployees.length === 0}
                   >
                     <option value="">
                       {!form.branch || !form.dept
                         ? 'Select branch & department first'
-                        : filteredEmployees.length === 0
-                          ? 'No eligible assignees'
-                          : 'Select employee or manager'}
+                        : loadingDeptAssignees
+                          ? 'Loading assignees…'
+                          : filteredEmployees.length === 0
+                            ? (isAdmin ? 'No managers found in this department' : 'No eligible assignees')
+                            : (isAdmin ? 'Select manager' : 'Select employee')}
                     </option>
                     {filteredEmployees.map(emp => (
                       <option key={emp.id} value={emp.id}>
-                        {cleanEmployeeName(emp.name)} {emp.roleName ? `· ${emp.roleName}` : ''}
+                        {cleanPersonName(emp.name)} {emp.roleName ? `· ${emp.roleName}` : ''}
                       </option>
                     ))}
                   </select>
@@ -623,7 +814,7 @@ export default function CreateTask({ user }) {
                         <div className="tm-assignee-avatar">{getInitials(selectedEmpObj.name)}</div>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--tm-text-primary)' }}>
-                            {cleanEmployeeName(selectedEmpObj.name)}
+                            {cleanPersonName(selectedEmpObj.name)}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--tm-text-muted)' }}>
                             {selectedDeptObj?.name || 'Department'} · {selectedBranchObj?.name || 'Branch'}
@@ -632,7 +823,7 @@ export default function CreateTask({ user }) {
                       </div>
                       <span className="tm-role-pill">
                         <FaUserCheck size={10} style={{ marginRight: 4 }} />
-                        {selectedEmpObj.roleName || 'Assignee'}
+                        {selectedEmpObj.roleName || (isAdmin ? 'Manager' : 'Assignee')}
                       </span>
                     </div>
                   )}
@@ -692,7 +883,7 @@ export default function CreateTask({ user }) {
                       value={form.deadline}
                       onChange={(e) => handleChange('deadline', e.target.value)}
                       onBlur={() => handleBlur('deadline')}
-                      min={!isEditing ? new Date().toISOString().split('T')[0] : undefined}
+                      min={!isEditing ? toLocalDateStr(new Date()) : undefined}
                     />
                     <FieldError msg={errors.deadline} />
                   </div>
@@ -745,7 +936,7 @@ export default function CreateTask({ user }) {
               <div className="tm-summary-row">
                 <span className="tm-summary-key">Assignee</span>
                 <span className="tm-summary-val">
-                  {selectedEmpObj ? cleanEmployeeName(selectedEmpObj.name) : 'Not selected'}
+                  {selectedEmpObj ? cleanPersonName(selectedEmpObj.name) : 'Not selected'}
                 </span>
               </div>
               <div className="tm-summary-row">

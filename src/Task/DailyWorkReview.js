@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FaCalendarAlt, FaClock, FaExternalLinkAlt,
@@ -7,9 +7,15 @@ import {
 } from 'react-icons/fa';
 import {
   API_ENDPOINTS,
-  getAuthHeaders
+  getAuthHeaders,
+  getMultipartAuthHeaders
 } from '../config/api.config';
-import { cleanPersonName } from './taskAccess';
+import {
+  cleanPersonName,
+  safeReadJson,
+  parseApiError,
+  notifyTaskDataChanged
+} from './taskAccess';
 import {
   buildReviewComment,
   parseReview
@@ -41,6 +47,7 @@ export default function DailyWorkReview({
   const [submittingAction, setSubmittingAction] = useState(null); // 'approve' | 'reject' | null
   const [downloading, setDownloading]           = useState(false);
   const [error, setError]                       = useState('');
+  const reviewBusyRef = useRef(false);
 
   // Reset form state whenever a different submission is selected
   useEffect(() => {
@@ -69,7 +76,7 @@ export default function DailyWorkReview({
 
   const review = async (approved) => {
     setError('');
-    if (!canReview || isBusy) return;
+    if (!canReview || isBusy || reviewBusyRef.current) return;
 
     if (approved && !rating) {
       setError('Please select a performance rating before approving.');
@@ -82,6 +89,7 @@ export default function DailyWorkReview({
     }
 
     try {
+      reviewBusyRef.current = true;
       setSubmittingAction(approved ? 'approve' : 'reject');
 
       const comment = approved
@@ -97,16 +105,18 @@ export default function DailyWorkReview({
         }
       );
 
-      const data = await response.json();
+      const data = await safeReadJson(response);
 
       if (!response.ok) {
-        throw new Error(data.message || 'Review failed');
+        throw new Error(parseApiError(response, data, 'Review failed'));
       }
 
+      notifyTaskDataChanged();
       onReviewed?.();
     } catch (err) {
       setError(err.message);
     } finally {
+      reviewBusyRef.current = false;
       setSubmittingAction(null);
     }
   };
@@ -119,11 +129,12 @@ export default function DailyWorkReview({
       setDownloading(true);
       const res = await fetch(
         API_ENDPOINTS.DOWNLOAD_PROOF(submission.id),
-        { headers: getAuthHeaders() }
+        { headers: getMultipartAuthHeaders() }
       );
 
       if (!res.ok) {
-        throw new Error('Proof download failed');
+        const errData = await safeReadJson(res);
+        throw new Error(parseApiError(res, errData, 'Proof download failed'));
       }
 
       const blob = await res.blob();

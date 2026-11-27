@@ -460,3 +460,223 @@ export const fetchScopedEmployeesPool = async (user, options = {}) => {
     departments,
   };
 };
+
+export const isTaskAssignedToIds = (task, myIds, myNameLower = '') => {
+  if (!task) return false;
+  const assignedToId =
+    task.assignedToId ??
+    task.assigneeId ??
+    (typeof task.assignedTo === 'object' ? task.assignedTo?.id : null);
+  if (assignedToId != null && myIds?.size > 0 && myIds.has(String(assignedToId))) {
+    return true;
+  }
+  const assignedToName = norm(cleanPersonName(task.assignedTo));
+  if (myNameLower && assignedToName && assignedToName === norm(myNameLower)) {
+    return true;
+  }
+  return false;
+};
+
+export const isTaskCreatedByIds = (task, myIds, myNameLower = '') => {
+  if (!task) return false;
+  const assignedById =
+    task.assignedById ??
+    task.createdById ??
+    (typeof task.assignedBy === 'object' ? task.assignedBy?.id : null);
+  if (assignedById != null && myIds?.size > 0 && myIds.has(String(assignedById))) {
+    return true;
+  }
+  const assignedByName = norm(cleanPersonName(task.assignedBy));
+  if (myNameLower && assignedByName && assignedByName === norm(myNameLower)) {
+    return true;
+  }
+  return false;
+};
+
+export const flattenUniqueTasks = (tasks = []) => {
+  const map = new Map();
+  const visit = (items, parentId = null) => {
+    (Array.isArray(items) ? items : []).forEach(task => {
+      if (!task || task.id == null) return;
+      const key = String(task.id);
+      const normalized = parentId != null && !(task.parentTaskId || task.parentId)
+        ? { ...task, parentTaskId: parentId }
+        : task;
+      if (!map.has(key)) {
+        map.set(key, normalized);
+      }
+      if (Array.isArray(task.subtasks) && task.subtasks.length > 0) {
+        visit(task.subtasks, task.id);
+      }
+    });
+  };
+  visit(tasks);
+  return [...map.values()];
+};
+
+export const hydrateMissingSubtasks = async (tasks = [], headers = getAuthHeaders()) => {
+  const list = Array.isArray(tasks) ? tasks : [];
+  const needsHydration = list.filter(
+    t =>
+      t &&
+      t.id != null &&
+      !(t.parentTaskId || t.parentId) &&
+      (!Array.isArray(t.subtasks) || (Number(t.subtaskCount) > 0 && t.subtasks.length === 0))
+  );
+  if (needsHydration.length === 0) return list;
+
+  const detailById = new Map();
+  await Promise.allSettled(
+    needsHydration.slice(0, 25).map(async t => {
+      const res = await fetch(API_ENDPOINTS.GET_TASK_BY_ID(t.id), { headers }).catch(() => null);
+      if (!res || !res.ok) return;
+      const json = await res.json().catch(() => null);
+      const detail = unwrapResponse(json);
+      if (detail && typeof detail === 'object' && Array.isArray(detail.subtasks)) {
+        detailById.set(String(t.id), detail.subtasks);
+      }
+    })
+  );
+
+  if (detailById.size === 0) return list;
+  return list.map(t => {
+    const subs = t?.id != null ? detailById.get(String(t.id)) : null;
+    return subs ? { ...t, subtasks: subs } : t;
+  });
+};
+
+export const scopeTasksForCurrentUser = (
+  tasks = [],
+  user,
+  scopedEmployees = [],
+  departments = [],
+  options = {}
+) => {
+  const raw = Array.isArray(tasks) ? tasks : [];
+  const currentUser = user || getStoredUser();
+  const userRole = getNormalizedRole(currentUser);
+  if (userRole === 'Admin') return raw;
+
+  const { myIds, myName, myDeptId, myDeptName, myBranchId, myBranchName } =
+    getMyOrgScope(scopedEmployees, currentUser);
+
+  if (userRole === 'Employee') {
+    const out = [];
+    const seen = new Set();
+    raw.forEach(t => {
+      const assignedDirectly = isTaskAssignedToIds(t, myIds, myName);
+      const mySubs = Array.isArray(t.subtasks)
+        ? t.subtasks.filter(st => isTaskAssignedToIds(st, myIds, myName))
+        : [];
+      if (assignedDirectly) {
+        if (!seen.has(String(t.id))) {
+          seen.add(String(t.id));
+          out.push(Array.isArray(t.subtasks) ? { ...t, subtasks: mySubs } : t);
+        }
+      } else if (mySubs.length > 0) {
+        mySubs.forEach(st => {
+          if (!seen.has(String(st.id))) {
+            seen.add(String(st.id));
+            out.push({ ...st, parentTaskId: st.parentTaskId ?? st.parentId ?? t.id });
+          }
+        });
+      }
+    });
+    return out;
+  }
+
+  const teamIds = new Set();
+  const teamNames = new Set();
+  (Array.isArray(scopedEmployees) ? scopedEmployees : []).forEach(e => {
+    [e.id, e.employeeId, e.userId].forEach(id => {
+      if (id != null && String(id).trim() !== '') teamIds.add(String(id));
+    });
+    const n = norm(cleanPersonName(e.name));
+    if (n) teamNames.add(n);
+  });
+
+  const { poolLoaded = false } = options;
+
+  const isAuthorizedTask = (t) => {
+    if (isTaskCreatedByIds(t, myIds, myName)) return true;
+    if (isTaskAssignedToIds(t, myIds, myName)) return true;
+
+    const assignedToId =
+      t.assignedToId ?? t.assigneeId ?? (typeof t.assignedTo === 'object' ? t.assignedTo?.id : null);
+    const assignedToName = norm(cleanPersonName(t.assignedTo));
+
+    if (assignedToId != null && teamIds.has(String(assignedToId))) return true;
+    if (assignedToName && teamNames.has(assignedToName)) return true;
+
+    if (!poolLoaded && teamIds.size === 0) {
+      const dId = t.departmentId ?? (typeof t.department === 'object' ? t.department?.id : null);
+      const dName = norm(
+        t.departmentName ||
+          (typeof t.department === 'object' ? t.department?.name : typeof t.department === 'string' && isNaN(Number(t.department)) ? t.department : '')
+      );
+      if (myDeptId != null && dId != null) return String(dId) === String(myDeptId);
+      if (myDeptName && dName) return dName === norm(myDeptName);
+      const bId = t.branchId ?? (typeof t.branch === 'object' ? t.branch?.id : null);
+      const bName = norm(
+        t.branchName ||
+          (typeof t.branch === 'object' ? t.branch?.name : typeof t.branch === 'string' && isNaN(Number(t.branch)) ? t.branch : '')
+      );
+      if (myBranchId != null && bId != null) return String(bId) === String(myBranchId);
+      if (myBranchName && bName) return bName === norm(myBranchName);
+    }
+
+    return false;
+  };
+
+  return raw
+    .filter(t => {
+      if (isAuthorizedTask(t)) return true;
+      return Array.isArray(t.subtasks) && t.subtasks.some(isAuthorizedTask);
+    })
+    .map(t => {
+      if (!Array.isArray(t.subtasks)) return t;
+      return {
+        ...t,
+        subtasks: t.subtasks.filter(st => isAuthorizedTask(st) || isTaskAssignedToIds(t, myIds, myName) || isTaskCreatedByIds(t, myIds, myName)),
+      };
+    });
+};
+
+export const canManagerCreateSubtask = (task, user) => {
+  if (!task) return false;
+  const currentUser = user || getStoredUser();
+  if (getNormalizedRole(currentUser) !== 'Manager') return false;
+  if (task.parentTaskId || task.parentId) return false;
+  if (task.status === 'COMPLETED' || task.status === 'REJECTED') return false;
+
+  const { myIds, myName } = getMyOrgScope([], currentUser);
+  return isTaskAssignedToIds(task, myIds, myName) || isTaskCreatedByIds(task, myIds, myName);
+};
+
+export const canUserEditTask = (task, user, scopedEmployees = []) => {
+  if (!task) return false;
+  const currentUser = user || getStoredUser();
+  const role = getNormalizedRole(currentUser);
+  if (role === 'Employee') return false;
+  if (role === 'Admin') return !(task.parentTaskId || task.parentId);
+  if (role === 'Hr') return true;
+
+  if (role === 'Manager') {
+    const { myIds, myName } = getMyOrgScope(scopedEmployees, currentUser);
+    if (isTaskCreatedByIds(task, myIds, myName)) return true;
+    const isSubtask = Boolean(task.parentTaskId || task.parentId);
+    if (isSubtask) {
+      const teamIds = new Set(
+        (scopedEmployees || [])
+          .flatMap(e => [e.id, e.employeeId, e.userId])
+          .filter(v => v != null)
+          .map(String)
+      );
+      const assignedToId = task.assignedToId ?? task.assigneeId ?? task.assignedTo?.id;
+      if (assignedToId != null && teamIds.has(String(assignedToId))) return true;
+    }
+    return false;
+  }
+
+  return false;
+};

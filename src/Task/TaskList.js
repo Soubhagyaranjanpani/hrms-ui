@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FaTasks, FaSearch, FaEye, FaEdit, FaPlus,
   FaThList, FaColumns, FaTimes, FaSort, FaSortUp, FaSortDown,
   FaChevronLeft, FaChevronRight, FaCalendarAlt, FaStar,
-  FaClock, FaCheckCircle, FaClipboardCheck
+  FaClock, FaCheckCircle, FaExclamationTriangle, FaSitemap
 } from 'react-icons/fa';
 import {
   API_ENDPOINTS,
@@ -13,8 +13,22 @@ import {
 } from '../config/api.config';
 import {
   getNormalizedRole,
-  cleanPersonName
+  cleanPersonName,
+  safeReadJson,
+  parseApiError,
+  isTaskOverdue,
+  toLocalDateStr,
+  TASK_UPDATED_EVENT
 } from './taskAccess';
+import {
+  getStoredUser,
+  fetchScopedEmployeesPool,
+  scopeTasksForCurrentUser,
+  flattenUniqueTasks,
+  canUserEditTask,
+  hydrateMissingSubtasks
+} from './taskScope';
+import TaskModuleNav from './TaskModuleNav';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import './TaskModule.css';
@@ -87,15 +101,24 @@ export default function TaskList({ user }) {
   const navigate   = useNavigate();
   const location   = useLocation();
   const navState   = location.state || {};
-  const userRole   = getNormalizedRole(user);
+  const currentUser = user || getStoredUser();
+  const userRole   = getNormalizedRole(currentUser);
   const isEmployee = userRole === 'Employee';
+  const isAdmin    = userRole === 'Admin';
+  const isManager  = userRole === 'Manager';
   const canCreate  = ['Admin', 'Hr', 'Manager'].includes(userRole);
 
-  const [tasks,        setTasks]        = useState([]);
-  const [branches,     setBranches]     = useState([]);
-  const [departments,  setDepartments]  = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [filterSource, setFilterSource] = useState(isEmployee ? 'mine' : 'all');
+  const [tasks,             setTasks]             = useState([]);
+  const [branches,          setBranches]          = useState([]);
+  const [departments,       setDepartments]       = useState([]);
+  const [scopedEmployees,   setScopedEmployees]   = useState([]);
+  const [poolLoaded,        setPoolLoaded]        = useState(false);
+  const [loading,           setLoading]           = useState(true);
+  const [loadError,         setLoadError]         = useState('');
+  const [filterSource,      setFilterSource]      = useState(
+    isEmployee ? 'mine' : (navState.scope || 'all')
+  );
+  const [onlySubtasks,      setOnlySubtasks]      = useState(Boolean(navState.onlySubtasks));
 
   const [view,             setView]             = useState(navState.view || 'table');
   const [filterBranch,     setFilterBranch]     = useState(navState.branch || 'ALL');
@@ -110,51 +133,81 @@ export default function TaskList({ user }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Sync filters when navigating from TaskModuleNav or TaskDashboard
+  useEffect(() => {
+    const st = location.state;
+    if (!st) return;
+    if (!isEmployee && st.scope) setFilterSource(st.scope);
+    setOnlySubtasks(Boolean(st.onlySubtasks));
+    setFilterStatus(st.status || 'ALL');
+    if (st.priority) setFilterPriority(st.priority);
+    if (st.branch) setFilterBranch(st.branch);
+    if (st.department) setFilterDepartment(st.department);
+    if (st.assignee) setFilterAssignee(st.assignee);
+    setCurrentPage(1);
+  }, [location.state, isEmployee]);
+
   // Load branches & departments for filter dropdowns (non-employee)
   useEffect(() => {
     if (isEmployee) return;
     let active = true;
     Promise.all([
-      fetch(API_ENDPOINTS.GET_ACTIVE_BRANCHES, { headers: getAuthHeaders() }).then(r => r.json()).catch(() => []),
-      fetch(API_ENDPOINTS.GET_ACTIVE_DEPARTMENTS, { headers: getAuthHeaders() }).then(r => r.json()).catch(() => []),
-    ]).then(([bData, dData]) => {
+      fetch(API_ENDPOINTS.GET_ACTIVE_BRANCHES, { headers: getAuthHeaders() }).then(r => (r.ok ? safeReadJson(r) : [])).catch(() => []),
+      fetch(API_ENDPOINTS.GET_ACTIVE_DEPARTMENTS, { headers: getAuthHeaders() }).then(r => (r.ok ? safeReadJson(r) : [])).catch(() => []),
+      fetchScopedEmployeesPool(currentUser, { includeAssigneesMeta: true, failClosed: !isAdmin }).catch(() => null),
+    ]).then(([bData, dData, empPool]) => {
       if (!active) return;
       setBranches(extractArray(bData));
       setDepartments(extractArray(dData));
+      if (empPool) {
+        setScopedEmployees(empPool.scopedEmployees || []);
+        setPoolLoaded(Boolean(empPool.loaded));
+      }
     });
     return () => { active = false; };
-  }, [isEmployee]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEmployee, isAdmin]);
 
-  // Fetch tasks when filter source changes
-  useEffect(() => {
-    let active = true;
-    const fetchTasks = async () => {
-      setLoading(true);
-      try {
-        const url = (isEmployee || filterSource === 'mine')
-          ? API_ENDPOINTS.GET_MY_TASKS
-          : API_ENDPOINTS.GET_ALL_TASKS;
+  const fetchTasks = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const url = (isEmployee || filterSource === 'mine')
+        ? API_ENDPOINTS.GET_MY_TASKS
+        : API_ENDPOINTS.GET_ALL_TASKS;
 
-        const res  = await fetch(url, { headers: getAuthHeaders() });
-        const data = await res.json();
+      const res  = await fetch(url, { headers: getAuthHeaders() });
+      const data = await safeReadJson(res);
 
-        if (!active) return;
-        if (!res.ok) throw new Error(data.message || 'Failed to load tasks');
+      if (!res.ok) throw new Error(parseApiError(res, data, 'Failed to load tasks'));
 
-        setTasks(extractArray(data));
-      } catch (err) {
-        if (!active) return;
-        toast.error('Load Error', err.message || 'Could not load tasks');
-        setTasks([]);
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    fetchTasks();
-    return () => { active = false; };
+      const raw = extractArray(data);
+      const hydrated = !isEmployee ? await hydrateMissingSubtasks(raw, getAuthHeaders()) : raw;
+      setTasks(hydrated);
+    } catch (err) {
+      setLoadError(err.message || 'Could not load tasks');
+      toast.error('Load Error', err.message || 'Could not load tasks');
+      setTasks([]);
+    } finally {
+      setLoading(false);
+    }
   }, [filterSource, isEmployee]);
 
-  const safeTasks = useMemo(() => (Array.isArray(tasks) ? tasks : []), [tasks]);
+  useEffect(() => {
+    fetchTasks();
+    const onUpdated = () => fetchTasks();
+    window.addEventListener(TASK_UPDATED_EVENT, onUpdated);
+    return () => window.removeEventListener(TASK_UPDATED_EVENT, onUpdated);
+  }, [fetchTasks]);
+
+  const safeTasks = useMemo(() => {
+    const scoped = scopeTasksForCurrentUser(tasks, currentUser, scopedEmployees, departments, { poolLoaded });
+    if (onlySubtasks) {
+      return flattenUniqueTasks(scoped).filter(t => Boolean(t.parentTaskId || t.parentId));
+    }
+    return scoped;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, scopedEmployees, departments, poolLoaded, onlySubtasks, userRole]);
 
   // Resolve branch/department display names safely
   const getTaskBranchName = (t) => {
@@ -212,9 +265,10 @@ export default function TaskList({ user }) {
 
   const summaryStats = useMemo(() => ({
     total: safeTasks.length,
+    pending: safeTasks.filter(t => t.status === 'PENDING_APPROVAL').length,
     inProgress: safeTasks.filter(t => t.status === 'IN_PROGRESS').length,
-    inReview: safeTasks.filter(t => t.status === 'IN_REVIEW').length,
     completed: safeTasks.filter(t => t.status === 'COMPLETED').length,
+    overdue: safeTasks.filter(isTaskOverdue).length,
   }), [safeTasks]);
 
   // Filter + Sort
@@ -222,18 +276,24 @@ export default function TaskList({ user }) {
     const list = safeTasks.filter(t => {
       const bName = getTaskBranchName(t);
       const dName = getTaskDeptName(t);
+      const bId = t.branchId ?? (typeof t.branch === 'object' ? t.branch?.id : null);
+      const dId = t.departmentId ?? (typeof t.department === 'object' ? t.department?.id : null);
       const aName = cleanPersonName(t.assignedTo) || 'Unassigned';
       const byName = cleanPersonName(t.assignedBy);
       const pri = normalizePriority(t.priority);
 
-      if (filterBranch !== 'ALL' && bName !== filterBranch) return false;
-      if (filterDepartment !== 'ALL' && dName !== filterDepartment) return false;
-      if (filterStatus !== 'ALL' && t.status !== filterStatus) return false;
+      if (filterBranch !== 'ALL' && bName !== filterBranch && String(bId) !== String(filterBranch)) return false;
+      if (filterDepartment !== 'ALL' && dName !== filterDepartment && String(dId) !== String(filterDepartment)) return false;
+      if (filterStatus === 'OVERDUE') {
+        if (!isTaskOverdue(t)) return false;
+      } else if (filterStatus !== 'ALL' && t.status !== filterStatus) {
+        return false;
+      }
       if (filterPriority !== 'ALL' && pri !== filterPriority) return false;
       if (filterAssignee !== 'ALL' && aName !== filterAssignee) return false;
 
       if (filterDueDate && t.dueDate) {
-        const dueStr = new Date(t.dueDate).toISOString().split('T')[0];
+        const dueStr = toLocalDateStr(t.dueDate);
         if (dueStr > filterDueDate) return false;
       } else if (filterDueDate && !t.dueDate) {
         return false;
@@ -354,7 +414,13 @@ export default function TaskList({ user }) {
           </div>
           <div>
             <h1 className="tm-title">
-              {isEmployee ? 'My Assigned Tasks' : 'Task Directory'}
+              {onlySubtasks
+                ? 'Subtasks Directory'
+                : isEmployee
+                  ? 'My Assigned Tasks'
+                  : isManager && filterSource === 'mine'
+                    ? 'My Assigned Tasks'
+                    : 'Task Directory'}
             </h1>
             <p className="tm-subtitle">
               {loading ? 'Loading…' : `${filteredAndSorted.length} task${filteredAndSorted.length !== 1 ? 's' : ''} matching current filters`}
@@ -390,18 +456,41 @@ export default function TaskList({ user }) {
         </div>
       </div>
 
+      <TaskModuleNav user={currentUser} />
+
+      {loadError && (
+        <div className="tm-alert tm-alert--danger" style={{ marginBottom: 14 }}>
+          <div className="tm-alert-text">
+            <FaExclamationTriangle size={13} color="#dc2626" />
+            <span>{loadError}</span>
+          </div>
+          <button type="button" className="tm-btn tm-btn-secondary tm-btn-sm" onClick={fetchTasks}>
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Compact Clickable KPI Summary Strip */}
       {!loading && (
-        <div className="tm-kpi-grid tm-kpi-grid--compact">
+        <div className="tm-kpi-grid tm-kpi-grid--compact tm-kpi-grid--5">
           {[
             {
               key: 'ALL',
-              label: 'Total Tasks',
+              label: isEmployee ? 'My Total Tasks' : onlySubtasks ? 'Total Subtasks' : 'Total Tasks',
               val: summaryStats.total,
               color: '#2563eb',
               bg: '#eff6ff',
               sub: 'Show all',
               icon: <FaTasks size={13} />,
+            },
+            {
+              key: 'PENDING_APPROVAL',
+              label: 'Pending Tasks',
+              val: summaryStats.pending,
+              color: '#d97706',
+              bg: '#fffbeb',
+              sub: 'Awaiting acceptance',
+              icon: <FaClock size={13} />,
             },
             {
               key: 'IN_PROGRESS',
@@ -413,15 +502,6 @@ export default function TaskList({ user }) {
               icon: <FaClock size={13} />,
             },
             {
-              key: 'IN_REVIEW',
-              label: 'In Review',
-              val: summaryStats.inReview,
-              color: '#d97706',
-              bg: '#fffbeb',
-              sub: 'Awaiting approval',
-              icon: <FaClipboardCheck size={13} />,
-            },
-            {
               key: 'COMPLETED',
               label: 'Completed',
               val: summaryStats.completed,
@@ -429,6 +509,15 @@ export default function TaskList({ user }) {
               bg: '#f0fdf4',
               sub: `${summaryStats.total > 0 ? Math.round((summaryStats.completed / summaryStats.total) * 100) : 0}% done`,
               icon: <FaCheckCircle size={13} />,
+            },
+            {
+              key: 'OVERDUE',
+              label: 'Overdue Tasks',
+              val: summaryStats.overdue,
+              color: '#dc2626',
+              bg: '#fee2e2',
+              sub: 'Past due date',
+              icon: <FaExclamationTriangle size={13} />,
             },
           ].map(card => {
             const isSelected = filterStatus === card.key && card.key !== 'ALL';
@@ -506,6 +595,7 @@ export default function TaskList({ user }) {
           {Object.entries(STATUS_LABELS).map(([k, label]) => (
             <option key={k} value={k}>{label}</option>
           ))}
+          <option value="OVERDUE">Overdue Only</option>
         </select>
 
         <select className="tm-select" value={filterPriority} onChange={e => { setFilterPriority(e.target.value); setCurrentPage(1); }}>
@@ -596,26 +686,38 @@ export default function TaskList({ user }) {
                   </thead>
                   <tbody>
                     {paginatedTasks.map(t => {
-                      const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED';
+                      const overdue = isTaskOverdue(t);
                       const bName = getTaskBranchName(t);
                       const dName = getTaskDeptName(t);
                       const pct = t.progress || 0;
+                      const subCount = Array.isArray(t.subtasks) ? t.subtasks.length : 0;
+                      const subDone = subCount > 0 ? t.subtasks.filter(s => s.status === 'COMPLETED').length : 0;
+                      const isSub = Boolean(t.parentTaskId || t.parentId);
+                      const canEditRow = canUserEditTask(t, currentUser, scopedEmployees);
                       return (
                         <tr key={t.id} className="tm-tr-clickable" onClick={() => openDetail(t.id)}>
                           <td style={{ whiteSpace: 'nowrap' }}>
                             <span className="tm-id-badge">
                               T-{String(t.id).padStart(3, '0')}
                             </span>
+                            {isSub && (
+                              <div className="tm-cell-sub" style={{ marginTop: 2 }}>
+                                Sub of #T-{String(t.parentTaskId || t.parentId).padStart(3, '0')}
+                              </div>
+                            )}
                           </td>
                           <td>
                             <div className="tm-cell-title" title={t.title}>
                               {t.title}
                             </div>
-                            {t.effort && (
-                              <div className="tm-cell-sub">
-                                Est: {t.effort}
-                              </div>
-                            )}
+                            <div className="tm-cell-sub" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              {t.effort && <span>Est: {t.effort}</span>}
+                              {subCount > 0 && (
+                                <span style={{ color: 'var(--tm-primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                  <FaSitemap size={9} /> {subDone}/{subCount} subtasks
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td style={{ color: 'var(--tm-text-secondary)', whiteSpace: 'nowrap' }}>
                             {cleanPersonName(t.assignedBy) || '—'}
@@ -645,9 +747,14 @@ export default function TaskList({ user }) {
                             {formatShortDate(t.startDate || t.createdAt)}
                           </td>
                           <td>
-                            <span className={`tm-cell-date ${isOverdue ? 'tm-cell-date--overdue' : ''}`}>
+                            <span className={`tm-cell-date ${overdue ? 'tm-cell-date--overdue' : ''}`}>
                               <FaCalendarAlt size={10} /> {formatShortDate(t.dueDate)}
                             </span>
+                            {overdue && (
+                              <span className="tm-mini-tag" style={{ background: '#fee2e2', color: '#991b1b', marginLeft: 4 }}>
+                                OVERDUE
+                              </span>
+                            )}
                           </td>
                           <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'inline-flex', gap: 6 }}>
@@ -659,7 +766,7 @@ export default function TaskList({ user }) {
                               >
                                 <FaEye size={12} />
                               </button>
-                              {canCreate && (
+                              {canEditRow && (
                                 <button
                                   type="button"
                                   className="tm-icon-action tm-icon-action--amber"
@@ -789,8 +896,8 @@ export default function TaskList({ user }) {
                         <div className="tm-kanban-card-foot">
                           <span>{cleanPersonName(t.assignedTo) || 'Unassigned'}</span>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                            <span>{formatShortDate(t.dueDate)}</span>
-                            {canCreate && (
+                            <span className={isTaskOverdue(t) ? 'tm-cell-date--overdue' : undefined}>{formatShortDate(t.dueDate)}</span>
+                            {canUserEditTask(t, currentUser, scopedEmployees) && (
                               <button
                                 type="button"
                                 className="tm-icon-action tm-icon-action--amber"

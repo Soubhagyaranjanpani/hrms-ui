@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Chart as ChartJS,
@@ -13,8 +13,9 @@ import { Doughnut, Bar } from 'react-chartjs-2';
 import {
   FaTasks, FaClock, FaCheckCircle, FaSpinner, FaSearch,
   FaExclamationTriangle, FaArrowRight, FaEye, FaEdit, FaPlus,
-  FaChartBar, FaPercent, FaClipboardCheck, FaChevronLeft,
-  FaChevronRight, FaCalendarAlt, FaBuilding, FaSitemap, FaStar
+  FaChartBar, FaClipboardCheck, FaChevronLeft,
+  FaChevronRight, FaCalendarAlt, FaBuilding, FaSitemap, FaStar,
+  FaUserCheck, FaFileAlt
 } from 'react-icons/fa';
 import {
   API_ENDPOINTS,
@@ -24,9 +25,28 @@ import {
 import {
   getNormalizedRole,
   getMyId,
-  cleanPersonName
+  cleanPersonName,
+  unwrapResponse,
+  safeReadJson,
+  parseApiError,
+  isTaskOverdue,
+  toLocalDateStr,
+  TASK_UPDATED_EVENT
 } from './taskAccess';
-import { getStoredUser, scopeEmployeesForRole, getMyOrgScope, collectMyIds, getTokenClaims } from './taskScope';
+import {
+  getStoredUser,
+  scopeEmployeesForRole,
+  getMyOrgScope,
+  fetchScopedEmployeesPool,
+  scopeTasksForCurrentUser,
+  flattenUniqueTasks,
+  isTaskAssignedToIds,
+  canUserEditTask,
+  hydrateMissingSubtasks
+} from './taskScope';
+import { computeRoleDashboardMetrics, computeRoleNavBadges } from './taskMetrics';
+import { parseReview } from './taskRating';
+import TaskModuleNav from './TaskModuleNav';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import './TaskModule.css';
@@ -128,10 +148,13 @@ export default function TaskDashboard({ user }) {
   const canCreate   = ['Admin', 'Hr', 'Manager'].includes(userRole);
 
   const [tasks,       setTasks]       = useState([]);
+  const [submissions, setSubmissions] = useState([]);
   const [branches,    setBranches]    = useState([]);
   const [departments, setDepartments] = useState([]);
   const [employees,   setEmployees]   = useState([]);
+  const [poolLoaded,  setPoolLoaded]  = useState(false);
   const [loading,     setLoading]     = useState(true);
+  const [loadError,   setLoadError]   = useState('');
 
   // Role-based drill-down filters
   const [selectedBranch,  setSelectedBranch]  = useState('ALL');
@@ -139,116 +162,119 @@ export default function TaskDashboard({ user }) {
   const [selectedManager, setSelectedManager] = useState('ALL');
 
   // Table filters & pagination
-  const [statusFilter,   setStatusFilter]   = useState('ALL'); // 'ALL' | status enum | 'OVERDUE' | 'PENDING_REVIEWS'
+  const [statusFilter,   setStatusFilter]   = useState('ALL'); // 'ALL' | status enum | 'OVERDUE' | 'PENDING_REVIEWS' | 'MY_ASSIGNED' | 'TEAM_SUBTASKS'
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [searchTerm,     setSearchTerm]     = useState('');
   const [currentPage,    setCurrentPage]    = useState(1);
   const [pageSize,       setPageSize]       = useState(6);
 
-  useEffect(() => {
-    let active = true;
-    const loadDashboardData = async () => {
-      setLoading(true);
-      try {
-        const tasksUrl = isEmployee ? API_ENDPOINTS.GET_MY_TASKS : API_ENDPOINTS.GET_ALL_TASKS;
+  const loadDashboardData = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const headers = getAuthHeaders();
+      const tasksUrl = isEmployee ? API_ENDPOINTS.GET_MY_TASKS : API_ENDPOINTS.GET_ALL_TASKS;
 
-        const requests = [
-          fetch(tasksUrl, { headers: getAuthHeaders() }),
-        ];
+      const [taskRes, branchRes, deptRes, empPool] = await Promise.all([
+        fetch(tasksUrl, { headers }),
+        !isEmployee ? fetch(API_ENDPOINTS.GET_ACTIVE_BRANCHES, { headers }).catch(() => null) : Promise.resolve(null),
+        !isEmployee ? fetch(API_ENDPOINTS.GET_ACTIVE_DEPARTMENTS, { headers }).catch(() => null) : Promise.resolve(null),
+        !isEmployee
+          ? fetchScopedEmployeesPool(currentUser, { includeAssigneesMeta: true, failClosed: !isAdmin }).catch(() => null)
+          : Promise.resolve(null),
+      ]);
 
-        if (!isEmployee) {
-          requests.push(
-            fetch(API_ENDPOINTS.GET_ACTIVE_BRANCHES, { headers: getAuthHeaders() }),
-            fetch(API_ENDPOINTS.GET_ACTIVE_DEPARTMENTS, { headers: getAuthHeaders() })
-          );
-          if (isManager || isHR) {
-            requests.push(
-              fetch(`${API_ENDPOINTS.GET_EMPLOYEES}?page=0&size=200`, { headers: getAuthHeaders() }).catch(() => null),
-              fetch(API_ENDPOINTS.GET_TASK_ASSIGNEES, { headers: getAuthHeaders() }).catch(() => null)
-            );
-          }
-        }
-
-        const responses = await Promise.all(requests);
-        const taskJson  = await responses[0].json();
-
-        if (!active) return;
-        if (!responses[0].ok) {
-          throw new Error(taskJson?.message || 'Failed to load tasks');
-        }
-
-        setTasks(extractArray(taskJson));
-
-        if (!isEmployee && responses[1] && responses[2]) {
-          const [bJson, dJson, eJson, aJson] = await Promise.all([
-            responses[1].json().catch(() => []),
-            responses[2].json().catch(() => []),
-            responses[3] && responses[3].ok ? responses[3].json().catch(() => null) : Promise.resolve(null),
-            responses[4] && responses[4].ok ? responses[4].json().catch(() => null) : Promise.resolve(null),
-          ]);
-          if (active) {
-            setBranches(extractArray(bJson));
-            setDepartments(extractArray(dJson));
-
-            const assigneeMetaById = new Map();
-            if (aJson) {
-              extractArray(aJson).forEach(group => {
-                (group.employees || []).forEach(emp => {
-                  if (emp?.id != null) {
-                    assigneeMetaById.set(String(emp.id), {
-                      roleName: emp.roleName || emp.role,
-                      departmentId: emp.departmentId ?? group.departmentId,
-                      departmentName: emp.departmentName ?? group.departmentName,
-                      branchId: emp.branchId ?? group.branchId,
-                      managerId: emp.managerId ?? emp.reportingManagerId ?? emp.reportingToId,
-                    });
-                  }
-                });
-              });
-            }
-
-            if (eJson) {
-              setEmployees(
-                extractArray(eJson).map(emp => {
-                  const meta = emp?.id != null ? assigneeMetaById.get(String(emp.id)) : null;
-                  return {
-                    ...emp,
-                    roleName: emp.roleName || emp.role || meta?.roleName,
-                    departmentId: emp.departmentId ?? emp.department?.id ?? meta?.departmentId,
-                    departmentName: emp.departmentName ?? emp.department?.name ?? meta?.departmentName,
-                    branchId: emp.branchId ?? emp.branch?.id ?? meta?.branchId,
-                    managerId: emp.managerId ?? meta?.managerId,
-                  };
-                })
-              );
-            } else if (aJson) {
-              setEmployees(
-                extractArray(aJson).flatMap(group =>
-                  (group.employees || []).map(emp => ({
-                    ...emp,
-                    roleName: emp.roleName || emp.role,
-                    departmentId: emp.departmentId ?? group.departmentId,
-                    departmentName: emp.departmentName ?? group.departmentName,
-                    branchId: emp.branchId ?? group.branchId,
-                  }))
-                )
-              );
-            }
-          }
-        }
-      } catch (err) {
-        if (!active) return;
-        console.error('Dashboard fetch error:', err);
-        toast.error('Load Error', err.message || 'Could not load dashboard');
-        setTasks([]);
-      } finally {
-        if (active) setLoading(false);
+      const taskJson = await safeReadJson(taskRes);
+      if (!taskRes.ok) {
+        throw new Error(parseApiError(taskRes, taskJson, 'Failed to load tasks'));
       }
-    };
 
+      let rawTasks = extractArray(taskJson);
+      let nextBranches = [];
+      let nextDepts = [];
+      let nextEmps = [];
+      let isPoolLoaded = false;
+
+      if (!isEmployee) {
+        const [bJson, dJson] = await Promise.all([
+          branchRes && branchRes.ok ? safeReadJson(branchRes) : Promise.resolve(null),
+          deptRes && deptRes.ok ? safeReadJson(deptRes) : Promise.resolve(null),
+        ]);
+        nextBranches = bJson ? extractArray(bJson) : [];
+        nextDepts = dJson ? extractArray(dJson) : (empPool?.departments || []);
+        nextEmps = empPool?.rawEmployees || [];
+        isPoolLoaded = Boolean(empPool?.loaded);
+        setBranches(nextBranches);
+        setDepartments(nextDepts);
+        setEmployees(nextEmps);
+        setPoolLoaded(isPoolLoaded);
+      }
+
+      const scopedEmps = !isEmployee
+        ? scopeEmployeesForRole(nextEmps, currentUser, nextDepts, { failClosed: !isAdmin })
+        : [];
+      if (!isEmployee) {
+        const preScoped = scopeTasksForCurrentUser(rawTasks, currentUser, scopedEmps, nextDepts, {
+          poolLoaded: isPoolLoaded,
+        });
+        const hydrated = await hydrateMissingSubtasks(preScoped, headers);
+        const hydratedById = new Map(hydrated.map(t => [String(t.id), t]));
+        rawTasks = rawTasks.map(t => hydratedById.get(String(t.id)) || t);
+      }
+
+      setTasks(rawTasks);
+
+      // Load authorized task submissions for accurate Pending Reviews & Employee Feedback
+      const authorizedTasks = scopeTasksForCurrentUser(rawTasks, currentUser, scopedEmps, nextDepts, {
+        poolLoaded: isPoolLoaded,
+      });
+      const uniqueTasks = flattenUniqueTasks(authorizedTasks);
+      const subResults = await Promise.allSettled(
+        uniqueTasks.slice(0, 60).map(t =>
+          fetch(API_ENDPOINTS.GET_TASK_SUBMISSIONS(t.id), { headers })
+            .then(async r => (r.ok ? unwrapResponse(await safeReadJson(r)) : []))
+            .then(arr => (Array.isArray(arr) ? arr : []))
+        )
+      );
+
+      const { myIds } = getMyOrgScope(scopedEmps, currentUser);
+      const subMap = new Map();
+      subResults.forEach(res => {
+        if (res.status !== 'fulfilled') return;
+        res.value.forEach(s => {
+          if (!s || s.id == null) return;
+          if (isEmployee && s.employeeId != null && myIds.size > 0 && !myIds.has(String(s.employeeId))) {
+            return;
+          }
+          subMap.set(String(s.id), {
+            ...s,
+            employeeName: cleanPersonName(s.employeeName),
+          });
+        });
+      });
+
+      const mergedSubs = [...subMap.values()].sort((a, b) =>
+        String(b.submittedAt || '').localeCompare(String(a.submittedAt || ''))
+      );
+      setSubmissions(mergedSubs);
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+      setLoadError(err.message || 'Could not load dashboard');
+      toast.error('Load Error', err.message || 'Could not load dashboard');
+      setTasks([]);
+      setSubmissions([]);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEmployee, isAdmin, isManager, isHR, myId]);
+
+  useEffect(() => {
     loadDashboardData();
-    return () => { active = false; };
-  }, [isEmployee, isManager, isHR]);
+    const onUpdated = () => loadDashboardData();
+    window.addEventListener(TASK_UPDATED_EVENT, onUpdated);
+    return () => window.removeEventListener(TASK_UPDATED_EVENT, onUpdated);
+  }, [loadDashboardData]);
 
   // Helpers to resolve branch & department names consistently
   const resolveBranchName = (t) => {
@@ -267,84 +293,18 @@ export default function TaskDashboard({ user }) {
     return found?.name || 'Unassigned Dept';
   };
 
+  const scopedTeamEmployees = useMemo(
+    () => (isEmployee ? [] : scopeEmployeesForRole(employees, currentUser, departments, { failClosed: !isAdmin })),
+    [isEmployee, employees, currentUser, departments, isAdmin]
+  );
+
   // Base role-scoped tasks:
-  // - Employee sees only tasks assigned to her (or containing a subtask assigned to her)
-  // - Manager sees only their own team/assigned tasks
+  // - Employee sees only tasks assigned to them
+  // - Manager sees only their own assigned tasks and authorized team tasks
   const roleScopedTasks = useMemo(() => {
-    const raw = Array.isArray(tasks) ? tasks : [];
-    if (isEmployee) {
-      const claims = getTokenClaims();
-      const myIds = collectMyIds(currentUser);
-      const myFullName = cleanPersonName(
-        currentUser?.fullName ||
-        (currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : '') ||
-        claims?.name ||
-        ''
-      ).toLowerCase();
-
-      return raw.filter(t => {
-        const assignedToId = t.assignedToId ?? t.assigneeId ?? (typeof t.assignedTo === 'object' ? t.assignedTo?.id : null);
-        const assignedToName = cleanPersonName(t.assignedTo).toLowerCase();
-        if (assignedToId != null && myIds.size > 0 && myIds.has(String(assignedToId))) return true;
-        if (myFullName && assignedToName && assignedToName === myFullName) return true;
-        if (Array.isArray(t.subtasks) && t.subtasks.some(st => {
-          const stId = st?.assignedToId ?? st?.assigneeId ?? (typeof st?.assignedTo === 'object' ? st.assignedTo?.id : null);
-          const stName = cleanPersonName(st?.assignedTo).toLowerCase();
-          if (stId != null && myIds.size > 0 && myIds.has(String(stId))) return true;
-          if (myFullName && stName && stName === myFullName) return true;
-          return false;
-        })) return true;
-        if ((assignedToId != null && myIds.size > 0) || (assignedToName && myFullName)) return false;
-        return true;
-      });
-    }
-    if (!isManager) return raw;
-
-    const { myIds, myName, myDeptId, myDeptName, myBranchId, myBranchName } = getMyOrgScope(employees, currentUser);
-    const teamEmps = scopeEmployeesForRole(employees, currentUser, departments);
-
-    const teamIds = new Set();
-    const teamNames = new Set();
-    teamEmps.forEach(e => {
-      [e.id, e.employeeId, e.userId].forEach(id => {
-        if (id != null && String(id).trim() !== '') teamIds.add(String(id));
-      });
-      const n = cleanPersonName(e.name).toLowerCase();
-      if (n) teamNames.add(n);
-    });
-
-    return raw.filter(t => {
-      const assignedById = t.assignedById ?? (typeof t.assignedBy === 'object' ? t.assignedBy?.id : null);
-      const assignedToId = t.assignedToId ?? (typeof t.assignedTo === 'object' ? t.assignedTo?.id : null);
-      const assignedByName = cleanPersonName(t.assignedBy).toLowerCase();
-      const assignedToName = cleanPersonName(t.assignedTo).toLowerCase();
-
-      // 1. Tasks created by this Manager or assigned directly to this Manager
-      if (assignedById != null && myIds.has(String(assignedById))) return true;
-      if (myName && assignedByName && assignedByName === myName) return true;
-      if (assignedToId != null && myIds.has(String(assignedToId))) return true;
-      if (myName && assignedToName && assignedToName === myName) return true;
-
-      // 2. Tasks assigned to this Manager's own scoped employees
-      if (assignedToId != null && teamIds.has(String(assignedToId))) return true;
-      if (assignedToName && teamNames.has(assignedToName)) return true;
-
-      // 3. Fallback when team employee IDs aren't loaded yet: match Manager's own department (not other departments)
-      if (employees.length === 0) {
-        const dId = t.departmentId ?? (typeof t.department === 'object' ? t.department?.id : null);
-        const dName = resolveDeptName(t).toLowerCase();
-        if (myDeptId != null && dId != null) return String(dId) === String(myDeptId);
-        if (myDeptName && dName) return dName === String(myDeptName).trim().toLowerCase();
-        const bId = t.branchId ?? (typeof t.branch === 'object' ? t.branch?.id : null);
-        const bName = resolveBranchName(t).toLowerCase();
-        if (myBranchId != null && bId != null) return String(bId) === String(myBranchId);
-        if (myBranchName && bName) return bName === String(myBranchName).trim().toLowerCase();
-      }
-
-      return false;
-    });
+    return scopeTasksForCurrentUser(tasks, currentUser, scopedTeamEmployees, departments, { poolLoaded });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, isManager, employees, departments]);
+  }, [tasks, scopedTeamEmployees, departments, poolLoaded, userRole]);
 
   const safeTasks = roleScopedTasks;
 
@@ -416,14 +376,22 @@ export default function TaskDashboard({ user }) {
     });
   }, [safeTasks, selectedBranch, selectedDept, selectedManager]);
 
-  const isTaskOverdue = (t) => {
-    if (!t.dueDate || t.status === 'COMPLETED' || t.status === 'REJECTED') return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return new Date(t.dueDate) < today;
-  };
+  // Submissions belonging to currently scoped tasks
+  const scopedSubmissions = useMemo(() => {
+    const taskIdSet = new Set(flattenUniqueTasks(scopedTasks).map(t => String(t.id)));
+    return submissions.filter(s => s.taskId == null || taskIdSet.has(String(s.taskId)));
+  }, [submissions, scopedTasks]);
 
-  // 8 Accurate KPI Metrics
+  const roleMetrics = useMemo(
+    () => computeRoleDashboardMetrics(userRole, scopedTasks, scopedSubmissions, currentUser, scopedTeamEmployees),
+    [userRole, scopedTasks, scopedSubmissions, currentUser, scopedTeamEmployees]
+  );
+
+  const navBadges = useMemo(
+    () => computeRoleNavBadges(userRole, roleScopedTasks, submissions, currentUser, scopedTeamEmployees),
+    [userRole, roleScopedTasks, submissions, currentUser, scopedTeamEmployees]
+  );
+
   const kpis = useMemo(() => {
     const total     = scopedTasks.length;
     const pending   = scopedTasks.filter(t => t.status === 'PENDING_APPROVAL').length;
@@ -433,8 +401,8 @@ export default function TaskDashboard({ user }) {
     const completed = scopedTasks.filter(t => t.status === 'COMPLETED').length;
     const rejected  = scopedTasks.filter(t => t.status === 'REJECTED').length;
     const overdue   = scopedTasks.filter(isTaskOverdue).length;
-    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
-    const pendingReviews = inReview + changeReq;
+    const completionRate = roleMetrics.completionRate ?? (total > 0 ? Math.round((completed / total) * 100) : 0);
+    const pendingReviews = roleMetrics.pendingReviews ?? (inReview + changeReq);
 
     return {
       total,
@@ -448,7 +416,7 @@ export default function TaskDashboard({ user }) {
       completionRate,
       pendingReviews,
     };
-  }, [scopedTasks]);
+  }, [scopedTasks, roleMetrics]);
 
   // Mutually Exclusive Task Status Donut Chart
   const donutData = useMemo(() => {
@@ -566,34 +534,48 @@ export default function TaskDashboard({ user }) {
     };
   }, [scopedTasks]);
 
-  // Employee Upcoming Deadlines & Subtask Summary
-  const employeeSubtaskSummary = useMemo(() => {
-    if (!isEmployee) return { total: 0, completed: 0, pending: 0 };
-    let total = 0;
-    let completed = 0;
-    scopedTasks.forEach(t => {
-      if (Array.isArray(t.subtasks)) {
-        t.subtasks.forEach(s => {
-          if (!myId || String(s.assignedToId) === String(myId)) {
-            total += 1;
-            if (s.status === 'COMPLETED') completed += 1;
-          }
-        });
-      }
-    });
-    return { total, completed, pending: total - completed };
-  }, [scopedTasks, isEmployee, myId]);
+  // My org scope for Manager/Employee filtering
+  const { myIds, myName } = useMemo(
+    () => getMyOrgScope(scopedTeamEmployees, currentUser),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scopedTeamEmployees, userRole]
+  );
+
+  // For Manager: expand table rows to include team subtasks when viewing TEAM_SUBTASKS or PENDING_REVIEWS
+  const displayTaskPool = useMemo(() => {
+    if (!isManager) return scopedTasks;
+    const all = flattenUniqueTasks(scopedTasks);
+    if (statusFilter === 'TEAM_SUBTASKS') {
+      return all.filter(t => Boolean(t.parentTaskId || t.parentId));
+    }
+    if (statusFilter === 'MY_ASSIGNED') {
+      return scopedTasks.filter(t => !(t.parentTaskId || t.parentId) && isTaskAssignedToIds(t, myIds, myName));
+    }
+    return scopedTasks;
+  }, [isManager, scopedTasks, statusFilter, myIds, myName]);
+
+  const pendingSubTaskIds = useMemo(() => {
+    return new Set(
+      scopedSubmissions
+        .filter(s => s.status === 'SUBMITTED' && !s.finalSubmission && s.taskId != null)
+        .map(s => String(s.taskId))
+    );
+  }, [scopedSubmissions]);
 
   // Filtered & Paginated Table Rows
   const tableTasks = useMemo(() => {
-    return [...scopedTasks]
+    return [...displayTaskPool]
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
       .filter(t => {
         if (statusFilter === 'OVERDUE') {
           if (!isTaskOverdue(t)) return false;
         } else if (statusFilter === 'PENDING_REVIEWS') {
-          if (t.status !== 'IN_REVIEW' && t.status !== 'CHANGE_REQUESTED') return false;
-        } else if (statusFilter !== 'ALL') {
+          const isRev =
+            t.status === 'IN_REVIEW' ||
+            t.status === 'CHANGE_REQUESTED' ||
+            pendingSubTaskIds.has(String(t.id));
+          if (!isRev) return false;
+        } else if (statusFilter !== 'ALL' && statusFilter !== 'MY_ASSIGNED' && statusFilter !== 'TEAM_SUBTASKS') {
           if (t.status !== statusFilter) return false;
         }
 
@@ -613,7 +595,7 @@ export default function TaskDashboard({ user }) {
         );
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopedTasks, statusFilter, priorityFilter, searchTerm, branches, departments]);
+  }, [displayTaskPool, statusFilter, priorityFilter, searchTerm, branches, departments, pendingSubTaskIds]);
 
   const totalPages = Math.max(1, Math.ceil(tableTasks.length / pageSize));
 
@@ -697,6 +679,20 @@ export default function TaskDashboard({ user }) {
           </button>
         </div>
       </div>
+
+      <TaskModuleNav user={currentUser} badgesOverride={navBadges} />
+
+      {loadError && (
+        <div className="tm-alert tm-alert--danger" style={{ marginBottom: 14 }}>
+          <div className="tm-alert-text">
+            <FaExclamationTriangle size={14} color="#dc2626" />
+            <span>{loadError}</span>
+          </div>
+          <button type="button" className="tm-btn tm-btn-secondary tm-btn-sm" onClick={loadDashboardData}>
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Role-Based Organizational Filter Strip (Admin / HR / Manager) */}
       {!isEmployee && (branchOptions.length > 0 || deptOptions.length > 0 || (isAdmin && managerOptions.length > 0)) && (
@@ -782,89 +778,177 @@ export default function TaskDashboard({ user }) {
         </div>
       )}
 
-      {/* 8 Compact Interactive KPI Cards */}
-      <div className="tm-kpi-grid tm-kpi-grid--compact">
-        <KpiCard
-          label="Total Tasks"
-          value={kpis.total}
-          icon={<FaTasks />}
-          accentBg="#eef2ff"
-          accentColor="#4f46e5"
-          sub={isEmployee && employeeSubtaskSummary.total > 0 ? `+ ${employeeSubtaskSummary.total} subtasks` : 'All scoped'}
-          active={statusFilter === 'ALL'}
-          onClick={() => toggleStatusFilter('ALL')}
-        />
-        <KpiCard
-          label="Pending Approval"
-          value={kpis.pending}
-          icon={<FaClock />}
-          accentBg="#fef3c7"
-          accentColor="#d97706"
-          sub="Awaiting acceptance"
-          active={statusFilter === 'PENDING_APPROVAL'}
-          onClick={() => toggleStatusFilter('PENDING_APPROVAL')}
-        />
-        <KpiCard
-          label="In Progress"
-          value={kpis.active}
-          icon={<FaSpinner />}
-          accentBg="#dbeafe"
-          accentColor="#2563eb"
-          sub="Active execution"
-          active={statusFilter === 'IN_PROGRESS'}
-          onClick={() => toggleStatusFilter('IN_PROGRESS')}
-        />
-        <KpiCard
-          label="In Review"
-          value={kpis.inReview}
-          icon={<FaSearch />}
-          accentBg="#fef3c7"
-          accentColor="#b45309"
-          sub="Under review"
-          active={statusFilter === 'IN_REVIEW'}
-          onClick={() => toggleStatusFilter('IN_REVIEW')}
-        />
-        <KpiCard
-          label="Completed"
-          value={kpis.completed}
-          icon={<FaCheckCircle />}
-          accentBg="#dcfce7"
-          accentColor="#16a34a"
-          sub="Closed & verified"
-          active={statusFilter === 'COMPLETED'}
-          onClick={() => toggleStatusFilter('COMPLETED')}
-        />
-        <KpiCard
-          label="Overdue"
-          value={kpis.overdue}
-          icon={<FaExclamationTriangle />}
-          accentBg="#fee2e2"
-          accentColor="#dc2626"
-          sub="Past due date"
-          active={statusFilter === 'OVERDUE'}
-          onClick={() => toggleStatusFilter('OVERDUE')}
-        />
-        <KpiCard
-          label="Completion Rate"
-          value={`${kpis.completionRate}%`}
-          icon={<FaPercent />}
-          accentBg="#dcfce7"
-          accentColor="#15803d"
-          sub={`${kpis.completed}/${kpis.total} done`}
-          active={statusFilter === 'COMPLETED'}
-          onClick={() => toggleStatusFilter('COMPLETED')}
-        />
-        <KpiCard
-          label="Pending Reviews"
-          value={kpis.pendingReviews}
-          icon={<FaClipboardCheck />}
-          accentBg="#ffedd5"
-          accentColor="#ea580c"
-          sub={`${kpis.inReview} rev · ${kpis.changeReq} chg`}
-          active={statusFilter === 'PENDING_REVIEWS'}
-          onClick={() => toggleStatusFilter('PENDING_REVIEWS')}
-        />
-      </div>
+      {/* Role-Based Dashboard Counters */}
+      {isEmployee ? (
+        <div className="tm-kpi-grid tm-kpi-grid--compact tm-kpi-grid--5">
+          <KpiCard
+            label="My Total Tasks"
+            value={roleMetrics.myTotalTasks ?? 0}
+            icon={<FaTasks />}
+            accentBg="#eef2ff"
+            accentColor="#4f46e5"
+            sub="Assigned to me"
+            active={statusFilter === 'ALL'}
+            onClick={() => toggleStatusFilter('ALL')}
+          />
+          <KpiCard
+            label="My Pending Tasks"
+            value={roleMetrics.myPendingTasks ?? 0}
+            icon={<FaClock />}
+            accentBg="#fef3c7"
+            accentColor="#d97706"
+            sub="Awaiting acceptance"
+            active={statusFilter === 'PENDING_APPROVAL'}
+            onClick={() => toggleStatusFilter('PENDING_APPROVAL')}
+          />
+          <KpiCard
+            label="My In Progress Tasks"
+            value={roleMetrics.myInProgressTasks ?? 0}
+            icon={<FaSpinner />}
+            accentBg="#dbeafe"
+            accentColor="#2563eb"
+            sub="Active work"
+            active={statusFilter === 'IN_PROGRESS'}
+            onClick={() => toggleStatusFilter('IN_PROGRESS')}
+          />
+          <KpiCard
+            label="My Completed Tasks"
+            value={roleMetrics.myCompletedTasks ?? 0}
+            icon={<FaCheckCircle />}
+            accentBg="#dcfce7"
+            accentColor="#16a34a"
+            sub={`${roleMetrics.completionRate ?? 0}% complete`}
+            active={statusFilter === 'COMPLETED'}
+            onClick={() => toggleStatusFilter('COMPLETED')}
+          />
+          <KpiCard
+            label="My Overdue Tasks"
+            value={roleMetrics.myOverdueTasks ?? 0}
+            icon={<FaExclamationTriangle />}
+            accentBg="#fee2e2"
+            accentColor="#dc2626"
+            sub="Past due date"
+            active={statusFilter === 'OVERDUE'}
+            onClick={() => toggleStatusFilter('OVERDUE')}
+          />
+        </div>
+      ) : isManager ? (
+        <div className="tm-kpi-grid tm-kpi-grid--compact tm-kpi-grid--5">
+          <KpiCard
+            label="My Assigned Tasks"
+            value={roleMetrics.myAssignedTasks ?? 0}
+            icon={<FaTasks />}
+            accentBg="#eef2ff"
+            accentColor="#4f46e5"
+            sub="Assigned by Admin"
+            active={statusFilter === 'MY_ASSIGNED'}
+            onClick={() => toggleStatusFilter('MY_ASSIGNED')}
+          />
+          <KpiCard
+            label="My Team Subtasks"
+            value={roleMetrics.myTeamSubtasks ?? 0}
+            icon={<FaSitemap />}
+            accentBg="#dbeafe"
+            accentColor="#2563eb"
+            sub="Team execution"
+            active={statusFilter === 'TEAM_SUBTASKS'}
+            onClick={() => toggleStatusFilter('TEAM_SUBTASKS')}
+          />
+          <KpiCard
+            label="Completed Tasks"
+            value={roleMetrics.completedTasks ?? 0}
+            icon={<FaCheckCircle />}
+            accentBg="#dcfce7"
+            accentColor="#16a34a"
+            sub={`${roleMetrics.completionRate ?? 0}% team completion`}
+            active={statusFilter === 'COMPLETED'}
+            onClick={() => toggleStatusFilter('COMPLETED')}
+          />
+          <KpiCard
+            label="Pending Reviews"
+            value={roleMetrics.pendingReviews ?? 0}
+            icon={<FaClipboardCheck />}
+            accentBg="#ffedd5"
+            accentColor="#ea580c"
+            sub={`${roleMetrics.pendingTaskReviews ?? 0} task · ${roleMetrics.reviewableSubmissions ?? 0} daily`}
+            active={statusFilter === 'PENDING_REVIEWS'}
+            onClick={() => toggleStatusFilter('PENDING_REVIEWS')}
+          />
+          <KpiCard
+            label="Overdue Tasks"
+            value={roleMetrics.overdueTasks ?? 0}
+            icon={<FaExclamationTriangle />}
+            accentBg="#fee2e2"
+            accentColor="#dc2626"
+            sub="Needs attention"
+            active={statusFilter === 'OVERDUE'}
+            onClick={() => toggleStatusFilter('OVERDUE')}
+          />
+        </div>
+      ) : (
+        <div className="tm-kpi-grid tm-kpi-grid--compact tm-kpi-grid--6">
+          <KpiCard
+            label="Total Tasks"
+            value={roleMetrics.totalTasks ?? kpis.total}
+            icon={<FaTasks />}
+            accentBg="#eef2ff"
+            accentColor="#4f46e5"
+            sub="All authorized"
+            active={statusFilter === 'ALL'}
+            onClick={() => toggleStatusFilter('ALL')}
+          />
+          <KpiCard
+            label="Pending Tasks"
+            value={roleMetrics.pendingTasks ?? kpis.pending}
+            icon={<FaClock />}
+            accentBg="#fef3c7"
+            accentColor="#d97706"
+            sub="Awaiting acceptance"
+            active={statusFilter === 'PENDING_APPROVAL'}
+            onClick={() => toggleStatusFilter('PENDING_APPROVAL')}
+          />
+          <KpiCard
+            label="In Progress"
+            value={roleMetrics.inProgressTasks ?? kpis.active}
+            icon={<FaSpinner />}
+            accentBg="#dbeafe"
+            accentColor="#2563eb"
+            sub="Active execution"
+            active={statusFilter === 'IN_PROGRESS'}
+            onClick={() => toggleStatusFilter('IN_PROGRESS')}
+          />
+          <KpiCard
+            label="Completed Tasks"
+            value={roleMetrics.completedTasks ?? kpis.completed}
+            icon={<FaCheckCircle />}
+            accentBg="#dcfce7"
+            accentColor="#16a34a"
+            sub={`${roleMetrics.completionRate ?? kpis.completionRate}% done`}
+            active={statusFilter === 'COMPLETED'}
+            onClick={() => toggleStatusFilter('COMPLETED')}
+          />
+          <KpiCard
+            label="Overdue Tasks"
+            value={roleMetrics.overdueTasks ?? kpis.overdue}
+            icon={<FaExclamationTriangle />}
+            accentBg="#fee2e2"
+            accentColor="#dc2626"
+            sub="Past due date"
+            active={statusFilter === 'OVERDUE'}
+            onClick={() => toggleStatusFilter('OVERDUE')}
+          />
+          <KpiCard
+            label="Pending Reviews"
+            value={roleMetrics.pendingReviews ?? kpis.pendingReviews}
+            icon={<FaClipboardCheck />}
+            accentBg="#ffedd5"
+            accentColor="#ea580c"
+            sub={`${roleMetrics.pendingTaskReviews ?? kpis.inReview} task · ${roleMetrics.pendingSubmissions ?? 0} daily`}
+            active={statusFilter === 'PENDING_REVIEWS'}
+            onClick={() => toggleStatusFilter('PENDING_REVIEWS')}
+          />
+        </div>
+      )}
 
       {/* Laptop-Fit Animated Analytics Row: Interactive Status Donut + Role Performance Comparison */}
       <div className="tm-charts-grid tm-charts-grid--compact tm-animate-section">
@@ -956,7 +1040,97 @@ export default function TaskDashboard({ user }) {
           </div>
         </div>
 
-        {/* Right Chart: Admin Branch / Manager Team Member / HR Dept Comparison */}
+        {/* Right Card: Employee Submissions & Feedback / Admin Branch / Manager Team / HR Dept */}
+        {isEmployee ? (
+          <div className="tm-chart-card tm-chart-card--compact tm-chart-card--elevated">
+            <div className="tm-chart-head">
+              <h3 className="tm-chart-title">
+                <FaFileAlt size={13} color="var(--tm-primary)" /> My Daily Submissions &amp; Manager Feedback
+              </h3>
+              <button
+                type="button"
+                className="tm-link-chip"
+                onClick={() => navigate('/DailyWork', { state: { tab: 'reports' } })}
+              >
+                Daily Work <FaArrowRight size={9} />
+              </button>
+            </div>
+
+            <div className="tm-mini-stats-grid" style={{ marginBottom: 12 }}>
+              <div className="tm-mini-stat">
+                <div className="tm-mini-stat-label">Submissions</div>
+                <div className="tm-mini-stat-val">{scopedSubmissions.length}</div>
+              </div>
+              <div className="tm-mini-stat">
+                <div className="tm-mini-stat-label">Approved</div>
+                <div className="tm-mini-stat-val" style={{ color: '#16a34a' }}>
+                  {scopedSubmissions.filter(s => s.status === 'APPROVED').length}
+                </div>
+              </div>
+              <div className="tm-mini-stat">
+                <div className="tm-mini-stat-label">Awaiting Review</div>
+                <div className="tm-mini-stat-val" style={{ color: '#d97706' }}>
+                  {scopedSubmissions.filter(s => s.status === 'SUBMITTED').length}
+                </div>
+              </div>
+            </div>
+
+            {scopedSubmissions.length === 0 ? (
+              <div className="tm-chart-empty" style={{ padding: '24px 16px' }}>
+                No daily submissions yet. Open Daily Work to log today&apos;s progress.
+              </div>
+            ) : (
+              <div className="tm-emp-feedback-list">
+                {scopedSubmissions.slice(0, 4).map(sub => {
+                  const rev = parseReview(sub.reviewComment);
+                  const badgeStyle =
+                    sub.status === 'APPROVED'
+                      ? { bg: '#dcfce7', color: '#166534' }
+                      : sub.status === 'REJECTED'
+                        ? { bg: '#fee2e2', color: '#991b1b' }
+                        : { bg: '#fef3c7', color: '#92400e' };
+                  return (
+                    <div
+                      key={sub.id}
+                      className="tm-emp-feedback-row"
+                      onClick={() => sub.taskId && navigate('/TaskDetail', { state: { taskId: sub.taskId } })}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--tm-text-primary)' }}>
+                          {sub.taskId ? `T-${String(sub.taskId).padStart(3, '0')} · ` : ''}
+                          {sub.taskTitle || 'Daily Progress'}
+                        </span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {rev.rating && (
+                            <span className="tm-mini-tag" style={{ background: '#eff6ff', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              <FaStar size={8} /> {rev.rating}
+                            </span>
+                          )}
+                          <span className="tm-mini-tag" style={{ background: badgeStyle.bg, color: badgeStyle.color }}>
+                            {sub.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11.5, color: 'var(--tm-text-muted)', marginTop: 2 }}>
+                        {sub.submissionDate || toLocalDateStr(sub.submittedAt)} · Progress {sub.progressPercent ?? 0}%
+                        {sub.hoursSpent != null ? ` · ${sub.hoursSpent}h` : ''}
+                      </div>
+                      {(rev.feedback || sub.reviewedBy) && (
+                        <div style={{ fontSize: 12, color: 'var(--tm-text-secondary)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <FaUserCheck size={10} color="var(--tm-primary)" />
+                          <span>
+                            {sub.reviewedBy ? `${cleanPersonName(sub.reviewedBy)}: ` : ''}
+                            {rev.feedback || 'Reviewed'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
         <div className="tm-chart-card tm-chart-card--compact tm-chart-card--elevated">
           <div className="tm-chart-head">
             <h3 className="tm-chart-title">
@@ -1135,6 +1309,7 @@ export default function TaskDashboard({ user }) {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Paginated Tasks Overview Table */}
@@ -1152,7 +1327,11 @@ export default function TaskDashboard({ user }) {
               className="tm-link-chip"
               onClick={() => navigate('/TaskList', {
                 state: {
-                  status: statusFilter === 'OVERDUE' ? 'ALL' : statusFilter,
+                  status: statusFilter === 'MY_ASSIGNED' || statusFilter === 'TEAM_SUBTASKS' || statusFilter === 'PENDING_REVIEWS'
+                    ? 'ALL'
+                    : statusFilter,
+                  onlySubtasks: statusFilter === 'TEAM_SUBTASKS',
+                  scope: statusFilter === 'MY_ASSIGNED' ? 'mine' : undefined,
                   priority: priorityFilter,
                   branch: selectedBranch,
                   department: selectedDept,
@@ -1287,7 +1466,7 @@ export default function TaskDashboard({ user }) {
                           >
                             <FaEye size={12} />
                           </button>
-                          {canCreate && (
+                          {canUserEditTask(t, currentUser, scopedTeamEmployees) && (
                             <button
                               type="button"
                               className="tm-icon-action tm-icon-action--amber"

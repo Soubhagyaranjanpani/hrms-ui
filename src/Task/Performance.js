@@ -15,9 +15,12 @@ import {
   normalizeRole,
   getMyId,
   cleanPersonName,
-  unwrapResponse
+  unwrapResponse,
+  safeReadJson,
+  parseApiError
 } from './taskAccess';
-import { getStoredUser, getMyOrgScope, fetchScopedEmployeesPool } from './taskScope';
+import { getStoredUser, getMyOrgScope, fetchScopedEmployeesPool, collectMyIds } from './taskScope';
+import TaskModuleNav from './TaskModuleNav';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import './TaskModule.css';
@@ -90,16 +93,16 @@ const Performance = ({ user }) => {
 
       const [listRes, statsRes, topRes, empPool, branchRes] = await Promise.all(requests);
 
-      if (!listRes.ok) throw new Error('Failed to load performance list');
-      if (!statsRes.ok) throw new Error('Failed to load performance stats');
-      if (!topRes.ok) throw new Error('Failed to load top performers');
-
       const [listData, statsData, topData, branchData] = await Promise.all([
-        listRes.json(),
-        statsRes.json(),
-        topRes.json(),
-        branchRes && branchRes.ok ? branchRes.json().catch(() => null) : Promise.resolve(null),
+        safeReadJson(listRes),
+        safeReadJson(statsRes),
+        safeReadJson(topRes),
+        branchRes && branchRes.ok ? safeReadJson(branchRes) : Promise.resolve(null),
       ]);
+
+      if (!listRes.ok) throw new Error(parseApiError(listRes, listData, 'Failed to load performance list'));
+      if (!statsRes.ok) throw new Error(parseApiError(statsRes, statsData, 'Failed to load performance stats'));
+      if (!topRes.ok) throw new Error(parseApiError(topRes, topData, 'Failed to load top performers'));
 
       let cleanedPerformances = extractArray(listData).map(perf => ({
         ...perf,
@@ -157,9 +160,14 @@ const Performance = ({ user }) => {
         cleanedTopPerformers = cleanedTopPerformers.filter(filterByScope);
         resolvedStats = computeScopedStats(cleanedPerformances);
       } else if (userRole === 'Employee') {
+        const myIds = collectMyIds(currentUser);
         const onlyMe = (item) => {
-          if (!myId) return false;
-          return String(item.employeeId ?? item.id) === String(myId);
+          const itemIds = [item.employeeId, item.empId, item.id, item.employee?.id]
+            .filter(v => v != null)
+            .map(String);
+          if (itemIds.some(id => myIds.has(id))) return true;
+          if (myId && itemIds.includes(String(myId))) return true;
+          return false;
         };
         cleanedPerformances = cleanedPerformances.filter(onlyMe);
         cleanedTopPerformers = cleanedTopPerformers.filter(onlyMe);
@@ -363,6 +371,8 @@ const Performance = ({ user }) => {
           )}
         </div>
       </div>
+
+      <TaskModuleNav user={currentUser} />
 
       {/* 4 Compact KPI Stats Cards */}
       <div className="tm-kpi-grid tm-kpi-grid--compact">

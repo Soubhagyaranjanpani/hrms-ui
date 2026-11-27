@@ -2588,6 +2588,111 @@
   font-size: 10px;
 }
 
+/* ---------- Role-Based Task Module Navigation & Badges ---------- */
+.tm-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 14px;
+  background: var(--tm-bg-white, #ffffff);
+  border: 1px solid var(--tm-border, #e2e8f0);
+  border-radius: var(--tm-radius-lg, 12px);
+  box-shadow: var(--tm-shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.04));
+}
+
+.tm-subnav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tm-text-secondary, #475569);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.tm-subnav-item:hover:not(.active) {
+  background: var(--tm-bg-surface, #f8fafc);
+  color: var(--tm-text-primary, #0f172a);
+}
+
+.tm-subnav-item.active {
+  background: var(--tm-primary, #2563eb);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+}
+
+.tm-subnav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.tm-subnav-item.active .tm-subnav-badge {
+  background: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+}
+
+.tm-subnav-badge--amber {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tm-subnav-badge--indigo {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.tm-subnav-badge--danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.tm-kpi-grid--5 {
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+}
+
+.tm-kpi-grid--6 {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.tm-emp-feedback-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tm-emp-feedback-row {
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--tm-border, #e2e8f0);
+  background: var(--tm-bg-surface, #f8fafc);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.tm-emp-feedback-row:hover {
+  border-color: var(--tm-primary, #2563eb);
+  background: #ffffff;
+}
+
+
 
 
 

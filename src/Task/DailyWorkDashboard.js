@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FaCalendarAlt, FaChartLine, FaClipboardCheck, FaSyncAlt,
   FaThLarge, FaFileAlt, FaChevronLeft, FaChevronRight,
@@ -15,13 +15,18 @@ import {
   getNormalizedRole,
   getMyId,
   cleanPersonName,
-  unwrapResponse
+  unwrapResponse,
+  safeReadJson,
+  parseApiError
 } from './taskAccess';
 import {
   getStoredUser,
   collectMyIds,
-  fetchScopedEmployeesPool
+  fetchScopedEmployeesPool,
+  scopeTasksForCurrentUser,
+  hydrateMissingSubtasks
 } from './taskScope';
+import TaskModuleNav from './TaskModuleNav';
 import DailyWorkCalendar, { formatDate } from './DailyWorkCalendar';
 import DailyWorkReport from './DailyWorkReport';
 import DailyWorkReview from './DailyWorkReview';
@@ -31,10 +36,10 @@ import './DailyWork.css';
 
 const fetchArray = async (url) => {
   const response = await fetch(url, { headers: getAuthHeaders() });
-  const data = await response.json();
+  const data = await safeReadJson(response);
 
   if (!response.ok) {
-    throw new Error(data.message || `HTTP ${response.status}`);
+    throw new Error(parseApiError(response, data, 'Failed to load data'));
   }
 
   const body = unwrapResponse(data);
@@ -67,6 +72,7 @@ const norm = (val) => (val == null ? '' : String(val).trim().toLowerCase());
 
 export default function DailyWorkDashboard({ user }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const currentUser = user || getStoredUser();
   const role = getNormalizedRole(currentUser);
   const myId = getMyId(currentUser);
@@ -76,6 +82,12 @@ export default function DailyWorkDashboard({ user }) {
   const isManager  = role === 'Manager';
   const isAdmin    = role === 'Admin';
   const isHR       = role === 'Hr';
+
+  const initialTabFromNav = location.state?.tab;
+  const resolvedInitialTab =
+    initialTabFromNav === 'review' && isEmployee
+      ? 'reports'
+      : (initialTabFromNav || null);
 
   const [tasks, setTasks]                       = useState([]);
   const [submissions, setSubmissions]           = useState([]);
@@ -90,7 +102,7 @@ export default function DailyWorkDashboard({ user }) {
   const [selectedEmployee, setSelectedEmployee] = useState('all');
   const [selectedTask, setSelectedTask]         = useState('all');
   const [historyStatus, setHistoryStatus]       = useState('ALL');
-  const [activeTab, setActiveTab]               = useState(null);
+  const [activeTab, setActiveTab]               = useState(resolvedInitialTab);
   const [overviewPage, setOverviewPage]         = useState(1);
   const [historyPage, setHistoryPage]           = useState(1);
   const [reviewPage, setReviewPage]             = useState(1);
@@ -98,6 +110,16 @@ export default function DailyWorkDashboard({ user }) {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [warning, setWarning] = useState('');
+
+  useEffect(() => {
+    const requestedTab = location.state?.tab;
+    if (!requestedTab) return;
+    if (requestedTab === 'review' && isEmployee) {
+      setActiveTab('reports');
+    } else {
+      setActiveTab(requestedTab);
+    }
+  }, [location.state?.tab, isEmployee]);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -133,29 +155,20 @@ export default function DailyWorkDashboard({ user }) {
         if (empPool?.rawEmployees) setRawPoolEmployees(empPool.rawEmployees);
         if (empPool?.scopedEmployees) setScopedPoolEmployees(empPool.scopedEmployees);
 
-        // Scope tasks for Manager / HR to their own team / assigned tasks
-        if ((isManager || isHR) && empPool?.loaded) {
-          const teamIds = new Set();
-          const teamNames = new Set();
-          (empPool.scopedEmployees || []).forEach(e => {
-            [e.id, e.employeeId, e.userId].forEach(id => {
-              if (id != null && String(id).trim() !== '') teamIds.add(String(id));
-            });
-            const n = norm(cleanPersonName(e.name));
-            if (n) teamNames.add(n);
-          });
-
-          allTasks = allTasks.filter(t => {
-            const assignedById = t.assignedById ?? (typeof t.assignedBy === 'object' ? t.assignedBy?.id : null);
-            const assignedToId = t.assignedToId ?? t.assigneeId ?? (typeof t.assignedTo === 'object' ? t.assignedTo?.id : null);
-            const assignedToName = norm(cleanPersonName(t.assignedTo));
-
-            if (assignedById != null && myIds.has(String(assignedById))) return true;
-            if (assignedToId != null && (myIds.has(String(assignedToId)) || teamIds.has(String(assignedToId)))) return true;
-            if (assignedToName && teamNames.has(assignedToName)) return true;
-            return false;
-          });
+        // Always scope tasks for Manager / HR even if employee pool failed to load
+        if (isManager || isHR) {
+          allTasks = scopeTasksForCurrentUser(
+            allTasks,
+            currentUser,
+            empPool?.scopedEmployees || [],
+            empPool?.departments || [],
+            { poolLoaded: Boolean(empPool?.loaded) }
+          );
         }
+        const hydrated = await hydrateMissingSubtasks(allTasks, getAuthHeaders());
+        allTasks = flattenTasks(hydrated);
+      } else {
+        allTasks = scopeTasksForCurrentUser(allTasks, currentUser, [], []);
       }
 
       setTasks(allTasks);
@@ -588,6 +601,8 @@ export default function DailyWorkDashboard({ user }) {
         </div>
       </div>
 
+      <TaskModuleNav user={currentUser} />
+
       {error && <div className="dw-error" style={{ marginBottom: 16 }}>{error}</div>}
       {warning && <div className="dw-warning" style={{ marginBottom: 16 }}>{warning}</div>}
 
@@ -624,7 +639,7 @@ export default function DailyWorkDashboard({ user }) {
                 }}
               >
                 <div className="dw-stat-top">
-                  <small>Pending Reviews</small>
+                  <small>{isEmployee ? 'Awaiting Review' : 'Pending Reviews'}</small>
                   <div className="dw-stat-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
                     <FaClock size={12} />
                   </div>
@@ -809,6 +824,7 @@ export default function DailyWorkDashboard({ user }) {
                     <DailyWorkReport
                       tasks={myTasks}
                       selectedDate={selectedDate}
+                      submissions={submissions}
                       onSubmitted={loadDashboard}
                     />
                   ) : (
@@ -995,6 +1011,7 @@ export default function DailyWorkDashboard({ user }) {
                   <DailyWorkReport
                     tasks={myTasks}
                     selectedDate={selectedDate}
+                    submissions={submissions}
                     onSubmitted={loadDashboard}
                   />
                 )}

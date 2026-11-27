@@ -1,16 +1,36 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   FaCalendarDay, FaTasks, FaClock, FaLink, FaPaperclip,
-  FaPaperPlane, FaCheckCircle, FaExclamationCircle, FaLock, FaTimes
+  FaPaperPlane, FaCheckCircle, FaExclamationCircle, FaLock, FaTimes,
+  FaUserCheck, FaStar
 } from 'react-icons/fa';
 import {
   API_ENDPOINTS,
-  getMultipartAuthHeaders
+  getAuthHeaders,
+  getMultipartAuthHeaders,
+  extractArray
 } from '../config/api.config';
+import {
+  cleanPersonName,
+  safeReadJson,
+  parseApiError,
+  getSubmissionLocalDate,
+  getNextBusinessDateStr,
+  formatBusinessDateLabel,
+  notifyTaskDataChanged
+} from './taskAccess';
+import { getStoredUser, collectMyIds } from './taskScope';
+import { parseReview } from './taskRating';
 import { formatDate } from './DailyWorkCalendar';
 import './DailyWork.css';
 
 const QUICK_HOURS = [1, 2, 4, 8];
+
+const SUBMISSION_STATUS_META = {
+  SUBMITTED: { label: 'Pending Review', bg: '#fef3c7', color: '#92400e' },
+  APPROVED:  { label: 'Approved',       bg: '#dcfce7', color: '#166534' },
+  REJECTED:  { label: 'Rejected',       bg: '#fee2e2', color: '#991b1b' },
+};
 
 const formatBytes = (bytes) => {
   if (!bytes) return '';
@@ -22,8 +42,12 @@ const formatBytes = (bytes) => {
 export default function DailyWorkReport({
   tasks = [],
   selectedDate,
+  submissions = [],
   onSubmitted
 }) {
+  const currentUser = getStoredUser();
+  const myIds = useMemo(() => collectMyIds(currentUser), [currentUser]);
+
   const [taskId, setTaskId]       = useState('');
   const [note, setNote]           = useState('');
   const [hours, setHours]         = useState('');
@@ -31,20 +55,85 @@ export default function DailyWorkReport({
   const [proofLink, setProofLink] = useState('');
   const [file, setFile]           = useState(null);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const [success, setSuccess] = useState('');
+  const [loading, setLoading]                 = useState(false);
+  const [checkingHistory, setCheckingHistory] = useState(false);
+  const [taskSubmissions, setTaskSubmissions] = useState([]);
+  const [error, setError]                     = useState('');
+  const [success, setSuccess]                 = useState('');
 
   const fileInputRef = useRef(null);
+  const submittingRef = useRef(false);
 
   const today = formatDate(new Date());
   const isToday = selectedDate === today;
+  const nextBusinessDate = getNextBusinessDateStr(new Date());
+  const nextBusinessDateLabel = formatBusinessDateLabel(nextBusinessDate);
 
-  const activeTasks = Array.isArray(tasks)
-    ? tasks.filter(task => task.status === 'IN_PROGRESS')
-    : [];
+  const activeTasks = useMemo(
+    () => (Array.isArray(tasks) ? tasks.filter(task => task.status === 'IN_PROGRESS') : []),
+    [tasks]
+  );
 
   const selectedTask = activeTasks.find(t => String(t.id) === String(taskId));
+
+  // Verify live submission history whenever selected task changes
+  useEffect(() => {
+    if (!taskId) {
+      setTaskSubmissions([]);
+      setCheckingHistory(false);
+      return;
+    }
+
+    const propMatches = (Array.isArray(submissions) ? submissions : []).filter(
+      s => String(s.taskId) === String(taskId)
+    );
+    setTaskSubmissions(propMatches);
+
+    let active = true;
+    const loadTaskHistory = async () => {
+      setCheckingHistory(true);
+      try {
+        const res = await fetch(API_ENDPOINTS.GET_TASK_SUBMISSIONS(taskId), {
+          headers: getAuthHeaders(),
+        });
+        const data = await safeReadJson(res);
+        if (!active) return;
+        if (!res.ok) {
+          setError(parseApiError(res, data, 'Could not verify submission history'));
+          return;
+        }
+        setTaskSubmissions(extractArray(data));
+      } catch {
+        // retain propMatches if offline/error
+      } finally {
+        if (active) setCheckingHistory(false);
+      }
+    };
+
+    loadTaskHistory();
+    return () => { active = false; };
+  }, [taskId, submissions]);
+
+  const todaySubmission = useMemo(() => {
+    if (!taskId) return null;
+    const merged = new Map();
+    [...(Array.isArray(submissions) ? submissions : []), ...taskSubmissions].forEach(s => {
+      if (s && s.id != null && String(s.taskId ?? taskId) === String(taskId)) {
+        merged.set(String(s.id), s);
+      }
+    });
+
+    return [...merged.values()].find(s => {
+      if (s.finalSubmission) return false;
+      if (getSubmissionLocalDate(s) !== today) return false;
+      if (s.employeeId != null && myIds.size > 0) {
+        return myIds.has(String(s.employeeId));
+      }
+      return true;
+    }) || null;
+  }, [taskId, submissions, taskSubmissions, today, myIds]);
+
+  const isLockedForToday = Boolean(todaySubmission);
 
   const selectTask = (id) => {
     setTaskId(id);
@@ -63,6 +152,7 @@ export default function DailyWorkReport({
 
   const submitReport = async (e) => {
     e.preventDefault();
+    if (submittingRef.current || loading) return;
     setError('');
     setSuccess('');
 
@@ -73,6 +163,16 @@ export default function DailyWorkReport({
 
     if (!selectedTask) {
       setError('Please select an active task.');
+      return;
+    }
+
+    if (checkingHistory) {
+      setError('Please wait while today’s submission status is verified.');
+      return;
+    }
+
+    if (isLockedForToday) {
+      setError("Today's work has already been submitted.");
       return;
     }
 
@@ -88,6 +188,7 @@ export default function DailyWorkReport({
     }
 
     try {
+      submittingRef.current = true;
       setLoading(true);
 
       const formData = new FormData();
@@ -113,27 +214,41 @@ export default function DailyWorkReport({
         }
       );
 
-      const data = await response.json();
+      const data = await safeReadJson(response);
 
       if (!response.ok) {
-        throw new Error(data.message || 'Submission failed');
+        throw new Error(parseApiError(response, data, 'Submission failed'));
+      }
+
+      const created = data?.response ?? data?.data ?? data;
+      if (created && created.id != null) {
+        setTaskSubmissions(prev => [created, ...prev]);
       }
 
       setSuccess('Daily work report submitted to manager successfully.');
-      setTaskId('');
       setNote('');
       setHours('');
-      setProgress(0);
       setProofLink('');
       clearFile();
 
+      notifyTaskDataChanged();
       onSubmitted?.();
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Submission failed');
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
+
+  const existingStatusMeta = todaySubmission
+    ? (SUBMISSION_STATUS_META[todaySubmission.status] || {
+        label: todaySubmission.status || 'Submitted',
+        bg: '#f1f5f9',
+        color: '#475569',
+      })
+    : null;
+  const existingReview = todaySubmission ? parseReview(todaySubmission.reviewComment) : null;
 
   return (
     <div className="dw-card">
@@ -145,7 +260,7 @@ export default function DailyWorkReport({
           </div>
           <div>
             <h3 className="dw-title">Daily Work Report</h3>
-            <p className="dw-subtitle">Log today&apos;s task progress &amp; proof of work</p>
+            <p className="dw-subtitle">One daily progress report per task per day · Next cycle on {nextBusinessDateLabel}</p>
           </div>
         </div>
 
@@ -199,11 +314,99 @@ export default function DailyWorkReport({
               <div className="dw-task-preview">
                 <span className="dw-task-id">T-{String(selectedTask.id).padStart(3, '0')}</span>
                 <span className="dw-task-meta">
-                  {selectedTask.department || 'General'} · Current Progress: <strong>{selectedTask.progress || 0}%</strong>
+                  {(typeof selectedTask.department === 'object' ? selectedTask.department?.name : selectedTask.departmentName || selectedTask.department) || 'General'}
+                  {' · '}Current Progress: <strong>{selectedTask.progress || 0}%</strong>
                 </span>
               </div>
             )}
           </div>
+
+          {checkingHistory && taskId && (
+            <div className="dw-info-banner">
+              <FaClock size={12} />
+              <span>Checking today&apos;s submission history…</span>
+            </div>
+          )}
+
+          {/* One Day, One Work Lock Card */}
+          {isLockedForToday && todaySubmission && (
+            <div className="dw-locked-submission-card">
+              <div className="dw-locked-submission-head">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FaLock size={13} color="#d97706" />
+                  <strong>Today&apos;s work has already been submitted.</strong>
+                </div>
+                <span
+                  className="dwr-status-pill"
+                  style={{ background: existingStatusMeta.bg, color: existingStatusMeta.color, padding: '2px 9px', fontSize: 11 }}
+                >
+                  {existingStatusMeta.label}
+                </span>
+              </div>
+
+              <div className="dw-locked-submission-meta">
+                <span>Progress: <strong>{todaySubmission.progressPercent ?? 0}%</strong></span>
+                {todaySubmission.hoursSpent != null && (
+                  <span>Hours: <strong>{todaySubmission.hoursSpent}h</strong></span>
+                )}
+                {todaySubmission.submittedAt && (
+                  <span>
+                    Submitted at:{' '}
+                    <strong>
+                      {new Date(todaySubmission.submittedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    </strong>
+                  </span>
+                )}
+              </div>
+
+              {todaySubmission.note && (
+                <p className="dwr-note-box--compact" style={{ marginTop: 6 }}>
+                  {todaySubmission.note}
+                </p>
+              )}
+
+              {/* Existing Manager Feedback */}
+              <div
+                className={`dwr-saved-box dwr-saved-box--compact ${
+                  todaySubmission.status === 'APPROVED'
+                    ? 'approved'
+                    : todaySubmission.status === 'REJECTED'
+                      ? 'rejected'
+                      : ''
+                }`}
+                style={{
+                  marginTop: 8,
+                  background: todaySubmission.status === 'SUBMITTED' ? '#fffbeb' : undefined,
+                  border: todaySubmission.status === 'SUBMITTED' ? '1px solid #fde68a' : undefined,
+                }}
+              >
+                <div className="dwr-saved-head" style={{ marginBottom: 3 }}>
+                  <h4 style={{ fontSize: 12 }}>
+                    <FaUserCheck size={11} /> Manager Feedback
+                  </h4>
+                  {existingReview?.rating && (
+                    <span className={`dwr-rating-tag ${existingReview.rating.toLowerCase()}`}>
+                      <FaStar size={9} /> {existingReview.rating}
+                    </span>
+                  )}
+                </div>
+                <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-secondary, #334155)' }}>
+                  {todaySubmission.status === 'SUBMITTED'
+                    ? 'Awaiting Manager review.'
+                    : (existingReview?.feedback || 'Reviewed with no written comment.')}
+                </p>
+                {todaySubmission.reviewedBy && (
+                  <small style={{ fontSize: 11, color: 'var(--text-muted, #64748b)' }}>
+                    Reviewed by <strong>{cleanPersonName(todaySubmission.reviewedBy)}</strong>
+                  </small>
+                )}
+              </div>
+
+              <div className="dw-locked-next-note">
+                Next daily submission will be enabled on <strong>{nextBusinessDateLabel}</strong>.
+              </div>
+            </div>
+          )}
 
           {/* Work Completed Today */}
           <div className="dw-field">
@@ -218,6 +421,7 @@ export default function DailyWorkReport({
               value={note}
               onChange={e => setNote(e.target.value)}
               placeholder="Summarize completed milestones, pull requests, or blockers encountered today..."
+              disabled={isLockedForToday || loading}
               required
             />
           </div>
@@ -237,6 +441,7 @@ export default function DailyWorkReport({
                       type="button"
                       className={`dw-hour-chip ${Number(hours) === h ? 'active' : ''}`}
                       onClick={() => setHours(String(h))}
+                      disabled={isLockedForToday || loading}
                     >
                       {h}h
                     </button>
@@ -251,6 +456,7 @@ export default function DailyWorkReport({
                 value={hours}
                 onChange={e => setHours(e.target.value)}
                 placeholder="e.g., 4.5"
+                disabled={isLockedForToday || loading}
                 required
               />
             </div>
@@ -268,6 +474,7 @@ export default function DailyWorkReport({
                   step="5"
                   value={progress}
                   onChange={e => setProgress(Number(e.target.value))}
+                  disabled={isLockedForToday || loading}
                   className="dw-range"
                 />
                 <div className="dw-range-ticks">
@@ -290,6 +497,7 @@ export default function DailyWorkReport({
               value={proofLink}
               onChange={e => setProofLink(e.target.value)}
               placeholder="https://github.com/org/repo/pull/12 or document URL"
+              disabled={isLockedForToday || loading}
             />
           </div>
 
@@ -301,11 +509,12 @@ export default function DailyWorkReport({
             </label>
 
             {!file ? (
-              <label className="dw-file-drop">
+              <label className="dw-file-drop" style={isLockedForToday ? { opacity: 0.55, pointerEvents: 'none' } : undefined}>
                 <input
                   ref={fileInputRef}
                   type="file"
                   onChange={e => setFile(e.target.files?.[0] || null)}
+                  disabled={isLockedForToday || loading}
                   style={{ display: 'none' }}
                 />
                 <FaPaperclip size={14} color="#6366f1" />
@@ -323,6 +532,7 @@ export default function DailyWorkReport({
                   onClick={clearFile}
                   className="dw-file-remove"
                   title="Remove attachment"
+                  disabled={isLockedForToday || loading}
                 >
                   <FaTimes size={11} />
                 </button>
@@ -349,10 +559,14 @@ export default function DailyWorkReport({
           <button
             type="submit"
             className="dw-primary-btn"
-            disabled={loading || !activeTasks.length}
+            disabled={loading || checkingHistory || isLockedForToday || !activeTasks.length}
           >
             <FaPaperPlane size={12} />
-            {loading ? 'Submitting Report...' : 'Submit to Manager'}
+            {loading
+              ? 'Submitting Report...'
+              : isLockedForToday
+                ? "Today's work has already been submitted."
+                : 'Submit to Manager'}
           </button>
         </form>
       )}

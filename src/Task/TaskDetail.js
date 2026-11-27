@@ -1,4 +1,4 @@
-import SubmissionsPanel, { SubmitWorkModal } from './TaskSubmissions';
+import SubmissionsPanel, { SubmitWorkModal, reviewLatest } from './TaskSubmissions';
 import DailyWorkReport from './DailyWorkReport';
 import { formatDate as formatIsoDate } from './DailyWorkCalendar';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -18,12 +18,25 @@ import {
 } from '../config/api.config';
 import {
   getNormalizedRole,
-  getMyId,
   cleanPersonName,
   unwrapResponse,
+  safeReadJson,
+  parseApiError,
+  toLocalDateStr,
+  isTaskOverdue,
+  notifyTaskDataChanged,
   calculateEffortFromDates
 } from './taskAccess';
-import { getStoredUser, scopeEmployeesForRole } from './taskScope';
+import {
+  getStoredUser,
+  scopeEmployeesForRole,
+  fetchScopedEmployeesPool,
+  getMyOrgScope,
+  isTaskAssignedToIds,
+  isTaskCreatedByIds,
+  canManagerCreateSubtask,
+  canUserEditTask
+} from './taskScope';
 import { parseReview } from './taskRating';
 import { toast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -144,19 +157,25 @@ export default function TaskDetail({ user }) {
   const navigate        = useNavigate();
   const location        = useLocation();
   const taskIdFromState = location.state?.taskId;
-  const userRole        = getNormalizedRole(user);
-  const myId            = getMyId(user);
-  const canManageSubtasks = ['Admin', 'Hr', 'Manager'].includes(userRole);
+  const currentUser     = user || getStoredUser();
+  const userRole        = getNormalizedRole(currentUser);
+  const isEmployee      = userRole === 'Employee';
+  const isManager       = userRole === 'Manager';
+  const isAdmin         = userRole === 'Admin';
 
   const [showSubmitWork, setShowSubmitWork] = useState(false);
   const [task,           setTask]           = useState(null);
   const [submissions,    setSubmissions]    = useState([]);
+  const [submissionsRefreshKey, setSubmissionsRefreshKey] = useState(0);
   const [loading,        setLoading]        = useState(true);
+  const [loadError,      setLoadError]      = useState('');
 
   const [branches,          setBranches]          = useState([]);
   const [departments,       setDepartments]       = useState([]);
   const [filteredDepts,     setFilteredDepts]     = useState([]);
   const [employees,         setEmployees]         = useState([]);
+  const [rawEmployees,      setRawEmployees]      = useState([]);
+  const [deptAssignees,     setDeptAssignees]     = useState(null);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [dropdownsLoaded,   setDropdownsLoaded]   = useState(false);
 
@@ -164,6 +183,7 @@ export default function TaskDetail({ user }) {
   const [commentText, setCommentText] = useState('');
   const [submitting,  setSubmitting]  = useState(false);
   const [actionBusy,  setActionBusy]  = useState(false);
+  const submittingRef = useRef(false);
 
   // Change Request Modal State
   const [showCRModal, setShowCRModal] = useState(false);
@@ -232,22 +252,25 @@ export default function TaskDetail({ user }) {
       setLoading(false);
       return;
     }
+    setLoadError('');
     try {
       const [taskRes, subRes] = await Promise.all([
         fetch(API_ENDPOINTS.GET_TASK_BY_ID(taskIdFromState), { headers: getAuthHeaders() }),
         fetch(API_ENDPOINTS.GET_TASK_SUBMISSIONS(taskIdFromState), { headers: getAuthHeaders() }),
       ]);
 
-      const taskData = await taskRes.json();
-      if (!taskRes.ok) throw new Error(taskData.message || 'Task not found');
+      const taskData = await safeReadJson(taskRes);
+      if (!taskRes.ok) throw new Error(parseApiError(taskRes, taskData, 'Task not found'));
       const unwrappedTask = unwrapResponse(taskData);
       setTask(unwrappedTask && typeof unwrappedTask === 'object' ? unwrappedTask : null);
 
       if (subRes.ok) {
-        const subData = await subRes.json();
+        const subData = await safeReadJson(subRes);
         setSubmissions(extractArray(subData));
       }
+      setSubmissionsRefreshKey(k => k + 1);
     } catch (err) {
+      setLoadError(err.message || 'Could not load task');
       toast.error('Error', err.message);
     } finally {
       setLoading(false);
@@ -263,51 +286,48 @@ export default function TaskDetail({ user }) {
   }, [fetchTaskAndSubmissions]);
 
   useEffect(() => {
-    if (!canManageSubtasks) return;
+    if (!isManager) return;
     let active = true;
     const fetchDropdowns = async () => {
       try {
-        const currentRole = getNormalizedRole();
-        const needsRefEmployees = currentRole === 'Manager' || currentRole === 'Hr';
-        const [branchRes, empRes, deptRes, refEmpRes] = await Promise.all([
-          fetch(API_ENDPOINTS.GET_ACTIVE_BRANCHES, { headers: getAuthHeaders() }),
-          fetch(API_ENDPOINTS.GET_TASK_ASSIGNEES, { headers: getAuthHeaders() }),
-          fetch(API_ENDPOINTS.GET_ACTIVE_DEPARTMENTS, { headers: getAuthHeaders() }),
-          needsRefEmployees
-            ? fetch(`${API_ENDPOINTS.GET_EMPLOYEES}?page=0&size=200`, { headers: getAuthHeaders() }).catch(() => null)
-            : Promise.resolve(null),
+        const headers = getAuthHeaders();
+        const [branchRes, deptRes, empPool] = await Promise.all([
+          fetch(API_ENDPOINTS.GET_ACTIVE_BRANCHES, { headers }).catch(() => null),
+          fetch(API_ENDPOINTS.GET_ACTIVE_DEPARTMENTS, { headers }).catch(() => null),
+          fetchScopedEmployeesPool(currentUser, { includeAssigneesMeta: true, failClosed: true }).catch(() => null),
         ]);
 
-        const [bJson, eJson, dJson, refJson] = await Promise.all([
-          branchRes.json(),
-          empRes.json(),
-          deptRes.json(),
-          refEmpRes ? refEmpRes.json().catch(() => null) : Promise.resolve(null),
+        const [bJson, dJson] = await Promise.all([
+          branchRes && branchRes.ok ? safeReadJson(branchRes) : Promise.resolve(null),
+          deptRes && deptRes.ok ? safeReadJson(deptRes) : Promise.resolve(null),
         ]);
 
         if (!active) return;
-        const deptList = extractArray(dJson);
-        setBranches(extractArray(bJson));
-        setDepartments(deptList);
-        if (empRes.ok) {
-          const flatEmployees = extractArray(eJson).flatMap(group =>
-            Array.isArray(group.employees)
-              ? group.employees.map(employee => ({
-                  ...employee,
-                  roleName: employee.roleName || employee.role,
-                  departmentId: employee.departmentId ?? group.departmentId,
-                  departmentName: employee.departmentName ?? group.departmentName,
-                }))
-              : [{ ...group, roleName: group.roleName || group.role }]
-          );
-          const referenceEmployees = refJson ? extractArray(refJson) : [];
-          setEmployees(
-            scopeEmployeesForRole(flatEmployees, getStoredUser(), deptList, {
-              referenceEmployees,
-              failClosed: false,
-            })
-          );
+        const rawBranches = bJson ? extractArray(bJson) : [];
+        const rawDepts = (dJson ? extractArray(dJson) : (empPool?.departments || [])).map(d => ({
+          ...d,
+          branchId: d.branchId ?? d.branch?.id ?? null,
+        }));
+        const scopedEmps = empPool?.scopedEmployees || [];
+        setRawEmployees(empPool?.rawEmployees || []);
+        setEmployees(scopedEmps);
+
+        let scopedDepts = rawDepts;
+        let scopedBranches = rawBranches;
+        if (scopedEmps.length > 0) {
+          const empDeptIds = new Set(scopedEmps.map(e => String(e.departmentId)).filter(Boolean));
+          const matchingDepts = rawDepts.filter(d => empDeptIds.has(String(d.id)));
+          if (matchingDepts.length > 0) {
+            scopedDepts = matchingDepts;
+            const matchingBranchIds = new Set(matchingDepts.map(d => String(d.branchId)).filter(Boolean));
+            if (matchingBranchIds.size > 0) {
+              scopedBranches = rawBranches.filter(b => matchingBranchIds.has(String(b.id)));
+            }
+          }
         }
+
+        setBranches(scopedBranches);
+        setDepartments(scopedDepts);
         setDropdownsLoaded(true);
       } catch (err) {
         console.error('Dropdown fetch error:', err);
@@ -315,7 +335,42 @@ export default function TaskDetail({ user }) {
     };
     fetchDropdowns();
     return () => { active = false; };
-  }, [canManageSubtasks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isManager]);
+
+  // Fetch department assignees dynamically when subtask department changes
+  useEffect(() => {
+    if (!isManager || !subtaskForm.dept) {
+      setDeptAssignees(null);
+      return;
+    }
+    let active = true;
+    fetch(API_ENDPOINTS.GET_DEPARTMENT_ASSIGNEES(subtaskForm.dept), { headers: getAuthHeaders() })
+      .then(async res => {
+        const data = await safeReadJson(res);
+        if (!active || !res.ok) return;
+        const flat = extractArray(data).flatMap(group =>
+          Array.isArray(group?.employees)
+            ? group.employees.map(emp => ({
+                ...emp,
+                roleName: emp.roleName || emp.role,
+                departmentId: emp.departmentId ?? group.departmentId ?? subtaskForm.dept,
+                branchId: emp.branchId ?? group.branchId ?? subtaskForm.branch,
+              }))
+            : [{ ...group, roleName: group.roleName || group.role, departmentId: group.departmentId ?? subtaskForm.dept }]
+        );
+        const scoped = scopeEmployeesForRole(flat, currentUser, departments, {
+          referenceEmployees: rawEmployees,
+          failClosed: true,
+        });
+        setDeptAssignees(scoped);
+      })
+      .catch(() => {
+        if (active) setDeptAssignees(null);
+      });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isManager, subtaskForm.dept, subtaskForm.branch, departments, rawEmployees]);
 
   const areAllSubtasksCompleted = () => {
     if (!task?.subtasks?.length) return true;
@@ -331,17 +386,25 @@ export default function TaskDetail({ user }) {
   }, [subtaskForm.branch, departments]);
 
   useEffect(() => {
-    let filtered = [...employees];
-    if (subtaskForm.dept) {
-      filtered = filtered.filter(emp => String(emp.departmentId) === String(subtaskForm.dept));
-    } else if (subtaskForm.branch) {
-      const deptIds = departments
-        .filter(d => String(d.branchId) === String(subtaskForm.branch))
-        .map(d => String(d.id));
-      filtered = filtered.filter(emp => deptIds.includes(String(emp.departmentId)));
+    if (!subtaskForm.branch || !subtaskForm.dept) {
+      setFilteredEmployees([]);
+      return;
     }
-    setFilteredEmployees(filtered);
-  }, [employees, departments, subtaskForm.branch, subtaskForm.dept]);
+    const base = Array.isArray(deptAssignees)
+      ? deptAssignees
+      : employees.filter(emp => String(emp.departmentId) === String(subtaskForm.dept));
+
+    // Preserve currently assigned employee when editing an authorized subtask
+    const list = [...base];
+    if (editingSubtask?.assignedToId != null) {
+      const existingId = String(editingSubtask.assignedToId);
+      if (!list.some(e => String(e.id) === existingId)) {
+        const match = employees.find(e => String(e.id) === existingId);
+        if (match) list.push(match);
+      }
+    }
+    setFilteredEmployees(list);
+  }, [deptAssignees, employees, subtaskForm.branch, subtaskForm.dept, editingSubtask]);
 
   const updateTaskStatus = async (taskId, newStatus, extraProgress = null) => {
     const payload = { taskId, status: newStatus };
@@ -349,12 +412,13 @@ export default function TaskDetail({ user }) {
     const res = await fetch(API_ENDPOINTS.UPDATE_TASK_STATUS, {
       method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to update status');
+    const data = await safeReadJson(res);
+    if (!res.ok) throw new Error(parseApiError(res, data, 'Failed to update status'));
     return true;
   };
 
   const handleStatusChange = async (taskId, newStatus, isSubtask = false) => {
+    if (actionBusy) return;
     if (newStatus === 'CHANGE_REQUESTED') {
       setCrTaskId(taskId);
       setCrReason('');
@@ -369,6 +433,7 @@ export default function TaskDetail({ user }) {
       await updateTaskStatus(taskId, newStatus);
       toast.success('Updated', `${isSubtask ? 'Subtask' : 'Task'} moved to ${STATUS_LABELS[newStatus]}`);
       setDropdownState({ open: false, subtaskId: null, position: { top: 0, left: 0 } });
+      notifyTaskDataChanged();
       await fetchTaskAndSubmissions();
     } catch (err) {
       toast.error('Error', err.message);
@@ -378,6 +443,7 @@ export default function TaskDetail({ user }) {
   };
 
   const updateStatus = async (newStatus, extraProgress = null) => {
+    if (actionBusy) return;
     if (newStatus === 'COMPLETED' && !areAllSubtasksCompleted()) {
       toast.warning('Cannot Complete', 'All subtasks must be completed before marking the main task as complete.');
       return;
@@ -392,8 +458,20 @@ export default function TaskDetail({ user }) {
 
     setActionBusy(true);
     try {
-      await updateTaskStatus(task.id, newStatus, extraProgress);
+      if (task.status === 'IN_REVIEW' && (newStatus === 'COMPLETED' || newStatus === 'IN_PROGRESS')) {
+        const reviewed = await reviewLatest(
+          task.id,
+          newStatus === 'COMPLETED',
+          newStatus === 'COMPLETED' ? 'Approved' : 'Sent back for updates'
+        ).catch(() => false);
+        if (!reviewed) {
+          await updateTaskStatus(task.id, newStatus, extraProgress);
+        }
+      } else {
+        await updateTaskStatus(task.id, newStatus, extraProgress);
+      }
       toast.success('Updated', `Task moved to ${STATUS_LABELS[newStatus] || newStatus}`);
+      notifyTaskDataChanged();
       await fetchTaskAndSubmissions();
     } catch (err) {
       toast.error('Error', err.message);
@@ -403,33 +481,37 @@ export default function TaskDetail({ user }) {
   };
 
   const handleApproveChange = async () => {
+    if (actionBusy) return;
     setActionBusy(true);
     try {
       const res  = await fetch(API_ENDPOINTS.APPROVE_CHANGE(crTaskId || task.id), { method: 'POST', headers: getAuthHeaders() });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed');
+      const data = await safeReadJson(res);
+      if (!res.ok) throw new Error(parseApiError(res, data, 'Failed to approve change'));
       toast.success('Approved', 'Change request approved');
       setShowCRModal(false); setCrTaskId(null); setCrReason(''); setCrDeadline('');
+      notifyTaskDataChanged();
       await fetchTaskAndSubmissions();
     } catch (err) { toast.error('Error', err.message); }
     finally { setActionBusy(false); }
   };
 
   const handleRejectChange = async () => {
+    if (actionBusy) return;
     setActionBusy(true);
     try {
       const res  = await fetch(API_ENDPOINTS.REJECT_CHANGE(crTaskId || task.id), { method: 'POST', headers: getAuthHeaders() });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed');
+      const data = await safeReadJson(res);
+      if (!res.ok) throw new Error(parseApiError(res, data, 'Failed to reject change'));
       toast.success('Rejected', 'Change request rejected');
       setShowCRModal(false); setCrTaskId(null); setCrReason(''); setCrDeadline('');
+      notifyTaskDataChanged();
       await fetchTaskAndSubmissions();
     } catch (err) { toast.error('Error', err.message); }
     finally { setActionBusy(false); }
   };
 
   const handleSendChange = async () => {
-    if (!crReason.trim()) return;
+    if (!crReason.trim() || actionBusy) return;
     setActionBusy(true);
     try {
       const targetId = crTaskId || task.id;
@@ -437,29 +519,34 @@ export default function TaskDetail({ user }) {
       const res  = await fetch(API_ENDPOINTS.SEND_CHANGE_REQ(targetId), {
         method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed');
+      const data = await safeReadJson(res);
+      if (!res.ok) throw new Error(parseApiError(res, data, 'Failed to send change request'));
       toast.warning('Sent', 'Change request submitted');
       setShowCRModal(false); setCrTaskId(null); setCrReason(''); setCrDeadline('');
+      notifyTaskDataChanged();
       await fetchTaskAndSubmissions();
     } catch (err) { toast.error('Error', err.message); }
     finally { setActionBusy(false); }
   };
 
   const handleComment = async () => {
-    if (!commentText.trim() || submitting) return;
+    if (!commentText.trim() || submitting || submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const res  = await fetch(API_ENDPOINTS.ADD_COMMENT(task.id), {
         method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ comment: commentText.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed');
+      const data = await safeReadJson(res);
+      if (!res.ok) throw new Error(parseApiError(res, data, 'Failed to post comment'));
       toast.success('Added', 'Comment posted');
       setCommentText('');
       await fetchTaskAndSubmissions();
     } catch (err) { toast.error('Error', err.message); }
-    finally { setSubmitting(false); }
+    finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   const validateSubtaskField = (field, value) => {
@@ -493,11 +580,15 @@ export default function TaskDetail({ user }) {
   };
 
   const openCreateSubtaskForm = () => {
+    if (!canManagerCreateSubtask(task, currentUser)) return;
     let defaultBranch = task?.branchId != null ? String(task.branchId) : '';
     if (!defaultBranch && task?.branch && branches.length > 0) {
       const bName = typeof task.branch === 'object' ? task.branch.name : task.branch;
       const found = branches.find(b => b.name === bName || String(b.id) === String(task.branch));
       if (found) defaultBranch = String(found.id);
+    }
+    if (!defaultBranch && branches.length === 1) {
+      defaultBranch = String(branches[0].id);
     }
 
     let defaultDept = task?.departmentId != null ? String(task.departmentId) : '';
@@ -505,6 +596,10 @@ export default function TaskDetail({ user }) {
       const dName = typeof task.department === 'object' ? task.department.name : task.department;
       const found = departments.find(d => d.name === dName || String(d.id) === String(task.department));
       if (found) defaultDept = String(found.id);
+    }
+    if (!defaultDept && defaultBranch) {
+      const bDepts = departments.filter(d => String(d.branchId) === String(defaultBranch));
+      if (bDepts.length === 1) defaultDept = String(bDepts[0].id);
     }
 
     setEditingSubtask(null);
@@ -521,10 +616,7 @@ export default function TaskDetail({ user }) {
 
   const handleEditSubtask = (subtask) => {
     if (!dropdownsLoaded) { toast.warning('Please wait', 'Loading form data...'); return; }
-    let formattedDeadline = '';
-    if (subtask.dueDate) {
-      formattedDeadline = new Date(subtask.dueDate).toISOString().split('T')[0];
-    }
+    const formattedDeadline = toLocalDateStr(subtask.dueDate);
     let branchId = subtask.branchId != null ? String(subtask.branchId) : '';
     if (!branchId && subtask.branch && branches.length > 0) {
       const name = typeof subtask.branch === 'object' ? subtask.branch.name : subtask.branch;
@@ -567,7 +659,7 @@ export default function TaskDetail({ user }) {
 
   const handleCreateOrUpdateSubtask = async (e) => {
     e.preventDefault();
-    if (submitting) return;
+    if (submitting || submittingRef.current) return;
     const allFields = ['title', 'assignee', 'branch', 'dept', 'deadline'];
     setSubtaskTouched(allFields.reduce((a, f) => ({ ...a, [f]: true }), {}));
     const errs = {};
@@ -587,6 +679,7 @@ export default function TaskDetail({ user }) {
       tags:         subtaskForm.tags.trim() || null,
     };
 
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const url = editingSubtask
@@ -594,17 +687,19 @@ export default function TaskDetail({ user }) {
         : API_ENDPOINTS.CREATE_SUBTASK(task.id);
       const method = editingSubtask ? 'PUT' : 'POST';
       const res    = await fetch(url, { method, headers: getAuthHeaders(), body: JSON.stringify(payload) });
-      const data   = await res.json();
-      if (!res.ok) throw new Error(data.message || `Failed to ${editingSubtask ? 'update' : 'create'} subtask`);
+      const data   = await safeReadJson(res);
+      if (!res.ok) throw new Error(parseApiError(res, data, `Failed to ${editingSubtask ? 'update' : 'create'} subtask`));
       toast.success(editingSubtask ? 'Updated' : 'Created', `Subtask ${editingSubtask ? 'updated' : 'added'} successfully`);
       setShowSubtaskForm(false); setEditingSubtask(null);
       setSubtaskForm({ title: '', description: '', assignee: '', branch: '', dept: '', priority: 'Medium', deadline: '', effort: '', tags: '' });
       setSubtaskErrors({}); setSubtaskTouched({});
       setSubtaskCurrentPage(1);
+      notifyTaskDataChanged();
       await fetchTaskAndSubmissions();
     } catch (err) {
       toast.error('Error', err.message);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -653,10 +748,39 @@ export default function TaskDetail({ user }) {
   const STATUS_FLOW = ['PENDING_APPROVAL', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED'];
   const statusIdx   = task ? STATUS_FLOW.indexOf(task.status) : -1;
 
+  const { myIds, myName } = useMemo(
+    () => getMyOrgScope(employees, currentUser),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [employees, userRole]
+  );
+
+  // Authorized subtasks visible to the current user
+  const authorizedSubtasks = useMemo(() => {
+    const subs = Array.isArray(task?.subtasks) ? task.subtasks : [];
+    if (isEmployee) {
+      return subs.filter(s => isTaskAssignedToIds(s, myIds, myName));
+    }
+    if (isManager) {
+      if (isTaskAssignedToIds(task, myIds, myName) || isTaskCreatedByIds(task, myIds, myName)) {
+        return subs;
+      }
+      const teamIds = new Set(
+        employees.flatMap(e => [e.id, e.employeeId, e.userId]).filter(v => v != null).map(String)
+      );
+      return subs.filter(
+        s =>
+          isTaskAssignedToIds(s, myIds, myName) ||
+          isTaskCreatedByIds(s, myIds, myName) ||
+          (s.assignedToId != null && teamIds.has(String(s.assignedToId)))
+      );
+    }
+    return subs;
+  }, [task, isEmployee, isManager, myIds, myName, employees]);
+
   // Subtask filter & pagination
   const filteredSubtasks = useMemo(() => {
-    if (!task?.subtasks) return [];
-    return task.subtasks.filter(s => {
+    if (!authorizedSubtasks.length) return [];
+    return authorizedSubtasks.filter(s => {
       const matchesStatus =
         subtaskStatusFilter === 'ALL' ||
         (subtaskStatusFilter === 'COMPLETED' && s.status === 'COMPLETED') ||
@@ -673,7 +797,7 @@ export default function TaskDetail({ user }) {
         cleanPersonName(s.assignedTo).toLowerCase().includes(term)
       );
     });
-  }, [task?.subtasks, subtaskSearchTerm, subtaskStatusFilter]);
+  }, [authorizedSubtasks, subtaskSearchTerm, subtaskStatusFilter]);
 
   const totalSubtaskPages = Math.max(1, Math.ceil(filteredSubtasks.length / SUBTASKS_PER_PAGE));
   const paginatedSubtasks = useMemo(() => {
@@ -723,7 +847,7 @@ export default function TaskDetail({ user }) {
         time: task.createdAt,
       });
     }
-    (task.subtasks || []).forEach(sub => {
+    authorizedSubtasks.forEach(sub => {
       if (sub.createdAt) {
         items.push({
           id: `sub-${sub.id}`,
@@ -768,21 +892,40 @@ export default function TaskDetail({ user }) {
       });
     });
     return items.sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
-  }, [task, submissions]);
+  }, [task, authorizedSubtasks, submissions]);
 
   if (loading) return <LoadingSpinner message="Loading task workspace…" />;
-  if (!task)   return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Task not found.</div>;
+  if (!task) {
+    return (
+      <div className="tm-page tm-page--narrow">
+        <div className="tm-card tm-card--padded" style={{ textAlign: 'center', padding: 36 }}>
+          <p style={{ margin: '0 0 12px', color: 'var(--tm-text-muted)' }}>{loadError || 'Task not found.'}</p>
+          <button type="button" className="tm-btn tm-btn-secondary" onClick={() => navigate('/TaskList')}>
+            <FaArrowLeft size={11} /> Back to Task List
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  const isAssignedUser = !!myId && String(task.assignedToId) === String(myId);
+  const isAssignedUser = isTaskAssignedToIds(task, myIds, myName);
+  const isTeamTask =
+    isManager &&
+    (employees.some(e => [e.id, e.employeeId, e.userId].some(id => id != null && String(id) === String(task.assignedToId))) ||
+      isTaskCreatedByIds(task, myIds, myName));
   const canReviewSubmission =
-    !!myId &&
+    !isEmployee &&
     !isAssignedUser &&
-    (String(task.assignedById) === String(myId) || ['Admin', 'Hr'].includes(userRole));
+    (isTaskCreatedByIds(task, myIds, myName) || isAdmin || userRole === 'Hr' || isTeamTask);
+
+  const canCreateSubtask = canManagerCreateSubtask(task, currentUser);
+  const canEditCurrentTask = canUserEditTask(task, currentUser, employees);
+  const taskOverdue = isTaskOverdue(task);
 
   const tags = task.tags ? task.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
   const allSubtasksCompleted    = areAllSubtasksCompleted();
-  const totalSubtasksCount      = task.subtasks?.length || 0;
-  const completedSubtasksCount  = task.subtasks ? task.subtasks.filter(s => s.status === 'COMPLETED').length : 0;
+  const totalSubtasksCount      = authorizedSubtasks.length;
+  const completedSubtasksCount  = authorizedSubtasks.filter(s => s.status === 'COMPLETED').length;
   const incompleteSubtasksCount = totalSubtasksCount - completedSubtasksCount;
   const subtaskCompletionPct    = totalSubtasksCount > 0 ? Math.round((completedSubtasksCount / totalSubtasksCount) * 100) : 0;
 
@@ -820,6 +963,11 @@ export default function TaskDetail({ user }) {
             <span className="tm-status-badge" style={{ background: PRIORITY_BG[priKey(task.priority)] || '#f1f5f9', color: PRIORITY_COLORS[priKey(task.priority)] || '#475569' }}>
               {priKey(task.priority)} Priority
             </span>
+            {taskOverdue && (
+              <span className="tm-status-badge" style={{ background: '#fee2e2', color: '#991b1b' }}>
+                Overdue
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -832,28 +980,28 @@ export default function TaskDetail({ user }) {
                 <FaStar size={11} /> Performance
               </button>
             )}
-            {canManageSubtasks && (
-              <>
-                <button
-                  type="button"
-                  className="tm-btn tm-btn-secondary tm-btn-sm"
-                  disabled={actionBusy}
-                  onClick={() => navigate('/CreateTask', { state: { taskToEdit: task, isEditing: true } })}
-                >
-                  <FaEdit size={11} /> Edit Task
-                </button>
-                <button
-                  type="button"
-                  className="tm-btn tm-btn-primary tm-btn-sm"
-                  disabled={actionBusy}
-                  onClick={() => {
-                    setActiveTab('subtasks');
-                    openCreateSubtaskForm();
-                  }}
-                >
-                  <FaPlus size={11} /> Add Subtask
-                </button>
-              </>
+            {canEditCurrentTask && (
+              <button
+                type="button"
+                className="tm-btn tm-btn-secondary tm-btn-sm"
+                disabled={actionBusy}
+                onClick={() => navigate('/CreateTask', { state: { taskToEdit: task, isEditing: true } })}
+              >
+                <FaEdit size={11} /> Edit Task
+              </button>
+            )}
+            {canCreateSubtask && (
+              <button
+                type="button"
+                className="tm-btn tm-btn-primary tm-btn-sm"
+                disabled={actionBusy}
+                onClick={() => {
+                  setActiveTab('subtasks');
+                  openCreateSubtaskForm();
+                }}
+              >
+                <FaPlus size={11} /> Add Subtask
+              </button>
             )}
 
             {isAssignedUser && task.status === 'IN_PROGRESS' && (
@@ -1125,7 +1273,7 @@ export default function TaskDetail({ user }) {
               </span>
             </div>
 
-            {canManageSubtasks && !showSubtaskForm && (
+            {canCreateSubtask && !showSubtaskForm && (
               <button
                 type="button"
                 className="tm-btn tm-btn-primary tm-btn-sm"
@@ -1169,7 +1317,7 @@ export default function TaskDetail({ user }) {
           )}
 
           <div className="tm-card-body">
-            {showSubtaskForm && canManageSubtasks && (
+            {showSubtaskForm && (canCreateSubtask || (editingSubtask && canUserEditTask(editingSubtask, currentUser, employees))) && (
               <div className="tm-subtask-form-box">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1232,7 +1380,7 @@ export default function TaskDetail({ user }) {
                         value={subtaskForm.deadline}
                         onChange={e => handleSubtaskChange('deadline', e.target.value)}
                         onBlur={() => handleSubtaskBlur('deadline')}
-                        min={!editingSubtask ? new Date().toISOString().split('T')[0] : undefined}
+                        min={!editingSubtask ? toLocalDateStr(new Date()) : undefined}
                       />
                       <FieldError msg={subtaskErrors.deadline} />
                     </div>
@@ -1283,12 +1431,14 @@ export default function TaskDetail({ user }) {
                     </thead>
                     <tbody>
                       {paginatedSubtasks.map(sub => {
-                        const subAvailableStatuses = getAvailableStatuses(sub.status);
+                        const rawAvailable = getAvailableStatuses(sub.status);
+                        const subAvailableStatuses = isEmployee && sub.status === 'IN_REVIEW' ? [] : rawAvailable;
                         const dueFmt = formatDate(sub.dueDate);
                         const daysLeft = daysUntil(sub.dueDate);
                         const isCompleted = sub.status === 'COMPLETED';
-                        const isSubAssignee = !!myId && String(sub.assignedToId) === String(myId);
-                        const canChangeSubStatus = subAvailableStatuses.length > 0 && (isSubAssignee || canManageSubtasks);
+                        const isSubAssignee = isTaskAssignedToIds(sub, myIds, myName);
+                        const canEditSub = isManager && (canCreateSubtask || canUserEditTask(sub, currentUser, employees));
+                        const canChangeSubStatus = subAvailableStatuses.length > 0 && (isSubAssignee || canEditSub || isAdmin);
 
                         let dateClass = '';
                         if (!isCompleted && daysLeft !== null) {
@@ -1361,7 +1511,7 @@ export default function TaskDetail({ user }) {
                                 >
                                   <FaEye size={11} />
                                 </button>
-                                {canManageSubtasks && (
+                                {canEditSub && (
                                   <button
                                     type="button"
                                     className="tm-icon-action tm-icon-action--amber"
@@ -1444,8 +1594,9 @@ export default function TaskDetail({ user }) {
         <div className="tm-col-stack">
           {isAssignedUser ? (
             <DailyWorkReport
-              tasks={[task, ...(task.subtasks || [])]}
+              tasks={[task, ...authorizedSubtasks.filter(s => isTaskAssignedToIds(s, myIds, myName))]}
               selectedDate={formatIsoDate(new Date())}
+              submissions={submissions}
               onSubmitted={fetchTaskAndSubmissions}
             />
           ) : (
@@ -1461,7 +1612,12 @@ export default function TaskDetail({ user }) {
 
       {/* TAB 4: SUBMISSIONS */}
       {activeTab === 'submissions' && (
-        <SubmissionsPanel taskId={task.id} canReview={canReviewSubmission} onChanged={fetchTaskAndSubmissions} />
+        <SubmissionsPanel
+          taskId={task.id}
+          canReview={canReviewSubmission}
+          refreshKey={submissionsRefreshKey}
+          onChanged={fetchTaskAndSubmissions}
+        />
       )}
 
       {/* TAB 5: FEEDBACK & COMMENTS */}
@@ -1648,7 +1804,14 @@ export default function TaskDetail({ user }) {
         </div>
       )}
 
-      {showSubmitWork && <SubmitWorkModal task={task} onClose={() => setShowSubmitWork(false)} onDone={fetchTaskAndSubmissions} />}
+      {showSubmitWork && (
+        <SubmitWorkModal
+          task={task}
+          submissions={submissions}
+          onClose={() => setShowSubmitWork(false)}
+          onDone={fetchTaskAndSubmissions}
+        />
+      )}
     </div>
   );
 }
